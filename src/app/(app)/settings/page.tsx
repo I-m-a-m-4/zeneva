@@ -300,7 +300,7 @@ export default function SettingsPage() {
                         <Button variant="outline" size="icon" onClick={handleCopyLink} disabled={!userProfile.referralCode}>
                             <Copy className="h-4 w-4" />
                         </Button>
-                        {typeof navigator !== 'undefined' && navigator.share && (
+                        {typeof navigator !== 'undefined' && !!navigator.share && (
                             <Button variant="outline" size="icon" onClick={handleShareLink} disabled={!userProfile.referralCode}>
                                 <Share2 className="h-4 w-4" />
                             </Button>
