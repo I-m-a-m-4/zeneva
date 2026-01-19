@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -15,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, Send, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import type { Notification } from '@/types';
+import type { AdminNotification } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +40,7 @@ export default function AdminNotificationsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const [isSaving, setIsSaving] = React.useState(false);
-    const [notificationToDelete, setNotificationToDelete] = React.useState<Notification | null>(null);
+    const [notificationToDelete, setNotificationToDelete] = React.useState<AdminNotification | null>(null);
 
     const form = useForm<NotificationFormValues>({
         resolver: zodResolver(notificationSchema),
@@ -50,7 +51,7 @@ export default function AdminNotificationsPage() {
         () => query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')),
         [firestore]
     );
-    const { data: notifications, isLoading } = useCollection<Notification>(notificationsQuery);
+    const { data: notifications, isLoading } = useCollection<AdminNotification>(notificationsQuery);
 
     const onSubmit = async (values: NotificationFormValues) => {
         if (!firestore || !user) {
