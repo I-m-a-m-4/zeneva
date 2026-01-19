@@ -9,18 +9,9 @@ import { getFirestore, initializeFirestore, persistentLocalCache } from 'firebas
 export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
   if (getApps().length === 0) {
-    // This is the first run, initialize everything
-    try {
-      // Attempt to initialize via Firebase App Hosting environment variables
-      firebaseApp = initializeApp();
-    } catch (e) {
-      // Only warn in production because it's normal to use the firebaseConfig to initialize
-      // during development
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
-      firebaseApp = initializeApp(firebaseConfig);
-    }
+    // Directly initialize with the config object.
+    // The try-catch for automatic initialization is not reliable in all build environments.
+    firebaseApp = initializeApp(firebaseConfig);
     
     // Initialize Firestore with persistence settings
     const firestore = initializeFirestore(firebaseApp, {

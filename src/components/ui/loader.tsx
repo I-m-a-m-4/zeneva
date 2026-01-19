@@ -2,15 +2,8 @@
 
 import { useEffect } from 'react';
 import NProgress from 'nprogress';
-import { usePathname, useSearchParams } from 'next/navigation';
 
 export default function Loader() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    NProgress.done();
-  }, [pathname, searchParams]);
 
   useEffect(() => {
     const handleAnchorClick = (event: MouseEvent) => {
