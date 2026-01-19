@@ -40,10 +40,21 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
   const form = useForm<QuickEditFormValues>({
     resolver: zodResolver(quickEditSchema),
     defaultValues: {
-        price: product?.price || 0,
-        stock: product?.stock || 0,
+        price: 0,
+        stock: 0,
     },
   });
+
+  // This useEffect will reset the form whenever a new product is selected
+  React.useEffect(() => {
+    if (product) {
+      form.reset({
+        price: product.price || 0,
+        stock: product.stock || 0,
+      });
+    }
+  }, [product, form]);
+
 
   const handleUpdate = async (values: QuickEditFormValues) => {
     if (!firestore || !product) return;

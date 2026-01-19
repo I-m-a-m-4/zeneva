@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -29,10 +29,9 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, updateDoc, query, collection, orderBy, writeBatch } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
-import { Loader } from 'lucide-react';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import CommandMenu from '@/components/layout/command-menu';
-import type { UserNotification, BusinessInstance } from '@/types';
+import type { UserNotification, BusinessInstance, AdminNotification } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
 import { ProductProvider } from '@/context/product-context';
@@ -81,17 +80,43 @@ export default function AppLayout({
   );
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
-  const notificationsQuery = useMemoFirebase(
+  // Fetch user-specific notifications
+  const userNotificationsQuery = useMemoFirebase(
       () => (firestore && user) ? query(collection(firestore, `users/${user.uid}/notifications`), orderBy('createdAt', 'desc')) : null,
       [firestore, user]
   );
-  const { data: notifications, isLoading: isLoadingNotifications } = useCollection<UserNotification>(notificationsQuery);
-  const unreadCount = React.useMemo(() => notifications?.filter(n => !n.read).length || 0, [notifications]);
+  const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
+
+  // Fetch global admin notifications
+  const adminNotificationsQuery = useMemoFirebase(
+      () => firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null,
+      [firestore]
+  );
+  const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
+
+  // Merge and sort all notifications
+  const allNotifications = React.useMemo(() => {
+    const combined = [
+        ...(userNotifications || []).map(n => ({...n, isGlobal: false})),
+        ...(adminNotifications || []).map(n => ({...n, read: true, isGlobal: true }))
+    ];
+    
+    combined.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+        return dateB.getTime() - dateA.getTime();
+    });
+
+    return combined.slice(0, 20); // Limit to 20 most recent
+  }, [userNotifications, adminNotifications]);
+
+  // Unread count is ONLY for user-specific notifications
+  const unreadCount = React.useMemo(() => userNotifications?.filter(n => !n.read).length || 0, [userNotifications]);
 
   const handleMarkAsRead = async () => {
-    if (!firestore || !user || unreadCount === 0) return;
+    if (!firestore || !user || unreadCount === 0 || !userNotifications) return;
     const batch = writeBatch(firestore);
-    notifications?.forEach(notif => {
+    userNotifications.forEach(notif => {
       if (!notif.read) {
         const notifRef = doc(firestore, `users/${user.uid}/notifications`, notif.id);
         batch.update(notifRef, { read: true });
@@ -158,7 +183,9 @@ export default function AppLayout({
 
   const pathname = usePathname();
   
-  if (isUserLoading || (user && isProfileLoading)) {
+  const isLoading = isUserLoading || (user && (isProfileLoading || isBusinessLoading));
+
+  if (isLoading) {
       return (
         <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4">
           <Loader className="h-8 w-8 animate-spin text-primary" />
@@ -293,13 +320,16 @@ export default function AppLayout({
                           <PopoverContent align="end" className="w-96 p-0">
                               <div className="flex items-center justify-between p-4 border-b">
                                 <p className="font-medium">Notifications</p>
-                                {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAsRead}>Clear All</Button>}
+                                {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAsRead}>Mark all as read</Button>}
                               </div>
                               <ScrollArea className="h-[300px]">
-                                  {isLoadingNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary"/></div> : notifications && notifications.length > 0 ? (
-                                      notifications.map(notif => (
-                                          <div key={notif.id} className={`p-4 border-b last:border-b-0 ${!notif.read ? 'bg-primary/5' : ''}`}>
-                                              <p className={`font-semibold text-sm ${!notif.read ? 'text-primary' : ''}`}>{notif.title}</p>
+                                  {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary"/></div> : allNotifications && allNotifications.length > 0 ? (
+                                      allNotifications.map(notif => (
+                                          <div key={notif.id} className={`p-4 border-b last:border-b-0 ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
+                                              <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
+                                                  {notif.isGlobal && <Globe className="inline-block h-4 w-4 mr-2 text-muted-foreground" />}
+                                                  {notif.title}
+                                              </p>
                                               <p className="text-xs text-muted-foreground">{notif.body}</p>
                                               <p className="text-xs text-muted-foreground/80 mt-1">
                                                   {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}

@@ -1,5 +1,8 @@
-// This page is intentionally left blank to resolve a routing conflict.
-// The main dashboard is now at /dashboard.
+
+import { redirect } from 'next/navigation';
+
+// This page has been intentionally left blank. 
+// It now redirects to the main dashboard to resolve a routing conflict and improve user experience.
 export default function RootAppPage() {
-  return null;
+  redirect('/dashboard');
 }
