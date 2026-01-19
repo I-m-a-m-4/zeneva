@@ -121,6 +121,23 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   
+  React.useEffect(() => {
+    if (business) {
+      const isTrialActive = business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date();
+      const isPaidPlan = business.plan && business.plan !== 'starter';
+      const isLifetime = business.accessLevel === 'lifetime';
+
+      if (!isTrialActive && !isPaidPlan && !isLifetime) {
+        toast({
+          variant: 'destructive',
+          title: 'Subscription Required',
+          description: 'Please subscribe to a plan to manage your inventory.',
+        });
+        router.push('/billing');
+      }
+    }
+  }, [business, router, toast]);
+
   const currentBusinessId = currentUserProfile?.businessId;
   const userRole = currentUserProfile?.role;
   const canManageStock = userRole === 'admin' || userRole === 'manager';

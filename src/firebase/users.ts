@@ -14,6 +14,7 @@ import {
   increment,
   addDoc,
   getDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { add } from 'date-fns';
@@ -122,54 +123,56 @@ export const createUserProfileDocument = async (
   // CRITICAL: Commit the creation of the new user and their business.
   await newUserBatch.commit();
 
-  // --- 2. Handle Referral Logic (Secondary, non-blocking operation) ---
-  // If a referrer was found, attempt to apply rewards in a separate, safe transaction.
+  // --- Step 2. Handle Referral Logic (Secondary, non-blocking operation) ---
   if (referrer && referrer.referrerId && referrer.referrerBusinessId) {
     try {
-      const rewardBatch = writeBatch(firestore);
-      const referrerUserRef = doc(firestore, 'users', referrer.referrerId);
-      const referrerBusinessRef = doc(firestore, 'businessInstances', referrer.referrerBusinessId);
-      
-      // Increment referrer's count first
-      rewardBatch.update(referrerUserRef, { referrals: increment(1) });
-      
-      // Log the successful referral event
-      const referralLogRef = doc(collection(firestore, 'referrals'));
-      rewardBatch.set(referralLogRef, { referrerId: referrer.referrerId, referredUserId: user.uid, createdAt: serverTimestamp() });
+      await runTransaction(firestore, async (transaction) => {
+        const referrerUserRef = doc(firestore, 'users', referrer.referrerId);
+        const referrerBusinessRef = doc(firestore, 'businessInstances', referrer.referrerBusinessId);
 
-      // Now, fetch the business doc to check its status for the reward
-      const referrerBusinessDoc = await getDoc(referrerBusinessRef);
-
-      if (referrerBusinessDoc.exists()) {
-        const businessData = referrerBusinessDoc.data();
-        // Only apply trial extension reward if the referrer is not a lifetime user
-        if (businessData.accessLevel !== 'lifetime') {
-            const now = new Date();
-            // Use existing trial date, or now if it doesn't exist
-            const currentExpiry = businessData.trialExpiresAt ? (businessData.trialExpiresAt as Timestamp).toDate() : now;
-            
-            // If the trial has already expired, start the new 10-day period from today.
-            // Otherwise, extend the existing future trial date.
-            const newTrialStartDate = currentExpiry > now ? currentExpiry : now;
-            const newExpiry = add(newTrialStartDate, { days: 10 });
-            
-            rewardBatch.update(referrerBusinessRef, { trialExpiresAt: newExpiry });
-            
-            // Notify the referrer of their reward
-            const notificationRef = doc(collection(firestore, `users/${referrer.referrerId}/notifications`));
-            rewardBatch.set(notificationRef, {
-                title: 'Referral Success! 🎉',
-                body: `Someone signed up with your code! 10 days have been added to your trial.`,
-                read: false,
-                createdAt: serverTimestamp()
-            });
+        // --- READS FIRST ---
+        const referrerBusinessDoc = await transaction.get(referrerBusinessRef);
+        if (!referrerBusinessDoc.exists()) {
+            console.error("Referrer's business document not found. Cannot apply reward.");
+            return; // Abort transaction gracefully
         }
-      }
 
-      await rewardBatch.commit(); // Commit the reward.
+        // --- LOGIC ---
+        const businessData = referrerBusinessDoc.data();
+        const currentExpiry = businessData.trialExpiresAt?.toDate();
+        const now = new Date();
+        
+        // If trial is expired/in the past, start a new 10-day trial from today.
+        // Otherwise, extend the current trial by 10 days.
+        const newExpiryDate = (currentExpiry && currentExpiry > now)
+            ? add(currentExpiry, { days: 10 })
+            : add(now, { days: 10 });
+        
+        // --- WRITES ---
+        // 1. Update the referrer's business with the new trial date.
+        transaction.update(referrerBusinessRef, { trialExpiresAt: newExpiryDate });
 
+        // 2. Increment the referrer's count.
+        transaction.update(referrerUserRef, { referrals: increment(1) });
+        
+        // 3. Log the successful referral event for analytics.
+        const referralLogRef = doc(collection(firestore, 'referrals'));
+        transaction.set(referralLogRef, { 
+          referrerId: referrer.referrerId, 
+          referredUserId: user.uid, 
+          createdAt: serverTimestamp() 
+        });
+
+        // 4. Send a notification to the referrer.
+        const notificationRef = doc(collection(firestore, `users/${referrer.referrerId}/notifications`));
+        transaction.set(notificationRef, {
+            title: 'New Referral! 🎉',
+            body: `10 days have been added to your trial. Your referral count is now updated.`,
+            read: false,
+            createdAt: serverTimestamp()
+        });
+      });
     } catch (rewardError) {
-      // Log the error but don't fail the signup. The new user's account is already safe.
       console.error("Failed to apply referral reward, but user creation was successful.", rewardError);
     }
   }

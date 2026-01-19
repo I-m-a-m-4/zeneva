@@ -84,11 +84,29 @@ export default function SelectProductsPage() {
     const { cart, addToCart, subtotal, currencySymbol } = usePOS();
     const router = useRouter();
     const { toast } = useToast();
+    const business = useBusiness();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
     
     const { products, isLoading } = useProducts();
+
+    React.useEffect(() => {
+        if (business) {
+            const isTrialActive = business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date();
+            const isPaidPlan = business.plan && business.plan !== 'starter';
+            const isLifetime = business.accessLevel === 'lifetime';
+
+            if (!isTrialActive && !isPaidPlan && !isLifetime) {
+            toast({
+                variant: 'destructive',
+                title: 'Subscription Required',
+                description: 'Please subscribe to a plan to create sales.',
+            });
+            router.push('/billing');
+            }
+        }
+    }, [business, router, toast]);
 
     const filteredProducts = React.useMemo(() => {
         if (!products) return [];

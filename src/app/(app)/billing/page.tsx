@@ -11,9 +11,8 @@ import { format } from 'date-fns';
 import { BusinessInstance, SubscriptionHistory, UserProfile } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, History, ShieldCheck, Zap } from 'lucide-react';
-import { formatDistanceToNowStrict } from 'date-fns';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, History, ShieldCheck } from 'lucide-react';
+import TrialCountdown from '@/components/settings/trial-countdown';
 
 const SubscriptionSection = dynamic(
     () => import('@/components/settings/subscription-section'),
@@ -34,6 +33,16 @@ const SubscriptionSection = dynamic(
     }
 );
 
+const LifetimeAccessStatus = () => (
+    <div className="flex items-center gap-3">
+        <ShieldCheck className="h-8 w-8 text-green-600" />
+        <div>
+            <p className="text-lg font-semibold text-green-600">Lifetime Access</p>
+            <p className="text-xs text-muted-foreground">You have permanent access to all features.</p>
+        </div>
+    </div>
+);
+
 
 function BillingPage() {
   const { user, isUserLoading } = useUser();
@@ -50,22 +59,6 @@ function BillingPage() {
     return query(collection(firestore, 'businessInstances', currentBusiness.id, 'subscription_history'), orderBy('timestamp', 'desc'));
   }, [currentBusiness?.id, firestore]);
   const { data: subscriptionHistory, isLoading: isHistoryLoading } = useCollection<SubscriptionHistory>(subscriptionHistoryQuery);
-  
-  const getMyTrialStatus = (business: BusinessInstance) => {
-    if (business.accessLevel === 'lifetime') {
-        return <p className="text-lg font-semibold text-green-600">Lifetime Access</p>;
-    }
-    if (!business.trialExpiresAt || !business.trialExpiresAt.toDate) {
-        return <p className="text-lg font-semibold text-destructive">Trial Expired or Inactive</p>;
-    }
-    const expiryDate = business.trialExpiresAt.toDate();
-    const now = new Date();
-    if (expiryDate < now) {
-        return <p className="text-lg font-semibold text-destructive">Trial Expired</p>;
-    }
-    const distance = formatDistanceToNowStrict(expiryDate);
-    return <p className="text-lg font-semibold text-primary">{distance} remaining</p>;
-  };
   
   const isLoading = isUserLoading || isBusinessLoading || isHistoryLoading;
 
@@ -89,7 +82,11 @@ function BillingPage() {
         <CardContent className="space-y-6">
             <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
                 <p className="text-sm text-muted-foreground">Current Status</p>
-                {getMyTrialStatus(currentBusiness)}
+                {currentBusiness.accessLevel === 'lifetime' ? (
+                    <LifetimeAccessStatus />
+                ) : (
+                    <TrialCountdown expiryDate={currentBusiness.trialExpiresAt?.toDate() || null} />
+                )}
             </div>
             <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />
         </CardContent>
