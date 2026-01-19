@@ -74,7 +74,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { BusinessInstance, UserProfile, Purchase, Receipt } from '@/types';
+import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { Switch } from '@/components/ui/switch';
@@ -139,7 +139,7 @@ export default function AdminDashboardPage() {
 
   const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
   const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
-  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
   const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
   const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
   
