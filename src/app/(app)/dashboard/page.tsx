@@ -92,24 +92,25 @@ export default function DashboardPage() {
   }, [business]);
 
   const dashboardData = React.useMemo(() => {
-    if (!products || !receipts || !customers || !businessUsers) {
-      return null;
-    }
+    // Use empty arrays as defaults to prevent checks from failing during initial renders
+    const inventoryItems = products || [];
+    const safeReceipts = receipts || [];
+    const safeCustomers = customers || [];
+    const safeBusinessUsers = businessUsers || [];
 
-    const inventoryItems = products;
     const totalStock = inventoryItems.reduce((sum, item) => sum + (item.stock || 0), 0);
     const uniqueSkus = inventoryItems.length;
     const lowStockItems = inventoryItems.filter(item => (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
 
-    const totalSalesValue = receipts.reduce((sum, receipt) => sum + receipt.total, 0);
-    const totalReceiptsCount = receipts.length;
+    const totalSalesValue = safeReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
+    const totalReceiptsCount = safeReceipts.length;
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentOrdersLast7Days = receipts.filter(r => new Date(r.createdAt.toDate()) > sevenDaysAgo).length;
+    const recentOrdersLast7Days = safeReceipts.filter(r => new Date(r.createdAt.toDate()) > sevenDaysAgo).length;
 
     const itemSalesCount: Record<string, number> = {};
-    receipts.forEach(receipt => {
+    safeReceipts.forEach(receipt => {
       receipt.items.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
         if (product) {
@@ -129,10 +130,10 @@ export default function DashboardPage() {
         } as TopSellingItem;
       });
 
-    const sortedCustomers = [...customers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
+    const sortedCustomers = [...safeCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
     const topLoyaltyCustomers = sortedCustomers.slice(0, 3);
     
-    const topReferrers = [...businessUsers]
+    const topReferrers = [...safeBusinessUsers]
         .filter(u => u.referrals && u.referrals > 0)
         .sort((a, b) => (b.referrals || 0) - (a.referrals || 0))
         .slice(0, 3);

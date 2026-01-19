@@ -96,6 +96,7 @@ export default function AppLayout({
 
   // Merge and sort all notifications
   const allNotifications = React.useMemo(() => {
+    if (!user) return [];
     const combined = [
         ...(userNotifications || []).map(n => ({...n, isGlobal: false})),
         ...(adminNotifications || []).map(n => ({...n, read: true, isGlobal: true }))
@@ -108,7 +109,7 @@ export default function AppLayout({
     });
 
     return combined.slice(0, 20); // Limit to 20 most recent
-  }, [userNotifications, adminNotifications]);
+  }, [user, userNotifications, adminNotifications]);
 
   // Unread count is ONLY for user-specific notifications
   const unreadCount = React.useMemo(() => userNotifications?.filter(n => !n.read).length || 0, [userNotifications]);
@@ -136,14 +137,10 @@ export default function AppLayout({
   }, [user, userProfile, businessInstance, firestore, isUserLoading, isProfileLoading]);
 
   React.useEffect(() => {
-    const isDataLoaded = !isUserLoading && !isProfileLoading;
-    if (!isDataLoaded) {
-      return; 
-    }
-    if (!user) {
+    if (!isUserLoading && !user) {
       router.replace('/login');
     }
-  }, [user, userProfile, isUserLoading, isProfileLoading, router]);
+  }, [user, isUserLoading, router]);
 
     React.useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -183,9 +180,9 @@ export default function AppLayout({
 
   const pathname = usePathname();
   
-  const isLoading = isUserLoading || (user && (isProfileLoading || isBusinessLoading));
+  const isStillLoading = isUserLoading || isProfileLoading || (userProfile && isBusinessLoading);
 
-  if (isLoading) {
+  if (isStillLoading) {
       return (
         <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4">
           <Loader className="h-8 w-8 animate-spin text-primary" />
@@ -193,6 +190,32 @@ export default function AppLayout({
         </div>
       );
   }
+  
+  if (user && (!userProfile || !businessInstance)) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4 p-4 text-center">
+        <ShieldAlert className="h-10 w-10 text-destructive" />
+        <h1 className="text-2xl font-bold mt-4">Account Configuration Error</h1>
+        <p className="text-muted-foreground max-w-md">
+          We couldn't load your business information. This can happen if the signup process was interrupted. Please try logging out and signing up again.
+        </p>
+        <Button onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4">
+          <Loader className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground font-body">Redirecting...</p>
+        </div>
+      );
+  }
+
 
   const isLinkActive = (linkHref: string, currentPathname: string) => {
     if (linkHref === '/dashboard') {
