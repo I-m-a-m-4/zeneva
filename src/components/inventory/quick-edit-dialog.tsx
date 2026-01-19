@@ -53,7 +53,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         stock: product.stock || 0,
       });
     }
-  }, [product, form]);
+  }, [product]);
 
 
   const handleUpdate = async (values: QuickEditFormValues) => {

@@ -89,8 +89,8 @@ export default function AppLayout({
 
   // Fetch global admin notifications
   const adminNotificationsQuery = useMemoFirebase(
-      () => firestore ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null,
-      [firestore]
+      () => (firestore && user) ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null,
+      [firestore, user]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
 
