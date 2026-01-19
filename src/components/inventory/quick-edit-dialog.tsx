@@ -1,0 +1,131 @@
+
+'use client';
+
+import * as React from 'react';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { useFirestore } from '@/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import type { Product, UserProfile } from '@/types';
+
+interface QuickEditDialogProps {
+  product: Product | null;
+  userProfile: UserProfile;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+}
+
+const quickEditSchema = z.object({
+    price: z.coerce.number().min(0, "Price must be a positive number."),
+    stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+});
+
+type QuickEditFormValues = z.infer<typeof quickEditSchema>;
+
+export default function QuickEditDialog({ product, userProfile, isOpen, onOpenChange }: QuickEditDialogProps) {
+  const { toast } = useToast();
+  const firestore = useFirestore();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const canManageStock = userProfile?.role === 'admin';
+  const canManagePrice = userProfile?.role === 'admin' || userProfile?.role === 'manager';
+
+  const form = useForm<QuickEditFormValues>({
+    resolver: zodResolver(quickEditSchema),
+    defaultValues: {
+        price: product?.price || 0,
+        stock: product?.stock || 0,
+    },
+  });
+
+  const handleUpdate = async (values: QuickEditFormValues) => {
+    if (!firestore || !product) return;
+    setIsSubmitting(true);
+    try {
+        const productRef = doc(firestore, 'products', product.id);
+        
+        const dataToUpdate: Partial<QuickEditFormValues> & { updatedAt: any } = {
+            updatedAt: serverTimestamp(),
+        };
+
+        if (canManagePrice) dataToUpdate.price = values.price;
+        if (canManageStock) dataToUpdate.stock = values.stock;
+
+        await updateDoc(productRef, dataToUpdate);
+
+        toast({
+            variant: 'success',
+            title: 'Product Updated',
+            description: `${product.name} has been updated.`,
+        });
+        onOpenChange(false);
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: 'Could not update product. Please try again.',
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quick Edit: {product?.name}</DialogTitle>
+          <DialogDescription>
+            Quickly update the price and stock for this product.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Price</FormLabel>
+                            <FormControl>
+                                <Input type="number" step="0.01" {...field} disabled={!canManagePrice}/>
+                            </FormControl>
+                             {!canManagePrice && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit price.</p>}
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="stock"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Stock</FormLabel>
+                            <FormControl>
+                                <Input type="number" {...field} disabled={!canManageStock}/>
+                            </FormControl>
+                            {!canManageStock && <p className="text-xs text-muted-foreground pt-1">Only admins can edit stock.</p>}
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <DialogFooter className='mt-6'>
+                    <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button type="submit" size="lg" disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                        Save Changes
+                    </Button>
+                </DialogFooter>
+            </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

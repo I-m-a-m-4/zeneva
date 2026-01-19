@@ -1,0 +1,40 @@
+{
+  "placeholderImages": [
+    {
+      "id": "zeneva-hero",
+      "description": "A modern business management software interface on a laptop.",
+      "imageUrl": "https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidXNpbmVzcyUyMG1hbmFnZW1lbnR8ZW58MHx8fHwxNzY4NTkyNzUyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "business management"
+    },
+    {
+      "id": "product-1",
+      "description": "A generic product image.",
+      "imageUrl": "https://images.unsplash.com/photo-1546868871-7041f2a55e12?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwcm9kdWN0fGVufDB8fHx8MTc2ODY1MTA1NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "product"
+    },
+    {
+      "id": "product-2",
+      "description": "Another generic product image.",
+      "imageUrl": "https://images.unsplash.com/photo-1738045646275-979fc0daea2e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwcm9kdWN0JTIwaXRlbXxlbnwwfHx8fDE3Njg2NjQwODJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "product item"
+    },
+    {
+      "id": "product-3",
+      "description": "A third generic product image.",
+      "imageUrl": "https://images.unsplash.com/photo-1462392246754-28dfa2df8e6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtZXJjaGFuZGlzZXxlbnwwfHx8fDE3Njg2NzAwOTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "merchandise"
+    },
+    {
+      "id": "product-4",
+      "description": "A fourth generic product image.",
+      "imageUrl": "https://images.unsplash.com/photo-1498049794561-7780e7231661?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxlbGVjdHJvbmljc3xlbnwwfHx8fDE3Njg2NDI5ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "electronics"
+    },
+    {
+      "id": "product-5",
+      "description": "A fifth generic product image.",
+      "imageUrl": "https://images.unsplash.com/photo-1620799139834-6b8f844fbe61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxhcHBhcmVsfGVufDB8fHx8MTc2ODY3MDA5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "apparel"
+    }
+  ]
+}
