@@ -121,7 +121,7 @@ export default function OverviewChart() {
                 />
                 <ChartTooltip
                   cursor={false}
-                  content={<ChartTooltipContent indicator="dot" formatter={(value: number) => `₦${value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`} />}
+                  content={<ChartTooltipContent indicator="dot" formatter={(value) => `₦${Number(value).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`} />}
                 />
                 <Bar dataKey="totalSales" fill="var(--color-totalSales)" radius={4} />
               </BarChart>
