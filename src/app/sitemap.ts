@@ -29,7 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
-  ] as MetadataRoute.Sitemap;
+  ];
  
   const blogPostRoutes = blogPosts.map(post => ({
     url: `${siteUrl}/blog/${post.slug}`,
