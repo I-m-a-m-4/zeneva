@@ -14,11 +14,11 @@ import { AlertTriangle, CheckCircle, Lightbulb, Loader, PartyPopper, Package, Fi
 import React, { useState, useTransition, useMemo } from "react";
 import Link from 'next/link';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProducts } from '@/context/product-context';
@@ -51,7 +51,7 @@ function TroubleshootSkeleton() {
                         <Skeleton className="h-5 w-1/4" />
                         <Skeleton className="h-4 w-full" />
                     </div>
-                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <Skeleton className="h-24" />
                         <Skeleton className="h-24" />
                         <Skeleton className="h-24" />
@@ -59,7 +59,7 @@ function TroubleshootSkeleton() {
                     </div>
                 </CardContent>
             </Card>
-             <Card>
+            <Card>
                 <CardHeader>
                     <Skeleton className="h-8 w-1/3" />
                     <Skeleton className="h-4 w-1/2" />
@@ -74,39 +74,39 @@ function TroubleshootSkeleton() {
 
 
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
-  if (!issue) return null;
+    if (!issue) return null;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{issue.title}</DialogTitle>
-          <DialogDescription>
-            Found {issue.items.length} products with this issue. Click on a product to go to its edit page and resolve the issue.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="h-96">
-          <div className="space-y-2 pr-4">
-            {issue.items.map(product => (
-              <Link href={`/inventory/${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
-                <div className="flex justify-between items-center">
-                    <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'}</p>
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{issue.title}</DialogTitle>
+                    <DialogDescription>
+                        Found {issue.items.length} products with this issue. Click on a product to go to its edit page and resolve the issue.
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96">
+                    <div className="space-y-2 pr-4">
+                        {issue.items.map(product => (
+                            <Link href={`/inventory/${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-medium">{product.name}</p>
+                                        <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'}</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <div className="flex items-center">
+                                            <Edit className="h-4 w-4 mr-2" /> Fix
+                                        </div>
+                                    </Button>
+                                </div>
+                            </Link>
+                        ))}
                     </div>
-                    <Button variant="ghost" size="sm" asChild>
-                        <div className="flex items-center">
-                            <Edit className="h-4 w-4 mr-2"/> Fix
-                        </div>
-                    </Button>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
-  )
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 
@@ -116,7 +116,7 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
         <Card className="flex flex-col">
             <CardHeader className="pb-4">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-destructive"/>
+                    <Icon className="h-5 w-5 text-destructive" />
                     {title}
                 </CardTitle>
             </CardHeader>
@@ -124,10 +124,10 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
                 <p className="text-3xl font-bold text-destructive">{count}</p>
                 <p className="text-xs text-muted-foreground">{unit} with this issue</p>
                 {items.length > 0 && (
-                     <ul className="text-xs text-muted-foreground mt-4 space-y-1">
+                    <ul className="text-xs text-muted-foreground mt-4 space-y-1">
                         {items.slice(0, 2).map(p => <li key={p.id} className="truncate" title={p.name}>- {p.name}</li>)}
                         {items.length > 2 && <li>...and {items.length - 2} more</li>}
-                     </ul>
+                    </ul>
                 )}
             </CardContent>
             <CardFooter>
@@ -152,7 +152,7 @@ export default function TroubleshootPage() {
     const currentBusinessId = currentUserProfile?.businessId;
 
     const { products, isLoading: isLoadingProducts } = useProducts();
-    
+
     const businessDocRef = useMemoFirebase(() => {
         if (!currentBusinessId || !firestore) return null;
         return doc(firestore, 'businessInstances', currentBusinessId);
@@ -165,7 +165,7 @@ export default function TroubleshootPage() {
         const productsWithoutCategory = products.filter(p => !p.category);
         const productsWithoutDescription = products.filter(p => !p.description || p.description.length < 10);
         const lowStockProducts = products.filter(p => (p.stock || 0) <= (p.lowStockThreshold || 5));
-        
+
         const totalPoints = products.length * 4;
         const issuePoints = productsWithoutPrice.length + productsWithoutCategory.length + productsWithoutDescription.length + lowStockProducts.length;
         const dataQualityScore = totalPoints > 0 ? Math.round(((totalPoints - issuePoints) / totalPoints) * 100) : 100;
@@ -190,30 +190,38 @@ export default function TroubleshootPage() {
             return;
         }
         startTransition(async () => {
-            const result = await productTroubleshoot({ products });
+            const mappedProducts = products.map(p => ({
+                productId: p.id,
+                name: p.name,
+                description: p.description,
+                price: p.price,
+                category: p.category,
+                sku: p.sku
+            }));
+            const result = await productTroubleshoot({ products: mappedProducts });
             setSuggestions(result);
         });
     };
-    
+
     const isLoading = isProfileLoading || isLoadingProducts || isBusinessLoading;
 
     if (isLoading) {
         return <TroubleshootSkeleton />;
     }
-    
+
     if (!analysis || analysis.totalProducts === 0) {
-         return (
-             <Card>
+        return (
+            <Card>
                 <CardHeader>
                     <CardTitle className="font-headline">Inventory Health Check</CardTitle>
                 </CardHeader>
                 <CardContent className="text-center py-12">
-                     <Package className="h-16 w-16 mx-auto text-muted-foreground/50"/>
-                     <h3 className="text-xl font-semibold mt-4">No Products to Analyze</h3>
-                     <p className="text-muted-foreground mt-2">Add some products to your inventory to get started.</p>
+                    <Package className="h-16 w-16 mx-auto text-muted-foreground/50" />
+                    <h3 className="text-xl font-semibold mt-4">No Products to Analyze</h3>
+                    <p className="text-muted-foreground mt-2">Add some products to your inventory to get started.</p>
                 </CardContent>
             </Card>
-         )
+        )
     }
 
     const canUseAIFeature = ['pro', 'business'].includes(businessInstance?.plan || '');
@@ -224,7 +232,7 @@ export default function TroubleshootPage() {
         { icon: FileText, title: "Short Description", count: analysis.productsWithoutDescription.length, items: analysis.productsWithoutDescription },
         { icon: Package, title: "Missing Category", count: analysis.productsWithoutCategory.length, items: analysis.productsWithoutCategory },
     ];
-    
+
     const hasIssues = allIssues.some(issue => issue.count > 0);
 
     return (
@@ -250,17 +258,17 @@ export default function TroubleshootPage() {
                         </div>
                     ) : (
                         <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300 [&>svg]:text-green-600">
-                           <CheckCircle className="h-4 w-4" />
-                           <AlertTitle className="font-semibold">Excellent Data Quality!</AlertTitle>
-                           <AlertDescription>All your products have prices, categories, descriptions, and healthy stock levels.</AlertDescription>
-                       </Alert>
+                            <CheckCircle className="h-4 w-4" />
+                            <AlertTitle className="font-semibold">Excellent Data Quality!</AlertTitle>
+                            <AlertDescription>All your products have prices, categories, descriptions, and healthy stock levels.</AlertDescription>
+                        </Alert>
                     )}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> AI-Powered Suggestions</CardTitle>
+                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary" /> AI-Powered Suggestions</CardTitle>
                     <CardDescription>Use GenAI to get advanced merchandising and data quality recommendations for your live inventory.</CardDescription>
                 </CardHeader>
                 {canUseAIFeature ? (
@@ -293,7 +301,7 @@ export default function TroubleshootPage() {
                     </>
                 ) : (
                     <CardContent className="text-center py-12">
-                        <Zap className="h-16 w-16 mx-auto text-muted-foreground/50"/>
+                        <Zap className="h-16 w-16 mx-auto text-muted-foreground/50" />
                         <h3 className="text-xl font-semibold mt-4">Upgrade to Unlock AI Suggestions</h3>
                         <p className="text-muted-foreground mt-2 max-w-md mx-auto">Get advanced merchandising, data quality recommendations, and more by upgrading to our Pro or Business plan.</p>
                         <Button asChild className="mt-6">
@@ -303,7 +311,7 @@ export default function TroubleshootPage() {
                 )}
             </Card>
 
-            <IssueDetailsDialog 
+            <IssueDetailsDialog
                 isOpen={isModalOpen}
                 onOpenChange={setIsModalOpen}
                 issue={selectedIssue}
