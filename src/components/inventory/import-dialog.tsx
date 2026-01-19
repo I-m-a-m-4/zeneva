@@ -23,9 +23,9 @@ interface ImportDialogProps {
   products: Product[] | null;
 }
 
-type ParsedProduct = Omit<Product, 'id' | 'businessId'>;
+type ParsedProduct = Omit<Product, 'id' | 'businessId' | 'imageUrl' | 'imageHint' | 'lowStockThreshold'>;
 
-const HEADER_MAPPINGS: { [key: string]: (keyof ParsedProduct)[] } = {
+const HEADER_MAPPINGS: { [key: string]: string[] } = {
   name: ['Name', 'Product Name', 'Item Name', 'Title'],
   sku: ['SKU', 'Code', 'Item Code'],
   category: ['Category', 'Product Category', 'Type'],
