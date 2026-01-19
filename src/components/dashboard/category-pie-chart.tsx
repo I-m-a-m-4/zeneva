@@ -12,9 +12,6 @@ import type { Product } from '@/types';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 
 const chartConfig = {
-  items: {
-    label: "Items",
-  },
   electronics: { label: "Electronics", color: "hsl(var(--chart-1))" },
   apparel: { label: "Apparel", color: "hsl(var(--chart-2))" },
   accessories: { label: "Accessories", color: "hsl(var(--chart-3))" },
