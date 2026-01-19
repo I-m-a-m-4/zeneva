@@ -1,5 +1,5 @@
 
-export type BlogPost = {
+export type StaticBlogPost = {
   slug: string;
   title: string;
   excerpt: string;
@@ -14,7 +14,7 @@ export type PressArticle = {
     url: string;
 }
 
-export const blogPosts: BlogPost[] = [
+export const blogPosts: StaticBlogPost[] = [
   {
     slug: 'getting-started-with-zeneva',
     title: 'Getting Started with Zeneva: A Quick Guide',

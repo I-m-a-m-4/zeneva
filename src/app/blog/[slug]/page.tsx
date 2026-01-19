@@ -3,10 +3,10 @@ import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { blogPosts, type BlogPost } from '@/lib/blog-data';
+import { blogPosts, type StaticBlogPost } from '@/lib/blog-data';
 import Image from 'next/image';
 
-const PostContent = ({ post }: { post: BlogPost }) => {
+const PostContent = ({ post }: { post: StaticBlogPost }) => {
     const contentMap: { [key: string]: React.ReactNode } = {
         'getting-started-with-zeneva': (
             <>
