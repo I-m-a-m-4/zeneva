@@ -35,19 +35,31 @@ import {
   Box,
   Anchor,
   BarChart2,
+  Loader,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import BackToTopButton from '@/components/back-to-top-button';
 import MarketingHeader from '@/components/layout/marketing-header';
 import Head from 'next/head';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import MarketingFooter from '@/components/layout/marketing-footer';
+import { useUser } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const { toast } = useToast();
+
+  useEffect(() => {
+    // If the user status is determined and they are logged in, redirect.
+    if (!isUserLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [isUserLoading, user, router]);
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -102,6 +114,16 @@ export default function Home() {
         }
     };
 
+  // While we wait for the user status, or if we are about to redirect,
+  // show a full-page loader to prevent flashing the marketing content.
+  if (isUserLoading || user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white">
+        <Loader className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="antialiased overflow-x-hidden text-slate-900 bg-[#F9F8F6]">
       <Head>
@@ -155,7 +177,7 @@ export default function Home() {
 
           {/* Right Column: UI Mockups */}
           <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-            <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
+            <Image src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/4aa0ba0f-cf6d-4050-bf33-824539eb56e0_1600w.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
           </div>
         </div>
         <div className="spline-container absolute top-0 left-0 w-full h-full -z-10"><iframe src="https://my.spline.design/retrofuturismbganimation-d8a23730248f63543111352c8c65f6c8/" frameBorder="0" width="100%" height="100%"></iframe></div>
