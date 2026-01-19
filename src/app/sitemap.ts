@@ -4,7 +4,7 @@ import { blogPosts } from '@/lib/blog-data'
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = 'https://zeneva.vercel.app';
 
-  const staticRoutes = [
+  const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: siteUrl,
       lastModified: new Date(),
@@ -31,7 +31,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
  
-  const blogPostRoutes = blogPosts.map(post => ({
+  const blogPostRoutes: MetadataRoute.Sitemap = blogPosts.map(post => ({
     url: `${siteUrl}/blog/${post.slug}`,
     lastModified: new Date(), // Ideally, use post's updated_at date
     changeFrequency: 'monthly',
