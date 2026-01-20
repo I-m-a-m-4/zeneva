@@ -19,6 +19,10 @@ export interface CartItem {
     quantity: number;
 }
 
+export type TopSellingItem = Product & {
+    quantitySold: number;
+};
+
 export type UserRole = 'admin' | 'manager' | 'vendor_operator';
 
 export interface UserProfile {
