@@ -42,7 +42,25 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
         </ol>
       </>
     )
-  }
+  },
+  {
+    question: "How do I manage staff roles and permissions?",
+    answer: (
+        <p>As an 'admin', you can invite new users from the 'Users' page. You can assign them roles like 'Manager' (who can manage products and view most reports) or 'Vendor Operator' (who can primarily use the POS). Permissions are pre-set for each role to ensure security.</p>
+    )
+  },
+  {
+    question: "How do I see my sales reports?",
+    answer: (
+        <p>If you are on a Pro or Business plan, you can access the 'Reports' page. This dashboard provides detailed analytics on your sales revenue, top-selling products, and top customers. You can filter all reports by a specific date range to analyze performance over time.</p>
+    )
+  },
+  {
+    question: "How can I upgrade or manage my subscription?",
+    answer: (
+        <p>Navigate to the 'Billing' page. Here, you can view your current plan, see your payment history, and choose to upgrade to a higher tier to unlock more features like advanced reporting and AI troubleshooting.</p>
+    )
+  },
 ];
 
 function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
@@ -225,46 +243,42 @@ export default function SupportPage() {
     const isLoading = isUserLoading || isProfileLoading;
 
     return (
-        <>
-            <div className="grid gap-8 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-8">
-                    <PageTitle title="Help & Support" subtitle="Find answers to your questions and get assistance." />
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><HelpCircle />Frequently Asked Questions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Accordion type="multiple" className="w-full">
-                                {faqItems.map((item, index) => (
-                                    <AccordionItem key={index} value={`item-${index}`}>
-                                        <AccordionTrigger>{item.question}</AccordionTrigger>
-                                        <AccordionContent className="prose prose-sm dark:prose-invert max-w-none">
-                                            {item.answer}
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="lg:col-span-1">
-                     <Card className="flex flex-col h-[60vh] lg:h-[70vh]">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Bot />Support Chat</CardTitle>
-                            <CardDescription>Talk directly with our support team.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-1 overflow-hidden">
-                             {isLoading ? (
-                                <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                            ) : userProfile ? (
-                                <UserSupportChat userProfile={userProfile} />
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        </>
+        <div className="space-y-8">
+            <PageTitle title="Help & Support" subtitle="Find answers to your questions and get assistance." />
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><HelpCircle />Frequently Asked Questions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Accordion type="multiple" className="w-full">
+                        {faqItems.map((item, index) => (
+                            <AccordionItem key={index} value={`item-${index}`}>
+                                <AccordionTrigger>{item.question}</AccordionTrigger>
+                                <AccordionContent className="prose prose-sm dark:prose-invert max-w-none">
+                                    {item.answer}
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                </CardContent>
+            </Card>
+
+            <Card className="flex flex-col h-[70vh]">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Bot />Support Chat</CardTitle>
+                    <CardDescription>Talk directly with our support team.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden">
+                        {isLoading ? (
+                        <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : userProfile ? (
+                        <UserSupportChat userProfile={userProfile} />
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     );
 }
