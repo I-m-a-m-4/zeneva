@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import type { UserProfile, Invitation, BusinessInstance } from '@/types';
@@ -95,6 +95,7 @@ export default function UsersPage() {
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
   const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   
   const businessDocRef = useMemoFirebase(() => {
       if (!currentUser?.businessId || !firestore) return null;
@@ -132,6 +133,7 @@ export default function UsersPage() {
 
   const handleUpdateUserStatus = async () => {
     if (!userToUpdate || !firestore) return;
+    setIsUpdatingStatus(true);
     const userRef = doc(firestore, 'users', userToUpdate.user.id);
     const newStatus = userToUpdate.action === 'activate' ? 'active' : 'inactive';
     
@@ -141,6 +143,7 @@ export default function UsersPage() {
             if (!userDoc.exists()) {
                 throw new Error("User does not exist.");
             }
+            // This is a safe update that only modifies the status field.
             transaction.update(userRef, { status: newStatus });
         });
         toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
@@ -148,6 +151,7 @@ export default function UsersPage() {
         toast({ title: 'Error', description: e.message || 'Could not update user status.', variant: 'destructive' });
     } finally {
         setUserToUpdate(null);
+        setIsUpdatingStatus(false);
     }
   }
 
@@ -340,14 +344,15 @@ export default function UsersPage() {
                 <AlertDialogTitle>Confirm Action</AlertDialogTitle>
                 <AlertDialogDescription>
                   {userToUpdate?.action === 'deactivate' 
-                    ? <>This will mark <strong>{userToUpdate?.user.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
-                    : <>This will reactivate <strong>{userToUpdate?.user.name}</strong>'s account, allowing them to log in again.</>
+                    ? <>This will mark <strong>{userToUpdate?.user?.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
+                    : <>This will reactivate <strong>{userToUpdate?.user?.name}</strong>'s account, allowing them to log in again.</>
                   }
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUpdateUserStatus} className={userToUpdate?.action === 'deactivate' ? 'bg-destructive hover:bg-destructive/90' : ''}>
+                <AlertDialogCancel disabled={isUpdatingStatus}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className={userToUpdate?.action === 'deactivate' ? 'bg-destructive hover:bg-destructive/90' : ''}>
+                    {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {userToUpdate?.action === 'deactivate' ? 'Deactivate' : 'Activate'}
                 </AlertDialogAction>
             </AlertDialogFooter>

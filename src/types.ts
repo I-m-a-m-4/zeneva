@@ -38,6 +38,7 @@ export interface UserProfile {
     referralCode?: string;
     referredBy?: string;
     referrals?: number;
+    lastSeen?: any;
 }
 
 
@@ -198,3 +199,5 @@ export interface PressArticle {
     logoUrl?: string;
     url: string;
 }
+
+    

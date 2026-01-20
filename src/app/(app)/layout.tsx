@@ -27,7 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import CommandMenu from '@/components/layout/command-menu';
@@ -158,6 +158,30 @@ export default function AppLayout({
     });
     await batch.commit().catch(console.error);
   }, [firestore, user, unreadCount, userNotifications]);
+
+  React.useEffect(() => {
+    if (!userDocRef) return;
+
+    // This function updates the user's presence timestamp.
+    const updateLastSeen = () => {
+      updateDoc(userDocRef, {
+        lastSeen: serverTimestamp()
+      }).catch(error => {
+        // This can fail if the user is offline. We'll ignore the error
+        // as it's not critical for the user experience.
+        console.warn("Could not update user's last seen timestamp.", error);
+      });
+    };
+
+    // Update once when the layout mounts
+    updateLastSeen();
+
+    // And set up an interval to update it periodically (e.g., every 5 minutes)
+    const intervalId = setInterval(updateLastSeen, 5 * 60 * 1000);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [userDocRef]);
 
   if (isUserLoading || isProfileLoading) return <FullScreenLoader text="Loading your session..." />;
   if (!user) return <FullScreenLoader text="Redirecting to login..." />;
@@ -434,3 +458,5 @@ export default function AppLayout({
     </POSProvider>
   );
 }
+
+    

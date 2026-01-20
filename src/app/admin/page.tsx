@@ -61,7 +61,7 @@ import {
   addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { format, formatDistanceToNowStrict } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
     Table,
@@ -115,6 +115,33 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string, va
         </CardContent>
     </Card>
 );
+
+const UserPresence = ({ lastSeen }: { lastSeen: any }) => {
+    if (!lastSeen?.toDate) {
+        return <span className="text-muted-foreground text-xs">Never</span>;
+    }
+    const lastSeenDate = lastSeen.toDate();
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+    const isOnline = lastSeenDate > fiveMinutesAgo;
+
+    return (
+        <div className="flex items-center gap-2">
+            {isOnline ? (
+                <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+            ) : (
+                <span className="relative flex h-2.5 w-2.5">
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted-foreground/50"></span>
+                </span>
+            )}
+            <span className="text-xs text-muted-foreground">{formatDistanceToNow(lastSeenDate, { addSuffix: true })}</span>
+        </div>
+    );
+};
 
 const PIE_CHART_COLORS = ['hsl(var(--primary))', '#60a5fa', '#a78bfa', '#facc15', '#fb923c', '#4ade80'];
 
@@ -366,16 +393,6 @@ export default function AdminDashboardPage() {
         }
     };
   
-  const getTrialStatus = (business: BusinessInstance) => {
-    if (business.accessLevel === 'lifetime') return <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge>;
-    if (!business?.trialExpiresAt?.toDate) return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> No Trial Data</Badge>;
-    const expiryDate = business.trialExpiresAt.toDate();
-    const now = new Date();
-    if (expiryDate < now) return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Expired</Badge>;
-    return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> Ends {formatDistanceToNowStrict(expiryDate, { addSuffix: true })}</Badge>;
-  };
-
-
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -512,7 +529,7 @@ export default function AdminDashboardPage() {
                                         <TableHead>User</TableHead>
                                         <TableHead>Business Name</TableHead>
                                         <TableHead>Plan</TableHead>
-                                        <TableHead className="text-right">Trial Status</TableHead>
+                                        <TableHead>Last Seen</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -527,7 +544,9 @@ export default function AdminDashboardPage() {
                                                         business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
                                                     ) : <Badge variant="outline">N/A</Badge>}
                                                 </TableCell>
-                                                <TableCell className="text-right">{business ? getTrialStatus(business) : <Badge variant="outline">No Business</Badge>}</TableCell>
+                                                <TableCell>
+                                                    <UserPresence lastSeen={user.lastSeen} />
+                                                </TableCell>
                                             </TableRow>
                                         )
                                     })}
@@ -624,6 +643,8 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
 
     
 
