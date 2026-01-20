@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,8 +11,10 @@ import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore
 import { add, format } from 'date-fns';
 import { Badge } from '../ui/badge';
 import { sendSubscriptionReceipt } from '@/lib/email';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import usePaystack from '@/hooks/use-paystack';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
@@ -21,20 +22,29 @@ const plans = [
     {
         name: 'Pro',
         price: 10000,
-        features: ['Up to 5 users', 'Unlimited Products', 'Point of Sale (POS)', 'Basic Sales Analytics'],
+        features: ['Up to 1,500 products', 'Basic Sales Analytics', 'Customer Management (CRM)', 'Point of Sale (POS)'],
         planId: 'pro',
     },
     {
         name: 'Business',
         price: 30000,
-        features: ['Unlimited users', 'Advanced Sales Analytics', 'AI-Powered Troubleshooting', 'Priority Support'],
+        features: ['Everything in Pro', 'Unlimited products', 'Unlimited users', 'Advanced Sales Analytics', 'AI-Powered Troubleshooting', 'Priority Support'],
         planId: 'business',
     }
+];
+
+const billingCycles = [
+    { id: '1m', months: 1, label: '1 month', discount: 0 },
+    { id: '3m', months: 3, label: '3 months', discount: 5 }, // 5% off
+    { id: '6m', months: 6, label: '6 months', discount: 10 }, // 10% off
+    { id: '12m', months: 12, label: '1 year', discount: 15 }, // 15% off
 ];
 
 // New self-contained button component using custom hook
 const PaystackSubscriptionButton = ({ 
     plan, 
+    cycle,
+    finalAmount,
     userProfile, 
     businessInstance, 
     isCurrentPlan, 
@@ -42,6 +52,8 @@ const PaystackSubscriptionButton = ({
     setProcessingPlan 
 }: { 
     plan: typeof plans[0], 
+    cycle: typeof billingCycles[0],
+    finalAmount: number,
     userProfile: UserProfile, 
     businessInstance: BusinessInstance,
     isCurrentPlan: boolean,
@@ -75,14 +87,18 @@ const PaystackSubscriptionButton = ({
             }
 
             // Step 2: Double-check amount on the backend response
-            if (verifyResult.data.amount !== plan.price * 100) {
+            if (verifyResult.data.amount !== finalAmount * 100) {
                 // This is a critical security check
                 throw new Error(`Paid amount does not match plan price. Please contact support.`);
             }
 
             // Step 3: Payment is fully verified. Update Firestore.
             const batch = writeBatch(firestore);
-            const newExpiryDate = add(new Date(), { months: 1 });
+            
+            // If renewing, add time to the existing expiry. Otherwise, start from now.
+            const currentExpiry = businessInstance.trialExpiresAt?.toDate() ?? new Date();
+            const startDate = currentExpiry > new Date() ? currentExpiry : new Date();
+            const newExpiryDate = add(startDate, { months: cycle.months });
             
             const businessDocRef = doc(firestore, 'businessInstances', businessInstance.id);
             batch.update(businessDocRef, {
@@ -97,7 +113,7 @@ const PaystackSubscriptionButton = ({
                 userId: userProfile.id,
                 businessId: businessInstance.id,
                 plan: plan.name,
-                amount: plan.price,
+                amount: finalAmount,
                 currency: 'NGN',
                 timestamp: serverTimestamp(),
                 reference: transaction.reference,
@@ -106,8 +122,8 @@ const PaystackSubscriptionButton = ({
             const historyRef = collection(firestore, 'businessInstances', businessInstance.id, 'subscription_history');
             const historyDocRef = doc(historyRef); // Auto-generate ID
             batch.set(historyDocRef, {
-                action: `Subscribed to ${plan.name} Plan`,
-                amount: plan.price,
+                action: `Subscribed to ${plan.name} Plan for ${cycle.label}`,
+                amount: finalAmount,
                 currency: 'NGN',
                 timestamp: serverTimestamp(),
             });
@@ -119,8 +135,8 @@ const PaystackSubscriptionButton = ({
                 await sendSubscriptionReceipt({
                     to_email: userProfile.email,
                     to_name: userProfile.name,
-                    plan_name: plan.name,
-                    amount_paid: `₦${plan.price.toLocaleString()}`,
+                    plan_name: `${plan.name} (${cycle.label})`,
+                    amount_paid: `₦${finalAmount.toLocaleString()}`,
                     expiry_date: format(newExpiryDate, 'PPP'),
                     business_name: businessInstance.name
                 });
@@ -144,7 +160,7 @@ const PaystackSubscriptionButton = ({
         } finally {
             setProcessingPlan(null);
         }
-    }, [firestore, userProfile, businessInstance, plan, toast, setProcessingPlan]);
+    }, [firestore, userProfile, businessInstance, plan, cycle, finalAmount, toast, setProcessingPlan]);
     
     const handlePaymentClick = () => {
         if (!isScriptLoaded) {
@@ -164,7 +180,7 @@ const PaystackSubscriptionButton = ({
         initializePayment({
             key: PAYSTACK_PUBLIC_KEY,
             email: userProfile.email,
-            amount: plan.price * 100,
+            amount: finalAmount * 100,
             currency: 'NGN',
             reference: `z-${businessInstance.id.substring(0, 6)}-${Date.now()}`,
             onSuccess: handleSuccessfulPayment,
@@ -174,58 +190,104 @@ const PaystackSubscriptionButton = ({
         });
     };
 
+    const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
+
     return (
         <Button
             onClick={handlePaymentClick}
             className="w-full"
-            disabled={isProcessing || isCurrentPlan || !isScriptLoaded}
+            disabled={isProcessing || !isScriptLoaded}
         >
             {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Zap className="mr-2 h-4 w-4" />}
-            {isCurrentPlan ? 'Current Plan' : `Get Started with ${plan.name}`}
+            {buttonText}
         </Button>
     )
 }
 
 // Main component that uses the button
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
-    const [processingPlan, setProcessingPlan] = React.useState<string | null>(null);
+    const [processingPlan, setProcessingPlan] = useState<string | null>(null);
+    const [selectedCycles, setSelectedCycles] = useState({ pro: '1m', business: '1m' });
+
+    const handleCycleChange = (planId: string, cycleId: string) => {
+        setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-            {plans.map((plan) => (
-                <Card key={plan.name} className={`flex flex-col ${plan.planId === businessInstance.plan ? 'border-2 border-primary' : ''}`}>
-                    <CardHeader>
-                        <CardTitle className="flex justify-between items-center">
-                            {plan.name}
-                            {plan.planId === businessInstance.plan && <Badge variant="secondary">Current Plan</Badge>}
-                        </CardTitle>
-                        <CardDescription>
-                            <span className="text-3xl font-bold">₦{plan.price.toLocaleString()}</span>
-                            <span className="text-muted-foreground"> / month</span>
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                        <ul className="space-y-3 text-sm">
-                            {plan.features.map(feature => (
-                                <li key={feature} className="flex items-center gap-2">
-                                    <Check className="h-4 w-4 text-primary"/>
-                                    <span>{feature}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                    <CardFooter>
-                        <PaystackSubscriptionButton
-                            plan={plan}
-                            userProfile={userProfile}
-                            businessInstance={businessInstance}
-                            isCurrentPlan={plan.planId === businessInstance.plan}
-                            isProcessing={processingPlan === plan.planId}
-                            setProcessingPlan={setProcessingPlan}
-                        />
-                    </CardFooter>
-                </Card>
-            ))}
+            {plans.map((plan) => {
+                const selectedCycleId = selectedCycles[plan.planId as keyof typeof selectedCycles];
+                const selectedCycle = billingCycles.find(c => c.id === selectedCycleId)!;
+                const finalAmount = plan.price * selectedCycle.months * (1 - selectedCycle.discount / 100);
+                const isCurrentPlan = plan.planId === businessInstance.plan;
+
+                return (
+                    <Card key={plan.name} className={`flex flex-col ${isCurrentPlan ? 'border-2 border-primary' : ''}`}>
+                        <CardHeader>
+                            <CardTitle className="flex justify-between items-center">
+                                {plan.name}
+                                {isCurrentPlan && <Badge variant="secondary">Current Plan</Badge>}
+                            </CardTitle>
+                            <CardDescription>
+                                <span className="text-3xl font-bold">₦{plan.price.toLocaleString()}</span>
+                                <span className="text-muted-foreground"> / month</span>
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow">
+                            <h4 className="font-semibold mb-3">Plan Details:</h4>
+                            <ul className="space-y-3 text-sm mb-6">
+                                {plan.features.map(feature => (
+                                    <li key={feature} className="flex items-center gap-2">
+                                        <Check className="h-4 w-4 text-primary"/>
+                                        <span>{feature}</span>
+                                    </li>
+                                ))}
+                            </ul>
+
+                            <h4 className="font-semibold mb-3">Billing Cycle:</h4>
+                            <RadioGroup 
+                                defaultValue={selectedCycleId}
+                                onValueChange={(value) => handleCycleChange(plan.planId, value)}
+                            >
+                                {billingCycles.map(cycle => {
+                                    const cyclePrice = plan.price * cycle.months;
+                                    const discountedPrice = cyclePrice * (1 - cycle.discount / 100);
+                                    return (
+                                        <Label 
+                                            key={cycle.id}
+                                            htmlFor={`${plan.planId}-${cycle.id}`}
+                                            className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value={cycle.id} id={`${plan.planId}-${cycle.id}`} />
+                                                <div>
+                                                    <span className="font-medium">{cycle.label}</span>
+                                                    {cycle.discount > 0 && (
+                                                        <Badge variant="destructive" className="ml-2">Save {cycle.discount}%</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <span className="font-semibold">₦{discountedPrice.toLocaleString()}</span>
+                                        </Label>
+                                    )
+                                })}
+                            </RadioGroup>
+                        </CardContent>
+                        <CardFooter>
+                            <PaystackSubscriptionButton
+                                plan={plan}
+                                cycle={selectedCycle}
+                                finalAmount={finalAmount}
+                                userProfile={userProfile}
+                                businessInstance={businessInstance}
+                                isCurrentPlan={isCurrentPlan}
+                                isProcessing={processingPlan === plan.planId}
+                                setProcessingPlan={setProcessingPlan}
+                            />
+                        </CardFooter>
+                    </Card>
+                )
+            })}
         </div>
     );
 }

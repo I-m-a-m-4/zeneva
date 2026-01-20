@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { add } from 'date-fns';
+import type { UserProfile, UserRole } from '@/types';
 
 /**
  * Creates a new business instance and links it to an existing user.
