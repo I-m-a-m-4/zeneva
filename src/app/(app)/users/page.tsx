@@ -135,13 +135,9 @@ export default function UsersPage() {
     const userRef = doc(firestore, 'users', userToUpdate.user.id);
     const newStatus = userToUpdate.action === 'activate' ? 'active' : 'inactive';
     
-    const dataToUpdate: { status: string; businessId?: string | null } = { status: newStatus };
-    if (newStatus === 'active') {
-        dataToUpdate.businessId = null; // Reset businessId on activation for a fresh start
-    }
-
     try {
-        await updateDoc(userRef, dataToUpdate);
+        // Only update the status, do not modify the businessId.
+        await updateDoc(userRef, { status: newStatus });
         toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
     } catch(e) {
         toast({ title: 'Error', description: 'Could not update user status.', variant: 'destructive' });
