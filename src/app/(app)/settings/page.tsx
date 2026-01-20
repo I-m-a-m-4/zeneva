@@ -395,7 +395,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="product-categories">
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5 text-primary" />Product Categories</CardTitle>
             <CardDescription>Manage the categories used for your products. Add one and press Enter.</CardDescription>

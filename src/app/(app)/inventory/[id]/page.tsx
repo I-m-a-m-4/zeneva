@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -117,9 +116,20 @@ export default function EditProductPage() {
         }
     }, [product, form]);
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+             if (file.size > MAX_FILE_SIZE) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Image Too Large',
+                    description: 'Please select an image smaller than 5MB.',
+                });
+                event.target.value = '';
+                return;
+            }
             setImageFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -140,7 +150,7 @@ export default function EditProductPage() {
                 const formData = new FormData();
                 formData.append('image', imageFile);
                 const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
-                if (!apiKey) throw new Error("ImgBB API key is not configured.");
+                if (!apiKey || apiKey === "your_api_key_here") throw new Error("ImgBB API key is not configured.");
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (!result.success) throw new Error(result.error?.message || 'Image upload failed.');
@@ -317,7 +327,12 @@ export default function EditProductPage() {
                                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                                     ))
                                 ) : (
-                                    <SelectItem value="other" disabled>No categories defined in settings</SelectItem>
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No categories defined.
+                                        <Button variant="link" asChild className="p-0 h-auto ml-1">
+                                            <Link href="/settings#product-categories">Create one now</Link>
+                                        </Button>
+                                    </div>
                                 )}
                             </SelectContent>
                         </Select>
@@ -331,7 +346,7 @@ export default function EditProductPage() {
                 <CardHeader>
                 <CardTitle>Product Image</CardTitle>
                 <CardDescription>
-                    Upload an image for your product.
+                    Upload an image (max 5MB) for your product.
                 </CardDescription>
                 </CardHeader>
                 <CardContent>
