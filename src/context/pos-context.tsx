@@ -27,6 +27,7 @@ interface POSContextType {
   resetPOS: () => void;
   currencySymbol: string;
   currencyCode: string;
+  business: BusinessInstance | null | undefined;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -168,6 +169,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
         resetPOS,
         currencySymbol,
         currencyCode,
+        business,
       }}
     >
       {children}
