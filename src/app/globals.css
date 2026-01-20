@@ -127,6 +127,12 @@
   .animated-input {
     @apply bg-white/5 border border-white/20 text-white placeholder:text-gray-400 focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all duration-300;
   }
+  .text-gradient-mask-subtle {
+    background: linear-gradient(to bottom, hsl(var(--foreground)) 70%, hsla(var(--foreground) / 0.4) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
  
 @layer base {
@@ -261,5 +267,5 @@ body {
 
 /* Ensure the portal container itself doesn't block clicks */
 [data-radix-portal] {
-  pointer-events: auto;
+  pointer-events: all;
 }

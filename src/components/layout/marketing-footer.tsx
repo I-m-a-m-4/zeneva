@@ -196,6 +196,7 @@ export default function MarketingFooter() {
               <span className="hidden sm:block text-white/20">•</span>
               <BackToTopButton />
             </div>
+            
           </div>
         </div>
       </div>

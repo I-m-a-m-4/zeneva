@@ -24,10 +24,8 @@ export function initializeFirebase() {
       if (err.code === 'failed-precondition') {
         // This means persistence is already enabled in another tab.
         // This is a normal scenario in a multi-tab environment, so we can ignore it.
-        // console.warn('Firestore persistence failed: another tab has persistence enabled.');
       } else if (err.code === 'unimplemented') {
         // The browser doesn't support all the features required for persistence.
-        // console.warn('Firestore persistence is not supported in this browser.');
       }
     });
 

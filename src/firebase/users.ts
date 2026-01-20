@@ -32,7 +32,7 @@ export const createNewBusinessForUser = async (firestore: Firestore, user: User)
     
     const batch = writeBatch(firestore);
     const businessDocRef = doc(collection(firestore, 'businessInstances'));
-    const trialEndDate = add(new Date(), { days: 7 });
+    const trialEndDate = add(new Date(), { days: 30 });
 
     batch.set(businessDocRef, {
         name: `${user.displayName}'s Business`,
@@ -121,7 +121,7 @@ export const createUserProfileDocument = async (
       const businessDocRef = doc(collection(firestore, 'businessInstances'));
       businessId = businessDocRef.id;
       userRole = 'admin';
-      const trialEndDate = add(new Date(), { days: 7 });
+      const trialEndDate = add(new Date(), { days: 30 });
       transaction.set(businessDocRef, {
         name: `${displayName}'s Business`,
         createdAt: serverTimestamp(),

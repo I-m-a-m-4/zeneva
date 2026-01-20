@@ -3,6 +3,9 @@
 
 import {
   ArrowRight,
+  Blocks,
+  Bot,
+  BrainCircuit,
   Check,
   Code,
   Cpu,
@@ -26,7 +29,6 @@ import {
   Share2,
   Sparkles,
   Terminal,
-  Triangle,
   Twitter,
   Wind,
   Github,
@@ -36,6 +38,13 @@ import {
   Anchor,
   BarChart2,
   Loader,
+  ShoppingCart,
+  Figma,
+  Gitlab,
+  GitCommit,
+  Workflow,
+  ShieldCheck,
+  Zap,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -47,6 +56,7 @@ import { useToast } from '@/hooks/use-toast';
 import MarketingFooter from '@/components/layout/marketing-footer';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -110,9 +120,20 @@ export default function Home() {
             }
         } else {
             handleCopyLink();
-            toast({ title: 'Share not supported', description: 'Signup link copied to clipboard instead.' });
+            toast({ title: 'Share not supported', description: 'Referral link copied to clipboard instead.' });
         }
     };
+    
+    const businessTypes = [
+      { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.' },
+      { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.' },
+      { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.' },
+      { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.' },
+      { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.' },
+      { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.' },
+      { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.' },
+      { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.' },
+    ];
 
   // While we wait for the user status, or if we are about to redirect,
   // show a full-page loader to prevent flashing the marketing content.
@@ -142,8 +163,8 @@ export default function Home() {
           <div className="max-w-xl z-10">
             <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
             <h1 className="sm:text-7xl text-6xl font-light text-slate-900 tracking-tight font-instrument-serif mb-8">
-              <span className="block">Streamline Your Inventory.</span>
-              <span className="block">Maximize Your Profit.</span>
+              <span className="block">Streamline <span className="text-slate-400">Your</span> Inventory.</span>
+              <span className="block">Maximize <span className="text-slate-400">Your</span> Profit.</span>
             </h1>
             <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-10 text-slate-900">
               The all-in-one platform for inventory management, point of sale, and customer relationships. Stop guessing, start growing.
@@ -175,7 +196,7 @@ export default function Home() {
 
           {/* Right Column: UI Mockups */}
           <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-            <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
+            <Image src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/4aa0ba0f-cf6d-4050-bf33-824539eb56e0_1600w.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
           </div>
         </div>
       </main>
@@ -243,73 +264,63 @@ export default function Home() {
                     See how it works <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
-              <div className="flex flex-col border rounded-md pt-5 pr-6 pb-5 pl-6 shadow bg-white border-stone-200">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="">
-                      <h2 className="text-xl sm:text-[22px] tracking-tight font-instrument-serif font-light text-slate-900">Inventory Status</h2>
-                      <p className="text-xs text-slate-500 mt-1 font-dm-sans tracking-tight">Track stock levels across all channels.</p>
-                  </div>
-                  <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition bg-slate-900 text-white hover:bg-slate-800">
-                  <span className="font-dm-sans tracking-tight">New Product</span>
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-                </div>
-                <div className="mt-2 space-y-3">
-                  <div className="flex items-center gap-3">
-                      <div className="w-16 text-[11px] text-slate-500 font-dm-sans tracking-tight">Online</div>
-                      <div className="flex-1">
-                          <div className="h-2 rounded-full overflow-hidden bg-slate-100">
-                              <div className="h-full w-full bg-slate-900"></div>
-                          </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className="font-medium font-dm-sans tracking-tight">100%</span>
-                          <div className="flex -space-x-2">
-                            <Globe className="w-5 h-5 p-1 bg-white rounded-full border border-slate-200" />
-                          </div>
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                      <div className="w-16 text-[11px] text-slate-500 font-dm-sans tracking-tight">In-Store</div>
-                      <div className="flex-1">
-                          <div className="h-2 rounded-full overflow-hidden bg-slate-100">
-                              <div className="h-full w-[59%] bg-slate-900"></div>
-                          </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className="font-medium font-dm-sans tracking-tight">59%</span>
-                          <div className="flex -space-x-2">
-                              <Server className="w-5 h-5 p-1 bg-white rounded-full border border-slate-200" />
-                          </div>
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                      <div className="w-16 text-[11px] text-slate-500 font-dm-sans tracking-tight">Warehouse</div>
-                      <div className="flex-1">
-                          <div className="w-[75%] h-full bg-fuchsia-700"></div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className="font-medium font-dm-sans tracking-tight">75%</span>
-                          <div className="flex -space-x-2">
-                              <Database className="w-5 h-5 p-1 bg-white rounded-full border border-slate-200" />
-                          </div>
-                      </div>
-                  </div>
-                </div>
-                <div className="mt-4 border-t pt-3 border-slate-100">
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <div className="flex items-center gap-4">
-                          <span className="font-dm-sans tracking-tight">Mon 12</span>
-                          <span className="font-dm-sans tracking-tight">Tue 13</span>
-                          <span className="font-medium font-dm-sans tracking-tight text-slate-900">Wed 14</span>
-                          <span className="font-dm-sans tracking-tight">Thu 15</span>
-                          <span className="font-dm-sans tracking-tight">Fri 16</span>
-                      </div>
-                      <div className="inline-flex items-center gap-1 rounded-full px-2 py-1 bg-slate-900/5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-700"></span>
-                          <span className="text-[10px] font-dm-sans tracking-tight text-slate-800">Live Sync</span>
-                      </div>
-                  </div>
+              <div className="z-10 animate-[fadeInUp_1s_ease-out_1.2s_forwards] relative" style={{transform: "translateY(0px)"}}>
+                <div className="relative h-56 sm:h-64 rounded-2xl bg-gradient-to-b ring-1 ring-inset mb-8 from-neutral-200 to-neutral-100 ring-black/5">
+                    <div className="absolute right-3 sm:right-6 top-4 sm:top-6 w-[78%] h-[68%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">SALES</span>
+                        <div className="flex items-center gap-2">
+                        <span className="text-xs text-green-600">+12.5%</span>
+                        <span className="h-2 w-12 rounded bg-green-500/20"></span>
+                        </div>
+                    </div>
+                    <div className="p-2">
+                        <svg viewBox="0 0 300 90" className="w-full h-20 sm:h-24 text-neutral-300">
+                        <defs><pattern id="dots1" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.5" fill="currentColor" opacity="0.3"></circle></pattern></defs>
+                        <rect width="100%" height="100%" fill="url(#dots1)"></rect>
+                        <rect x="20" y="45" width="3" height="20" fill="#F87171"></rect>
+                        <rect x="40" y="35" width="3" height="25" fill="#4ADE80"></rect>
+                        <rect x="60" y="50" width="3" height="15" fill="#F87171"></rect>
+                        <rect x="80" y="30" width="3" height="30" fill="#4ADE80"></rect>
+                        <rect x="100" y="40" width="3" height="20" fill="#4ADE80"></rect>
+                        <rect x="120" y="25" width="3" height="35" fill="#4ADE80"></rect>
+                        <rect x="140" y="45" width="3" height="18" fill="#F87171"></rect>
+                        <rect x="160" y="20" width="3" height="40" fill="#4ADE80"></rect>
+                        <rect x="180" y="35" width="3" height="25" fill="#4ADE80"></rect>
+                        <rect x="200" y="15" width="3" height="45" fill="#4ADE80"></rect>
+                        <polyline points="22,55 42,47 62,57 82,45 102,50 122,42 142,54 162,40 182,47 202,37" fill="none" stroke="#4ADE80" strokeWidth="1.5" strokeLinecap="round"></polyline>
+                        </svg>
+                    </div>
+                    </div>
+                    <div className="absolute left-6 sm:left-12 bottom-10 sm:bottom-12 w-[62%] h-[52%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">TOP PRODUCTS</span>
+                    </div>
+                    <div className="p-2 space-y-1">
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Quantum HD Monitor</span><span className="text-green-600">+8.2%</span></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Ergo Mouse</span><span className="text-red-600">-1.5%</span></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Zeneva Hoodie</span><span className="text-green-600">+5.8%</span></div>
+                    </div>
+                    </div>
+                    <div className="absolute left-3 sm:left-6 bottom-3 sm:bottom-4 w-[38%] h-[44%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">POS</span>
+                    </div>
+                    <div className="p-2">
+                        <svg viewBox="0 0 180 70" className="w-full h-14 sm:h-16 text-neutral-300">
+                        <rect x="10" y="35" width="2" height="12" fill="#4ADE80"></rect>
+                        <rect x="25" y="30" width="2" height="17" fill="#4ADE80"></rect>
+                        <rect x="40" y="40" width="2" height="10" fill="#F87171"></rect>
+                        <rect x="55" y="25" width="2" height="22" fill="#4ADE80"></rect>
+                        <rect x="70" y="20" width="2" height="27" fill="#4ADE80"></rect>
+                        <rect x="85" y="35" width="2" height="12" fill="#F87171"></rect>
+                        <rect x="100" y="15" width="2" height="32" fill="#4ADE80"></rect>
+                        <rect x="115" y="28" width="2" height="19" fill="#4ADE80"></rect>
+                        <rect x="130" y="12" width="2" height="35" fill="#4ADE80"></rect>
+                        <polyline points="11,41 26,38 41,45 56,36 71,33 86,41 101,31 116,36 131,29" fill="none" stroke="#4ADE80" strokeWidth="1" strokeLinecap="round"></polyline>
+                        </svg>
+                    </div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -340,6 +351,185 @@ export default function Home() {
       </div>
     </section>
 
+    <section id="how-it-works" className="py-24 bg-white overflow-hidden relative border-b border-slate-100">
+        <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] text-primary ring-1 ring-primary/20 uppercase tracking-tight mb-4 font-semibold">
+                    <Workflow className="mr-1 h-3 w-3"/>
+                    The Future is AI-Native
+                </span>
+                <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-4 font-instrument-serif">
+                   The Future of Inventory Management
+                </h2>
+                <p className="text-lg text-slate-500 max-w-2xl mx-auto font-light">
+                    Zeneva is built to revolutionize how you manage your business. We're not just tracking stock; we're creating a smarter, predictive, and automated future for retail.
+                </p>
+            </div>
+
+            <div className="relative mx-auto max-w-4xl">
+                <div className="flex items-center justify-center gap-6 sm:gap-10 relative z-10">
+                    <div className="group relative cursor-pointer">
+                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                           <BrainCircuit className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                        </span>
+                    </div>
+                     <div className="group relative cursor-pointer">
+                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                            <Bot className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                        </span>
+                    </div>
+                     <div className="group relative cursor-pointer">
+                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                            <Blocks className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                        </span>
+                    </div>
+                     <div className="group relative cursor-pointer">
+                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                            <Database className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                        </span>
+                    </div>
+                    <div className="group relative cursor-pointer">
+                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                           <ShoppingCart className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                        </span>
+                    </div>
+                </div>
+
+                <div className="relative mt-8 h-64 pointer-events-none">
+                    <svg viewBox="0 0 900 360" className="absolute inset-0 w-full h-full" fill="none">
+                        <defs>
+                            <linearGradient id="line-gradient-light" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0"></stop>
+                                <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.8"></stop>
+                                <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0"></stop>
+                            </linearGradient>
+                        </defs>
+                        <path d="M450 300 C 450 200, 300 120, 150 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
+                            <animate attributeName="stroke-dasharray" values="600" dur="0.1s" fill="freeze" />
+                            <animate attributeName="stroke-dashoffset" values="600;0;600" dur="4s" repeatCount="indefinite" />
+                        </path>
+                         <path d="M450 300 C 450 210, 360 130, 270 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
+                            <animate attributeName="stroke-dasharray" values="520" dur="0.1s" fill="freeze" />
+                            <animate attributeName="stroke-dashoffset" values="520;0;520" dur="4s" begin="0.2s" repeatCount="indefinite" />
+                        </path>
+                         <path d="M450 300 C 450 210, 540 130, 630 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
+                           <animate attributeName="stroke-dasharray" values="520" dur="0.1s" fill="freeze" />
+                           <animate attributeName="stroke-dashoffset" values="520;0;520" dur="4s" begin="0.8s" repeatCount="indefinite" />
+                        </path>
+                         <path d="M450 300 C 450 200, 600 120, 750 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
+                            <animate attributeName="stroke-dasharray" values="600" dur="0.1s" fill="freeze" />
+                            <animate attributeName="stroke-dashoffset" values="600;0;600" dur="4s" begin="1s" repeatCount="indefinite" />
+                        </path>
+                    </svg>
+
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
+                        <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-background/80 ring-1 ring-slate-200 backdrop-blur-lg shadow-[0_0_50px_rgba(var(--primary-rgb),0.15)] relative z-20">
+                            <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={40} height={40} />
+                            <span className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl animate-pulse"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mx-auto mt-12 max-w-4xl">
+                <div className="flex items-center justify-center gap-3 flex-wrap text-sm text-slate-600">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
+                        <Workflow className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-xs">Instant Sync</span>
+                    </div>
+                    <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
+                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-xs">Secure Data</span>
+                    </div>
+                    <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
+                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
+                        <Cpu className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-xs">Real-time</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    
+    <section className="py-24 relative border-b border-slate-100 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="mb-16 max-w-2xl">
+                <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6 text-slate-900 font-instrument-serif">
+                   Stop <span className="text-slate-400">guessing</span>, start <span className="text-slate-400">selling.</span>
+                </h2>
+                <p className="text-lg text-slate-500 font-light">
+                    Your data is scattered across spreadsheets, receipts, and notebooks. Zeneva unifies it all, turning chaos into clarity.
+                </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-slate-200 border border-slate-200 shadow-sm relative overflow-hidden rounded-lg">
+                <div className="bg-slate-50 p-8 group cursor-pointer">
+                    <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center mb-6 text-slate-900 group-hover:text-primary group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300 shadow-inner">
+                        <Layers className="w-5 h-5"/>
+                    </div>
+                    <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Unified Dashboard</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors">
+                      Stop the tab-switching madness. See your inventory levels, sales data, and customer profiles in one clean, synchronized view.
+                    </p>
+                </div>
+                <div className="bg-slate-50 p-8 group cursor-pointer">
+                    <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center mb-6 text-slate-900 group-hover:text-primary group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300 shadow-inner">
+                        <Sparkles className="w-5 h-5" />
+                    </div>
+                     <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Plain-English AI</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors">
+                        No complex queries. Ask "Why did signup drop yesterday?" and get a direct, actionable answer from your data.
+                    </p>
+                </div>
+                <div className="bg-slate-50 p-8 group cursor-pointer">
+                    <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center mb-6 text-slate-900 group-hover:text-primary group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300 shadow-inner">
+                       <Zap className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Action Suggestions</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors">
+                        Don't just see the problem. Zeneva suggests fixes like "Shorten signup form" to improve conversion and boost your bottom line.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="text-4xl font-light text-slate-900 tracking-tight font-instrument-serif mb-4">
+            Perfect for Your Business
+          </h2>
+          <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
+            Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+          {businessTypes.map((type) => {
+              const image = PlaceHolderImages.find(p => p.id === type.imageId);
+              if (!image) return null;
+              return (
+                <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
+                  <Image
+                    src={image.imageUrl}
+                    alt={type.name}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    data-ai-hint={image.imageHint}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+                  <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
+                    <h3 className="text-2xl font-light tracking-tight font-instrument-serif">{type.name}</h3>
+                    <p className="mt-1 text-sm text-white/90">{type.description}</p>
+                  </div>
+                </div>
+              )
+            })}
+        </div>
+      </div>
+    </section>
+
     <section className="z-10 animate-[fadeInUp_1s_ease-out_1.2s_forwards] relative" style={{transform: "translateY(0px)"}}>
         <div className="max-w-7xl mx-auto pt-16 pb-16 px-6">
         <div className="grid gap-12 lg:grid-cols-2 gap-x-12 gap-y-12">
@@ -356,71 +546,71 @@ export default function Home() {
                     Live streaming
                     </span>
                 </div>
-                <div className="relative h-56 sm:h-64 rounded-2xl bg-gradient-to-b ring-1 ring-inset mb-8 from-neutral-900 to-neutral-800 ring-white/5">
-                    <div className="absolute right-3 sm:right-6 top-4 sm:top-6 w-[78%] h-[68%] rounded-2xl backdrop-blur border shadow-sm bg-neutral-900/90 border-neutral-800">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800/70">
-                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-400">SALES</span>
+                <div className="relative h-56 sm:h-64 rounded-2xl bg-gradient-to-b ring-1 ring-inset mb-8 from-neutral-200 to-neutral-100 ring-black/5">
+                    <div className="absolute right-3 sm:right-6 top-4 sm:top-6 w-[78%] h-[68%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">SALES</span>
                         <div className="flex items-center gap-2">
-                        <span className="text-xs text-green-400">+12.5%</span>
+                        <span className="text-xs text-green-600">+12.5%</span>
                         <span className="h-2 w-12 rounded bg-green-500/20"></span>
                         </div>
                     </div>
                     <div className="p-2">
-                        <svg viewBox="0 0 300 90" className="w-full h-20 sm:h-24 text-neutral-700">
+                        <svg viewBox="0 0 300 90" className="w-full h-20 sm:h-24 text-neutral-300">
                         <defs><pattern id="dots1" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.5" fill="currentColor" opacity="0.3"></circle></pattern></defs>
                         <rect width="100%" height="100%" fill="url(#dots1)"></rect>
-                        <rect x="20" y="45" width="3" height="20" fill="#EF4444"></rect>
-                        <rect x="40" y="35" width="3" height="25" fill="#10B981"></rect>
-                        <rect x="60" y="50" width="3" height="15" fill="#EF4444"></rect>
-                        <rect x="80" y="30" width="3" height="30" fill="#10B981"></rect>
-                        <rect x="100" y="40" width="3" height="20" fill="#10B981"></rect>
-                        <rect x="120" y="25" width="3" height="35" fill="#10B981"></rect>
-                        <rect x="140" y="45" width="3" height="18" fill="#EF4444"></rect>
-                        <rect x="160" y="20" width="3" height="40" fill="#10B981"></rect>
-                        <rect x="180" y="35" width="3" height="25" fill="#10B981"></rect>
-                        <rect x="200" y="15" width="3" height="45" fill="#10B981"></rect>
-                        <polyline points="22,55 42,47 62,57 82,45 102,50 122,42 142,54 162,40 182,47 202,37" fill="none" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round"></polyline>
+                        <rect x="20" y="45" width="3" height="20" fill="#F87171"></rect>
+                        <rect x="40" y="35" width="3" height="25" fill="#4ADE80"></rect>
+                        <rect x="60" y="50" width="3" height="15" fill="#F87171"></rect>
+                        <rect x="80" y="30" width="3" height="30" fill="#4ADE80"></rect>
+                        <rect x="100" y="40" width="3" height="20" fill="#4ADE80"></rect>
+                        <rect x="120" y="25" width="3" height="35" fill="#4ADE80"></rect>
+                        <rect x="140" y="45" width="3" height="18" fill="#F87171"></rect>
+                        <rect x="160" y="20" width="3" height="40" fill="#4ADE80"></rect>
+                        <rect x="180" y="35" width="3" height="25" fill="#4ADE80"></rect>
+                        <rect x="200" y="15" width="3" height="45" fill="#4ADE80"></rect>
+                        <polyline points="22,55 42,47 62,57 82,45 102,50 122,42 142,54 162,40 182,47 202,37" fill="none" stroke="#4ADE80" strokeWidth="1.5" strokeLinecap="round"></polyline>
                         </svg>
                     </div>
                     </div>
-                    <div className="absolute left-6 sm:left-12 bottom-10 sm:bottom-12 w-[62%] h-[52%] rounded-2xl backdrop-blur border shadow-sm bg-neutral-900/90 border-neutral-800">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800/70">
-                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-400">TOP PRODUCTS</span>
+                    <div className="absolute left-6 sm:left-12 bottom-10 sm:bottom-12 w-[62%] h-[52%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">TOP PRODUCTS</span>
                     </div>
                     <div className="p-2 space-y-1">
-                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-300">Quantum HD Monitor</span><span className="text-green-400">+8.2%</span></div>
-                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-300">Ergo Mouse</span><span className="text-red-400">-1.5%</span></div>
-                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-300">Zeneva Hoodie</span><span className="text-green-400">+5.8%</span></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Quantum HD Monitor</span><span className="text-green-600">+8.2%</span></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Ergo Mouse</span><span className="text-red-600">-1.5%</span></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Zeneva Hoodie</span><span className="text-green-600">+5.8%</span></div>
                     </div>
                     </div>
-                    <div className="absolute left-3 sm:left-6 bottom-3 sm:bottom-4 w-[38%] h-[44%] rounded-2xl backdrop-blur border shadow-sm bg-neutral-900/90 border-neutral-800">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800/70">
-                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-400">POS</span>
+                    <div className="absolute left-3 sm:left-6 bottom-3 sm:bottom-4 w-[38%] h-[44%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
+                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">POS</span>
                     </div>
                     <div className="p-2">
-                        <svg viewBox="0 0 180 70" className="w-full h-14 sm:h-16 text-neutral-700">
-                        <rect x="10" y="35" width="2" height="12" fill="#10B981"></rect>
-                        <rect x="25" y="30" width="2" height="17" fill="#10B981"></rect>
-                        <rect x="40" y="40" width="2" height="10" fill="#EF4444"></rect>
-                        <rect x="55" y="25" width="2" height="22" fill="#10B981"></rect>
-                        <rect x="70" y="20" width="2" height="27" fill="#10B981"></rect>
-                        <rect x="85" y="35" width="2" height="12" fill="#EF4444"></rect>
-                        <rect x="100" y="15" width="2" height="32" fill="#10B981"></rect>
-                        <rect x="115" y="28" width="2" height="19" fill="#10B981"></rect>
-                        <rect x="130" y="12" width="2" height="35" fill="#10B981"></rect>
-                        <polyline points="11,41 26,38 41,45 56,36 71,33 86,41 101,31 116,36 131,29" fill="none" stroke="#10B981" strokeWidth="1" strokeLinecap="round"></polyline>
+                        <svg viewBox="0 0 180 70" className="w-full h-14 sm:h-16 text-neutral-300">
+                        <rect x="10" y="35" width="2" height="12" fill="#4ADE80"></rect>
+                        <rect x="25" y="30" width="2" height="17" fill="#4ADE80"></rect>
+                        <rect x="40" y="40" width="2" height="10" fill="#F87171"></rect>
+                        <rect x="55" y="25" width="2" height="22" fill="#4ADE80"></rect>
+                        <rect x="70" y="20" width="2" height="27" fill="#4ADE80"></rect>
+                        <rect x="85" y="35" width="2" height="12" fill="#F87171"></rect>
+                        <rect x="100" y="15" width="2" height="32" fill="#4ADE80"></rect>
+                        <rect x="115" y="28" width="2" height="19" fill="#4ADE80"></rect>
+                        <rect x="130" y="12" width="2" height="35" fill="#4ADE80"></rect>
+                        <polyline points="11,41 26,38 41,45 56,36 71,33 86,41 101,31 116,36 131,29" fill="none" stroke="#4ADE80" strokeWidth="1" strokeLinecap="round"></polyline>
                         </svg>
                     </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <div>
-                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-instrument-serif">Advanced Charting</h4>
-                    <p className="text-sm text-stone-700 mt-2">Professional-grade sales analysis tools with real-time product performance.</p>
+                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-instrument-serif">Why Zeneva?</h4>
+                    <p className="text-sm text-stone-700 mt-2">Founders are drowning in useless charts. You have data in Stripe, Google Analytics, and Mixpanel. But you still don't know why users aren't converting. Zeneva fixes that.</p>
                     </div>
                     <div>
-                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-instrument-serif">Smart Insights</h4>
-                    <p className="mt-2 text-sm text-neutral-400">Curated inventory tracking with instant performance updates and alerts.</p>
+                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-instrument-serif">Action Suggestions</h4>
+                    <p className="mt-2 text-sm text-neutral-400">Don't just see the problem. Zeneva suggests fixes like "Shorten signup form" to improve conversion.</p>
                     </div>
                 </div>
                 <div>
@@ -525,12 +715,12 @@ export default function Home() {
                     <p className="text-slate-500 mt-2">Explore core features with a free trial.</p>
                     <div className="mt-6">
                         <span className="text-5xl font-bold tracking-tight font-instrument-serif text-slate-900">₦0</span>
-                        <span className="text-slate-500"> / for 7 days</span>
+                        <span className="text-slate-500"> / for 30 days</span>
                     </div>
                     <ul className="mt-8 space-y-4 text-slate-600 flex-grow">
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>7-Day Free Trial of Pro features</span>
+                            <span>30-Day Free Trial of Pro features</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
