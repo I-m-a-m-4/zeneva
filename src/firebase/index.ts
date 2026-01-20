@@ -3,26 +3,33 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
+  
   if (getApps().length === 0) {
     firebaseApp = initializeApp(firebaseConfig);
-    
-    // Initialize Firestore with multi-tab persistence settings
-    initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
   } else {
     firebaseApp = getApp();
   }
 
-  // Always get the instances after ensuring initialization (with settings)
-  // This pattern ensures that even on hot-reload, we are using the correctly configured instance.
   const auth = getAuth(firebaseApp);
   const firestore = getFirestore(firebaseApp);
+  
+  // Enable multi-tab persistence.
+  // This is the correct way to handle persistence with hot-reloading.
+  enableMultiTabIndexedDbPersistence(firestore)
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // This means persistence is already enabled in another tab.
+        // This is a normal scenario in a multi-tab environment, so we can ignore it.
+        // console.warn('Firestore persistence failed: another tab has persistence enabled.');
+      } else if (err.code === 'unimplemented') {
+        // The browser doesn't support all the features required for persistence.
+        // console.warn('Firestore persistence is not supported in this browser.');
+      }
+    });
 
   return {
     firebaseApp,

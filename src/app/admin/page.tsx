@@ -58,6 +58,8 @@ import {
   getDocs,
   doc,
   updateDoc,
+  addDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -278,12 +280,25 @@ export default function AdminDashboardPage() {
         const userData = userDoc.data() as UserProfile;
         if (!userData.businessId) throw new Error("This user is not associated with any business.");
         const businessDocRef = doc(firestore, 'businessInstances', userData.businessId);
+        const historyColRef = collection(firestore, 'businessInstances', userData.businessId, 'subscription_history');
 
         if (grantLifetime) {
             await updateDoc(businessDocRef, { accessLevel: 'lifetime', trialExpiresAt: null });
+            await addDoc(historyColRef, {
+                action: 'Admin Grant: Lifetime access',
+                amount: 0,
+                currency: 'NGN',
+                timestamp: serverTimestamp()
+            });
             toast({ variant: 'success', title: 'Lifetime Access Granted!', description: `${userData.name}'s business now has lifetime access.` });
         } else if (grantDate) {
             await updateDoc(businessDocRef, { trialExpiresAt: grantDate });
+             await addDoc(historyColRef, {
+                action: `Admin Grant: Trial extended to ${format(grantDate, 'PPP')}`,
+                amount: 0,
+                currency: 'NGN',
+                timestamp: serverTimestamp()
+            });
             toast({ variant: 'success', title: 'Access Granted', description: `${userData.name}'s trial now expires on ${format(grantDate, 'PPP')}.` });
         }
         setGrantEmail('');
@@ -609,5 +624,7 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
 
     

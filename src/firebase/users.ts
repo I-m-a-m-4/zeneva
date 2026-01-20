@@ -168,12 +168,31 @@ export const createUserProfileDocument = async (
 
       if(referrerDoc.exists()) {
         const referrerData = referrerDoc.data();
-        const referrerBusinessRef = doc(firestore, 'businessInstances', referrerData.businessId);
-        
-        // Extend referrer's trial by 10 days
-        batch.update(referrerBusinessRef, {
-            trialExpiresAt: add(referrerData.trialExpiresAt.toDate(), { days: 10 }),
-        });
+        if (referrerData.businessId) {
+            const referrerBusinessRef = doc(firestore, 'businessInstances', referrerData.businessId);
+            const referrerBusinessDoc = await getDoc(referrerBusinessRef);
+
+            if (referrerBusinessDoc.exists()) {
+                const referrerBusinessData = referrerBusinessDoc.data();
+                // Safely get the current expiry date, or use now() if it's missing/invalid
+                const currentExpiry = referrerBusinessData.trialExpiresAt?.toDate() ?? new Date();
+                const newExpiryDate = add(currentExpiry, { days: 10 });
+
+                // Extend referrer's trial by 10 days
+                batch.update(referrerBusinessRef, {
+                    trialExpiresAt: newExpiryDate,
+                });
+                
+                // Add log for the referral bonus
+                const historyRef = doc(collection(firestore, `businessInstances/${referrerData.businessId}/subscription_history`));
+                batch.set(historyRef, {
+                    action: `Referral Bonus: +10 Days (from ${displayName})`,
+                    amount: 0,
+                    currency: 'NGN',
+                    timestamp: serverTimestamp(),
+                });
+            }
+        }
         
         batch.update(referrerUserRef, { referrals: increment(1) });
       
@@ -201,3 +220,6 @@ export const createUserProfileDocument = async (
   await batch.commit();
 
 };
+
+
+    

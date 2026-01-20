@@ -1,10 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp } from 'firebase/firestore';
@@ -13,6 +11,8 @@ import Papa from 'papaparse';
 import { Customer } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
+import { Checkbox } from '../ui/checkbox';
+import { Label } from '../ui/label';
 
 interface ImportCustomersDialogProps {
   isOpen: boolean;
@@ -23,11 +23,12 @@ interface ImportCustomersDialogProps {
 }
 
 type ParsedCustomer = Partial<Pick<Customer, 'name' | 'email' | 'phone'>>;
+type ParsedCustomerWithEmail = ParsedCustomer & { email: string; };
 
 const HEADER_MAPPINGS: { [key: string]: string[] } = {
-  name: ['Name', 'Full Name', 'Customer Name'],
-  email: ['Email', 'Email Address'],
-  phone: ['Phone', 'Phone Number'],
+  name: ['name', 'Name', 'Full Name', 'Customer Name'],
+  email: ['email', 'Email', 'Email Address'],
+  phone: ['phone', 'Phone', 'Phone Number', 'Mobile'],
 };
 
 export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess, businessId, existingCustomers }: ImportCustomersDialogProps) {
@@ -35,30 +36,17 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
   const firestore = useFirestore();
 
   const [file, setFile] = React.useState<File | null>(null);
-  const [parsedData, setParsedData] = React.useState<ParsedCustomer[]>([]);
+  const [parsedData, setParsedData] = React.useState<ParsedCustomerWithEmail[]>([]);
   const [isParsing, setIsParsing] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [generatePlaceholderEmail, setGeneratePlaceholderEmail] = React.useState(true);
   const existingEmails = React.useMemo(() => new Set(existingCustomers.map(c => c.email.toLowerCase())), [existingCustomers]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      if (selectedFile.type !== 'text/csv') {
-        setError('Invalid file type. Please upload a CSV file.');
-        setFile(null);
-        setParsedData([]);
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
-      parseFile(selectedFile);
-    }
-  };
-
-  const parseFile = (fileToParse: File) => {
+  const parseFile = React.useCallback((fileToParse: File) => {
     setIsParsing(true);
     setParsedData([]);
+    setError(null);
     Papa.parse(fileToParse, {
       header: true,
       skipEmptyLines: true,
@@ -88,26 +76,41 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
             phone: findHeader(HEADER_MAPPINGS.phone),
         };
 
-        if (!mappedHeaders.name || !mappedHeaders.email) {
-          setError("CSV must contain at least 'Name' and 'Email' columns.");
+        if (!mappedHeaders.name) {
+          setError("CSV must contain a 'Name' column.");
           setIsParsing(false);
           return;
         }
-
+        
         const data: ParsedCustomer[] = results.data.map((row: any) => ({
           name: row[mappedHeaders.name!] || undefined,
-          email: row[mappedHeaders.email!] || undefined,
-          phone: mappedHeaders.phone ? row[mappedHeaders.phone] || '' : '',
+          email: mappedHeaders.email ? row[mappedHeaders.email] || undefined : undefined,
+          phone: mappedHeaders.phone ? String(row[mappedHeaders.phone] || '') : undefined,
         }));
         
-        const validData = data.filter(d => d.name && d.email);
-        const newData = validData.filter(d => d.email && !existingEmails.has(d.email.toLowerCase()));
+        const validData = data.filter(d => d.name);
+        
+        const processedData = validData.map(d => {
+            if (generatePlaceholderEmail && !d.email && d.name) {
+                const sanitizedName = d.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (sanitizedName) {
+                    const uniqueSuffix = Math.random().toString(36).substring(2, 6);
+                    return {
+                        ...d,
+                        email: `${sanitizedName}${uniqueSuffix}@zeneva-import.local`,
+                    };
+                }
+            }
+            return d;
+        }).filter((d): d is ParsedCustomerWithEmail => !!d.name && !!d.email);
 
-        if(newData.length !== validData.length) {
+        const newData = processedData.filter(d => !existingEmails.has(d.email.toLowerCase()));
+
+        if(newData.length !== processedData.length && newData.length < validData.length) {
             toast({
                 variant: 'warning',
                 title: 'Duplicates Found',
-                description: `${validData.length - newData.length} customers already exist and will be skipped.`
+                description: `${processedData.length - newData.length} customers already exist and will be skipped.`
             })
         }
 
@@ -119,6 +122,27 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
         setIsParsing(false);
       }
     });
+  }, [generatePlaceholderEmail, existingEmails, toast]);
+  
+  React.useEffect(() => {
+    if (file) {
+      parseFile(file);
+    } else {
+      setParsedData([]);
+      setError(null);
+    }
+  }, [file, generatePlaceholderEmail, parseFile]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.type !== 'text/csv') {
+        setError('Invalid file type. Please upload a CSV file.');
+        setFile(null);
+        return;
+      }
+      setFile(selectedFile);
+    }
   };
 
   const handleImport = async () => {
@@ -129,15 +153,15 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
       const customersRef = collection(firestore, 'customers');
       
       parsedData.forEach(customerData => {
-        if (customerData.name && customerData.email) {
-          const newCustomerRef = doc(customersRef);
-          batch.set(newCustomerRef, {
-            ...customerData,
-            businessId,
-            loyaltyPoints: 0,
-            createdAt: serverTimestamp(),
-          });
-        }
+        const newCustomerRef = doc(customersRef);
+        batch.set(newCustomerRef, {
+          name: customerData.name,
+          email: customerData.email,
+          phone: customerData.phone || '',
+          businessId,
+          loyaltyPoints: 0,
+          createdAt: serverTimestamp(),
+        });
       });
 
       await batch.commit();
@@ -166,6 +190,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
     setError(null);
     setIsParsing(false);
     setIsImporting(false);
+    setGeneratePlaceholderEmail(true);
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -181,7 +206,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk-add customers. Ensure your file has columns for 'Name' and 'Email'.
+            Upload a CSV file to bulk-add customers. Ensure your file has columns for 'Name' and 'Email' or 'Phone'.
           </DialogDescription>
         </DialogHeader>
         
@@ -211,7 +236,18 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
                             {isParsing ? 'Parsing...' : `${parsedData.length} new customers found.`}
                         </p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => { setFile(null); setParsedData([]); }}>Change file</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setFile(null)}>Change file</Button>
+                </div>
+
+                <div className="mt-4 flex items-center space-x-2">
+                    <Checkbox
+                        id="generate-email"
+                        checked={generatePlaceholderEmail}
+                        onCheckedChange={(checked) => setGeneratePlaceholderEmail(!!checked)}
+                    />
+                    <Label htmlFor="generate-email" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                        Generate placeholder emails for rows that are missing one (based on customer name). If unchecked, rows without an email will be skipped.
+                    </Label>
                 </div>
 
                 {parsedData.length > 0 && (

@@ -30,6 +30,34 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
     )
   },
   {
+    question: "How should I format my CSV files for import?",
+    answer: (
+      <>
+        <p>To ensure a smooth import process for your products or customers, please make sure your CSV file's first row contains headers that match (or are similar to) the ones listed below. The header names are case-insensitive, meaning <code>name</code> works the same as <code>Name</code>.</p>
+        
+        <h4 className="font-semibold mt-4 mb-2">Product Import Headers</h4>
+        <p>Required headers: <strong>Name</strong> and <strong>Price</strong>.</p>
+        <ul className="list-disc list-inside space-y-1 my-2 text-sm text-muted-foreground">
+          <li>For <strong>Name</strong>, common headers are: <code>Name</code>, <code>Product Name</code>, <code>Title</code>.</li>
+          <li>For <strong>Price</strong>, common headers are: <code>Price</code>, <code>RetailPrice</code>.</li>
+          <li>For <strong>Stock</strong>, common headers are: <code>Stock</code>, <code>Quantity</code>, <code>Qty</code>.</li>
+          <li>For <strong>SKU</strong>, common headers are: <code>SKU</code>, <code>Code</code>.</li>
+          <li>For <strong>Category</strong>, common headers are: <code>Category</code>, <code>Type</code>.</li>
+          <li>For <strong>Description</strong>, common headers are: <code>Description</code>, <code>Body HTML</code>.</li>
+          <li>For <strong>Image URL</strong>, common headers are: <code>Image URL</code>, <code>Image Src</code>.</li>
+        </ul>
+
+        <h4 className="font-semibold mt-6 mb-2">Customer Import Headers</h4>
+        <p>Required headers: <strong>Name</strong> and <strong>Email</strong>.</p>
+        <ul className="list-disc list-inside space-y-1 my-2 text-sm text-muted-foreground">
+          <li>For <strong>Name</strong>, common headers are: <code>Name</code>, <code>Full Name</code>.</li>
+          <li>For <strong>Email</strong>, common headers are: <code>Email</code>, <code>Email Address</code>.</li>
+          <li>For <strong>Phone</strong>, common headers are: <code>Phone</code>, <code>Mobile</code>.</li>
+        </ul>
+      </>
+    )
+  },
+  {
     question: "How do I process a sale using the POS?",
     answer: (
       <>
