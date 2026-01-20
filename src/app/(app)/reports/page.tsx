@@ -1,20 +1,19 @@
+
 'use client';
 
 import * as React from 'react';
-import PageTitle from '@/components/shared/page-title';
-import { useBusiness } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import { Loader2, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ReportsDashboard from '@/components/reports/reports-dashboard';
-import { ProductProvider } from '@/context/product-context';
-import { POSProvider } from '@/context/pos-context';
+import PageTitle from '@/components/shared/page-title';
 
 export default function ReportsPage() {
-    const business = useBusiness();
+    const { business, isLoading } = usePOS();
 
-    if (!business) {
+    if (isLoading || !business) {
         return (
             <div className="flex h-64 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -51,11 +50,6 @@ export default function ReportsPage() {
         )
     }
 
-    return (
-        <POSProvider>
-            <ProductProvider>
-                <ReportsDashboard />
-            </ProductProvider>
-        </POSProvider>
-    );
+    // The main POSProvider is already in the layout, so we don't need extra providers here.
+    return <ReportsDashboard />;
 }

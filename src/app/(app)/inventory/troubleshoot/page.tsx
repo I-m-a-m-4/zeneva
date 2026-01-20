@@ -2,113 +2,63 @@
 "use client";
 
 import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
-import type { Product, UserProfile, BusinessInstance } from "@/types";
+import type { Product, BusinessInstance } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useDoc, useFirestore, useUser, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
-import { AlertTriangle, CheckCircle, Lightbulb, Loader, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit } from "lucide-react";
+import { usePOS } from "@/context/pos-context";
+import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit } from "lucide-react";
 import React, { useState, useTransition, useMemo } from "react";
 import Link from 'next/link';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useProducts } from '@/context/product-context';
 
 type Suggestion = {
     suggestions: string;
 }
 
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-    return { profile: userProfile, isLoading };
-}
-
-function TroubleshootSkeleton() {
-    return (
-        <div className="grid gap-6">
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-1/2" />
-                    <Skeleton className="h-4 w-3/4" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <Skeleton className="h-5 w-1/4" />
-                        <Skeleton className="h-4 w-full" />
-                    </div>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Skeleton className="h-24" />
-                        <Skeleton className="h-24" />
-                        <Skeleton className="h-24" />
-                        <Skeleton className="h-24" />
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-1/3" />
-                    <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-10 w-40" />
-                </CardContent>
-            </Card>
-        </div>
-    )
-}
-
-
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
-    if (!issue) return null;
+  if (!issue) return null;
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>{issue.title}</DialogTitle>
-                    <DialogDescription>
-                        Found {issue.items.length} products with this issue. Click on a product to go to its edit page and resolve the issue.
-                    </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="h-96">
-                    <div className="space-y-2 pr-4">
-                        {issue.items.map(product => (
-                            <Link href={`/inventory/${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="font-medium">{product.name}</p>
-                                        <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'}</p>
-                                    </div>
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <div className="flex items-center">
-                                            <Edit className="h-4 w-4 mr-2" /> Fix
-                                        </div>
-                                    </Button>
-                                </div>
-                            </Link>
-                        ))}
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{issue.title}</DialogTitle>
+          <DialogDescription>
+            Found {issue.items.length} products with this issue. Click on a product to go to its edit page and resolve the issue.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-96">
+          <div className="space-y-2 pr-4">
+            {issue.items.map(product => (
+              <Link href={`/inventory/${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'}</p>
                     </div>
-                </ScrollArea>
-            </DialogContent>
-        </Dialog>
-    )
+                    <Button variant="ghost" size="sm" asChild>
+                        <div className="flex items-center">
+                            <Edit className="h-4 w-4 mr-2"/> Fix
+                        </div>
+                    </Button>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
 }
-
 
 function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick }: { icon: React.ElementType, title: string, count: number, items: Product[], unit?: string, onFixClick: () => void }) {
     if (count === 0) return null;
@@ -116,7 +66,7 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
         <Card className="flex flex-col">
             <CardHeader className="pb-4">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-destructive" />
+                    <Icon className="h-5 w-5 text-destructive"/>
                     {title}
                 </CardTitle>
             </CardHeader>
@@ -124,10 +74,10 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
                 <p className="text-3xl font-bold text-destructive">{count}</p>
                 <p className="text-xs text-muted-foreground">{unit} with this issue</p>
                 {items.length > 0 && (
-                    <ul className="text-xs text-muted-foreground mt-4 space-y-1">
+                     <ul className="text-xs text-muted-foreground mt-4 space-y-1">
                         {items.slice(0, 2).map(p => <li key={p.id} className="truncate" title={p.name}>- {p.name}</li>)}
                         {items.length > 2 && <li>...and {items.length - 2} more</li>}
-                    </ul>
+                     </ul>
                 )}
             </CardContent>
             <CardFooter>
@@ -140,32 +90,21 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
     )
 }
 
-
 export default function TroubleshootPage() {
     const [isPending, startTransition] = useTransition();
     const [suggestions, setSuggestions] = useState<Suggestion | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState<{ title: string, items: Product[] } | null>(null);
 
-    const { profile: currentUserProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
-    const firestore = useFirestore();
-    const currentBusinessId = currentUserProfile?.businessId;
-
-    const { products, isLoading: isLoadingProducts } = useProducts();
-
-    const businessDocRef = useMemoFirebase(() => {
-        if (!currentBusinessId || !firestore) return null;
-        return doc(firestore, 'businessInstances', currentBusinessId);
-    }, [currentBusinessId, firestore]);
-    const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
-
+    const { products, business, isLoading } = usePOS();
+    
     const analysis = useMemo(() => {
         if (!products) return null;
         const productsWithoutPrice = products.filter(p => !p.price || p.price <= 0);
         const productsWithoutCategory = products.filter(p => !p.category);
         const productsWithoutDescription = products.filter(p => !p.description || p.description.length < 10);
         const lowStockProducts = products.filter(p => (p.stock || 0) <= (p.lowStockThreshold || 5));
-
+        
         const totalPoints = products.length * 4;
         const issuePoints = productsWithoutPrice.length + productsWithoutCategory.length + productsWithoutDescription.length + lowStockProducts.length;
         const dataQualityScore = totalPoints > 0 ? Math.round(((totalPoints - issuePoints) / totalPoints) * 100) : 100;
@@ -190,41 +129,31 @@ export default function TroubleshootPage() {
             return;
         }
         startTransition(async () => {
-            const mappedProducts = products.map(p => ({
-                productId: p.id,
-                name: p.name,
-                description: p.description,
-                price: p.price,
-                category: p.category,
-                sku: p.sku
-            }));
-            const result = await productTroubleshoot({ products: mappedProducts });
+            const result = await productTroubleshoot({ products });
             setSuggestions(result);
         });
     };
-
-    const isLoading = isProfileLoading || isLoadingProducts || isBusinessLoading;
-
+    
     if (isLoading) {
-        return <TroubleshootSkeleton />;
+        return <div className="flex items-center justify-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
     }
-
+    
     if (!analysis || analysis.totalProducts === 0) {
-        return (
-            <Card>
+         return (
+             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline">Inventory Health Check</CardTitle>
                 </CardHeader>
                 <CardContent className="text-center py-12">
-                    <Package className="h-16 w-16 mx-auto text-muted-foreground/50" />
-                    <h3 className="text-xl font-semibold mt-4">No Products to Analyze</h3>
-                    <p className="text-muted-foreground mt-2">Add some products to your inventory to get started.</p>
+                     <Package className="h-16 w-16 mx-auto text-muted-foreground/50"/>
+                     <h3 className="text-xl font-semibold mt-4">No Products to Analyze</h3>
+                     <p className="text-muted-foreground mt-2">Add some products to your inventory to get started.</p>
                 </CardContent>
             </Card>
-        )
+         )
     }
 
-    const canUseAIFeature = ['pro', 'business'].includes(businessInstance?.plan || '');
+    const canUseAIFeature = ['pro', 'business'].includes(business?.plan || '');
 
     const allIssues = [
         { icon: DollarSign, title: "Missing Price", count: analysis.productsWithoutPrice.length, items: analysis.productsWithoutPrice },
@@ -232,7 +161,7 @@ export default function TroubleshootPage() {
         { icon: FileText, title: "Short Description", count: analysis.productsWithoutDescription.length, items: analysis.productsWithoutDescription },
         { icon: Package, title: "Missing Category", count: analysis.productsWithoutCategory.length, items: analysis.productsWithoutCategory },
     ];
-
+    
     const hasIssues = allIssues.some(issue => issue.count > 0);
 
     return (
@@ -258,17 +187,17 @@ export default function TroubleshootPage() {
                         </div>
                     ) : (
                         <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300 [&>svg]:text-green-600">
-                            <CheckCircle className="h-4 w-4" />
-                            <AlertTitle className="font-semibold">Excellent Data Quality!</AlertTitle>
-                            <AlertDescription>All your products have prices, categories, descriptions, and healthy stock levels.</AlertDescription>
-                        </Alert>
+                           <CheckCircle className="h-4 w-4" />
+                           <AlertTitle className="font-semibold">Excellent Data Quality!</AlertTitle>
+                           <AlertDescription>All your products have prices, categories, descriptions, and healthy stock levels.</AlertDescription>
+                       </Alert>
                     )}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary" /> AI-Powered Suggestions</CardTitle>
+                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> AI-Powered Suggestions</CardTitle>
                     <CardDescription>Use GenAI to get advanced merchandising and data quality recommendations for your live inventory.</CardDescription>
                 </CardHeader>
                 {canUseAIFeature ? (
@@ -276,7 +205,7 @@ export default function TroubleshootPage() {
                         <CardContent>
                             {isPending ? (
                                 <div className="space-y-2 p-8 text-center">
-                                    <Loader className="h-8 w-8 animate-spin mx-auto text-primary" />
+                                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                                     <p className="text-muted-foreground">AI is analyzing your inventory...</p>
                                 </div>
                             ) : suggestions ? (
@@ -294,14 +223,14 @@ export default function TroubleshootPage() {
                         </CardContent>
                         <CardFooter>
                             <Button onClick={handleGetSuggestions} disabled={isPending || analysis.totalProducts === 0}>
-                                {isPending && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isPending ? "Analyzing..." : suggestions ? "Regenerate Suggestions" : "Get AI Suggestions"}
                             </Button>
                         </CardFooter>
                     </>
                 ) : (
                     <CardContent className="text-center py-12">
-                        <Zap className="h-16 w-16 mx-auto text-muted-foreground/50" />
+                        <Zap className="h-16 w-16 mx-auto text-muted-foreground/50"/>
                         <h3 className="text-xl font-semibold mt-4">Upgrade to Unlock AI Suggestions</h3>
                         <p className="text-muted-foreground mt-2 max-w-md mx-auto">Get advanced merchandising, data quality recommendations, and more by upgrading to our Pro or Business plan.</p>
                         <Button asChild className="mt-6">
@@ -311,7 +240,7 @@ export default function TroubleshootPage() {
                 )}
             </Card>
 
-            <IssueDetailsDialog
+            <IssueDetailsDialog 
                 isOpen={isModalOpen}
                 onOpenChange={setIsModalOpen}
                 issue={selectedIssue}

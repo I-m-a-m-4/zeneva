@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
-import { PieChart as PieChartIcon, Loader2 } from "lucide-react";
-import { useProducts } from '@/context/product-context';
+import { PieChart as PieChartIcon } from "lucide-react";
+import type { Product } from '@/types';
 
 const chartConfig = {
   electronics: { label: "Electronics", color: "hsl(var(--chart-1))" },
@@ -18,35 +18,33 @@ const chartConfig = {
   other: { label: "Other", color: "hsl(var(--muted))" },
 } satisfies ChartConfig;
 
+interface CategoryPieChartProps {
+  products: Product[];
+}
 
-export default function CategoryPieChart() {
-  const { products, isLoading } = useProducts();
-
+export default function CategoryPieChart({ products }: CategoryPieChartProps) {
   const chartData = React.useMemo(() => {
-    if (!products) {
-        return [];
-    }
+    if (!products) return [];
 
     const categoryCounts: Record<string, number> = {};
     products.forEach(product => {
-      const categoryKey = product.category || 'other';
-      // Ensure the categoryKey is a valid key for chartConfig
+      const categoryKey = product.category?.toLowerCase() || 'other';
       const validCategoryKey = Object.keys(chartConfig).includes(categoryKey) ? categoryKey : 'other';
       categoryCounts[validCategoryKey] = (categoryCounts[validCategoryKey] || 0) + (product.stock || 0);
     });
 
     return Object.entries(categoryCounts).map(([name, items]) => ({
-      name: chartConfig[name as keyof typeof chartConfig]?.label || name,
+      name: chartConfig[name as keyof typeof chartConfig]?.label || name.charAt(0).toUpperCase() + name.slice(1),
       items,
       fill: chartConfig[name as keyof typeof chartConfig]?.color || "hsl(var(--muted))",
     }));
   }, [products]);
 
   const totalItems = React.useMemo(() => {
-    return chartData.reduce((acc, curr) => acc + curr.items, 0);
-  }, [chartData]);
+    return products.reduce((acc, curr) => acc + (curr.stock || 0), 0);
+  }, [products]);
   
-  const noData = !isLoading && chartData.length === 0;
+  const noData = chartData.length === 0;
 
   return (
     <Card className="flex flex-col shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
@@ -55,11 +53,7 @@ export default function CategoryPieChart() {
         <CardDescription>Distribution of your total stock across categories.</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        {isLoading ? (
-          <div className="h-[250px] flex items-center justify-center">
-            <Loader2 className="h-12 w-12 text-primary animate-spin"/>
-          </div>
-        ) : noData ? (
+        {noData ? (
           <div className="h-[250px] flex flex-col items-center justify-center text-center text-muted-foreground">
             <PieChartIcon className="h-16 w-16 opacity-50 mb-4" />
             <p className="text-lg font-medium">No Data to Display</p>

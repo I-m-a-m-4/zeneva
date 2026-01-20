@@ -30,6 +30,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
+import RefreshButton from '@/components/shared/refresh-button';
 
 // Hook to get current user's profile
 function useCurrentUserProfile() {
@@ -122,6 +123,7 @@ export default function CustomersPage() {
                 </CardDescription>
             </div>
              <div className="flex items-center gap-2">
+                <RefreshButton />
                 <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                     <Upload className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

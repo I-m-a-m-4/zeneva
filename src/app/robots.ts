@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
       disallow: [
-        '/admin-imam/',
+        '/admin-imamshaffy/',
         '/sales/',
         '/dashboard/',
         '/inventory/',
@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
         '/customers/',
         '/settings/',
         '/billing/',
-        '/onboarding/',
       ],
     },
     sitemap: `${siteUrl}/sitemap.xml`,

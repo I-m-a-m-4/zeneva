@@ -29,14 +29,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import type { UserProfile } from '@/types';
-import { useBusiness } from '@/context/pos-context';
-import { useProducts } from '@/context/product-context';
+import { usePOS } from '@/context/pos-context';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -55,29 +53,17 @@ const PRODUCT_LIMITS = {
   business: Infinity,
 };
 
-// Hook to get current user's profile
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-
-    return { profile: userProfile, isLoading };
-}
-
 export default function AddProductPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const { profile: userProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
-    const business = useBusiness();
-    const { products, isLoading: isLoadingProducts } = useProducts();
+    const { user } = useUser();
+    const { business, products, businessUsers, isLoading } = usePOS();
     const firestore = useFirestore();
     const [isSaving, setIsSaving] = React.useState(false);
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+    
+    const userProfile = businessUsers?.find(u => u.id === user?.uid);
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
@@ -133,7 +119,6 @@ export default function AddProductPage() {
         let imageUrl = '';
 
         try {
-            // Step 1: Upload image if one is selected
             if (imageFile) {
                 const formData = new FormData();
                 formData.append('image', imageFile);
@@ -156,7 +141,6 @@ export default function AddProductPage() {
                 imageUrl = result.data.url;
             }
 
-            // Step 2: Save product to Firestore
             const productsCollection = collection(firestore, 'products');
             await addDoc(productsCollection, {
                 ...values,
@@ -176,8 +160,6 @@ export default function AddProductPage() {
             setIsSaving(false);
         }
     };
-
-    const isLoading = isProfileLoading || isLoadingProducts;
 
   return (
     <Form {...form}>

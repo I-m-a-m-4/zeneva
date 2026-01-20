@@ -49,9 +49,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
-import type { Product, UserProfile } from '@/types';
+import type { Product } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import ImportDialog from '@/components/inventory/import-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -59,23 +59,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
-import { useBusiness, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
-import { useProducts } from '@/context/product-context';
 import Papa from 'papaparse';
-
-// Hook to get current user's profile
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-
-    return { profile: userProfile, isLoading };
-}
+import { useUser } from '@/firebase';
+import RefreshButton from '@/components/shared/refresh-button';
 
 function ProductRowSkeleton() {
     return (
@@ -109,12 +97,13 @@ function ProductRowSkeleton() {
 const PRODUCTS_PER_PAGE = 10;
 
 export default function InventoryPage() {
-  const { profile: currentUserProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const business = useBusiness();
-  const { products: allProducts, isLoading: isLoadingProducts } = useProducts();
+  const { products: allProducts, isLoading, business, currencySymbol, businessUsers } = usePOS();
+  const { user } = useUser();
+  
+  const currentUserProfile = businessUsers?.find(u => u.id === user?.uid);
 
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -140,14 +129,8 @@ export default function InventoryPage() {
     }
   }, [business, router, toast]);
 
-  const currentBusinessId = currentUserProfile?.businessId;
   const userRole = currentUserProfile?.role;
   const canManageStock = userRole === 'admin' || userRole === 'manager';
-
-  const currencySymbol = React.useMemo(() => {
-    const code = business?.settings?.currency || 'NGN';
-    return CURRENCY_SYMBOLS[code] || '₦';
-  }, [business]);
 
   const filteredAndSortedProducts = React.useMemo(() => {
     if (!allProducts) return [];
@@ -171,8 +154,6 @@ export default function InventoryPage() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const isLoading = isProfileLoading || isLoadingProducts;
-  
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
       setSelectedProductIds(filteredAndSortedProducts.map(p => p.id));
@@ -269,6 +250,7 @@ export default function InventoryPage() {
                   </span>
               </Button>
           )}
+          <RefreshButton />
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
             <Download className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -469,7 +451,7 @@ export default function InventoryPage() {
         isOpen={isImportOpen} 
         onOpenChange={setIsImportOpen} 
         onSuccess={handleImportSuccess}
-        businessId={currentBusinessId}
+        businessId={business?.id}
         products={allProducts}
       />
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

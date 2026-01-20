@@ -12,11 +12,9 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { Product, UserProfile } from '@/types';
 import { Home, Package, ShoppingCart, Users, LifeBuoy, CreditCard, Settings, FileText, Bot } from 'lucide-react';
-import { useProducts } from '@/context/product-context';
+import { usePOS } from '@/context/pos-context';
+import { useUser } from '@/firebase';
 
 interface CommandMenuProps {
     open: boolean;
@@ -35,23 +33,12 @@ const navLinks = [
     { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];
 
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-    return userProfile;
-}
-
 export default function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
     const router = useRouter();
-    const currentUserProfile = useCurrentUserProfile();
+    const { user } = useUser();
+    const { products, businessUsers } = usePOS();
+    const currentUserProfile = businessUsers?.find(u => u.id === user?.uid);
     const userRole = currentUserProfile?.role;
-
-    const { products } = useProducts();
 
     const runCommand = React.useCallback((command: () => unknown) => {
         onOpenChange(false);

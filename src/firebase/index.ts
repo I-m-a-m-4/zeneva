@@ -3,37 +3,32 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
   if (getApps().length === 0) {
-    // Directly initialize with the config object.
-    // The try-catch for automatic initialization is not reliable in all build environments.
     firebaseApp = initializeApp(firebaseConfig);
     
-    // Initialize Firestore with persistence settings
-    const firestore = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({})
+    // Initialize Firestore with multi-tab persistence settings
+    initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
-    
-    return {
-      firebaseApp,
-      auth: getAuth(firebaseApp),
-      firestore: firestore
-    };
   } else {
-    // App is already initialized (e.g. on hot-reload)
     firebaseApp = getApp();
-    
-    // Simply get the existing instances of the services
-    return {
-      firebaseApp,
-      auth: getAuth(firebaseApp),
-      firestore: getFirestore(firebaseApp)
-    };
   }
+
+  // Always get the instances after ensuring initialization (with settings)
+  // This pattern ensures that even on hot-reload, we are using the correctly configured instance.
+  const auth = getAuth(firebaseApp);
+  const firestore = getFirestore(firebaseApp);
+
+  return {
+    firebaseApp,
+    auth,
+    firestore
+  };
 }
 
 export * from './provider';

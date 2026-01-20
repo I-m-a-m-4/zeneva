@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { usePOS, useBusiness } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ChevronsDown } from "lucide-react";
+import { usePOS } from "@/context/pos-context";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import *as React from "react";
@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useProducts } from "@/context/product-context";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -81,16 +80,13 @@ const CartContents = () => {
 
 
 export default function SelectProductsPage() {
-    const { cart, addToCart, subtotal, currencySymbol } = usePOS();
+    const { cart, addToCart, subtotal, currencySymbol, products, isLoading, business } = usePOS();
     const router = useRouter();
     const { toast } = useToast();
-    const business = useBusiness();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
     
-    const { products, isLoading } = useProducts();
-
     React.useEffect(() => {
         if (business) {
             const isTrialActive = business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date();

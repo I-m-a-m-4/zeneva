@@ -3,26 +3,21 @@
 import *as React from 'react';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
-import { DollarSign, Package, Users, AlertCircle, ShoppingCart, TrendingUp, FileText, ArrowRightCircle, CreditCard, Truck, CheckCircle, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, Send, Gift, Loader2, PlusCircle, Download, Trophy } from 'lucide-react';
+import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, Trophy, PlusCircle, Download } from 'lucide-react';
 import DashboardClientContent from '@/components/dashboard/dashboard-client-content';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import type { Customer, Receipt, InventoryItem, UserProfile } from '@/types';
+import type { TopSellingItem } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, getDocs, query, where, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBusiness, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
-import { useProducts } from '@/context/product-context';
-
-interface TopSellingItem extends InventoryItem {
-  quantitySold: number;
-}
+import { useUser } from '@/firebase';
+import RefreshButton from '@/components/shared/refresh-button';
 
 function DashboardSkeleton() {
   return (
@@ -52,47 +47,16 @@ function DashboardSkeleton() {
   );
 }
 
-
 export default function DashboardPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
-  const business = useBusiness();
   const dashboardRef = React.useRef<HTMLDivElement>(null);
   
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
-  const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+  const { products, receipts, customers, businessUsers, isLoading, currencySymbol, business } = usePOS();
   
-  const currentBusinessId = currentUserProfile?.businessId;
-  const { products, isLoading: areProductsLoading } = useProducts();
-
-  const receiptsQuery = useMemoFirebase(() => {
-    if (!currentBusinessId || !firestore) return null;
-    return query(collection(firestore, "receipts"), where("businessId", "==", currentBusinessId));
-  }, [currentBusinessId, firestore]);
-  const { data: receipts, isLoading: areReceiptsLoading } = useCollection<Receipt>(receiptsQuery);
-
-  const customersQuery = useMemoFirebase(() => {
-    if (!currentBusinessId || !firestore) return null;
-    return query(collection(firestore, "customers"), where("businessId", "==", currentBusinessId));
-  }, [currentBusinessId, firestore]);
-  const { data: customers, isLoading: areCustomersLoading } = useCollection<Customer>(customersQuery);
-
-  const usersQuery = useMemoFirebase(() => {
-    if (!currentBusinessId || !firestore) return null;
-    return query(collection(firestore, "users"), where("businessId", "==", currentBusinessId));
-  }, [currentBusinessId, firestore]);
-  const { data: businessUsers, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
-
-  const currencySymbol = React.useMemo(() => {
-    const code = business?.settings?.currency || 'NGN';
-    return CURRENCY_SYMBOLS[code] || '₦';
-  }, [business]);
-
   const dashboardData = React.useMemo(() => {
-    // Use empty arrays as defaults to prevent checks from failing during initial renders
     const inventoryItems = products || [];
     const safeReceipts = receipts || [];
     const safeCustomers = customers || [];
@@ -137,6 +101,8 @@ export default function DashboardPage() {
         .filter(u => u.referrals && u.referrals > 0)
         .sort((a, b) => (b.referrals || 0) - (a.referrals || 0))
         .slice(0, 3);
+    
+    const currentUserProfile = safeBusinessUsers.find(u => u.id === user?.uid);
 
     return {
       totalStock,
@@ -148,11 +114,10 @@ export default function DashboardPage() {
       topSellingItems: sortedItems,
       topLoyaltyCustomers,
       topReferrers,
+      currentUserProfile,
     };
-  }, [products, receipts, customers, businessUsers]);
+  }, [products, receipts, customers, businessUsers, user]);
   
-  const isLoading = areProductsLoading || areReceiptsLoading || areCustomersLoading || isProfileLoading || areUsersLoading;
-
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;
     if (!element) return;
@@ -178,12 +143,13 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers, topReferrers } = dashboardData;
+  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers, topReferrers, currentUserProfile } = dashboardData;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
         <div className="no-capture flex items-center gap-2">
+          <RefreshButton />
           <Button onClick={() => setIsAddCustomerOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
           </Button>
@@ -237,19 +203,19 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">Completed Sales</p>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
-                <Truck className="h-8 w-8 text-primary mb-2" />
+                <FileDigit className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">To be Shipped</p>
+                <p className="text-xs text-muted-foreground">To be Invoiced</p>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <PackageSearch className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
                 <p className="text-xs text-muted-foreground">To be Delivered</p>
               </div>
-              <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
-                <FileDigit className="h-8 w-8 text-primary mb-2" />
+               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
+                <PackageSearch className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">To be Invoiced</p>
+                <p className="text-xs text-muted-foreground">To be Delivered</p>
               </div>
             </div>
           </CardContent>
@@ -391,11 +357,11 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {currentBusinessId && (
+      {business && (
         <AddCustomerDialog
             isOpen={isAddCustomerOpen}
             onOpenChange={setIsAddCustomerOpen}
-            businessId={currentBusinessId}
+            businessId={business.id}
         />
       )}
     </div>

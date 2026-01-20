@@ -34,7 +34,7 @@ import CommandMenu from '@/components/layout/command-menu';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
-import { ProductProvider } from '@/context/product-context';
+import { POSProvider } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -243,7 +243,7 @@ export default function AppLayout({
   };
   
   return (
-    <ProductProvider>
+    <POSProvider>
       <TooltipProvider>
         <SidebarProvider defaultOpen={true}>
           <div 
@@ -431,6 +431,6 @@ export default function AppLayout({
           <CommandMenu open={openCommandMenu} onOpenChange={setOpenCommandMenu}/>
         </SidebarProvider>
       </TooltipProvider>
-    </ProductProvider>
+    </POSProvider>
   );
 }

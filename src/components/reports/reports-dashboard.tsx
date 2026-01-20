@@ -2,10 +2,9 @@
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
-import { useProducts } from '@/context/product-context';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Customer, Receipt } from '@/types';
+import type { Receipt } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2 } from 'lucide-react';
@@ -19,6 +18,7 @@ import TopCustomersList from './top-customers-list';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
+import RefreshButton from '../shared/refresh-button';
 
 function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
     return (
@@ -35,8 +35,7 @@ function ReportStatCard({ title, value, icon: Icon }: { title: string, value: st
 }
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business } = usePOS();
-    const { products, isLoading: isLoadingProducts } = useProducts();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading } = usePOS();
     const firestore = useFirestore();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
@@ -63,14 +62,7 @@ export default function ReportsDashboard() {
 
     const { data: receipts, isLoading: isLoadingReceipts } = useCollection<Receipt>(receiptsQuery);
     
-    const customersQuery = useMemoFirebase(() => {
-        if (!business?.id || !firestore) return null;
-        return query(collection(firestore, "customers"), where("businessId", "==", business.id));
-    }, [business?.id, firestore]);
-
-    const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
-    
-    const isLoading = isLoadingProducts || isLoadingReceipts || isLoadingCustomers;
+    const isLoading = isPosLoading || isLoadingReceipts;
 
     const reportData = React.useMemo(() => {
         if (isLoading || !receipts || !products || !customers) return null;
@@ -118,6 +110,7 @@ export default function ReportsDashboard() {
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
             <PageTitle title="Reports" subtitle="Deep dive into your business performance.">
                 <div className="flex items-center gap-2 no-capture">
+                    <RefreshButton />
                     <DateRangePicker date={date} onDateChange={setDate} />
                     <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4"/>Download</Button>
                 </div>

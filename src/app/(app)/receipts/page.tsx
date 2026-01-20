@@ -27,6 +27,7 @@ import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import RefreshButton from "@/components/shared/refresh-button";
 
 // Hook to get current business ID and user profile
 function useCurrentUserProfile() {
@@ -139,8 +140,13 @@ export default function ReceiptsPage() {
     <>
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Transaction History</CardTitle>
-        <CardDescription>A log of all completed sales.</CardDescription>
+        <div className="flex items-center justify-between">
+            <div>
+                <CardTitle>Transaction History</CardTitle>
+                <CardDescription>A log of all completed sales.</CardDescription>
+            </div>
+            <RefreshButton />
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
