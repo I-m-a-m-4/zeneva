@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
-import { initiateEmailSignIn } from "@/firebase/non-blocking-login";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const router = useRouter();
   const auth = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -31,9 +29,11 @@ export default function LoginPage() {
         return;
     }
     setIsLoading(true);
-    initiateEmailSignIn(auth, email, password)
+    signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        router.push('/dashboard');
+        // On success, do nothing. The auth layout will detect the state
+        // change and handle the redirection automatically. This prevents
+        // any flashes of content or layout shifts.
       })
       .catch((error) => {
          toast({
@@ -41,7 +41,7 @@ export default function LoginPage() {
           title: 'Login Failed',
           description: 'Invalid email or password. Please try again.',
         });
-        setIsLoading(false);
+        setIsLoading(false); // Only set loading to false on failure.
       });
   };
 

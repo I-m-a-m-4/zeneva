@@ -68,6 +68,10 @@
           "type": "string",
           "description": "The user's full name."
         },
+        "phone": {
+            "type": "string",
+            "description": "The user's phone number."
+        },
         "referralCode": {
             "type": "string",
             "description": "Unique code for referring new users."
@@ -332,6 +336,34 @@
             "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": ["referrerId", "referredUserId", "createdAt"]
+    },
+    "SupportThread": {
+        "title": "Support Thread",
+        "description": "Represents a single conversation thread between a user and admin support.",
+        "type": "object",
+        "properties": {
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "userEmail": { "type": "string", "format": "email" },
+            "subject": { "type": "string" },
+            "status": { "type": "string", "enum": ["open", "closed"] },
+            "lastMessageAt": { "type": "string", "format": "date-time" },
+            "lastMessageSnippet": { "type": "string" },
+            "isReadByAdmin": { "type": "boolean" }
+        },
+        "required": ["userId", "userName", "userEmail", "subject", "status", "lastMessageAt"]
+    },
+    "SupportMessage": {
+        "title": "Support Message",
+        "description": "A single message within a support thread.",
+        "type": "object",
+        "properties": {
+            "senderId": { "type": "string" },
+            "senderName": { "type": "string" },
+            "text": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["senderId", "senderName", "text", "createdAt"]
     }
   },
   "auth": {
@@ -485,6 +517,22 @@
             "schema": { "$ref": "#/backend/entities/Referral" },
             "description": "A log of all successful user referrals for analytics."
         }
+      },
+      {
+          "path": "/supportThreads/{threadId}",
+          "definition": {
+              "entityName": "SupportThread",
+              "schema": { "$ref": "#/backend/entities/SupportThread" },
+              "description": "Stores all support conversation threads."
+          }
+      },
+      {
+          "path": "/supportThreads/{threadId}/messages/{messageId}",
+          "definition": {
+              "entityName": "SupportMessage",
+              "schema": { "$ref": "#/backend/entities/SupportMessage" },
+              "description": "Stores all messages within a specific support thread."
+          }
       }
     ],
     "reasoning": "The Firestore structure for Zeneva is designed around multi-tenancy and the core design principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. Each top-level collection (products, receipts, customers, and users) is scoped to a BusinessInstance to ensure data isolation and straightforward security rules. The design denormalizes the businessId into every business-specific document, thus ensuring authorization independence. The roles of users is stored directly in the `users` collection. Path-based ownership is applied to the `/users/{userId}` collection, simplifying security rules for user profiles.\n\nThe structure achieves Authorization Independence (Strategy A) by denormalizing the `businessId` into each document within the `products`, `receipts`, `customers` collections. This eliminates the need for `get()` calls to parent documents in security rules, enabling atomic operations and improving performance. Every collection is segregated to guarantee a Homogeneous Security Posture (Strategy B).\n\nA top-level `/purchases` collection is added for admins to easily query and analyze revenue data, while user-specific subscription details are nested under `/businessInstances/{businessId}/subscription_history` for privacy.\n\nTo support the new referral system, a `referralCode` is added to the User entity. A new top-level `/referrals` collection logs each successful referral event for analytics. User-specific notifications (like referral rewards) are stored in a nested collection `/users/{userId}/notifications` to ensure they are private and scalable, while platform-wide admin announcements remain in the `/notifications` collection."

@@ -4,12 +4,12 @@
 
 import *as React from 'react';
 import PageTitle from '@/components/shared/page-title';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Paintbrush, Briefcase, Percent, Building, UserCircle, Bell, DollarSign, ShieldCheck, FileText, DownloadCloud, Eye, EyeOff, KeyRound, Gift, Trophy, Loader2, Clock, History, Tag, X, Copy, Share2 } from 'lucide-react'; 
+import { Paintbrush, Briefcase, Percent, Building, UserCircle, Bell, DollarSign, ShieldCheck, FileText, DownloadCloud, Eye, EyeOff, KeyRound, Gift, Trophy, Loader2, Clock, History, Tag, X, Copy, Share2, Trash2 } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -20,9 +20,21 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, writeBatch, deleteDoc, setDoc } from "firebase/firestore";
 import { BusinessInstance, UserProfile } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getAuth, signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 const dummyVendorPolicyTemplate = `
 **Zeneva Inventory Vendor/Operator Agreement**
@@ -45,6 +57,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
 
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
@@ -53,6 +66,9 @@ export default function SettingsPage() {
   const { data: currentBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
   const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
   
   const [businessName, setBusinessName] = React.useState("");
   const [businessAddress, setBusinessAddress] = React.useState("");
@@ -276,6 +292,49 @@ export default function SettingsPage() {
         }
     };
 
+    const handleDeleteAccount = async () => {
+        if (!firestore || !user || !businessDocRef || !userDocRef) return;
+        setIsDeleting(true);
+
+        try {
+            const batch = writeBatch(firestore);
+            
+            // Mark the business as deleted
+            batch.update(businessDocRef, {
+                status: 'deleted',
+                deletedAt: serverTimestamp(),
+            });
+
+            // Set user status to 'inactive', allowing admin to reactivate
+            batch.update(userDocRef, {
+                status: 'inactive',
+            });
+            
+            await batch.commit();
+
+            toast({
+                variant: "success",
+                title: "Account Deletion Successful",
+                description: "Your business has been deleted and your account is now inactive. You will be logged out.",
+            });
+            
+            setTimeout(() => {
+                signOut(getAuth()).then(() => {
+                    router.push('/login'); 
+                });
+            }, 2000);
+
+        } catch (e) {
+            console.error("Account deletion failed:", e);
+            toast({
+                variant: "destructive",
+                title: "Deletion Failed",
+                description: "An error occurred while deleting your account. Please contact support.",
+            });
+            setIsDeleting(false);
+        }
+    }
+
   const isLoading = isUserLoading || isProfileLoading || isBusinessLoading;
 
   if (isLoading || !userProfile) {
@@ -447,8 +506,63 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <Card id="danger-zone" className="border-destructive">
+          <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2"><Trash2/> Danger Zone</CardTitle>
+              <CardDescription>This action is permanent and cannot be undone.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">Deleting your business will make its data inaccessible and disable your user account. An administrator can reactivate your account later.</p>
+          </CardContent>
+          <CardFooter>
+                <Button variant="destructive" onClick={() => setIsDeleteAlertOpen(true)} disabled={userProfile?.role !== 'admin'}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete My Business
+                </Button>
+          </CardFooter>
+      </Card>
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={(open) => {
+          setIsDeleteAlertOpen(open);
+          if (!open) {
+              setDeleteConfirmation('');
+          }
+      }}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action is irreversible. To confirm, please type{" "}
+                    <strong className="text-destructive">i want to delete my account</strong>{" "}
+                    in the box below.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-2">
+                <Label htmlFor="delete-confirm" className="sr-only">
+                    Confirmation Text
+                </Label>
+                <Input
+                    id="delete-confirm"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder="i want to delete my account"
+                    className="border-destructive focus-visible:ring-destructive"
+                />
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteAccount} 
+                  disabled={deleteConfirmation !== 'i want to delete my account' || isDeleting}
+                >
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    I understand, delete my business
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
-
-    

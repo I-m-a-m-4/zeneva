@@ -15,27 +15,57 @@ import {
   addDoc,
   getDoc,
   runTransaction,
+  updateDoc,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { add } from 'date-fns';
 
 /**
- * Finds a referrer's user ID and business ID based on a referral code.
+ * Creates a new business instance and links it to an existing user.
+ * This is used for reactivated users who need a fresh start.
+ * @param firestore The Firestore instance.
+ * @param user The Firebase user object.
+ */
+export const createNewBusinessForUser = async (firestore: Firestore, user: User) => {
+    const userDocRef = doc(firestore, `users/${user.uid}`);
+    
+    const batch = writeBatch(firestore);
+    const businessDocRef = doc(collection(firestore, 'businessInstances'));
+    const trialEndDate = add(new Date(), { days: 7 });
+
+    batch.set(businessDocRef, {
+        name: `${user.displayName}'s Business`,
+        createdAt: serverTimestamp(),
+        ownerId: user.uid,
+        plan: 'starter',
+        trialExpiresAt: trialEndDate,
+        status: 'active',
+        settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
+    });
+
+    batch.update(userDocRef, {
+        businessId: businessDocRef.id,
+        role: 'admin', // Ensure they are admin of the new business
+        surveyCompleted: true, // This is now an automatic step
+    });
+
+    await batch.commit();
+};
+
+
+/**
+ * Finds a referrer's user ID based on a referral code.
  * @param firestore The Firestore instance.
  * @param referralCode The referral code to look for.
- * @returns An object with the referrer's ID and business ID, or null if not found.
+ * @returns The referrer's user ID, or null if not found.
  */
-async function findReferrer(firestore: Firestore, referralCode?: string): Promise<{ referrerId: string, referrerBusinessId: string } | null> {
+async function findReferrerId(firestore: Firestore, referralCode?: string): Promise<string | null> {
     if (!referralCode) return null;
     try {
         const q = query(collection(firestore, 'users'), where('referralCode', '==', referralCode.toUpperCase()));
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            return {
-                referrerId: doc.id,
-                referrerBusinessId: doc.data().businessId,
-            };
+            return snapshot.docs[0].id;
         }
     } catch (e) {
         console.error("Error finding referrer:", e);
@@ -55,10 +85,19 @@ export const createUserProfileDocument = async (
   user: User,
   displayName: string,
   referralCodeInput?: string,
+  phone?: string
 ) => {
   const userDocRef = doc(firestore, `users/${user.uid}`);
 
-  // 1. Check for a pending invitation first (highest priority).
+  const existingUserDoc = await getDoc(userDocRef);
+  if (existingUserDoc.exists()) {
+    if (!existingUserDoc.data().businessId) {
+        await createNewBusinessForUser(firestore, user);
+    }
+    return;
+  }
+
+  // Check for a pending invitation first (highest priority).
   const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
   const invitationSnapshot = await getDocs(invitationQuery);
 
@@ -71,11 +110,12 @@ export const createUserProfileDocument = async (
     const userProfile = {
       email: user.email,
       name: displayName || invitationData.name || user.email,
+      phone: phone || invitationData.phone || '',
       photoURL: user.photoURL || '',
       createdAt: serverTimestamp(),
       businessId: invitationData.businessId,
       role: invitationData.role,
-      surveyCompleted: true,
+      surveyCompleted: true, // They are joining an existing business
       referralCode: user.uid.substring(0, 8).toUpperCase(),
       referrals: 0,
       status: 'active',
@@ -86,28 +126,26 @@ export const createUserProfileDocument = async (
     return; // Done.
   }
 
-  // --- If not invited, create a new business for the user. ---
-  // This is the primary operation and must succeed.
-  const newUserBatch = writeBatch(firestore);
+  // --- CASE 2: New user creating their own business ---
+  const batch = writeBatch(firestore);
   const businessDocRef = doc(collection(firestore, 'businessInstances'));
-  const trialEndDate = add(new Date(), { days: 7 });
+  
+  let trialEndDate = add(new Date(), { days: 7 });
 
-  const businessData = {
+  batch.set(businessDocRef, {
       name: `${displayName}'s Business`,
       createdAt: serverTimestamp(),
       ownerId: user.uid,
       plan: 'starter',
       trialExpiresAt: trialEndDate,
+      status: 'active',
       settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
-  };
-  newUserBatch.set(businessDocRef, businessData);
-  
-  // Find referrer ID before creating user profile
-  const referrer = await findReferrer(firestore, referralCodeInput);
+  });
 
-  const newUserProfile = {
+  const newUserProfile: any = {
       email: user.email,
       name: displayName,
+      phone: phone || '',
       photoURL: user.photoURL || '',
       createdAt: serverTimestamp(),
       businessId: businessDocRef.id,
@@ -116,64 +154,50 @@ export const createUserProfileDocument = async (
       referralCode: user.uid.substring(0, 8).toUpperCase(),
       referrals: 0,
       status: 'active',
-      ...(referrer && { referredBy: referrer.referrerId }), // Add referredBy if a referrer was found
   };
-  newUserBatch.set(userDocRef, newUserProfile);
 
-  // CRITICAL: Commit the creation of the new user and their business.
-  await newUserBatch.commit();
+  // Find the referrer ID first, before the transaction
+  const referrerId = await findReferrerId(firestore, referralCodeInput);
+  
+  // If a referrer was found, add referral tracking to the batch
+  if (referrerId) {
+      newUserProfile.referredBy = referrerId;
+      
+      const referrerUserRef = doc(firestore, 'users', referrerId);
+      const referrerDoc = await getDoc(referrerUserRef);
 
-  // --- Step 2. Handle Referral Logic (Secondary, non-blocking operation) ---
-  if (referrer && referrer.referrerId && referrer.referrerBusinessId) {
-    try {
-      await runTransaction(firestore, async (transaction) => {
-        const referrerUserRef = doc(firestore, 'users', referrer.referrerId);
-        const referrerBusinessRef = doc(firestore, 'businessInstances', referrer.referrerBusinessId);
-
-        // --- READS FIRST ---
-        const referrerBusinessDoc = await transaction.get(referrerBusinessRef);
-        if (!referrerBusinessDoc.exists()) {
-            console.error("Referrer's business document not found. Cannot apply reward.");
-            return; // Abort transaction gracefully
-        }
-
-        // --- LOGIC ---
-        const businessData = referrerBusinessDoc.data();
-        const currentExpiry = businessData.trialExpiresAt?.toDate();
-        const now = new Date();
+      if(referrerDoc.exists()) {
+        const referrerData = referrerDoc.data();
+        const referrerBusinessRef = doc(firestore, 'businessInstances', referrerData.businessId);
         
-        // If trial is expired/in the past, start a new 10-day trial from today.
-        // Otherwise, extend the current trial by 10 days.
-        const newExpiryDate = (currentExpiry && currentExpiry > now)
-            ? add(currentExpiry, { days: 10 })
-            : add(now, { days: 10 });
-        
-        // --- WRITES ---
-        // 1. Update the referrer's business with the new trial date.
-        transaction.update(referrerBusinessRef, { trialExpiresAt: newExpiryDate });
-
-        // 2. Increment the referrer's count.
-        transaction.update(referrerUserRef, { referrals: increment(1) });
-        
-        // 3. Log the successful referral event for analytics.
-        const referralLogRef = doc(collection(firestore, 'referrals'));
-        transaction.set(referralLogRef, { 
-          referrerId: referrer.referrerId, 
-          referredUserId: user.uid, 
-          createdAt: serverTimestamp() 
+        // Extend referrer's trial by 10 days
+        batch.update(referrerBusinessRef, {
+            trialExpiresAt: add(referrerData.trialExpiresAt.toDate(), { days: 10 }),
         });
-
-        // 4. Send a notification to the referrer.
-        const notificationRef = doc(collection(firestore, `users/${referrer.referrerId}/notifications`));
-        transaction.set(notificationRef, {
-            title: 'New Referral! 🎉',
-            body: `10 days have been added to your trial. Your referral count is now updated.`,
+        
+        batch.update(referrerUserRef, { referrals: increment(1) });
+      
+        const notificationRef = doc(collection(firestore, `users/${referrerId}/notifications`));
+        batch.set(notificationRef, {
+            title: 'New Referral! +10 Days Trial 🎉',
+            body: `Someone signed up with your code. 10 days have been added to your trial period!`,
             read: false,
             createdAt: serverTimestamp()
         });
-      });
-    } catch (rewardError) {
-      console.error("Failed to apply referral reward, but user creation was successful.", rewardError);
-    }
+
+        const referralLogRef = doc(collection(firestore, 'referrals'));
+        batch.set(referralLogRef, {
+          referrerId: referrerId,
+          referredUserId: user.uid,
+          createdAt: serverTimestamp(),
+        });
+      }
   }
+  
+  // Set the new user's profile (with or without referredBy)
+  batch.set(userDocRef, newUserProfile);
+  
+  // Commit all user creation and referral counting operations at once.
+  await batch.commit();
+
 };

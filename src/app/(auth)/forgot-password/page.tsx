@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -6,15 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
-import { sendPasswordReset } from "@/firebase/non-blocking-login";
+import { sendPasswordResetEmail } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader } from "lucide-react";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const auth = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -28,7 +25,7 @@ export default function ForgotPasswordPage() {
         return;
     }
     setIsLoading(true);
-    sendPasswordReset(auth, email)
+    sendPasswordResetEmail(auth, email)
       .then(() => {
         toast({
           title: 'Password Reset Email Sent',

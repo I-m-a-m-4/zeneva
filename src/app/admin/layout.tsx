@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useUser } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ const navLinks = [
     { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
     { href: '/admin-imamshaffy/notifications', label: 'Notifications', icon: Bell },
+    { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -87,7 +88,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     href={link.href}
                     className={cn(
                         "text-muted-foreground transition-colors hover:text-foreground",
-                        pathname === link.href && "text-foreground font-semibold"
+                        pathname.startsWith(link.href) && "text-foreground font-semibold"
                     )}
                 >
                     {link.label}

@@ -183,7 +183,7 @@ export default function DashboardPage() {
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
-        <div className="no-capture">
+        <div className="no-capture flex items-center gap-2">
           <Button onClick={() => setIsAddCustomerOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
           </Button>

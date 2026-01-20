@@ -36,22 +36,10 @@ export function initializeFirebase() {
   }
 }
 
-// This function's logic is now inlined into initializeFirebase to solve the re-initialization issue.
-// export function getSdks(firebaseApp: FirebaseApp) {
-//   return {
-//     firebaseApp,
-//     auth: getAuth(firebaseApp),
-//     firestore: initializeFirestore(firebaseApp, {
-//       localCache: persistentLocalCache({})
-//     })
-//   };
-// }
-
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './non-blocking-updates';
-export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';

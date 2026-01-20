@@ -26,10 +26,11 @@ export interface UserProfile {
     businessId: string;
     name: string;
     email: string;
+    phone?: string;
     role: UserRole;
     createdAt?: any;
     surveyCompleted?: boolean;
-    status?: 'active' | 'inactive';
+    status?: 'active' | 'inactive' | 'deleted';
     referralCode?: string;
     referredBy?: string;
     referrals?: number;
@@ -75,6 +76,8 @@ export interface BusinessInstance {
     trialExpiresAt?: any; // Firestore Timestamp
     plan?: 'starter' | 'pro' | 'business';
     accessLevel?: 'lifetime';
+    status?: 'active' | 'deleted';
+    deletedAt?: any;
     settings?: {
         phone?: string;
         email?: string;
@@ -161,6 +164,27 @@ export interface Referral {
     referrerId: string;
     referredUserId: string;
     createdAt: any;
+}
+
+export interface SupportThread {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    subject: string;
+    status: 'open' | 'closed';
+    lastMessageAt: any; // Timestamp
+    lastMessageSnippet: string;
+    isReadByAdmin: boolean;
+    createdAt: any;
+}
+
+export interface SupportMessage {
+    id: string;
+    senderId: string;
+    senderName: string;
+    text: string;
+    createdAt: any; // Timestamp
 }
 
 

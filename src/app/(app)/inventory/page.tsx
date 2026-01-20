@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Download,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -61,6 +62,7 @@ import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { useBusiness, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import { useProducts } from '@/context/product-context';
+import Papa from 'papaparse';
 
 // Hook to get current user's profile
 function useCurrentUserProfile() {
@@ -210,6 +212,41 @@ export default function InventoryPage() {
     setIsImportOpen(false);
   };
 
+  const handleExport = () => {
+    if (!allProducts) {
+        toast({
+            variant: 'destructive',
+            title: 'Export Failed',
+            description: 'No product data available to export.',
+        });
+        return;
+    }
+    const csvData = Papa.unparse(
+        allProducts.map(p => ({
+            Name: p.name,
+            SKU: p.sku,
+            Category: p.category,
+            Price: p.price,
+            Stock: p.stock,
+            Description: p.description,
+            ImageURL: p.imageUrl,
+        }))
+    );
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `zeneva-products-export-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({
+        variant: 'success',
+        title: 'Export Complete',
+        description: 'Your product data has been downloaded.',
+    });
+  };
+
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex items-center pb-4 gap-4">
@@ -232,6 +269,12 @@ export default function InventoryPage() {
                   </span>
               </Button>
           )}
+          <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
+            <Download className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+              Export
+            </span>
+          </Button>
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
             <Upload className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,56 +9,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { createUserProfileDocument } from '@/firebase/users';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader, ChevronLeft } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { doc } from 'firebase/firestore';
 import Image from 'next/image';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.'}),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  phone: z.string().optional(),
   referralCode: z.string().optional(),
 });
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
-function SignupSkeleton() {
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md space-y-4">
-        <Skeleton className="h-8 w-32 mx-auto" />
-        <Skeleton className="h-4 w-48 mx-auto" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    </div>
-  );
-}
-
 export default function SignupPage() {
   const router = useRouter();
   const auth = useAuth();
-  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const searchParams = useSearchParams();
-  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
-  const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
-
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', name: '', referralCode: '' },
+    defaultValues: { email: '', password: '', name: '', phone: '', referralCode: '' },
   });
 
   useEffect(() => {
@@ -73,36 +52,30 @@ export default function SignupPage() {
     }
   }, [searchParams, form]);
 
-  useEffect(() => {
-    if (isCreatingProfile) return;
-
-    if (!isUserLoading && user && !isProfileLoading) {
-      if (userProfile) {
-        router.replace('/dashboard');
-      }
-    }
-  }, [user, isUserLoading, userProfile, isProfileLoading, isCreatingProfile, router]);
-
-
   const onSubmit = async (data: SignupFormValues) => {
     if (!auth || !firestore) return;
-    setIsCreatingProfile(true);
+    setIsLoading(true);
     try {
-      const userCredential = await initiateEmailSignUp(auth, data.email, data.password, data.name);
-      await createUserProfileDocument(firestore, userCredential.user, data.name, data.referralCode);
+      // Step 1: Create the user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      
+      // Step 2: Update their Auth profile with the display name
+      await updateProfile(userCredential.user, { displayName: data.name });
+
+      // Step 3: Create all associated Firestore documents (user profile, business, etc.)
+      await createUserProfileDocument(firestore, userCredential.user, data.name, data.referralCode, data.phone);
+
+      // On success, do nothing. The auth layout will detect the state
+      // change and handle the redirection automatically.
     } catch (error: any) {
        let description = "Please try again.";
       if (error.code === 'auth/email-already-in-use') {
           description = "This email is already in use. Please log in instead.";
       }
       toast({ variant: "destructive", title: "Signup Failed", description });
-      setIsCreatingProfile(false);
+      setIsLoading(false); // Only set loading to false on failure
     }
   };
-
-  if (isUserLoading || (user && isProfileLoading)) {
-     return <SignupSkeleton />;
-  }
 
   return (
     <div className="w-full min-h-screen flex lg:grid lg:grid-cols-2">
@@ -158,6 +131,19 @@ export default function SignupPage() {
               />
               <FormField
                 control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <Label>Phone Number (Optional)</Label>
+                    <FormControl>
+                      <Input type="tel" placeholder="+2348012345678" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
@@ -191,8 +177,8 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isCreatingProfile}>
-                 {isCreatingProfile ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : 'Create an account'}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                 {isLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : 'Create an account'}
               </Button>
             </form>
           </Form>
@@ -220,4 +206,3 @@ export default function SignupPage() {
     </div>
   )
 }
-    

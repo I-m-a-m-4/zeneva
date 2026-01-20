@@ -46,6 +46,7 @@ import {
   Check,
   Ban,
   Briefcase,
+  UserX,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState } from 'react';
@@ -193,7 +194,8 @@ export default function AdminDashboardPage() {
     const mrr = (businesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (businesses?.filter(b => b.plan === 'business').length || 0) * 30000;
     const arr = mrr * 12;
 
-    const businessCreators = users?.filter(u => u.role === 'admin') || [];
+    const activeUsers = (users || []).filter(u => u.status === 'active' || typeof u.status === 'undefined');
+    const inactiveUsers = (users || []).filter(u => u.status === 'inactive');
     
     const usersByDate = (users || []).reduce((acc, user) => {
         if (user.createdAt?.seconds) {
@@ -253,7 +255,7 @@ export default function AdminDashboardPage() {
     const topSellingProducts = Object.entries(platformTopItems).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
 
-    return { totalUsers, totalBusinesses, totalProducts, totalRevenue, totalReceipts, platformAOV, averageRevenuePerBusiness, mrr, arr, businessCreators, newUserGrowth, revenueGrowth, topBusinesses, categoryData, subscriptionStatusData, planDistributionData, userRoleData, activeSubscriptions, trialingUsers, topSellingProducts };
+    return { totalUsers, totalBusinesses, totalProducts, totalRevenue, totalReceipts, platformAOV, averageRevenuePerBusiness, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, topBusinesses, categoryData, subscriptionStatusData, planDistributionData, userRoleData, activeSubscriptions, trialingUsers, topSellingProducts };
   }, [users, businesses, products, receipts, purchases]);
 
 
@@ -350,6 +352,7 @@ export default function AdminDashboardPage() {
     };
   
   const getTrialStatus = (business: BusinessInstance) => {
+    if (business.accessLevel === 'lifetime') return <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge>;
     if (!business?.trialExpiresAt?.toDate) return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> No Trial Data</Badge>;
     const expiryDate = business.trialExpiresAt.toDate();
     const now = new Date();
@@ -483,21 +486,32 @@ export default function AdminDashboardPage() {
             <div className="lg:col-span-2 space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Business Creators</CardTitle>
-                        <CardDescription>List of users who have created a business account (Admins).</CardDescription>
+                        <CardTitle>Active Accounts</CardTitle>
+                        <CardDescription>List of all users with an active status on the platform.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-[330px]">
                             <Table>
-                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Business Name</TableHead><TableHead>Date Joined</TableHead><TableHead className="text-right">Trial Status</TableHead></TableRow></TableHeader>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Business Name</TableHead>
+                                        <TableHead>Plan</TableHead>
+                                        <TableHead className="text-right">Trial Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
                                 <TableBody>
-                                    {analyticsData.businessCreators.map(creator => {
-                                        const business = businesses?.find(b => b.id === creator.businessId);
+                                    {analyticsData.activeUsers.map(user => {
+                                        const business = businesses?.find(b => b.id === user.businessId);
                                         return (
-                                            <TableRow key={creator.id}>
-                                                <TableCell><div className="font-medium">{creator.name}</div><div className="text-xs text-muted-foreground">{creator.email}</div></TableCell>
+                                            <TableRow key={user.id}>
+                                                <TableCell><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div></TableCell>
                                                 <TableCell>{business?.name || 'N/A'}</TableCell>
-                                                <TableCell>{creator.createdAt?.seconds ? format(new Date(creator.createdAt.seconds * 1000), 'PP') : 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    {business ? (
+                                                        business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
+                                                    ) : <Badge variant="outline">N/A</Badge>}
+                                                </TableCell>
                                                 <TableCell className="text-right">{business ? getTrialStatus(business) : <Badge variant="outline">No Business</Badge>}</TableCell>
                                             </TableRow>
                                         )
@@ -509,8 +523,8 @@ export default function AdminDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Recent Subscription Payments</CardTitle>
-                        <CardDescription>The latest successful payments from businesses.</CardDescription>
+                        <CardTitle className='flex items-center gap-2'><UserX className="text-destructive"/>Inactive Accounts</CardTitle>
+                        <CardDescription>Users who have deleted their accounts.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-72">
@@ -518,28 +532,21 @@ export default function AdminDashboardPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>User</TableHead>
-                                        <TableHead>Plan</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {purchasesWithUserInfo.length > 0 ? (
-                                        purchasesWithUserInfo.map(p => (
-                                            <TableRow key={p.id}>
-                                                <TableCell>
-                                                    <div className="font-medium">{p.userProfile?.name || 'Unknown User'}</div>
-                                                    <div className="text-xs text-muted-foreground">{p.userProfile?.email}</div>
-                                                </TableCell>
-                                                <TableCell><Badge variant="secondary">{p.plan}</Badge></TableCell>
-                                                <TableCell>{p.timestamp?.seconds ? format(p.timestamp.toDate(), 'PPp') : 'N/A'}</TableCell>
-                                                <TableCell className="text-right font-medium">₦{p.amount.toLocaleString()}</TableCell>
+                                    {analyticsData.inactiveUsers.length > 0 ? (
+                                        analyticsData.inactiveUsers.map(user => (
+                                            <TableRow key={user.id}>
+                                                <TableCell>{user.name}</TableCell>
+                                                <TableCell>{user.email}</TableCell>
+                                                <TableCell><Badge variant="destructive">Inactive</Badge></TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center">No payments recorded yet.</TableCell>
-                                        </TableRow>
+                                         <TableRow><TableCell colSpan={3} className="h-24 text-center">No inactive accounts found.</TableCell></TableRow>
                                     )}
                                 </TableBody>
                             </Table>
@@ -602,3 +609,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    

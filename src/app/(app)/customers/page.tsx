@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -17,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, Edit, Trash2, Upload } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, deleteDoc } from 'firebase/firestore';
 import type { Customer, UserProfile } from '@/types';
@@ -28,6 +29,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
+import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
 
 // Hook to get current user's profile
 function useCurrentUserProfile() {
@@ -77,6 +79,7 @@ export default function CustomersPage() {
   const { toast } = useToast();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
+  const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
   const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
 
@@ -118,12 +121,20 @@ export default function CustomersPage() {
                 Manage your customers and view their purchase history.
                 </CardDescription>
             </div>
-            <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Add Customer
-                </span>
-            </Button>
+             <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
+                    <Upload className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                        Import
+                    </span>
+                </Button>
+                <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                        Add Customer
+                    </span>
+                </Button>
+            </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -213,6 +224,15 @@ export default function CustomersPage() {
             businessId={currentUser.businessId}
         />
     )}
+     {currentUser?.businessId && (
+        <ImportCustomersDialog
+            isOpen={isImportOpen}
+            onOpenChange={setIsImportOpen}
+            businessId={currentUser.businessId}
+            existingCustomers={customers || []}
+            onSuccess={() => setIsImportOpen(false)}
+        />
+     )}
     <EditCustomerDialog
         isOpen={!!customerToEdit}
         onOpenChange={(open) => !open && setCustomerToEdit(null)}
