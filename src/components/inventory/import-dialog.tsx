@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -25,14 +26,15 @@ interface ImportDialogProps {
 
 type ParsedProduct = Partial<Omit<Product, 'id' | 'businessId' | 'imageHint' | 'lowStockThreshold'>>;
 
+// Mappings for common CSV header variations
 const HEADER_MAPPINGS: { [key: string]: string[] } = {
   name: ['Name', 'Product Name', 'Item Name', 'Title'],
   sku: ['SKU', 'Code', 'Item Code'],
   category: ['Category', 'Product Category', 'Type'],
-  price: ['RetailPrice', 'Price', 'Sale Price'],
+  price: ['RetailPrice', 'Price', 'Sale Price', 'Regular Price'], // Added 'Regular Price'
   stock: ['Stock', 'Quantity', 'In Stock', 'Qty'],
   description: ['ShortDescription', 'Description', 'Details', 'Body HTML'],
-  imageUrl: ['Image URL', 'ImageURL', 'Image Link', 'Image Src', 'Image'],
+  imageUrl: ['Image URL', 'ImageURL', 'Image Link', 'Image Src', 'Image', 'Images'], // Added 'Images'
 };
 
 const PRODUCT_LIMITS = {
@@ -82,6 +84,8 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         }
 
         const lowerCaseHeaders = headers.map(h => h.toLowerCase().trim());
+        
+        // Function to find the first matching header from a list of possibilities
         const findHeader = (possibleNames: string[]): string | undefined => {
             for (const name of possibleNames) {
                 const lowerName = name.toLowerCase();
@@ -104,7 +108,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         };
 
         if (!mappedHeaders.name || !mappedHeaders.price) {
-          setError("CSV must contain at least 'Name' and 'Price' columns.");
+          setError("CSV must contain at least 'Name' and 'Price' columns (or a common variation like 'Regular Price').");
           setIsParsing(false);
           return;
         }
@@ -170,6 +174,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
 
       await batch.commit();
       
+      // Try to update categories in the business settings
       try {
         const businessDocRef = doc(firestore, 'businessInstances', businessId);
         const businessDocSnap = await getDoc(businessDocRef);
@@ -232,8 +237,8 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         <DialogHeader>
           <DialogTitle>Import Products from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk-add products. Ensure your file has columns for at least 'Name' and 'Price'. 
-            For more details on formatting, visit our <Link href="/support" className="text-primary underline" onClick={() => onOpenChange(false)}>Support page</Link>.
+            Upload a CSV file to bulk-add products. Your file must have columns for at least **Name** and **Price**. We also support common variations like 'Regular Price' (from WooCommerce) and various 'Image' headers.
+            For more details on formatting, visit our <Link href="/support#csv-formatting" className="text-primary underline" onClick={() => onOpenChange(false)}>Support page</Link>.
           </DialogDescription>
         </DialogHeader>
         

@@ -138,48 +138,32 @@ export const createUserProfileDocument = async (
     if (referrerId && referrerId !== user.uid) {
         referredBy = referrerId;
         const referrerUserRef = doc(firestore, 'users', referrerId);
+        
+        // This get() is allowed inside a transaction as it's reading before writing.
         const referrerDoc = await transaction.get(referrerUserRef);
 
         if (referrerDoc.exists()) {
-            const referrerData = referrerDoc.data() as UserProfile;
+            // Action 1: Increment the referrer's counter.
+            // This is allowed by the `isIncrementingReferrals` security rule.
             transaction.update(referrerUserRef, { referrals: increment(1) });
             
-            let rewardMessage = `Someone signed up with your code! Your referral count has increased.`;
-            let rewardAction = `Referral Credit: +1 (from ${displayName})`;
-
-            if (referrerData.businessId) {
-                const referrerBusinessRef = doc(firestore, 'businessInstances', referrerData.businessId);
-                const referrerBusinessDoc = await transaction.get(referrerBusinessRef);
-                
-                if(referrerBusinessDoc.exists()){
-                    const businessData = referrerBusinessDoc.data() as BusinessInstance;
-                    
-                    if (businessData.plan === 'starter' && businessData.accessLevel !== 'lifetime') {
-                        const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
-                        const newExpiryDate = add(currentExpiry > new Date() ? currentExpiry : new Date(), { days: 10 });
-                        transaction.update(referrerBusinessDoc.ref, { trialExpiresAt: newExpiryDate });
-                        
-                        rewardMessage = `New Referral! +10 Days Trial 🎉. 10 days have been added to your trial period!`;
-                        rewardAction = `Referral Bonus: +10 Days (from ${displayName})`;
-                    }
-                     const historyRef = doc(collection(firestore, `businessInstances/${referrerData.businessId}/subscription_history`));
-                     transaction.set(historyRef, {
-                        action: rewardAction,
-                        amount: 0, currency: 'NGN', timestamp: serverTimestamp(),
-                    });
-                }
-            }
-           
+            // Action 2: Create a notification for the referrer.
+            // This is allowed by the rule on the notifications subcollection.
             const notificationRef = doc(collection(firestore, `users/${referrerId}/notifications`));
             transaction.set(notificationRef, {
                 title: 'New Referral!',
-                body: rewardMessage,
-                read: false, createdAt: serverTimestamp()
+                body: `Someone signed up with your code! Your referral count has increased.`,
+                read: false, 
+                createdAt: serverTimestamp()
             });
 
+            // Action 3: Log the referral event for analytics.
+            // This is allowed by the rule on the top-level referrals collection.
             const referralLogRef = doc(collection(firestore, 'referrals'));
             transaction.set(referralLogRef, {
-                referrerId: referrerId, referredUserId: user.uid, createdAt: serverTimestamp(),
+                referrerId: referrerId, 
+                referredUserId: user.uid, 
+                createdAt: serverTimestamp(),
             });
         }
     }

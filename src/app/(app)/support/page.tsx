@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -16,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 
-const faqItems: { question: string; answer: React.ReactNode }[] = [
+const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
   {
     question: "How do I add a new product to my inventory?",
     answer: (
@@ -30,25 +31,26 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
     )
   },
   {
+    id: "csv-formatting",
     question: "How should I format my CSV files for import?",
     answer: (
       <>
-        <p>To ensure a smooth import process for your products or customers, please make sure your CSV file's first row contains headers that match (or are similar to) the ones listed below. The header names are case-insensitive, meaning <code>name</code> works the same as <code>Name</code>.</p>
+        <p>To ensure a smooth import, your CSV file's first row must contain headers. We can automatically detect many common header names (e.g., 'Regular Price' from WooCommerce is automatically mapped to 'Price'). Below are the fields we support and common headers for each.</p>
         
         <h4 className="font-semibold mt-4 mb-2">Product Import Headers</h4>
         <p>Required headers: <strong>Name</strong> and <strong>Price</strong>.</p>
         <ul className="list-disc list-inside space-y-1 my-2 text-sm text-muted-foreground">
           <li>For <strong>Name</strong>, common headers are: <code>Name</code>, <code>Product Name</code>, <code>Title</code>.</li>
-          <li>For <strong>Price</strong>, common headers are: <code>Price</code>, <code>RetailPrice</code>.</li>
-          <li>For <strong>Stock</strong>, common headers are: <code>Stock</code>, <code>Quantity</code>, <code>Qty</code>.</li>
+          <li>For <strong>Price</strong>, common headers are: <code>Price</code>, <code>RetailPrice</code>, <code>Sale Price</code>, <code>Regular Price</code>.</li>
+          <li>For <strong>Stock</strong>, common headers are: <code>Stock</code>, <code>Quantity</code>, <code>Qty</code>, <code>In Stock</code>.</li>
           <li>For <strong>SKU</strong>, common headers are: <code>SKU</code>, <code>Code</code>.</li>
           <li>For <strong>Category</strong>, common headers are: <code>Category</code>, <code>Type</code>.</li>
-          <li>For <strong>Description</strong>, common headers are: <code>Description</code>, <code>Body HTML</code>.</li>
-          <li>For <strong>Image URL</strong>, common headers are: <code>Image URL</code>, <code>Image Src</code>.</li>
+          <li>For <strong>Description</strong>, common headers are: <code>Description</code>, <code>Body HTML</code>, <code>Details</code>.</li>
+          <li>For <strong>Image URL</strong>, common headers are: <code>Image URL</code>, <code>Image Src</code>, <code>Image</code>, <code>Images</code>.</li>
         </ul>
 
         <h4 className="font-semibold mt-6 mb-2">Customer Import Headers</h4>
-        <p>Required headers: <strong>Name</strong> and <strong>Email</strong>.</p>
+        <p>Required headers: <strong>Name</strong> and <strong>Email</strong> (or enable placeholder generation).</p>
         <ul className="list-disc list-inside space-y-1 my-2 text-sm text-muted-foreground">
           <li>For <strong>Name</strong>, common headers are: <code>Name</code>, <code>Full Name</code>.</li>
           <li>For <strong>Email</strong>, common headers are: <code>Email</code>, <code>Email Address</code>.</li>
@@ -281,7 +283,7 @@ export default function SupportPage() {
                 <CardContent>
                     <Accordion type="multiple" className="w-full">
                         {faqItems.map((item, index) => (
-                            <AccordionItem key={index} value={`item-${index}`}>
+                            <AccordionItem key={index} value={`item-${index}`} id={item.id}>
                                 <AccordionTrigger>{item.question}</AccordionTrigger>
                                 <AccordionContent className="prose prose-sm dark:prose-invert max-w-none">
                                     {item.answer}
