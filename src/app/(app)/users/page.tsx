@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, where, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import type { UserProfile, Invitation, BusinessInstance } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -136,11 +136,16 @@ export default function UsersPage() {
     const newStatus = userToUpdate.action === 'activate' ? 'active' : 'inactive';
     
     try {
-        // Only update the status, do not modify the businessId.
-        await updateDoc(userRef, { status: newStatus });
+        await runTransaction(firestore, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) {
+                throw new Error("User does not exist.");
+            }
+            transaction.update(userRef, { status: newStatus });
+        });
         toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
-    } catch(e) {
-        toast({ title: 'Error', description: 'Could not update user status.', variant: 'destructive' });
+    } catch(e: any) {
+        toast({ title: 'Error', description: e.message || 'Could not update user status.', variant: 'destructive' });
     } finally {
         setUserToUpdate(null);
     }
@@ -333,7 +338,12 @@ export default function UsersPage() {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Confirm Action</AlertDialogTitle>
-                <AlertDialogDescription>Are you sure you want to {userToUpdate?.action} <strong>{userToUpdate?.user.name}</strong>'s account? They will {userToUpdate?.action === 'deactivate' ? 'lose' : 'regain'} access to the business.</AlertDialogDescription>
+                <AlertDialogDescription>
+                  {userToUpdate?.action === 'deactivate' 
+                    ? <>This will mark <strong>{userToUpdate?.user.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
+                    : <>This will reactivate <strong>{userToUpdate?.user.name}</strong>'s account, allowing them to log in again.</>
+                  }
+                </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
