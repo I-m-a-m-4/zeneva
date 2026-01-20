@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ProductSchema = z.object({
-  productId: z.string(),
+  id: z.string(),
   name: z.string(),
   description: z.string().optional(),
   price: z.number().optional(),
@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
 
 Product Data:
 {{#each products}}
-- Product ID: {{productId}}
+- Product ID: {{id}}
   Name: {{name}}
   Description: {{description}}
   Price: {{price}}
