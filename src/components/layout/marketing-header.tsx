@@ -43,11 +43,11 @@ export default function MarketingHeader() {
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-4">
               {user ? (
-                <Link href="/dashboard" className="hover:bg-[#033476] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#004BB0] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Dashboard</Link>
+                <Link href="/dashboard" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Dashboard</Link>
               ) : (
                 <>
                   <Link href="/login" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-3 py-2 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>
-                  <Link href="/signup" className="hover:bg-[#033476] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#004BB0] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Get Started</Link>
+                  <Link href="/signup" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Get Started</Link>
                 </>
               )}
             </div>
@@ -100,11 +100,11 @@ export default function MarketingHeader() {
             </div>
              <div className="mt-8 flex flex-col gap-4">
                  {user ? (
-                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#033476] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#004BB0] rounded-md py-3 px-5 shadow-sm">Dashboard</Link>
+                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">Dashboard</Link>
                 ) : (
                     <>
                         <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center transition-colors text-base font-medium bg-[#ffffff] border rounded-md py-3 px-5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>
-                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#033476] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#004BB0] rounded-md py-3 px-5 shadow-sm">Get Started</Link>
+                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">Get Started</Link>
                     </>
                 )}
             </div>

@@ -162,9 +162,9 @@ export default function Home() {
               <div className="cta-buttons-container flex flex-col sm:flex-row gap-4 rounded-md gap-x-4 gap-y-4 items-center justify-center">
                 <div className="inline-block rounded-md">
                    <div className="codepen-button rounded-md">
-                        <div style={{ position: 'absolute', inset: 0, width: '400%', height: '100%', background: 'linear-gradient(115deg, #004BB0, #004BB0, #004BB0)', backgroundSize: '25% 100%', animation: 'border-shift .75s linear infinite' }}></div>
+                        <div style={{ position: 'absolute', inset: 0, width: '400%', height: '100%', background: 'linear-gradient(115deg, #1e293b, #1e293b, #1e293b)', backgroundSize: '25% 100%', animation: 'border-shift .75s linear infinite' }}></div>
                         <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'}>
-                           <span className="block w-full text-center bg-[#004BB0] text-primary-foreground hover:bg-[#033476] transition-colors text-sm font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
+                           <span className="block w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-sm font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
                                 Get Started
                                 <ArrowRight className="inline w-5 h-5" />
                            </span>

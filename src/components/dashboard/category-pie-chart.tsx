@@ -7,9 +7,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
 import { PieChart as PieChartIcon, Loader2 } from "lucide-react";
-import { collection, query, where, getDocs, doc } from 'firebase/firestore';
-import type { Product } from '@/types';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useProducts } from '@/context/product-context';
 
 const chartConfig = {
   electronics: { label: "Electronics", color: "hsl(var(--chart-1))" },
@@ -20,58 +18,29 @@ const chartConfig = {
   other: { label: "Other", color: "hsl(var(--muted))" },
 } satisfies ChartConfig;
 
-function useCurrentBusinessId() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile } = useDoc<any>(userDocRef);
-    return userProfile?.businessId;
-}
 
 export default function CategoryPieChart() {
-  const currentBusinessId = useCurrentBusinessId();
-  const firestore = useFirestore();
-  const [chartData, setChartData] = React.useState<{ name: string; items: number; fill: string; }[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const { products, isLoading } = useProducts();
 
-  React.useEffect(() => {
-    const fetchProductData = async () => {
-      if (!currentBusinessId || !firestore) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const productsQuery = query(collection(firestore, "products"), where("businessId", "==", currentBusinessId));
-        const productsSnapshot = await getDocs(productsQuery);
-        const products = productsSnapshot.docs.map(doc => doc.data() as Product);
+  const chartData = React.useMemo(() => {
+    if (!products) {
+        return [];
+    }
 
-        const categoryCounts: Record<string, number> = {};
-        products.forEach(product => {
-          const categoryKey = product.category || 'other';
-          categoryCounts[categoryKey] = (categoryCounts[categoryKey] || 0) + (product.stock || 0);
-        });
+    const categoryCounts: Record<string, number> = {};
+    products.forEach(product => {
+      const categoryKey = product.category || 'other';
+      // Ensure the categoryKey is a valid key for chartConfig
+      const validCategoryKey = Object.keys(chartConfig).includes(categoryKey) ? categoryKey : 'other';
+      categoryCounts[validCategoryKey] = (categoryCounts[validCategoryKey] || 0) + (product.stock || 0);
+    });
 
-        const formattedData = Object.entries(categoryCounts).map(([name, items]) => ({
-          name: chartConfig[name as keyof typeof chartConfig]?.label || name,
-          items,
-          fill: chartConfig[name as keyof typeof chartConfig]?.color || "hsl(var(--muted))",
-        }));
-        
-        setChartData(formattedData);
-
-      } catch (error) {
-        console.error("Error fetching product data for pie chart:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProductData();
-  }, [currentBusinessId, firestore]);
+    return Object.entries(categoryCounts).map(([name, items]) => ({
+      name: chartConfig[name as keyof typeof chartConfig]?.label || name,
+      items,
+      fill: chartConfig[name as keyof typeof chartConfig]?.color || "hsl(var(--muted))",
+    }));
+  }, [products]);
 
   const totalItems = React.useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.items, 0);
