@@ -10,7 +10,6 @@ import { useFirestore } from '@/firebase';
 import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore';
 import { add, format } from 'date-fns';
 import { Badge } from '../ui/badge';
-import { sendSubscriptionReceipt } from '@/lib/email';
 import { useCallback, useState } from 'react';
 import usePaystack from '@/hooks/use-paystack';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -129,25 +128,6 @@ const PaystackSubscriptionButton = ({
             });
 
             await batch.commit();
-
-            // Step 4: Send email receipt (best effort)
-            try {
-                await sendSubscriptionReceipt({
-                    to_email: userProfile.email,
-                    to_name: userProfile.name,
-                    plan_name: `${plan.name} (${cycle.label})`,
-                    amount_paid: `₦${finalAmount.toLocaleString()}`,
-                    expiry_date: format(newExpiryDate, 'PPP'),
-                    business_name: businessInstance.name
-                });
-            } catch (emailError) {
-                console.error("Failed to send receipt email:", emailError);
-                toast({
-                    variant: 'warning',
-                    title: 'Could not send receipt',
-                    description: 'Your subscription is active, but we failed to email the receipt.',
-                });
-            }
 
             toast({
                 variant: 'success',
