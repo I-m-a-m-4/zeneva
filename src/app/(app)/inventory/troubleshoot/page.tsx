@@ -2,14 +2,14 @@
 "use client";
 
 import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
-import type { Product } from "@/types";
+import type { Product, AISuggestions } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { usePOS } from "@/context/pos-context";
 import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit, Flame, ShieldAlert, Info } from "lucide-react";
-import React, { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo, useEffect } from "react";
 import Link from 'next/link';
 import {
   Dialog,
@@ -20,14 +20,10 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-
-type Suggestion = {
-    suggestions: {
-        title: string;
-        description: string;
-        severity: 'High' | 'Medium' | 'Low';
-    }[];
-}
+import { useFirestore } from "@/firebase";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
   if (!issue) return null;
@@ -103,11 +99,19 @@ const severityIcons = {
 
 export default function TroubleshootPage() {
     const [isPending, startTransition] = useTransition();
-    const [suggestions, setSuggestions] = useState<Suggestion | null>(null);
+    const [suggestions, setSuggestions] = useState<AISuggestions | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState<{ title: string, items: Product[] } | null>(null);
 
     const { products, business, isLoading } = usePOS();
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (business?.settings?.aiTroubleshootSuggestions) {
+            setSuggestions(business.settings.aiTroubleshootSuggestions);
+        }
+    }, [business]);
     
     const analysis = useMemo(() => {
         if (!products) return null;
@@ -136,11 +140,11 @@ export default function TroubleshootPage() {
     };
 
     const handleGetSuggestions = () => {
-        if (!products || products.length === 0) {
+        if (!products || products.length === 0 || !business?.id || !firestore) {
+            toast({ variant: 'destructive', title: 'Cannot Run AI Analysis', description: 'Product or business data is not available.' });
             return;
         }
         startTransition(async () => {
-            // Sanitize products to pass only plain objects to the server action
             const sanitizedProducts = products.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -150,9 +154,22 @@ export default function TroubleshootPage() {
                 sku: p.sku,
             }));
 
-            // The 'products' in the input must now match the sanitized version
             const result = await productTroubleshoot({ products: sanitizedProducts });
-            setSuggestions(result as Suggestion);
+            
+            const dataToSave: AISuggestions = { ...result, createdAt: serverTimestamp() };
+
+            try {
+                const businessDocRef = doc(firestore, 'businessInstances', business.id);
+                await updateDoc(businessDocRef, {
+                    'settings.aiTroubleshootSuggestions': dataToSave
+                });
+                setSuggestions({ ...result, createdAt: new Date() });
+                toast({ variant: 'success', title: 'Suggestions Saved', description: 'Your AI suggestions have been generated and saved.' });
+            } catch (error) {
+                console.error("Failed to save AI suggestions:", error);
+                toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the AI suggestions.' });
+                setSuggestions({ ...result, createdAt: new Date() });
+            }
         });
     };
     
@@ -175,7 +192,7 @@ export default function TroubleshootPage() {
          )
     }
 
-    const canUseAIFeature = ['pro', 'business'].includes(business?.plan || '');
+    const canUseAIFeature = ['pro', 'business'].includes(business?.plan || '') || business?.accessLevel === 'lifetime';
 
     const allIssues = [
         { icon: DollarSign, title: "Missing Price", count: analysis.productsWithoutPrice.length, items: analysis.productsWithoutPrice },
@@ -221,7 +238,7 @@ export default function TroubleshootPage() {
                 <CardHeader>
                     <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> AI-Powered Suggestions</CardTitle>
                     <CardDescription>
-                        Use GenAI to get advanced merchandising and data quality recommendations for your live inventory. When you click the button, we send your current product list to a generative AI model, which provides custom-tailored advice to improve your product listings, enhance SEO, and suggest merchandising strategies.
+                        Use GenAI to get advanced merchandising and data quality recommendations for your live inventory. Suggestions are saved and can be revisited anytime.
                     </CardDescription>
                 </CardHeader>
                 {canUseAIFeature ? (
@@ -232,7 +249,7 @@ export default function TroubleshootPage() {
                                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                                     <p className="text-muted-foreground">AI is analyzing your inventory...</p>
                                 </div>
-                            ) : suggestions ? (
+                            ) : suggestions?.suggestions?.length > 0 ? (
                                 <Accordion type="multiple" className="w-full space-y-2">
                                     {suggestions.suggestions.map((suggestion, index) => (
                                         <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-muted/50 px-4">
@@ -257,11 +274,16 @@ export default function TroubleshootPage() {
                                 </div>
                             )}
                         </CardContent>
-                        <CardFooter>
+                        <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                             <Button onClick={handleGetSuggestions} disabled={isPending || analysis.totalProducts === 0}>
                                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isPending ? "Analyzing..." : suggestions ? "Regenerate Suggestions" : "Get AI Suggestions"}
                             </Button>
+                            {suggestions?.createdAt && (
+                                <p className="text-xs text-muted-foreground">
+                                    Last generated: {formatDistanceToNow(suggestions.createdAt.toDate ? suggestions.createdAt.toDate() : new Date(suggestions.createdAt), { addSuffix: true })}
+                                </p>
+                            )}
                         </CardFooter>
                     </>
                 ) : (

@@ -72,6 +72,17 @@ export interface Receipt {
     createdBy?: string;
 }
 
+export interface AISuggestion {
+    title: string;
+    description: string;
+    severity: 'High' | 'Medium' | 'Low';
+}
+
+export interface AISuggestions {
+    suggestions: AISuggestion[];
+    createdAt: any; // Firestore Timestamp
+}
+
 export interface BusinessInstance {
     id: string;
     name: string;
@@ -100,6 +111,7 @@ export interface BusinessInstance {
         loyaltyPointsForReward?: number;
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
+        aiTroubleshootSuggestions?: AISuggestions;
     };
 }
 

@@ -94,7 +94,7 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
   const [categories, setCategories] = React.useState<string[]>(business.settings?.productCategories || []);
   const [categoryInput, setCategoryInput] = React.useState('');
   
-  const referralLink = userProfile?.referralCode ? `https://zeneva.vercel.app/signup?ref=${'\'\'\'' + userProfile.referralCode + '\'\'\''}` : '';
+  const referralLink = userProfile?.referralCode ? `https://zeneva.vercel.app/signup?ref=${userProfile.referralCode}` : '';
 
   const handleSettingsSubmit = async (formName: string, dataToSave: any) => {
     if (!businessDocRef) {
@@ -286,36 +286,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
     <div className="flex flex-col gap-6">
       <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
       
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary"/>Zeneva's Core Capabilities</CardTitle>
-          <CardDescription>An overview of what Zeneva can do for your business.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-           <ul className="space-y-3">
-             <li className="flex items-start gap-3">
-               <Briefcase className="h-4 w-4 mt-1 text-primary shrink-0"/>
-               <div><strong className="text-foreground">Inventory Management:</strong> Track stock levels in real-time, add products individually or via CSV, and get low-stock alerts.</div>
-             </li>
-             <li className="flex items-start gap-3">
-               <ShoppingCart className="h-4 w-4 mt-1 text-primary shrink-0"/>
-                <div><strong className="text-foreground">Point of Sale (POS):</strong> Process customer sales quickly, manage carts, and handle various payment methods.</div>
-             </li>
-             <li className="flex items-start gap-3">
-               <Users className="h-4 w-4 mt-1 text-primary shrink-0"/>
-                <div><strong className="text-foreground">Customer Management (CRM):</strong> Build a customer database, track purchase history, and run a loyalty program.</div>
-             </li>
-             <li className="flex items-start gap-3">
-                <BarChart2 className="h-4 w-4 mt-1 text-primary shrink-0"/>
-                <div><strong className="text-foreground">Reporting & Analytics:</strong> View sales trends, identify top products, and gain insights into your business performance.</div>
-             </li>
-           </ul>
-           <div className="p-4 bg-muted/50 border rounded-lg">
-             <p>Zeneva helps you manage your existing customers and build loyalty. It does not directly find new customers for you; that's best achieved through your own marketing, SEO, and advertising efforts.</p>
-           </div>
-        </CardContent>
-      </Card>
-
        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary" />Referral Program</CardTitle>

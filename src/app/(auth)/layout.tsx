@@ -2,19 +2,20 @@
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Loader, LogOut, UserX } from 'lucide-react';
 import { createNewBusinessForUser } from '@/firebase/users';
 import { useToast } from '@/hooks/use-toast';
 import type { BusinessInstance, UserProfile } from '@/types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 
-function FullScreenLoader() {
+function FullScreenLoader({ text }: { text?: string }) {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-background">
+    <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-2">
       <Loader className="h-8 w-8 animate-spin text-primary" />
+      {text && <p className="text-sm text-muted-foreground">{text}</p>}
     </div>
   );
 }
@@ -84,7 +85,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   // Show loader if we are still waiting on essential data.
   const isOverallLoading = isUserLoading || (user && (isProfileLoading || (shouldFetchBusiness && isBusinessLoading)));
   if (isOverallLoading) {
-    return <FullScreenLoader />;
+    return <FullScreenLoader text="Getting things ready..." />;
   }
 
   // If there's no logged-in user, show the auth pages (login, signup).
@@ -119,5 +120,5 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
   // If there IS a user, we should be either creating a business or getting ready to redirect.
   // In either case, we show a loader to prevent a flash of content.
-  return <FullScreenLoader />;
+  return <FullScreenLoader text="Redirecting to dashboard..." />;
 }

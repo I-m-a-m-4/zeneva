@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -80,6 +79,11 @@ export default function AppLayout({
   const pathname = usePathname();
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const userDocRef = useMemoFirebase(
     () => (user?.uid && firestore ? doc(firestore, 'users', user.uid) : null), 
@@ -123,19 +127,24 @@ export default function AppLayout({
   }, [userNotifications]);
   
   React.useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (isMounted && !isUserLoading && !user) {
       router.replace('/login');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, isMounted]);
   
+  const needsRoleUpgrade = React.useMemo(() => {
+      return businessInstance?.ownerId === user?.uid && userProfile?.role !== 'admin';
+  }, [businessInstance?.ownerId, user?.uid, userProfile?.role]);
+
+
   React.useEffect(() => {
-    if (businessInstance && user && userProfile) {
-      if (businessInstance.ownerId === user.uid && userProfile.role !== 'admin') {
-        const userToUpdateDocRef = doc(firestore, 'users', user.uid);
-        updateDoc(userToUpdateDocRef, { role: 'admin' }).catch(console.error);
-      }
+    if (needsRoleUpgrade && firestore && user?.uid) {
+      const userToUpdateDocRef = doc(firestore, 'users', user.uid);
+      console.log("Attempting to upgrade user to admin...");
+      updateDoc(userToUpdateDocRef, { role: 'admin' }).catch(console.error);
     }
-  }, [businessInstance, user, userProfile, firestore]);
+  }, [needsRoleUpgrade, firestore, user?.uid]);
+
 
   React.useEffect(() => {
       const down = (e: KeyboardEvent) => {
@@ -160,49 +169,11 @@ export default function AppLayout({
     await batch.commit().catch(console.error);
   }, [firestore, user, unreadCount, userNotifications]);
 
-  React.useEffect(() => {
-    if (!userDocRef) return;
+  if (!isMounted) {
+    return <FullScreenLoader text="Getting things ready..." />;
+  }
 
-    const updateLastSeen = () => {
-      try {
-        updateDoc(userDocRef, {
-          lastSeen: serverTimestamp()
-        }).catch(error => {
-          // This can fail if offline, which is expected. We can safely ignore it,
-          // unless it's a different kind of error.
-          if (error.code !== 'unavailable') {
-             console.warn("Could not update user's last seen timestamp.", error.code);
-          }
-        });
-      } catch (e) {
-        console.warn("Error trying to update lastSeen.", e);
-      }
-    };
-
-    // This function is called when the user's presence changes (e.g., switches tabs, closes window).
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        updateLastSeen();
-      }
-    };
-    
-    // Update once when the layout mounts to signal the user is active
-    updateLastSeen();
-
-    // Listen for visibility changes to detect when the user leaves the page
-    document.addEventListener('visibilitychange', handleVisibilityChange, true);
-    
-    // pagehide is a more reliable event for when a page is being unloaded
-    window.addEventListener('pagehide', handleVisibilityChange, true);
-
-    // Cleanup the event listeners when the component unmounts
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange, true);
-      window.removeEventListener('pagehide', handleVisibilityChange, true);
-    };
-  }, [userDocRef]);
-
-  if (isUserLoading || isProfileLoading) return <FullScreenLoader text="Loading your session..." />;
+  if (isUserLoading || isProfileLoading) return <FullScreenLoader text="Getting things ready..." />;
   if (!user) return <FullScreenLoader text="Redirecting to login..." />;
   
   if (userProfile?.status === 'inactive') {
@@ -230,10 +201,10 @@ export default function AppLayout({
   }
   
   if (!userProfile || !userProfile.businessId) {
-      return <FullScreenLoader text="Finalizing account setup..." />;
+      return <FullScreenLoader text="Creating your workspace..." />;
   }
 
-  if (isBusinessLoading) return <FullScreenLoader text="Loading workspace..." />;
+  if (isBusinessLoading) return <FullScreenLoader text="Loading your workspace..." />;
   
   if (businessInstance?.status === 'deleted') {
     return (

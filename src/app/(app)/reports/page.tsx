@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import RefreshButton from '@/components/shared/refresh-button';
+import ReportsTeaser from '@/components/reports/reports-teaser';
+import Link from 'next/link';
 
 function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
     return (
@@ -42,6 +44,8 @@ export default function ReportsDashboard() {
       from: subDays(new Date(), 29),
       to: new Date(),
     });
+
+    const isStarterPlan = business?.plan === 'starter' && business?.accessLevel !== 'lifetime';
 
     const receipts = React.useMemo(() => {
         if (!allReceipts) return [];
@@ -105,7 +109,27 @@ export default function ReportsDashboard() {
         } catch (err) {
             toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
         }
-      };
+    };
+    
+    if (isStarterPlan) {
+        return (
+            <div className="flex flex-col gap-6">
+                <PageTitle title="Reports" subtitle="Upgrade to Pro or Business to unlock detailed analytics." />
+                <div className="relative">
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                        <div className="text-center p-8 bg-card border rounded-lg shadow-lg max-w-md">
+                            <h3 className="text-2xl font-bold mb-2">Upgrade to Unlock Reports</h3>
+                            <p className="text-muted-foreground mb-6">Gain valuable insights into your business performance by upgrading to a Pro or Business plan.</p>
+                            <Button asChild size="lg">
+                                <Link href="/billing">View Plans & Upgrade</Link>
+                            </Button>
+                        </div>
+                    </div>
+                    <ReportsTeaser />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
