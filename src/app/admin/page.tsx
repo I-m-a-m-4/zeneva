@@ -1,4 +1,5 @@
 
+
 'use client';
 import {
   Card,
@@ -145,7 +146,7 @@ const UserPresence = ({ lastSeen }: { lastSeen: any }) => {
 
 const PIE_CHART_COLORS = ['hsl(var(--primary))', '#60a5fa', '#a78bfa', '#facc15', '#fb923c', '#4ade80'];
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -160,29 +161,6 @@ export default function AdminDashboardPage() {
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
   const [isAssigningPlan, setIsAssigningPlan] = useState(false);
 
-
-  const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
-  const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances'), orderBy('name')), [firestore]);
-  const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
-  const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
-  const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
-
-  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
-  const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
-  const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
-  const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
-  
-  const loading = usersLoading || businessesLoading || productsLoading || receiptsLoading || purchasesLoading;
-  
-  useEffect(() => {
-    if (userStatusEmail && users) {
-      const selectedUser = users.find(u => u.email === userStatusEmail);
-      if (selectedUser) {
-        setIsUserActive(selectedUser.status !== 'inactive');
-      }
-    }
-  }, [userStatusEmail, users]);
 
   const userOptions = useMemo(() => (users || []).map(user => ({
       value: user.email,
@@ -347,6 +325,16 @@ export default function AdminDashboardPage() {
     }
   }
 
+   const handleUserStatusSelection = (email: string) => {
+    setUserStatusEmail(email);
+    if (email && users) {
+        const selectedUser = users.find(u => u.email === email);
+        if (selectedUser) {
+            setIsUserActive(selectedUser.status !== 'inactive');
+        }
+    }
+  };
+
    const handleUpdateUserStatus = async () => {
         if (!userStatusEmail) {
             toast({ variant: 'destructive', title: 'Missing Email', description: 'Please select a user to update.' });
@@ -401,8 +389,277 @@ export default function AdminDashboardPage() {
             setIsAssigningPlan(false);
         }
     };
+
+    const statCards = [
+        { title: "Total Revenue", value: `₦${analyticsData.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
+        { title: "Total Businesses", value: analyticsData.totalBusinesses.toLocaleString(), icon: Building },
+        { title: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
+        { title: "Total Products", value: analyticsData.totalProducts.toLocaleString(), icon: Package },
+        { title: "Active Subscriptions", value: analyticsData.activeSubscriptions.toLocaleString(), icon: UserCheck, description: 'Pro + Business plans' },
+        { title: "Trialing Users", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
+        { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
+        { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
+      ];
+    
+      return (
+        <div className="p-4 md:p-6 lg:p-8 space-y-6">
+          <div className="mb-2">
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <p className="text-muted-foreground">
+              Platform-wide overview of Zeneva.
+            </p>
+          </div>
+    
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {statCards.map(card => <StatCard key={card.title} {...card} />)}
+          </div>
+    
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+             <Card>
+              <CardHeader><CardTitle>New User Growth</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <ReBarChart data={analyticsData.newUserGrowth}>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.1)'}} />
+                    <Bar dataKey="New Users" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </ReBarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <Card>
+                <CardHeader><CardTitle>Subscription Revenue Over Time</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <ReLineChart data={analyticsData.revenueGrowth}>
+                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis tickFormatter={(value) => `₦${Number(value) >= 1000 ? (Number(value)/1000).toLocaleString() : value}k`} allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12}/>
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                      <Line type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                    </ReLineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+          </div>
+    
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1">
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><TrendingUp className="text-amber-500"/>Top 5 Selling Products</CardTitle>
+                        <CardDescription>Platform-wide product sales from POS transactions.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Product Name</TableHead>
+                                    <TableHead className="text-right">Quantity Sold</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analyticsData.topSellingProducts.map(([name, quantity]) => (
+                                    <TableRow key={name}>
+                                        <TableCell className="font-medium">{name}</TableCell>
+                                        <TableCell className="text-right font-semibold">{quantity.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                         </Table>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle className="flex items-center gap-2"><PieChartIcon className="text-primary"/>User Role Distribution</CardTitle></CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                            <RePieChart>
+                            <Pie data={analyticsData.userRoleData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                {analyticsData.userRoleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
+                            </Pie>
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend iconSize={10} />
+                            </RePieChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+                <div className="space-y-6">
+                  <Card>
+                      <CardHeader><CardTitle className="flex items-center gap-2"><Layers className="text-primary"/>Plan Distribution</CardTitle></CardHeader>
+                      <CardContent>
+                          <ResponsiveContainer width="100%" height={150}>
+                             <RePieChart>
+                               <Pie data={analyticsData.planDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                                  {analyticsData.planDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
+                               </Pie>
+                               <Tooltip content={<CustomTooltip />} />
+                               <Legend iconSize={10} />
+                             </RePieChart>
+                          </ResponsiveContainer>
+                      </CardContent>
+                  </Card>
+                </div>
+           </div>
+           
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Active Accounts</CardTitle>
+                            <CardDescription>List of all users with an active status on the platform.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-[330px]">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>User</TableHead>
+                                            <TableHead>Business Name</TableHead>
+                                            <TableHead>Plan</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Last Seen</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {analyticsData.activeUsers.map(user => {
+                                            const business = businesses?.find(b => b.id === user.businessId);
+                                            return (
+                                                <TableRow key={user.id}>
+                                                    <TableCell><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div></TableCell>
+                                                    <TableCell>{business?.name || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        {business ? (
+                                                            business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
+                                                        ) : <Badge variant="outline">N/A</Badge>}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                                                            {user.status || 'active'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <UserPresence lastSeen={user.lastSeen} />
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className='flex items-center gap-2'><UserX className="text-destructive"/>Inactive Accounts</CardTitle>
+                            <CardDescription>Users who have deleted their accounts.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-72">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>User</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {analyticsData.inactiveUsers.length > 0 ? (
+                                            analyticsData.inactiveUsers.map(user => (
+                                                <TableRow key={user.id}>
+                                                    <TableCell>{user.name}</TableCell>
+                                                    <TableCell>{user.email}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                                                            {user.status || 'active'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                             <TableRow><TableCell colSpan={3} className="h-24 text-center">No inactive accounts found.</TableCell></TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className='space-y-6'>
+                    <Card>
+                        <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase/>Assign Plan</CardTitle><CardDescription>Manually set a subscription plan for a business.</CardDescription></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2"><Label htmlFor="plan-email">User Email</Label><Combobox options={userOptions} value={planUserEmail} onChange={setPlanUserEmail} placeholder="Select a user..."/></div>
+                            <div className="space-y-2"><Label>Plan</Label><Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as any)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="starter">Starter</SelectItem><SelectItem value="pro">Pro</SelectItem><SelectItem value="business">Business</SelectItem></SelectContent></Select></div>
+                        </CardContent>
+                        <CardFooter><Button onClick={handleAssignPlan} disabled={isAssigningPlan} className="w-full">{isAssigningPlan && <Loader className="mr-2 h-4 w-4 animate-spin"/>}Assign Plan</Button></CardFooter>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Grant Trial / Lifetime Access</CardTitle><CardDescription>Extend a trial or grant permanent lifetime access.</CardDescription></CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div className='space-y-2'><Label htmlFor='grant-email'>User Email</Label><Combobox options={userOptions} value={grantEmail} onChange={setGrantEmail} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found."/></div>
+                                <div className='flex items-center space-x-2'><Switch id="grant-lifetime" checked={grantLifetime} onCheckedChange={setGrantLifetime}/><Label htmlFor="grant-lifetime">Grant Lifetime Access</Label></div>
+                                <div className='space-y-2'><Label>New Expiry Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!grantDate && "text-muted-foreground")} disabled={grantLifetime}><CalendarIcon className="mr-2 h-4 w-4" />{grantDate && !grantLifetime ? format(grantDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={grantDate} onSelect={setGrantDate} initialFocus disabled={grantLifetime} /></PopoverContent></Popover></div>
+                            </div>
+                        </CardContent>
+                        <CardFooter><Button onClick={handleGrantAccess} disabled={isGranting} className='w-full'>{isGranting && <Loader className='mr-2 h-4 w-4 animate-spin' />}Grant Access</Button></CardFooter>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle className='flex items-center gap-2'><UserCog/>User Account Management</CardTitle><CardDescription>Activate or deactivate a user account.</CardDescription></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className='space-y-2'><Label htmlFor='status-email'>User Email</Label><Combobox options={userOptions} value={userStatusEmail} onChange={handleUserStatusSelection} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found."/></div>
+                            <div className='flex items-center space-x-2'><Switch id="user-status" checked={isUserActive} onCheckedChange={setIsUserActive}/><Label htmlFor="user-status">{isUserActive ? "Active" : "Inactive"}</Label></div>
+                        </CardContent>
+                        <CardFooter><Button onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className='w-full'>{isUpdatingStatus && <Loader className='mr-2 h-4 w-4 animate-spin' />}{isUserActive ? <Check className='mr-2 h-4 w-4'/> : <Ban className='mr-2 h-4 w-4'/>}Set Status</Button></CardFooter>
+                    </Card>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Newspaper/>Blog Management</CardTitle>
+                            <CardDescription>Create and manage blog posts for the platform.</CardDescription>
+                        </CardHeader>
+                        <CardFooter>
+                            <Button className="w-full" asChild>
+                                <Link href="/admin-imamshaffy/blog">Go to Blog Posts</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Send/>Notifications</CardTitle>
+                            <CardDescription>Send platform-wide announcements to all users.</CardDescription>
+                        </CardHeader>
+                        <CardFooter>
+                             <Button className="w-full" asChild>
+                                <Link href="/admin-imamshaffy/notifications">Send Notification</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+          </div>
+        </div>
+      );
+}
+
+export default function AdminDashboardPage() {
+  const firestore = useFirestore();
+
+  const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
+  const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances'), orderBy('name')), [firestore]);
+  const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
+  const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
+  const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
+
+  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+  const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
+  const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
   
-  if (loading) {
+  const isLoading = usersLoading || businessesLoading || productsLoading || receiptsLoading || purchasesLoading;
+  
+  if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader className="h-8 w-8 animate-spin text-primary" />
@@ -411,256 +668,7 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const statCards = [
-    { title: "Total Revenue", value: `₦${analyticsData.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
-    { title: "Total Businesses", value: analyticsData.totalBusinesses.toLocaleString(), icon: Building },
-    { title: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
-    { title: "Total Products", value: analyticsData.totalProducts.toLocaleString(), icon: Package },
-    { title: "Active Subscriptions", value: analyticsData.activeSubscriptions.toLocaleString(), icon: UserCheck, description: 'Pro + Business plans' },
-    { title: "Trialing Users", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
-    { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
-    { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
-  ];
-
-  return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <div className="mb-2">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground">
-          Platform-wide overview of Zeneva.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statCards.map(card => <StatCard key={card.title} {...card} />)}
-      </div>
-
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         <Card>
-          <CardHeader><CardTitle>New User Growth</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <ReBarChart data={analyticsData.newUserGrowth}>
-                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.1)'}} />
-                <Bar dataKey="New Users" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </ReBarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-            <CardHeader><CardTitle>Subscription Revenue Over Time</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <ReLineChart data={analyticsData.revenueGrowth}>
-                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis tickFormatter={(value) => `₦${Number(value) >= 1000 ? (Number(value)/1000).toLocaleString() : value}k`} allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12}/>
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                  <Line type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
-                </ReLineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-      </div>
-
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-1">
-                <CardHeader>
-                    <CardTitle className='flex items-center gap-2'><TrendingUp className="text-amber-500"/>Top 5 Selling Products</CardTitle>
-                    <CardDescription>Platform-wide product sales from POS transactions.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Product Name</TableHead>
-                                <TableHead className="text-right">Quantity Sold</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {analyticsData.topSellingProducts.map(([name, quantity]) => (
-                                <TableRow key={name}>
-                                    <TableCell className="font-medium">{name}</TableCell>
-                                    <TableCell className="text-right font-semibold">{quantity.toLocaleString()}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                     </Table>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2"><PieChartIcon className="text-primary"/>User Role Distribution</CardTitle></CardHeader>
-                <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                        <RePieChart>
-                        <Pie data={analyticsData.userRoleData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                            {analyticsData.userRoleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend iconSize={10} />
-                        </RePieChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
-            <div className="space-y-6">
-              <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2"><Layers className="text-primary"/>Plan Distribution</CardTitle></CardHeader>
-                  <CardContent>
-                      <ResponsiveContainer width="100%" height={150}>
-                         <RePieChart>
-                           <Pie data={analyticsData.planDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
-                              {analyticsData.planDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
-                           </Pie>
-                           <Tooltip content={<CustomTooltip />} />
-                           <Legend iconSize={10} />
-                         </RePieChart>
-                      </ResponsiveContainer>
-                  </CardContent>
-              </Card>
-            </div>
-       </div>
-       
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Active Accounts</CardTitle>
-                        <CardDescription>List of all users with an active status on the platform.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-[330px]">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Business Name</TableHead>
-                                        <TableHead>Plan</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Last Seen</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {analyticsData.activeUsers.map(user => {
-                                        const business = businesses?.find(b => b.id === user.businessId);
-                                        return (
-                                            <TableRow key={user.id}>
-                                                <TableCell><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div></TableCell>
-                                                <TableCell>{business?.name || 'N/A'}</TableCell>
-                                                <TableCell>
-                                                    {business ? (
-                                                        business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
-                                                    ) : <Badge variant="outline">N/A</Badge>}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                                                        {user.status || 'active'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <UserPresence lastSeen={user.lastSeen} />
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><UserX className="text-destructive"/>Inactive Accounts</CardTitle>
-                        <CardDescription>Users who have deleted their accounts.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-72">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {analyticsData.inactiveUsers.length > 0 ? (
-                                        analyticsData.inactiveUsers.map(user => (
-                                            <TableRow key={user.id}>
-                                                <TableCell>{user.name}</TableCell>
-                                                <TableCell>{user.email}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                                                        {user.status || 'active'}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                         <TableRow><TableCell colSpan={3} className="h-24 text-center">No inactive accounts found.</TableCell></TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </div>
-            <div className='space-y-6'>
-                <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase/>Assign Plan</CardTitle><CardDescription>Manually set a subscription plan for a business.</CardDescription></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2"><Label htmlFor="plan-email">User Email</Label><Combobox options={userOptions} value={planUserEmail} onChange={setPlanUserEmail} placeholder="Select a user..."/></div>
-                        <div className="space-y-2"><Label>Plan</Label><Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as any)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="starter">Starter</SelectItem><SelectItem value="pro">Pro</SelectItem><SelectItem value="business">Business</SelectItem></SelectContent></Select></div>
-                    </CardContent>
-                    <CardFooter><Button onClick={handleAssignPlan} disabled={isAssigningPlan} className="w-full">{isAssigningPlan && <Loader className="mr-2 h-4 w-4 animate-spin"/>}Assign Plan</Button></CardFooter>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle>Grant Trial / Lifetime Access</CardTitle><CardDescription>Extend a trial or grant permanent lifetime access.</CardDescription></CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className='space-y-2'><Label htmlFor='grant-email'>User Email</Label><Combobox options={userOptions} value={grantEmail} onChange={setGrantEmail} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found."/></div>
-                            <div className='flex items-center space-x-2'><Switch id="grant-lifetime" checked={grantLifetime} onCheckedChange={setGrantLifetime}/><Label htmlFor="grant-lifetime">Grant Lifetime Access</Label></div>
-                            <div className='space-y-2'><Label>New Expiry Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!grantDate && "text-muted-foreground")} disabled={grantLifetime}><CalendarIcon className="mr-2 h-4 w-4" />{grantDate && !grantLifetime ? format(grantDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={grantDate} onSelect={setGrantDate} initialFocus disabled={grantLifetime} /></PopoverContent></Popover></div>
-                        </div>
-                    </CardContent>
-                    <CardFooter><Button onClick={handleGrantAccess} disabled={isGranting} className='w-full'>{isGranting && <Loader className='mr-2 h-4 w-4 animate-spin' />}Grant Access</Button></CardFooter>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle className='flex items-center gap-2'><UserCog/>User Account Management</CardTitle><CardDescription>Activate or deactivate a user account.</CardDescription></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className='space-y-2'><Label htmlFor='status-email'>User Email</Label><Combobox options={userOptions} value={userStatusEmail} onChange={setUserStatusEmail} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found."/></div>
-                        <div className='flex items-center space-x-2'><Switch id="user-status" checked={isUserActive} onCheckedChange={setIsUserActive}/><Label htmlFor="user-status">{isUserActive ? "Active" : "Inactive"}</Label></div>
-                    </CardContent>
-                    <CardFooter><Button onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className='w-full'>{isUpdatingStatus && <Loader className='mr-2 h-4 w-4 animate-spin' />}{isUserActive ? <Check className='mr-2 h-4 w-4'/> : <Ban className='mr-2 h-4 w-4'/>}Set Status</Button></CardFooter>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Newspaper/>Blog Management</CardTitle>
-                        <CardDescription>Create and manage blog posts for the platform.</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
-                        <Button className="w-full" asChild>
-                            <Link href="/admin-imamshaffy/blog">Go to Blog Posts</Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Send/>Notifications</CardTitle>
-                        <CardDescription>Send platform-wide announcements to all users.</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
-                         <Button className="w-full" asChild>
-                            <Link href="/admin-imamshaffy/notifications">Send Notification</Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </div>
-      </div>
-    </div>
-  );
+  return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} />
 }
 
     
@@ -668,3 +676,5 @@ export default function AdminDashboardPage() {
     
 
     
+
+

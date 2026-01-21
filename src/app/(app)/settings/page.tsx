@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Paintbrush, Briefcase, Percent, Building, UserCircle, Bell, DollarSign, ShieldCheck, FileText, DownloadCloud, Eye, EyeOff, KeyRound, Gift, Trophy, Loader2, Clock, History, Tag, X, Copy, Share2, Trash2 } from 'lucide-react'; 
+import { Paintbrush, Briefcase, Percent, Building, UserCircle, Bell, DollarSign, ShieldCheck, FileText, DownloadCloud, Eye, EyeOff, KeyRound, Gift, Trophy, Loader2, Clock, History, Tag, X, Copy, Share2, Trash2, Zap, BarChart2, ShoppingCart, Users } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -51,104 +51,50 @@ This agreement outlines the terms and conditions for vendors/operators using the
    - Any discrepancies or errors identified must be reported to management immediately.
 `;
 
-const OWNER_ACCESS_KEY_STORAGE = "zeneva-inventory-owner-access-key";
+export const OWNER_ACCESS_KEY_STORAGE = "zeneva-inventory-owner-access-key";
 
-export default function SettingsPage() {
+// Inner component to hold form logic and state, preventing re-render loops.
+function SettingsForms({ business, userProfile, businessDocRef }: { business: BusinessInstance, userProfile: UserProfile, businessDocRef: any }) {
   const { toast } = useToast();
-  const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
   const router = useRouter();
-
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
-
-  const businessDocRef = useMemoFirebase(() => userProfile ? doc(firestore, 'businessInstances', userProfile.businessId) : null, [userProfile, firestore]);
-  const { data: currentBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
+  const firestore = useFirestore();
 
   const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
   
-  const [businessName, setBusinessName] = React.useState("");
-  const [businessAddress, setBusinessAddress] = React.useState("");
-  const [businessPhone, setBusinessPhone] = React.useState("");
-  const [businessEmail, setBusinessEmail] = React.useState("");
+  // Initialize state directly from props. This happens once per mount/key-change.
+  const [businessName, setBusinessName] = React.useState(business.name || "My Store");
+  const [businessAddress, setBusinessAddress] = React.useState(business.address || "");
+  const [businessPhone, setBusinessPhone] = React.useState(business.settings?.phone || "");
+  const [businessEmail, setBusinessEmail] = React.useState(business.settings?.email || "");
 
-  const [currency, setCurrency] = React.useState("NGN");
-  const [timezone, setTimezone] = React.useState("Africa/Lagos");
-  const [defaultTaxRate, setDefaultTaxRate] = React.useState("0");
+  const [currency, setCurrency] = React.useState(business.settings?.currency || "NGN");
+  const [timezone, setTimezone] = React.useState(business.settings?.timezone || "Africa/Lagos");
+  const [defaultTaxRate, setDefaultTaxRate] = React.useState(String(business.settings?.defaultTaxRate ?? 0));
 
-  const [paymentBankAccountId, setPaymentBankAccountId] = React.useState("");
-  const [paymentBankName, setPaymentBankName] = React.useState("");
-  const [paymentInstructions, setPaymentInstructions] = React.useState("");
+  const [paymentBankAccountId, setPaymentBankAccountId] = React.useState(business.settings?.paymentBankAccountId || "");
+  const [paymentBankName, setPaymentBankName] = React.useState(business.settings?.paymentBankName || "");
+  const [paymentInstructions, setPaymentInstructions] = React.useState(business.settings?.paymentInstructions || "");
 
-  const [vendorPolicy, setVendorPolicy] = React.useState(dummyVendorPolicyTemplate);
-  const [enableVendorPolicy, setEnableVendorPolicy] = React.useState(false);
+  const [vendorPolicy, setVendorPolicy] = React.useState(business.settings?.vendorPolicyText || dummyVendorPolicyTemplate);
+  const [enableVendorPolicy, setEnableVendorPolicy] = React.useState(business.settings?.vendorPolicyEnabled || false);
 
   const [newOwnerPassword, setNewOwnerPassword] = React.useState("");
   const [confirmNewOwnerPassword, setConfirmNewOwnerPassword] = React.useState("");
   const [showNewOwnerPassword, setShowNewOwnerPassword] = React.useState(false);
   const [showConfirmNewOwnerPassword, setShowConfirmNewOwnerPassword] = React.useState(false);
 
-  const [enableLoyaltyProgram, setEnableLoyaltyProgram] = React.useState(true);
-  const [pointsPerUnit, setPointsPerUnit] = React.useState("1"); 
-  const [loyaltyPointsForReward, setLoyaltyPointsForReward] = React.useState("1000");
-  const [rewardDiscountPercentage, setRewardDiscountPercentage] = React.useState("10");
+  const [enableLoyaltyProgram, setEnableLoyaltyProgram] = React.useState(business.settings?.loyaltyProgramEnabled ?? true);
+  const [pointsPerUnit, setPointsPerUnit] = React.useState(String(business.settings?.pointsPerUnit || 1));
+  const [loyaltyPointsForReward, setLoyaltyPointsForReward] = React.useState(String(business.settings?.loyaltyPointsForReward || 1000));
+  const [rewardDiscountPercentage, setRewardDiscountPercentage] = React.useState(String(business.settings?.loyaltyRewardDiscountPercentage || 10));
 
-  const [categories, setCategories] = React.useState<string[]>([]);
+  const [categories, setCategories] = React.useState<string[]>(business.settings?.productCategories || []);
   const [categoryInput, setCategoryInput] = React.useState('');
   
-  const referralLink = userProfile?.referralCode ? `https://zeneva.vercel.app/signup?ref=${userProfile.referralCode}` : '';
-
-  React.useEffect(() => {
-    if (currentBusiness) {
-      setBusinessName(currentBusiness.name || "My Store");
-      setBusinessAddress(currentBusiness.address || "");
-      
-      const settings = currentBusiness.settings || {};
-      setBusinessPhone(settings.phone || "");
-      setBusinessEmail(settings.email || "");
-      setCurrency(settings.currency || "NGN");
-      setTimezone(settings.timezone || "Africa/Lagos");
-      setDefaultTaxRate(String(settings.defaultTaxRate ?? 0));
-      setPaymentBankAccountId(settings.paymentBankAccountId || "");
-      setPaymentBankName(settings.paymentBankName || "");
-      setPaymentInstructions(settings.paymentInstructions || "");
-      setEnableVendorPolicy(settings.vendorPolicyEnabled || false);
-      setVendorPolicy(settings.vendorPolicyText || dummyVendorPolicyTemplate);
-      setEnableLoyaltyProgram(settings.loyaltyProgramEnabled ?? true);
-      setPointsPerUnit(String(settings.pointsPerUnit || 1));
-      setLoyaltyPointsForReward(String(settings.loyaltyPointsForReward || 1000));
-      setRewardDiscountPercentage(String(settings.loyaltyRewardDiscountPercentage || 10));
-      setCategories(settings.productCategories || []);
-    }
-  }, [currentBusiness]);
-
-  React.useEffect(() => {
-    if (user && userProfile && !isProfileLoading && !userProfile.referralCode && firestore) {
-        const generateAndSaveCode = async () => {
-            const newCode = user.uid.substring(0, 8).toUpperCase();
-            const userRef = doc(firestore, 'users', user.uid);
-            try {
-                await updateDoc(userRef, { referralCode: newCode });
-                toast({
-                    variant: 'success',
-                    title: "Referral Code Generated!",
-                    description: "Your unique referral code is now ready to be shared.",
-                });
-            } catch (e) {
-                console.error("Could not save referral code:", e);
-                toast({
-                    variant: 'destructive',
-                    title: "Code Generation Failed",
-                    description: "We couldn't generate your referral code. Please try refreshing.",
-                });
-            }
-        };
-        generateAndSaveCode();
-    }
-  }, [user, userProfile, isProfileLoading, firestore, toast]);
+  const referralLink = userProfile?.referralCode ? `https://zeneva.vercel.app/signup?ref=${'\'\'\'' + userProfile.referralCode + '\'\'\''}` : '';
 
   const handleSettingsSubmit = async (formName: string, dataToSave: any) => {
     if (!businessDocRef) {
@@ -293,7 +239,8 @@ export default function SettingsPage() {
     };
 
     const handleDeleteAccount = async () => {
-        if (!firestore || !user || !businessDocRef || !userDocRef) return;
+        if (!firestore || !userProfile || !businessDocRef) return;
+        const userDocRef = doc(firestore, 'users', userProfile.id);
         setIsDeleting(true);
 
         try {
@@ -334,17 +281,41 @@ export default function SettingsPage() {
             setIsDeleting(false);
         }
     }
-
-  const isLoading = isUserLoading || isProfileLoading || isBusinessLoading;
-
-  if (isLoading || !userProfile) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading settings...</span></div>;
-  }
-
+  
   return (
     <div className="flex flex-col gap-6">
       <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
       
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary"/>Zeneva's Core Capabilities</CardTitle>
+          <CardDescription>An overview of what Zeneva can do for your business.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+           <ul className="space-y-3">
+             <li className="flex items-start gap-3">
+               <Briefcase className="h-4 w-4 mt-1 text-primary shrink-0"/>
+               <div><strong className="text-foreground">Inventory Management:</strong> Track stock levels in real-time, add products individually or via CSV, and get low-stock alerts.</div>
+             </li>
+             <li className="flex items-start gap-3">
+               <ShoppingCart className="h-4 w-4 mt-1 text-primary shrink-0"/>
+                <div><strong className="text-foreground">Point of Sale (POS):</strong> Process customer sales quickly, manage carts, and handle various payment methods.</div>
+             </li>
+             <li className="flex items-start gap-3">
+               <Users className="h-4 w-4 mt-1 text-primary shrink-0"/>
+                <div><strong className="text-foreground">Customer Management (CRM):</strong> Build a customer database, track purchase history, and run a loyalty program.</div>
+             </li>
+             <li className="flex items-start gap-3">
+                <BarChart2 className="h-4 w-4 mt-1 text-primary shrink-0"/>
+                <div><strong className="text-foreground">Reporting & Analytics:</strong> View sales trends, identify top products, and gain insights into your business performance.</div>
+             </li>
+           </ul>
+           <div className="p-4 bg-muted/50 border rounded-lg">
+             <p>Zeneva helps you manage your existing customers and build loyalty. It does not directly find new customers for you; that's best achieved through your own marketing, SEO, and advertising efforts.</p>
+           </div>
+        </CardContent>
+      </Card>
+
        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary" />Referral Program</CardTitle>
@@ -564,5 +535,42 @@ export default function SettingsPage() {
       </AlertDialog>
 
     </div>
-  );
+  )
+}
+
+
+export default function SettingsPage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+
+  const businessDocRef = useMemoFirebase(() => userProfile ? doc(firestore, 'businessInstances', userProfile.businessId) : null, [userProfile, firestore]);
+  const { data: currentBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
+  
+  React.useEffect(() => {
+    if (user && userProfile && !isProfileLoading && !userProfile.referralCode && firestore) {
+        const generateAndSaveCode = async () => {
+            const newCode = user.uid.substring(0, 8).toUpperCase();
+            const userRef = doc(firestore, 'users', user.uid);
+            try {
+                await updateDoc(userRef, { referralCode: newCode });
+                // Do not toast here, it's a background process
+            } catch (e) {
+                console.error("Could not save referral code:", e);
+            }
+        };
+        generateAndSaveCode();
+    }
+  }, [user, userProfile, isProfileLoading, firestore]);
+
+  const isLoading = isUserLoading || isProfileLoading || isBusinessLoading;
+
+  if (isLoading || !currentBusiness || !userProfile) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading settings...</span></div>;
+  }
+
+  // Use a key to force re-mount when business data changes, solving the loop.
+  return <SettingsForms key={currentBusiness.id} business={currentBusiness} userProfile={userProfile} businessDocRef={businessDocRef} />;
 }

@@ -31,7 +31,7 @@ export default function MobileBottomNav({ navItems, moreNavItems }: MobileBottom
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border z-40 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border z-40 md:hidden no-print">
       <div className="flex justify-around items-center h-full">
         {navItems.map((item) => {
           const isActive = (item.href === '/dashboard' && pathname === item.href) || (item.href !== '/dashboard' && pathname.startsWith(item.href));

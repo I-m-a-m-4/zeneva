@@ -18,10 +18,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, KeyRound } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { UserProfile, Invitation, BusinessInstance } from '@/types';
+import type { UserProfile, Invitation, BusinessInstance, UserRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -47,7 +47,84 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
+import { OWNER_ACCESS_KEY_STORAGE } from '../settings/page';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
+// --- Owner Access Gate Component ---
+interface OwnerAccessGateProps {
+    children: React.ReactNode;
+}
+
+function OwnerAccessGate({ children }: OwnerAccessGateProps) {
+    const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+    const [showAuthModal, setShowAuthModal] = React.useState(false);
+    const [passwordInput, setPasswordInput] = React.useState('');
+    const [authError, setAuthError] = React.useState('');
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        const ownerPassword = localStorage.getItem(OWNER_ACCESS_KEY_STORAGE);
+        if (ownerPassword) {
+            setShowAuthModal(true);
+        } else {
+            setIsAuthenticated(true);
+        }
+    }, []);
+
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const storedPassword = localStorage.getItem(OWNER_ACCESS_KEY_STORAGE);
+        if (passwordInput === storedPassword) {
+            setIsAuthenticated(true);
+            setShowAuthModal(false);
+            toast({ variant: 'success', title: 'Access Granted' });
+        } else {
+            setAuthError('Incorrect password. Please try again.');
+        }
+    };
+
+    if (!isAuthenticated) {
+        return (
+            <AlertDialog open={showAuthModal}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                           <KeyRound className="h-5 w-5 text-primary"/> Owner Access Required
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            To protect sensitive user management functions, please enter the Owner Access Password you set in the settings.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <form onSubmit={handlePasswordSubmit}>
+                        <div className="space-y-2">
+                            <Label htmlFor="owner-password">Password</Label>
+                            <Input
+                                id="owner-password"
+                                type="password"
+                                value={passwordInput}
+                                onChange={(e) => {
+                                    setPasswordInput(e.target.value);
+                                    setAuthError('');
+                                }}
+                                autoFocus
+                            />
+                            {authError && <p className="text-sm text-destructive">{authError}</p>}
+                        </div>
+                        <AlertDialogFooter className="mt-4">
+                            <Button type="submit">Unlock</Button>
+                        </AlertDialogFooter>
+                    </form>
+                </AlertDialogContent>
+            </AlertDialog>
+        );
+    }
+
+    return <>{children}</>;
+}
+
+
+// --- Main Page Components ---
 
 function useCurrentUserProfile() {
     const { user } = useUser();
@@ -55,7 +132,7 @@ function useCurrentUserProfile() {
     const userDocRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
+    }, [user?.uid, firestore]);
     const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
 
     return { profile: userProfile, isLoading };
@@ -137,7 +214,7 @@ function UsersPageSkeleton() {
     );
 }
 
-function UserManagementDashboard({ currentUser }: { currentUser: UserProfile }) {
+function UserManagementDashboard({ businessId, currentUserId, inviterName }: { businessId: string, currentUserId: string, inviterName: string }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
@@ -146,30 +223,30 @@ function UserManagementDashboard({ currentUser }: { currentUser: UserProfile }) 
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
 
   const businessDocRef = useMemoFirebase(() => {
-      if (!currentUser.businessId || !firestore) return null;
-      return doc(firestore, 'businessInstances', currentUser.businessId);
-  }, [currentUser.businessId, firestore]);
+      if (!businessId || !firestore) return null;
+      return doc(firestore, 'businessInstances', businessId);
+  }, [businessId, firestore]);
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
-  // This query is now safe because this component only renders for admins.
   const usersQuery = useMemoFirebase(() => {
-    if (!currentUser.businessId || !firestore) return null;
-    return query(collection(firestore, "users"), where("businessId", "==", currentUser.businessId));
-  }, [currentUser.businessId, firestore]);
+    if (!businessId || !firestore) return null;
+    return query(collection(firestore, "users"), where("businessId", "==", businessId));
+  }, [businessId, firestore]);
+  
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
   const invitationsQuery = useMemoFirebase(() => {
-    if (!currentUser.businessId || !firestore) return null;
-    return query(collection(firestore, 'invitations'), where('businessId', '==', currentUser.businessId));
-  }, [currentUser.businessId, firestore]);
+    if (!businessId || !firestore) return null;
+    return query(collection(firestore, 'invitations'), where('businessId', '==', businessId));
+  }, [businessId, firestore]);
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
   
   const isLoading = areUsersLoading || areInvitationsLoading || isBusinessLoading;
 
   const staffUsers = React.useMemo(() => {
       if (!users) return [];
-      return users.filter(user => user.id !== currentUser.id);
-  }, [users, currentUser.id]);
+      return users.filter(user => user.id !== currentUserId);
+  }, [users, currentUserId]);
 
   const handleRevokeInvitation = async () => {
     if (!invitationToRevoke || !firestore) return;
@@ -202,206 +279,207 @@ function UserManagementDashboard({ currentUser }: { currentUser: UserProfile }) 
   }
 
   return (
-    <>
-      <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="w-full md:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-                <div>
-                    <CardTitle>Your Staff</CardTitle>
-                    <CardDescription>
-                        A list of all users in your business.
-                    </CardDescription>
-                </div>
-                <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)}>
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                        Invite User
-                    </span>
-                </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead className="hidden sm:table-cell">Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <UserRowSkeleton />
-                        <UserRowSkeleton />
-                    </TableBody>
-                </Table>
-            ) : staffUsers && staffUsers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead className="hidden sm:table-cell">Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead><span className='sr-only'>Actions</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {staffUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="font-medium">{user.name}</div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                    <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                            {user.role.replace('_', ' ')}
-                        </Badge>
-                    </TableCell>
-                    <TableCell>
-                       <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                           {user.status || 'active'}
-                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                            <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                                disabled={currentUser.id === user.id}
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                {user.status === 'inactive' ? (
-                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'activate'}); }}>
-                                        <UserCheck className="mr-2 h-4 w-4" /> Activate User
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate'}); }}>
-                                        <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
-                    <User className="h-12 w-12 text-muted-foreground" />
-                    <h3 className="text-xl font-semibold mt-4">No Staff Found</h3>
-                    <p className="text-muted-foreground mt-2 mb-4">Invite your first team member to get started.</p>
-                </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
+    <OwnerAccessGate>
+        <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
+        <div className="grid gap-6 md:grid-cols-2">
+            <Card className="w-full md:col-span-2">
             <CardHeader>
-                <CardTitle>Pending Invitations</CardTitle>
-                <CardDescription>These users have been invited but have not yet signed up.</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Your Staff</CardTitle>
+                        <CardDescription>
+                            A list of all users in your business.
+                        </CardDescription>
+                    </div>
+                    <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)}>
+                        <PlusCircle className="h-3.5 w-3.5" />
+                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                            Invite User
+                        </span>
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
-                 {isLoading ? (
-                     <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
-                 ) : invitations && invitations.length > 0 ? (
+                {isLoading ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead>Invited</TableHead>
-                                <TableHead><span className="sr-only">Actions</span></TableHead>
+                            <TableHead>User</TableHead>
+                            <TableHead className="hidden sm:table-cell">Email</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {invitations.map(invitation => (
-                                <TableRow key={invitation.id}>
-                                    <TableCell className="font-medium">{invitation.email}</TableCell>
-                                    <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>
-                                    <TableCell className="text-muted-foreground">{invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            <UserRowSkeleton />
+                            <UserRowSkeleton />
                         </TableBody>
                     </Table>
-                 ) : (
-                    <div className="text-center text-muted-foreground p-8">
-                        <Mail className="mx-auto h-12 w-12 opacity-50" />
-                        <p className="mt-4">No pending invitations.</p>
+                ) : staffUsers && staffUsers.length > 0 ? (
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead className="hidden sm:table-cell">Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead><span className='sr-only'>Actions</span></TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {staffUsers.map((user) => (
+                    <TableRow key={user.id}>
+                        <TableCell>
+                        <div className="font-medium">{user.name}</div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
+                        <TableCell>
+                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                                {user.role.replace('_', ' ')}
+                            </Badge>
+                        </TableCell>
+                        <TableCell>
+                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                            {user.status || 'active'}
+                        </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button
+                                    aria-haspopup="true"
+                                    size="icon"
+                                    variant="ghost"
+                                    disabled={currentUserId === user.id}
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    {user.status === 'inactive' ? (
+                                        <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'activate'}); }}>
+                                            <UserCheck className="mr-2 h-4 w-4" /> Activate User
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate'}); }}>
+                                            <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
+                        <User className="h-12 w-12 text-muted-foreground" />
+                        <h3 className="text-xl font-semibold mt-4">No Staff Found</h3>
+                        <p className="text-muted-foreground mt-2 mb-4">Invite your first team member to get started.</p>
                     </div>
-                 )}
+                )}
             </CardContent>
-        </Card>
-      </div>
+            </Card>
 
-      {currentUser.businessId && (
-        <AddUserDialog 
-          isOpen={isAddUserDialogOpen}
-          onOpenChange={setIsAddUserDialogOpen}
-          businessId={currentUser.businessId}
-          businessName={businessInstance?.name || ''}
-          inviterName={currentUser.name}
-        />
-      )}
+            <Card className="md:col-span-2">
+                <CardHeader>
+                    <CardTitle>Pending Invitations</CardTitle>
+                    <CardDescription>These users have been invited but have not yet signed up.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
+                    ) : invitations && invitations.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Invited</TableHead>
+                                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {invitations.map(invitation => (
+                                    <TableRow key={invitation.id}>
+                                        <TableCell className="font-medium">{invitation.email}</TableCell>
+                                        <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>
+                                        <TableCell className="text-muted-foreground">{invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <div className="text-center text-muted-foreground p-8">
+                            <Mail className="mx-auto h-12 w-12 opacity-50" />
+                            <p className="mt-4">No pending invitations.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
 
-      <AlertDialog open={!!invitationToRevoke} onOpenChange={(open) => !open && setInvitationToRevoke(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>This will revoke the invitation for <strong>{invitationToRevoke?.email}</strong>. They will not be able to join your business unless you invite them again.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleRevokeInvitation} className="bg-destructive hover:bg-destructive/90">Revoke</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {businessId && (
+            <AddUserDialog 
+            isOpen={isAddUserDialogOpen}
+            onOpenChange={setIsAddUserDialogOpen}
+            businessId={businessId}
+            businessName={businessInstance?.name || ''}
+            inviterName={inviterName}
+            />
+        )}
 
-      <AlertDialog open={!!userToUpdate} onOpenChange={(open) => !open && setUserToUpdate(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Action</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {userToUpdate?.action === 'deactivate' 
-                    ? <>This will mark <strong>{userToUpdate?.user?.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
-                    : <>This will reactivate <strong>{userToUpdate?.user?.name}</strong>'s account, allowing them to log in again.</>
-                  }
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isUpdatingStatus}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className={userToUpdate?.action === 'deactivate' ? 'bg-destructive hover:bg-destructive/90' : ''}>
-                    {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {userToUpdate?.action === 'deactivate' ? 'Deactivate' : 'Activate'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+        <AlertDialog open={!!invitationToRevoke} onOpenChange={(open) => !open && setInvitationToRevoke(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>This will revoke the invitation for <strong>{invitationToRevoke?.email}</strong>. They will not be able to join your business unless you invite them again.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRevokeInvitation} className="bg-destructive hover:bg-destructive/90">Revoke</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!userToUpdate} onOpenChange={(open) => !open && setUserToUpdate(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Action</AlertDialogTitle>
+                    <AlertDialogDescription>
+                    {userToUpdate?.action === 'deactivate' 
+                        ? <>This will mark <strong>{userToUpdate?.user?.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
+                        : <>This will reactivate <strong>{userToUpdate?.user?.name}</strong>'s account, allowing them to log in again.</>
+                    }
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isUpdatingStatus}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className={userToUpdate?.action === 'deactivate' ? 'bg-destructive hover:bg-destructive/90' : ''}>
+                        {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {userToUpdate?.action === 'deactivate' ? 'Deactivate' : 'Activate'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    </OwnerAccessGate>
   );
 }
 
 export default function UsersPage() {
     const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+    const { user: authUser } = useUser();
 
-    if (isProfileLoading) {
+    if (isProfileLoading || !currentUser || !authUser || authUser.uid !== currentUser.id) {
         return <UsersPageSkeleton />;
     }
 
@@ -420,5 +498,7 @@ export default function UsersPage() {
         );
     }
 
-    return <UserManagementDashboard currentUser={currentUser} />;
+    return <UserManagementDashboard businessId={currentUser.businessId} currentUserId={currentUser.id} inviterName={currentUser.name} />;
 }
+
+    

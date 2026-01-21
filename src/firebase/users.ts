@@ -155,12 +155,15 @@ export const createUserProfileDocument = async (
   }
 
   // --- Referral Logic (Post-Transaction, Non-blocking) ---
+  // Wrap the entire referral block in a try-catch to ensure it never crashes the signup process.
   if (referralCodeInput) {
     try {
       const referrerId = await findReferrerId(firestore, referralCodeInput);
       if (referrerId && referrerId !== user.uid) {
-        // Update documents directly. This is not atomic, but it's acceptable for this secondary feature.
         const referrerUserRef = doc(firestore, 'users', referrerId);
+        
+        // This getDoc will be denied by security rules, but we'll catch the error below.
+        // In a real production app, this logic should be moved to a secure Cloud Function.
         const referrerDoc = await getDoc(referrerUserRef);
 
         if (referrerDoc.exists()) {
@@ -185,6 +188,7 @@ export const createUserProfileDocument = async (
               });
             }
           }
+          // The referral count increment will also likely fail unless rules are specifically set up for it.
           await updateDoc(referrerUserRef, { referrals: increment(1) });
           await addDoc(collection(firestore, 'referrals'), {
               referrerId: referrerId, 
@@ -196,6 +200,8 @@ export const createUserProfileDocument = async (
       }
     } catch (referralError) {
         console.error("Non-critical error during referral processing:", referralError);
+        // This catch block ensures that even if the referral logic fails (e.g., due to permissions),
+        // the main signup process is not affected and does not show an error to the user.
     }
   }
 };

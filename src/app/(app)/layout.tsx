@@ -38,6 +38,7 @@ import { POSProvider } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -292,7 +293,7 @@ export default function AppLayout({
             className="relative flex h-screen w-full overflow-hidden"
             style={primaryColor ? { '--primary': primaryColor } as React.CSSProperties : {}}
           >
-            <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r">
+            <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
                 <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
                     <Link href="/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground h-10 w-full">
                         <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={28} height={28} className="shrink-0" />
@@ -339,7 +340,7 @@ export default function AppLayout({
                       <Separator className="my-2 bg-sidebar-border" />
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                              <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent">
                                   <div className="flex items-center gap-2 w-full">
                                       <Avatar className="h-8 w-8">
                                           {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
@@ -369,7 +370,7 @@ export default function AppLayout({
                 </SidebarFooter>
             </Sidebar>
             <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
+                <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
                   <SidebarTrigger className="hidden md:flex"/>
                     <div className="relative flex-1">
                       <Button variant="outline" className="w-full justify-start text-muted-foreground md:w-[200px] lg:w-[336px]" onClick={() => setOpenCommandMenu(true)}>
@@ -473,6 +474,7 @@ export default function AppLayout({
             </div>
           </div>
           <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
+          <NetworkStatusIndicator />
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
           <CommandMenu open={openCommandMenu} onOpenChange={setOpenCommandMenu}/>
         </SidebarProvider>
@@ -480,4 +482,3 @@ export default function AppLayout({
     </POSProvider>
   );
 }
-
