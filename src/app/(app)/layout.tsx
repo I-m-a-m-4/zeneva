@@ -162,25 +162,43 @@ export default function AppLayout({
   React.useEffect(() => {
     if (!userDocRef) return;
 
-    // This function updates the user's presence timestamp.
     const updateLastSeen = () => {
-      updateDoc(userDocRef, {
-        lastSeen: serverTimestamp()
-      }).catch(error => {
-        // This can fail if the user is offline. We'll ignore the error
-        // as it's not critical for the user experience.
-        console.warn("Could not update user's last seen timestamp.", error);
-      });
+      try {
+        updateDoc(userDocRef, {
+          lastSeen: serverTimestamp()
+        }).catch(error => {
+          // This can fail if offline, which is expected. We can safely ignore it,
+          // unless it's a different kind of error.
+          if (error.code !== 'unavailable') {
+             console.warn("Could not update user's last seen timestamp.", error.code);
+          }
+        });
+      } catch (e) {
+        console.warn("Error trying to update lastSeen.", e);
+      }
     };
 
-    // Update once when the layout mounts
+    // This function is called when the user's presence changes (e.g., switches tabs, closes window).
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        updateLastSeen();
+      }
+    };
+    
+    // Update once when the layout mounts to signal the user is active
     updateLastSeen();
 
-    // And set up an interval to update it periodically (e.g., every 5 minutes)
-    const intervalId = setInterval(updateLastSeen, 5 * 60 * 1000);
+    // Listen for visibility changes to detect when the user leaves the page
+    document.addEventListener('visibilitychange', handleVisibilityChange, true);
+    
+    // pagehide is a more reliable event for when a page is being unloaded
+    window.addEventListener('pagehide', handleVisibilityChange, true);
 
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(intervalId);
+    // Cleanup the event listeners when the component unmounts
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange, true);
+      window.removeEventListener('pagehide', handleVisibilityChange, true);
+    };
   }, [userDocRef]);
 
   if (isUserLoading || isProfileLoading) return <FullScreenLoader text="Loading your session..." />;
@@ -324,7 +342,7 @@ export default function AppLayout({
                               <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                                   <div className="flex items-center gap-2 w-full">
                                       <Avatar className="h-8 w-8">
-                                          <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                                          {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
                                           <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
                                       </Avatar>
                                       <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
@@ -337,7 +355,9 @@ export default function AppLayout({
                           <DropdownMenuContent side="right" align="start" className="w-56">
                               <DropdownMenuLabel>My Account</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
+                              {userRole === 'admin' && (
+                                <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
+                              )}
                               <DropdownMenuItem>Support</DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
@@ -412,8 +432,8 @@ export default function AppLayout({
                       <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                           <Avatar className="h-8 w-8">
-                              <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || ""} />
-                              <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                                {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ""} />}
+                                <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
                           </Avatar>
                           </Button>
                       </DropdownMenuTrigger>
@@ -430,12 +450,14 @@ export default function AppLayout({
                             </div>
                           </DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem asChild>
-                          <Link href="/settings">
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Settings</span>
-                          </Link>
-                          </DropdownMenuItem>
+                          {userRole === 'admin' && (
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings">
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                </Link>
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
                           <LogOut className="mr-2 h-4 w-4" />
@@ -458,3 +480,4 @@ export default function AppLayout({
     </POSProvider>
   );
 }
+

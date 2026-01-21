@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -14,7 +13,6 @@ import {
 } from '@/components/ui/command';
 import { Home, Package, ShoppingCart, Users, LifeBuoy, CreditCard, Settings, FileText, Bot } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
-import { useUser } from '@/firebase';
 
 interface CommandMenuProps {
     open: boolean;
@@ -35,9 +33,7 @@ const navLinks = [
 
 export default function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
     const router = useRouter();
-    const { user } = useUser();
-    const { products, businessUsers } = usePOS();
-    const currentUserProfile = businessUsers?.find(u => u.id === user?.uid);
+    const { products, currentUserProfile } = usePOS();
     const userRole = currentUserProfile?.role;
 
     const runCommand = React.useCallback((command: () => unknown) => {

@@ -7,7 +7,7 @@ import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, P
 import DashboardClientContent from '@/components/dashboard/dashboard-client-content';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import type { TopSellingItem } from '@/types';
+import type { TopSellingItem, UserProfile } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +17,8 @@ import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
 import RefreshButton from '@/components/shared/refresh-button';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { query, collection, where } from 'firebase/firestore';
 
 function DashboardSkeleton() {
   return (
@@ -52,8 +54,19 @@ export default function DashboardPage() {
   
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const { products, receipts, customers, businessUsers, isLoading, currencySymbol, business, currentUserProfile } = usePOS();
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, currentUserProfile } = usePOS();
+  const firestore = useFirestore();
+
+  // Conditionally fetch the list of all users only if the current user is an admin.
+  const usersQuery = useMemoFirebase(() => {
+    if (!business?.id || !firestore || currentUserProfile?.role !== 'admin') return null;
+    return query(collection(firestore, "users"), where("businessId", "==", business.id));
+  }, [business?.id, firestore, currentUserProfile?.role]);
+
+  const { data: businessUsers, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
   
+  const isLoading = isPosLoading || isLoadingUsers;
+
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];
     const safeReceipts = receipts || [];
@@ -81,7 +94,7 @@ export default function DashboardPage() {
       });
     });
 
-    const sortedItems = Object.entries(itemSalesCount)
+    const topSellingItems = Object.entries(itemSalesCount)
       .sort(([, qtyA], [, qtyB]) => qtyB - qtyA)
       .slice(0, 3)
       .map(([name, quantitySold]) => {
@@ -107,7 +120,7 @@ export default function DashboardPage() {
       totalSalesValue,
       totalReceipts: totalReceiptsCount,
       recentOrdersLast7Days,
-      topSellingItems: sortedItems,
+      topSellingItems,
       topLoyaltyCustomers,
       topReferrers,
       currentUserProfile,
@@ -283,45 +296,55 @@ export default function DashboardPage() {
                 </Button>
             </CardContent>
         </Card>
+        {currentUserProfile?.role === 'admin' && (
+          <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+              <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-primary" />
+                      Referral Leaderboard
+                  </CardTitle>
+                  <CardDescription>Your business's top referrers.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                  {topReferrers.length > 0 ? (
+                      <ul className="space-y-3">
+                          {topReferrers.map(referrer => (
+                              <li key={referrer.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                      <Avatar className="h-8 w-8 flex-shrink-0">
+                                          <AvatarFallback>{referrer.name.split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
+                                      </Avatar>
+                                      <div className="min-w-0">
+                                          <p className="text-sm font-medium truncate" title={referrer.name}>{referrer.name}</p>
+                                      </div>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                      <p className="text-sm font-semibold text-primary">{referrer.referrals || 0} referrals</p>
+                                  </div>
+                              </li>
+                          ))}
+                      </ul>
+                  ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No referrals made in your business yet.</p>
+                  )}
+              </CardContent>
+          </Card>
+        )}
         <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-primary" />
-                    Referral Leaderboard
-                </CardTitle>
-                <CardDescription>Your business's top referrers.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {topReferrers.length > 0 ? (
-                    <ul className="space-y-3">
-                        {topReferrers.map(referrer => (
-                             <li key={referrer.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <Avatar className="h-8 w-8 flex-shrink-0">
-                                        <AvatarFallback>{referrer.name.split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium truncate" title={referrer.name}>{referrer.name}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                    <p className="text-sm font-semibold text-primary">{referrer.referrals || 0} referrals</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No referrals made in your business yet.</p>
-                )}
-                 <Separator className="my-4" />
-                 <div className="text-center">
-                    <p className="text-sm text-muted-foreground">Your Referrals</p>
-                    <p className="text-3xl font-bold">{currentUserProfile?.referrals || 0}</p>
-                    <Button variant="link" size="sm" asChild className="mt-1">
-                        <Link href="/settings">Get Your Code</Link>
-                    </Button>
-                 </div>
-            </CardContent>
+          <CardHeader>
+             <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+                Your Referrals
+              </CardTitle>
+              <CardDescription>Keep track of your own referral count.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+                 <p className="text-6xl font-bold">{currentUserProfile?.referrals || 0}</p>
+                  <p className="text-sm text-muted-foreground">successful referrals</p>
+                  <Button variant="link" size="sm" asChild className="mt-2">
+                      <Link href="/settings">Get Your Code</Link>
+                  </Button>
+          </CardContent>
         </Card>
         <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
           <CardHeader>

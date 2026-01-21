@@ -12,7 +12,6 @@ interface POSContextType {
   products: Product[] | null;
   receipts: Receipt[] | null;
   customers: Customer[] | null;
-  businessUsers: UserProfile[] | null;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
 
@@ -52,7 +51,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   const businessId = currentUserProfile?.businessId;
-  const userRole = currentUserProfile?.role;
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
   const { data: business, isLoading: isLoadingBusiness } = useDoc<BusinessInstance>(businessDocRef);
@@ -65,18 +63,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
-
-  const usersQuery = useMemoFirebase(() => {
-    // Only fetch the list of all users if the current user is an admin
-    if (businessId && userRole === 'admin') {
-        return query(collection(firestore, "users"), where("businessId", "==", businessId));
-    }
-    return null; // Non-admins will not execute this query
-  }, [businessId, userRole, firestore, refreshKey]);
-
-  const { data: businessUsers, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
   
-  const isLoading = isProfileLoading || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || (userRole === 'admin' && isLoadingUsers);
+  const isLoading = isProfileLoading || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers;
   
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -154,7 +142,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     products,
     receipts,
     customers,
-    businessUsers,
     currentUserProfile,
     isLoading,
     cart,
@@ -177,7 +164,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     currencySymbol,
     currencyCode,
     triggerRefresh,
-  }), [business, products, receipts, customers, businessUsers, currentUserProfile, isLoading, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh]);
+  }), [business, products, receipts, customers, currentUserProfile, isLoading, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 };

@@ -138,27 +138,41 @@ export const createUserProfileDocument = async (
     if (referrerId && referrerId !== user.uid) {
         referredBy = referrerId;
         const referrerUserRef = doc(firestore, 'users', referrerId);
-        
-        // This get() is allowed inside a transaction as it's reading before writing.
         const referrerDoc = await transaction.get(referrerUserRef);
 
         if (referrerDoc.exists()) {
-            // Action 1: Increment the referrer's counter.
-            // This is allowed by the `isIncrementingReferrals` security rule.
-            transaction.update(referrerUserRef, { referrals: increment(1) });
-            
-            // Action 2: Create a notification for the referrer.
-            // This is allowed by the rule on the notifications subcollection.
-            const notificationRef = doc(collection(firestore, `users/${referrerId}/notifications`));
-            transaction.set(notificationRef, {
-                title: 'New Referral!',
-                body: `Someone signed up with your code! Your referral count has increased.`,
-                read: false, 
-                createdAt: serverTimestamp()
-            });
+            const referrerData = referrerDoc.data() as UserProfile;
 
-            // Action 3: Log the referral event for analytics.
-            // This is allowed by the rule on the top-level referrals collection.
+            // Only proceed if the referrer has a business to apply the reward to
+            if (referrerData.businessId) {
+                const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
+                const businessDoc = await transaction.get(businessRef); // Read inside transaction
+
+                if (businessDoc.exists()) {
+                    const businessData = businessDoc.data() as BusinessInstance;
+                    // If trial has expired, start new trial from now. Otherwise, extend existing.
+                    const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
+                    const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
+                    const newExpiryDate = add(startDateForExtension, { days: 10 });
+                    
+                    // Update referrer's business trial period
+                    transaction.update(businessRef, { trialExpiresAt: newExpiryDate });
+
+                    // Create a notification for the referrer confirming the reward
+                    const notificationRef = doc(collection(firestore, `users/${referrerId}/notifications`));
+                    transaction.set(notificationRef, {
+                        title: 'Referral Reward!',
+                        body: `Success! A new user signed up with your code and your trial has been extended by 10 days.`,
+                        read: false, 
+                        createdAt: serverTimestamp()
+                    });
+                }
+            }
+            
+            // Always increment the referrer's counter
+            transaction.update(referrerUserRef, { referrals: increment(1) });
+
+            // Always log the referral event for analytics
             const referralLogRef = doc(collection(firestore, 'referrals'));
             transaction.set(referralLogRef, {
                 referrerId: referrerId, 

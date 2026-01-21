@@ -2,14 +2,38 @@
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ReportsDashboard from '@/components/reports/reports-dashboard';
 import ReportsTeaser from '@/components/reports/reports-teaser';
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+
+function UnauthorizedAccess() {
+  return (
+    <div className="flex items-center justify-center h-[60vh]">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
+            <AlertTriangle className="h-10 w-10 text-destructive" />
+          </div>
+          <CardTitle>Access Denied</CardTitle>
+          <CardDescription>
+            You do not have the required permissions to view this page. Please contact your administrator.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Button asChild className="w-full">
+            <Link href="/dashboard">Return to Dashboard</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
 
 export default function ReportsPage() {
-    const { business, isLoading } = usePOS();
+    const { business, isLoading, currentUserProfile } = usePOS();
 
     if (isLoading || !business) {
         return (
@@ -20,9 +44,15 @@ export default function ReportsPage() {
         )
     }
 
-    const canAccessReports = business.plan === 'pro' || business.plan === 'business' || business.accessLevel === 'lifetime';
+    const canAccessReportsByRole = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
-    if (!canAccessReports) {
+    if (!canAccessReportsByRole) {
+        return <UnauthorizedAccess />;
+    }
+
+    const canAccessReportsByPlan = business.plan === 'pro' || business.plan === 'business' || business.accessLevel === 'lifetime';
+
+    if (!canAccessReportsByPlan) {
         return (
             <div className="relative">
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-lg bg-background/80 p-6 text-center backdrop-blur-sm">
@@ -37,7 +67,7 @@ export default function ReportsPage() {
                         <Link href="/billing">View Plans & Upgrade</Link>
                     </Button>
                 </div>
-                <div className="blur-sm grayscale pointer-events-none">
+                <div className="grayscale pointer-events-none">
                     <ReportsTeaser />
                 </div>
             </div>

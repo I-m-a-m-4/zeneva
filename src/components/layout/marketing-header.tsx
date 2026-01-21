@@ -1,16 +1,32 @@
-
 'use client';
 
 import { useUser } from '@/firebase';
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getAuth, signOut } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { Button } from '../ui/button';
 
 export default function MarketingHeader() {
   const { user } = useUser();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    signOut(getAuth())
+      .then(() => {
+        toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+        router.push('/');
+      })
+      .catch(() => {
+        toast({ variant: 'destructive', title: 'Logout Failed' });
+      });
+  };
 
   const navLinks = [
     { href: "/#features", label: "Features" },
@@ -43,7 +59,13 @@ export default function MarketingHeader() {
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-4">
               {user ? (
-                <Link href="/dashboard" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Dashboard</Link>
+                <>
+                  <Link href="/dashboard" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Dashboard</Link>
+                  <Button onClick={handleLogout} variant="outline" size="sm">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </Button>
+                </>
               ) : (
                 <>
                   <Link href="/login" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-3 py-2 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>
@@ -100,7 +122,13 @@ export default function MarketingHeader() {
             </div>
              <div className="mt-8 flex flex-col gap-4">
                  {user ? (
+                   <>
                     <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">Dashboard</Link>
+                    <Button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} variant="outline" size="lg">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
+                    </Button>
+                   </>
                 ) : (
                     <>
                         <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center transition-colors text-base font-medium bg-[#ffffff] border rounded-md py-3 px-5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>

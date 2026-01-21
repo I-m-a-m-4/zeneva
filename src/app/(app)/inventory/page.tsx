@@ -62,7 +62,6 @@ import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
-import { useUser } from '@/firebase';
 import RefreshButton from '@/components/shared/refresh-button';
 
 function ProductRowSkeleton() {
@@ -100,11 +99,8 @@ export default function InventoryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { products: allProducts, isLoading, business, currencySymbol, businessUsers } = usePOS();
-  const { user } = useUser();
+  const { products: allProducts, isLoading, business, currencySymbol, currentUserProfile } = usePOS();
   
-  const currentUserProfile = businessUsers?.find(u => u.id === user?.uid);
-
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);

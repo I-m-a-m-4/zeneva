@@ -28,8 +28,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
-import { useFirestore, useUser } from '@/firebase';
-import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -55,14 +55,13 @@ const PRODUCT_LIMITS = {
 export default function AddProductPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const { user } = useUser();
-    const { business, products, businessUsers, isLoading } = usePOS();
+    const { business, products, currentUserProfile, isLoading } = usePOS();
     const firestore = useFirestore();
     const [isSaving, setIsSaving] = React.useState(false);
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     
-    const userProfile = businessUsers?.find(u => u.id === user?.uid);
+    const userProfile = currentUserProfile;
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
