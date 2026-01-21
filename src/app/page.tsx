@@ -196,7 +196,7 @@ export default function Home() {
 
           {/* Right Column: UI Mockups */}
           <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-            <Image src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/4aa0ba0f-cf6d-4050-bf33-824539eb56e0_1600w.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
+            <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
           </div>
         </div>
       </main>
