@@ -538,6 +538,7 @@ export default function AdminDashboardPage() {
                                         <TableHead>User</TableHead>
                                         <TableHead>Business Name</TableHead>
                                         <TableHead>Plan</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead>Last Seen</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -552,6 +553,11 @@ export default function AdminDashboardPage() {
                                                     {business ? (
                                                         business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
                                                     ) : <Badge variant="outline">N/A</Badge>}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                                                        {user.status || 'active'}
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <UserPresence lastSeen={user.lastSeen} />
@@ -585,7 +591,11 @@ export default function AdminDashboardPage() {
                                             <TableRow key={user.id}>
                                                 <TableCell>{user.name}</TableCell>
                                                 <TableCell>{user.email}</TableCell>
-                                                <TableCell><Badge variant="destructive">Inactive</Badge></TableCell>
+                                                <TableCell>
+                                                    <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                                                        {user.status || 'active'}
+                                                    </Badge>
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     ) : (

@@ -54,22 +54,11 @@ import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import MarketingFooter from '@/components/layout/marketing-footer';
-import { useUser } from '@/firebase';
-import { useRouter } from 'next/navigation';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function Home() {
-  const { user, isUserLoading } = useUser();
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const { toast } = useToast();
-
-  useEffect(() => {
-    // If the user status is determined and they are logged in, redirect.
-    if (!isUserLoading && user) {
-      router.replace('/dashboard');
-    }
-  }, [isUserLoading, user, router]);
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -134,16 +123,6 @@ export default function Home() {
       { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.' },
       { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.' },
     ];
-
-  // While we wait for the user status, or if we are about to redirect,
-  // show a full-page loader to prevent flashing the marketing content.
-  if (isUserLoading || user) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-white">
-        <Loader className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="antialiased overflow-x-hidden text-slate-900 bg-[#F9F8F6]">
@@ -477,18 +456,18 @@ export default function Home() {
                     <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center mb-6 text-slate-900 group-hover:text-primary group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300 shadow-inner">
                         <Sparkles className="w-5 h-5" />
                     </div>
-                     <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Plain-English AI</h3>
+                     <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">AI-Powered Insights</h3>
                     <p className="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors">
-                        No complex queries. Ask "Why did signup drop yesterday?" and get a direct, actionable answer from your data.
+                        Don't just see numbers, get answers. Ask "Which products are selling fastest this week?" and get a straightforward, actionable report.
                     </p>
                 </div>
                 <div className="bg-slate-50 p-8 group cursor-pointer">
                     <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center mb-6 text-slate-900 group-hover:text-primary group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300 shadow-inner">
                        <Zap className="w-5 h-5" />
                     </div>
-                    <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Action Suggestions</h3>
+                    <h3 className="text-xl font-light text-slate-900 tracking-tight font-instrument-serif mb-3 group-hover:text-slate-900 transition-colors">Smart Alerts</h3>
                     <p className="text-sm text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors">
-                        Don't just see the problem. Zeneva suggests fixes like "Shorten signup form" to improve conversion and boost your bottom line.
+                        Don't wait for a stockout. Zeneva proactively tells you when your bestsellers are running low so you never miss a sale.
                     </p>
                 </div>
             </div>

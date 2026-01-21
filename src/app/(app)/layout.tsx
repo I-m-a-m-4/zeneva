@@ -329,7 +329,7 @@ export default function AppLayout({
                                       </Avatar>
                                       <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
                                           <span className="truncate text-sm font-medium" title={user?.displayName || user?.email || ''}>{user?.displayName || user?.email}</span>
-                                           {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-400 border-orange-600 text-white')}>{plan}</Badge>}
+                                           {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                                       </div>
                                   </div>
                               </Button>
@@ -422,7 +422,7 @@ export default function AppLayout({
                             <div className="flex flex-col space-y-2">
                                 <div className="flex justify-between items-center">
                                   <p className="text-sm font-medium leading-none truncate">{user?.displayName || "Zeneva User"}</p>
-                                  {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-400 border-orange-600 text-white')}>{plan}</Badge>}
+                                  {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                                 </div>
                                 <p className="text-xs leading-none text-muted-foreground">
                                 {user?.email}
@@ -458,5 +458,3 @@ export default function AppLayout({
     </POSProvider>
   );
 }
-
-    

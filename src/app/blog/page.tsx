@@ -50,7 +50,7 @@ export default function BlogPage() {
           <div className="grid lg:grid-cols-5 gap-10 items-center min-h-[50vh] pt-32 lg:pt-40">
             <div className="lg:col-span-3">
               <div className="max-w-2xl">
-                <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter leading-tight font-headline">
+                <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter leading-tight font-instrument-serif">
                   Blog & Stories
                 </h1>
                 <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-2xl">
@@ -92,7 +92,7 @@ export default function BlogPage() {
                       <p className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">
                         {post.category}
                       </p>
-                      <h3 className="text-lg font-bold uppercase mb-3 font-headline line-clamp-2">
+                      <h3 className="text-lg font-bold uppercase mb-3 font-instrument-serif line-clamp-2">
                         {post.title}
                       </h3>
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2 flex-grow">{post.excerpt}</p>
@@ -173,7 +173,7 @@ export default function BlogPage() {
                       <p className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">
                         {post.category}
                       </p>
-                      <h2 className="text-lg font-bold uppercase mb-3 font-headline line-clamp-2">
+                      <h2 className="text-lg font-bold uppercase mb-3 font-instrument-serif line-clamp-2">
                         {post.title}
                       </h2>
                       <p className="text-sm text-muted-foreground mb-4 flex-grow line-clamp-3">{post.excerpt}</p>
@@ -189,7 +189,7 @@ export default function BlogPage() {
 
         {/* Press Section */}
         <div className="mt-32">
-          <h2 className="text-4xl font-bold border-b border-black pb-5 mb-8 font-headline">
+          <h2 className="text-4xl font-bold border-b border-black pb-5 mb-8 font-instrument-serif">
             Press
           </h2>
           <div className="grid divide-y divide-black">
