@@ -6,11 +6,11 @@ import { ArrowLeft } from 'lucide-react';
 import { blogPosts, type StaticBlogPost } from '@/lib/blog-data';
 import Image from 'next/image';
 
-type PageProps = {
-  params: {
-    slug: string;
-  };
-};
+export async function generateStaticParams() {
+  return blogPosts.map((post) => ({
+    slug: post.slug,
+  }));
+}
 
 const PostContent = ({ post }: { post: StaticBlogPost }) => {
     const contentMap: { [key: string]: React.ReactNode } = {
@@ -245,7 +245,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
     return contentMap[post.slug] || <p>Content for this post is not available.</p>;
 }
 
-export default function BlogPostPage({ params }: PageProps) {
+export default function BlogPostPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
   const post = blogPosts.find(p => p.slug === slug);
 
