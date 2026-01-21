@@ -49,7 +49,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -175,6 +175,15 @@ export default function AdminDashboardPage() {
   
   const loading = usersLoading || businessesLoading || productsLoading || receiptsLoading || purchasesLoading;
   
+  useEffect(() => {
+    if (userStatusEmail && users) {
+      const selectedUser = users.find(u => u.email === userStatusEmail);
+      if (selectedUser) {
+        setIsUserActive(selectedUser.status !== 'inactive');
+      }
+    }
+  }, [userStatusEmail, users]);
+
   const userOptions = useMemo(() => (users || []).map(user => ({
       value: user.email,
       label: `${user.name} (${user.email})`
