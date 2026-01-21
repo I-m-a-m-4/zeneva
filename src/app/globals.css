@@ -159,6 +159,9 @@
 }
 
 @layer utilities {
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
   @media print {
     .no-print, .no-print * {
       display: none !important;

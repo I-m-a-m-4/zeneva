@@ -445,7 +445,7 @@ export default function AppLayout({
                       </DropdownMenu>
                   </div>
                   </header>
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body">
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
                     {children}
                 </main>
             </div>
