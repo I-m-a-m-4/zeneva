@@ -1,14 +1,12 @@
-
 'use client';
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
 import { Loader2, Zap } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ReportsDashboard from '@/components/reports/reports-dashboard';
-import PageTitle from '@/components/shared/page-title';
+import ReportsTeaser from '@/components/reports/reports-teaser';
 
 export default function ReportsPage() {
     const { business, isLoading } = usePOS();
@@ -26,30 +24,25 @@ export default function ReportsPage() {
 
     if (!canAccessReports) {
         return (
-            <div className="flex flex-col gap-6">
-                <PageTitle title="Reports" subtitle="Analyze your business performance with detailed reports." />
-                <Card className="w-full">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Zap className="text-primary"/>Upgrade to Access Reports</CardTitle>
-                        <CardDescription>
-                            Gain deep insights into your sales, inventory, and customer behavior by upgrading your plan.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center text-center p-12">
-                        <Zap className="h-16 w-16 text-muted-foreground/50" />
-                        <h3 className="mt-4 text-2xl font-semibold">Unlock Advanced Analytics</h3>
-                        <p className="mt-2 max-w-md text-muted-foreground">
-                            The Reports Dashboard is a premium feature available on our Pro and Business plans.
-                        </p>
-                        <Button asChild className="mt-6">
-                            <Link href="/billing">View Plans & Upgrade</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+            <div className="relative">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-lg bg-background/80 p-6 text-center backdrop-blur-sm">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                        <Zap className="h-10 w-10 text-primary" />
+                    </div>
+                    <h3 className="text-2xl font-bold">Upgrade to Unlock Full Reports</h3>
+                    <p className="max-w-sm text-muted-foreground">
+                        Gain deep insights into your sales, inventory, and customer behavior by upgrading your plan.
+                    </p>
+                    <Button asChild size="lg" className="mt-4">
+                        <Link href="/billing">View Plans & Upgrade</Link>
+                    </Button>
+                </div>
+                <div className="blur-sm grayscale pointer-events-none">
+                    <ReportsTeaser />
+                </div>
             </div>
-        )
+        );
     }
 
-    // The main POSProvider is already in the layout, so we don't need extra providers here.
     return <ReportsDashboard />;
 }
