@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
-import { useUser } from '@/firebase';
 import RefreshButton from '@/components/shared/refresh-button';
 
 function DashboardSkeleton() {
@@ -48,13 +47,12 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { user } = useUser();
   const { toast } = useToast();
   const dashboardRef = React.useRef<HTMLDivElement>(null);
   
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const { products, receipts, customers, businessUsers, isLoading, currencySymbol, business } = usePOS();
+  const { products, receipts, customers, businessUsers, isLoading, currencySymbol, business, currentUserProfile } = usePOS();
   
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];
@@ -102,8 +100,6 @@ export default function DashboardPage() {
         .sort((a, b) => (b.referrals || 0) - (a.referrals || 0))
         .slice(0, 3);
     
-    const currentUserProfile = safeBusinessUsers.find(u => u.id === user?.uid);
-
     return {
       totalStock,
       uniqueSkus,
@@ -116,7 +112,7 @@ export default function DashboardPage() {
       topReferrers,
       currentUserProfile,
     };
-  }, [products, receipts, customers, businessUsers, user]);
+  }, [products, receipts, customers, businessUsers, currentUserProfile]);
   
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;
@@ -143,7 +139,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers, topReferrers, currentUserProfile } = dashboardData;
+  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers, topReferrers } = dashboardData;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
