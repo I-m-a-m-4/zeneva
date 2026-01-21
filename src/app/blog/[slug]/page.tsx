@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { blogPosts, type StaticBlogPost } from '@/lib/blog-data';
 import Image from 'next/image';
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
   return blogPosts.map((post) => ({
     slug: post.slug,
   }));
