@@ -1,78 +1,187 @@
+
 'use client';
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
-import { Loader2, Zap, AlertTriangle } from 'lucide-react';
+import type { Receipt } from '@/types';
+import PageTitle from '@/components/shared/page-title';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2 } from 'lucide-react';
+import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
+import TopProductsChart from '@/components/reports/top-products-chart';
+import { DateRangePicker } from '@/components/reports/date-range-picker';
+import { DateRange } from 'react-day-picker';
+import { subDays } from 'date-fns';
+import RecentSalesTable from '@/components/reports/recent-sales-table';
+import TopCustomersList from '@/components/reports/top-customers-list';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import ReportsDashboard from '@/components/reports/reports-dashboard';
-import ReportsTeaser from '@/components/reports/reports-teaser';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import html2canvas from 'html2canvas';
+import RefreshButton from '@/components/shared/refresh-button';
 
-function UnauthorizedAccess() {
-  return (
-    <div className="flex items-center justify-center h-[60vh]">
-      <Card className="w-full max-w-md text-center">
-        <CardHeader>
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
-            <AlertTriangle className="h-10 w-10 text-destructive" />
-          </div>
-          <CardTitle>Access Denied</CardTitle>
-          <CardDescription>
-            You do not have the required permissions to view this page. Please contact your administrator.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button asChild className="w-full">
-            <Link href="/dashboard">Return to Dashboard</Link>
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
+function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+            </CardContent>
+        </Card>
+    )
 }
 
-export default function ReportsPage() {
-    const { business, isLoading, currentUserProfile } = usePOS();
+export default function ReportsDashboard() {
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts } = usePOS();
+    const dashboardRef = React.useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
 
-    if (isLoading || !business) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2">Loading Business Data...</span>
-            </div>
-        )
-    }
+    const [date, setDate] = React.useState<DateRange | undefined>({
+      from: subDays(new Date(), 29),
+      to: new Date(),
+    });
 
-    const canAccessReportsByRole = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
+    const receipts = React.useMemo(() => {
+        if (!allReceipts) return [];
 
-    if (!canAccessReportsByRole) {
-        return <UnauthorizedAccess />;
-    }
+        const fromDate = date?.from;
+        const toDate = date?.to;
 
-    const canAccessReportsByPlan = business.plan === 'pro' || business.plan === 'business' || business.accessLevel === 'lifetime';
+        return allReceipts.filter(receipt => {
+            if (!receipt.createdAt?.toDate) return false;
+            const createdAt = receipt.createdAt.toDate();
+            
+            if (fromDate && createdAt < fromDate) return false;
+            if (toDate) {
+                const toDateEnd = new Date(toDate);
+                toDateEnd.setHours(23, 59, 59, 999);
+                if (createdAt > toDateEnd) return false;
+            }
+            return true;
+        });
+    }, [allReceipts, date]);
+    
+    const isLoading = isPosLoading;
 
-    if (!canAccessReportsByPlan) {
-        return (
-            <div className="relative">
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-lg bg-background/80 p-6 text-center backdrop-blur-sm">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                        <Zap className="h-10 w-10 text-primary" />
+    const reportData = React.useMemo(() => {
+        if (isLoading || !receipts || !products || !customers) return null;
+
+        const totalRevenue = receipts.reduce((sum, r) => sum + r.total, 0);
+        const totalSales = receipts.length;
+        const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+        const inventoryValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
+        const totalProductsSold = receipts.reduce((sum, r) => sum + r.items.length, 0);
+
+        return {
+            totalRevenue,
+            totalSales,
+            averageOrderValue,
+            inventoryValue,
+            totalCustomers: customers.length,
+            totalProductsSold,
+        }
+
+    }, [receipts, products, customers, isLoading]);
+    
+    const handleDownloadImage = async () => {
+        const element = dashboardRef.current;
+        if (!element) return;
+        toast({ title: 'Generating Report...', description: 'Please wait while we capture your dashboard.' });
+        try {
+            const canvas = await html2canvas(element, { 
+              scale: 2,
+              ignoreElements: (el) => el.classList.contains('no-capture')
+            });
+            const data = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = data;
+            link.download = `zeneva-report-${new Date().toISOString().split('T')[0]}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({ variant: 'success', title: 'Report Downloaded', description: 'Your dashboard image has been saved.' });
+        } catch (err) {
+            toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
+        }
+      };
+
+    return (
+        <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
+            <PageTitle title="Reports" subtitle="Deep dive into your business performance.">
+                <div className="flex flex-wrap items-center gap-2 no-capture">
+                    <RefreshButton />
+                    <DateRangePicker date={date} onDateChange={setDate} />
+                    <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4"/>Download</Button>
+                </div>
+            </PageTitle>
+            
+            {isLoading ? (
+                <div className="flex h-64 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            ) : (
+             <>
+                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                    <ReportStatCard 
+                        title="Total Revenue"
+                        value={`${currencySymbol}${reportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                        icon={DollarSign}
+                    />
+                    <ReportStatCard 
+                        title="Total Sales"
+                        value={reportData?.totalSales.toLocaleString() || '0'}
+                        icon={ShoppingCart}
+                    />
+                     <ReportStatCard 
+                        title="Avg. Order Value"
+                        value={`${currencySymbol}${reportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
+                        icon={FileText}
+                    />
+                    <ReportStatCard 
+                        title="Products Sold"
+                        value={reportData?.totalProductsSold.toLocaleString() || '0'}
+                        icon={Package}
+                    />
+                    <ReportStatCard 
+                        title="Total Customers"
+                        value={reportData?.totalCustomers.toLocaleString() || '0'}
+                        icon={Users}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div className="lg:col-span-3">
+                        <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} />
                     </div>
-                    <h3 className="text-2xl font-bold">Upgrade to Unlock Full Reports</h3>
-                    <p className="max-w-sm text-muted-foreground">
-                        Gain deep insights into your sales, inventory, and customer behavior by upgrading your plan.
-                    </p>
-                    <Button asChild size="lg" className="mt-4">
-                        <Link href="/billing">View Plans & Upgrade</Link>
-                    </Button>
+                    <div className="lg:col-span-2">
+                        <TopProductsChart receipts={receipts || []} />
+                    </div>
                 </div>
-                <div className="grayscale pointer-events-none">
-                    <ReportsTeaser />
-                </div>
-            </div>
-        );
-    }
 
-    return <ReportsDashboard />;
+                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div className="lg:col-span-3">
+                        <RecentSalesTable receipts={receipts || []} currencySymbol={currencySymbol}/>
+                    </div>
+                    <div className="lg:col-span-2">
+                        <TopCustomersList receipts={receipts || []} currencySymbol={currencySymbol} />
+                    </div>
+                </div>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Profit & Loss Report</CardTitle>
+                        <CardDescription>Analyze your profitability over time.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center py-12 text-muted-foreground">
+                        <PieChart className="mx-auto h-12 w-12 opacity-50" />
+                        <h3 className="mt-4 text-lg font-medium">Coming Soon!</h3>
+                        <p className="mt-2 max-w-md mx-auto">This feature requires a 'cost price' field for each product to calculate profit margins. We're working on adding this capability.</p>
+                    </CardContent>
+                </Card>
+             </>
+            )}
+        </div>
+    );
 }

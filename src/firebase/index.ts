@@ -1,34 +1,43 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, enableMultiTabIndexedDbPersistence, type Firestore } from 'firebase/firestore';
 
-export function initializeFirebase() {
-  let firebaseApp: FirebaseApp;
-  
-  if (getApps().length === 0) {
-    firebaseApp = initializeApp(firebaseConfig);
-  } else {
-    firebaseApp = getApp();
-  }
+// --- Singleton Initialization ---
+let firebaseApp: FirebaseApp;
 
-  const auth = getAuth(firebaseApp);
-  const firestore = getFirestore(firebaseApp);
-  
-  // Enable multi-tab persistence.
-  // This is the correct way to handle persistence with hot-reloading.
+// Check if Firebase has already been initialized to prevent errors in Fast Refresh environments.
+if (!getApps().length) {
+  firebaseApp = initializeApp(firebaseConfig);
+} else {
+  firebaseApp = getApp();
+}
+
+const auth: Auth = getAuth(firebaseApp);
+const firestore: Firestore = getFirestore(firebaseApp);
+
+// Enable persistence only on the client-side. This allows multiple tabs to share
+// the same offline data. We can safely ignore 'failed-precondition' errors, which
+// occur when another tab has already enabled persistence.
+if (typeof window !== 'undefined') {
   enableMultiTabIndexedDbPersistence(firestore)
     .catch((err) => {
       if (err.code === 'failed-precondition') {
-        // This means persistence is already enabled in another tab.
-        // This is a normal scenario in a multi-tab environment, so we can ignore it.
+        // This is an expected error when multiple tabs are open.
+        // It means persistence is already enabled in another tab.
       } else if (err.code === 'unimplemented') {
-        // The browser doesn't support all the features required for persistence.
+        // The browser does not support all of the features required to enable persistence.
       }
     });
+}
+// --- End Singleton Initialization ---
 
+/**
+ * @deprecated This function is deprecated. Import firebaseApp, auth, and firestore directly.
+ */
+export function initializeFirebase() {
   return {
     firebaseApp,
     auth,
@@ -36,6 +45,11 @@ export function initializeFirebase() {
   };
 }
 
+// --- Exports ---
+// Export the initialized singleton services for direct use.
+export { firebaseApp, auth, firestore };
+
+// Re-export hooks and providers for convenience.
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';

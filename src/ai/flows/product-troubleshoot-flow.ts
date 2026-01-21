@@ -28,9 +28,18 @@ const ProductTroubleshootInputSchema = z.object({
 
 export type ProductTroubleshootInput = z.infer<typeof ProductTroubleshootInputSchema>;
 
-const ProductTroubleshootOutputSchema = z.object({
-  suggestions: z.string().describe('AI-powered suggestions for improving product data quality and merchandising.'),
+// NEW: Define a schema for a single suggestion
+const SuggestionSchema = z.object({
+  title: z.string().describe('A short, actionable title for the suggestion.'),
+  description: z.string().describe('A brief explanation of the issue and how to fix it (2-3 sentences max).'),
+  severity: z.enum(['High', 'Medium', 'Low']).describe('The priority of the suggestion.'),
 });
+
+// NEW: Update the output schema to be an array of structured suggestions
+const ProductTroubleshootOutputSchema = z.object({
+  suggestions: z.array(SuggestionSchema).describe('A list of the top 3-5 most critical suggestions for improving product data.'),
+});
+
 
 export type ProductTroubleshootOutput = z.infer<typeof ProductTroubleshootOutputSchema>;
 
@@ -42,19 +51,21 @@ const prompt = ai.definePrompt({
   name: 'productTroubleshootPrompt',
   input: {schema: ProductTroubleshootInputSchema},
   output: {schema: ProductTroubleshootOutputSchema},
-  prompt: `You are an AI assistant specializing in e-commerce inventory optimization. Analyze the provided product data and provide actionable suggestions for improving data quality, completeness, and merchandising.
+  // NEW: Updated prompt for more concise, structured, and budget-friendly output
+  prompt: `You are an expert e-commerce optimization AI. Your task is to analyze a list of product data and provide a concise list of the top 3-5 most critical suggestions for improvement.
+
+For each suggestion, provide:
+1.  A short, actionable title.
+2.  A brief description of the issue and how to fix it (2-3 sentences maximum).
+3.  A severity rating ('High', 'Medium', or 'Low').
+
+Focus on issues that will have the biggest impact on sales and data quality, such as missing prices, poor descriptions, or inconsistent categorization. Do not provide a preamble or a summary. Respond ONLY with the structured list of suggestions.
 
 Product Data:
 {{#each products}}
-- Product ID: {{id}}
-  Name: {{name}}
-  Description: {{description}}
-  Price: {{price}}
-  Category: {{category}}
-  SKU: {{sku}}
+- Name: {{name}}, Price: {{price}}, Category: {{category}}, Description: {{description}}
 {{/each}}
-
-Suggestions:`,
+`,
 });
 
 const productTroubleshootFlow = ai.defineFlow(

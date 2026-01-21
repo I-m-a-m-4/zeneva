@@ -98,92 +98,42 @@ export const createUserProfileDocument = async (
     return;
   }
 
-  // --- PRE-TRANSACTION READS ---
-  // These are queries, which are not allowed inside a client-side transaction.
-  const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
-  const invitationSnapshot = await getDocs(invitationQuery);
-  const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
+  // --- Main User Creation Transaction ---
+  try {
+    const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
+    const invitationSnapshot = await getDocs(invitationQuery);
+    const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
 
-  const referrerId = await findReferrerId(firestore, referralCodeInput);
+    await runTransaction(firestore, async (transaction) => {
+      let businessId: string;
+      let userRole: UserRole;
 
-  // --- ATOMIC TRANSACTION ---
-  await runTransaction(firestore, async (transaction) => {
-    let businessId: string;
-    let userRole: UserRole;
+      if (invitationDoc) {
+        // User is joining an existing business.
+        const invitationData = invitationDoc.data();
+        businessId = invitationData.businessId;
+        userRole = invitationData.role;
+        transaction.delete(invitationDoc.ref); // Consume invitation
+      } else {
+        // User is creating a new business.
+        const businessDocRef = doc(collection(firestore, 'businessInstances'));
+        businessId = businessDocRef.id;
+        userRole = 'admin';
+        const trialEndDate = add(new Date(), { days: 30 });
+        const newBusiness: Omit<BusinessInstance, 'id'> = {
+          name: `${displayName}'s Business`,
+          createdAt: serverTimestamp(),
+          ownerId: user.uid,
+          plan: 'starter',
+          trialExpiresAt: trialEndDate,
+          status: 'active',
+          settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
+        };
+        transaction.set(businessDocRef, newBusiness);
+      }
 
-    // 1. Determine Business & Role
-    if (invitationDoc) {
-      const invitationData = invitationDoc.data();
-      businessId = invitationData.businessId;
-      userRole = invitationData.role;
-      transaction.delete(invitationDoc.ref); // Consume invitation
-    } else {
-      const businessDocRef = doc(collection(firestore, 'businessInstances'));
-      businessId = businessDocRef.id;
-      userRole = 'admin';
-      const trialEndDate = add(new Date(), { days: 30 });
-      transaction.set(businessDocRef, {
-        name: `${displayName}'s Business`,
-        createdAt: serverTimestamp(),
-        ownerId: user.uid,
-        plan: 'starter',
-        trialExpiresAt: trialEndDate,
-        status: 'active',
-        settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
-      });
-    }
-
-    // 2. Process Referral
-    let referredBy: string | null = null;
-    if (referrerId && referrerId !== user.uid) {
-        referredBy = referrerId;
-        const referrerUserRef = doc(firestore, 'users', referrerId);
-        const referrerDoc = await transaction.get(referrerUserRef);
-
-        if (referrerDoc.exists()) {
-            const referrerData = referrerDoc.data() as UserProfile;
-
-            // Only proceed if the referrer has a business to apply the reward to
-            if (referrerData.businessId) {
-                const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
-                const businessDoc = await transaction.get(businessRef); // Read inside transaction
-
-                if (businessDoc.exists()) {
-                    const businessData = businessDoc.data() as BusinessInstance;
-                    // If trial has expired, start new trial from now. Otherwise, extend existing.
-                    const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
-                    const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
-                    const newExpiryDate = add(startDateForExtension, { days: 10 });
-                    
-                    // Update referrer's business trial period
-                    transaction.update(businessRef, { trialExpiresAt: newExpiryDate });
-
-                    // Create a notification for the referrer confirming the reward
-                    const notificationRef = doc(collection(firestore, `users/${referrerId}/notifications`));
-                    transaction.set(notificationRef, {
-                        title: 'Referral Reward!',
-                        body: `Success! A new user signed up with your code and your trial has been extended by 10 days.`,
-                        read: false, 
-                        createdAt: serverTimestamp()
-                    });
-                }
-            }
-            
-            // Always increment the referrer's counter
-            transaction.update(referrerUserRef, { referrals: increment(1) });
-
-            // Always log the referral event for analytics
-            const referralLogRef = doc(collection(firestore, 'referrals'));
-            transaction.set(referralLogRef, {
-                referrerId: referrerId, 
-                referredUserId: user.uid, 
-                createdAt: serverTimestamp(),
-            });
-        }
-    }
-    
-    // 3. Create the new user's profile
-    const userProfile: Omit<UserProfile, 'id'> = {
+      // Create the new user's profile.
+      const userProfile: Omit<UserProfile, 'id'> = {
         email: user.email!,
         name: displayName,
         phone: phone || '',
@@ -194,8 +144,58 @@ export const createUserProfileDocument = async (
         referralCode: user.uid.substring(0, 8).toUpperCase(),
         referrals: 0,
         status: 'active',
-        ...(referredBy && { referredBy: referredBy }),
-    };
-    transaction.set(userDocRef, userProfile);
-  });
+      };
+      transaction.set(userDocRef, userProfile);
+    });
+
+  } catch (error) {
+    console.error("FATAL: User and Business creation failed.", error);
+    // Re-throw the error so the calling function knows signup failed.
+    throw error;
+  }
+
+  // --- Referral Logic (Post-Transaction, Non-blocking) ---
+  if (referralCodeInput) {
+    try {
+      const referrerId = await findReferrerId(firestore, referralCodeInput);
+      if (referrerId && referrerId !== user.uid) {
+        // Update documents directly. This is not atomic, but it's acceptable for this secondary feature.
+        const referrerUserRef = doc(firestore, 'users', referrerId);
+        const referrerDoc = await getDoc(referrerUserRef);
+
+        if (referrerDoc.exists()) {
+          const referrerData = referrerDoc.data() as UserProfile;
+          if (referrerData.businessId) {
+            const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
+            const businessDoc = await getDoc(businessRef);
+            if (businessDoc.exists()) {
+              const businessData = businessDoc.data() as BusinessInstance;
+              const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
+              const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
+              const newExpiryDate = add(startDateForExtension, { days: 10 });
+              
+              await updateDoc(businessRef, { trialExpiresAt: newExpiryDate });
+
+              const notificationRef = collection(firestore, `users/${referrerId}/notifications`);
+              await addDoc(notificationRef, {
+                  title: 'Referral Reward!',
+                  body: `Success! A new user signed up with your code and your trial has been extended by 10 days.`,
+                  read: false, 
+                  createdAt: serverTimestamp()
+              });
+            }
+          }
+          await updateDoc(referrerUserRef, { referrals: increment(1) });
+          await addDoc(collection(firestore, 'referrals'), {
+              referrerId: referrerId, 
+              referredUserId: user.uid, 
+              createdAt: serverTimestamp(),
+          });
+          await updateDoc(userDocRef, { referredBy: referrerId });
+        }
+      }
+    } catch (referralError) {
+        console.error("Non-critical error during referral processing:", referralError);
+    }
+  }
 };

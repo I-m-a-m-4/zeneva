@@ -2,13 +2,13 @@
 "use client";
 
 import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
-import type { Product, BusinessInstance } from "@/types";
+import type { Product } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { usePOS } from "@/context/pos-context";
-import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit } from "lucide-react";
+import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit, Flame, ShieldAlert, Info } from "lucide-react";
 import React, { useState, useTransition, useMemo } from "react";
 import Link from 'next/link';
 import {
@@ -19,9 +19,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Suggestion = {
-    suggestions: string;
+    suggestions: {
+        title: string;
+        description: string;
+        severity: 'High' | 'Medium' | 'Low';
+    }[];
 }
 
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
@@ -90,6 +95,12 @@ function IssueCard({ icon: Icon, title, count, items, unit = "items", onFixClick
     )
 }
 
+const severityIcons = {
+    High: <Flame className="h-5 w-5 text-destructive" />,
+    Medium: <ShieldAlert className="h-5 w-5 text-amber-500" />,
+    Low: <Info className="h-5 w-5 text-sky-500" />,
+}
+
 export default function TroubleshootPage() {
     const [isPending, startTransition] = useTransition();
     const [suggestions, setSuggestions] = useState<Suggestion | null>(null);
@@ -129,8 +140,19 @@ export default function TroubleshootPage() {
             return;
         }
         startTransition(async () => {
-            const result = await productTroubleshoot({ products });
-            setSuggestions(result);
+            // Sanitize products to pass only plain objects to the server action
+            const sanitizedProducts = products.map(p => ({
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                price: p.price,
+                category: p.category,
+                sku: p.sku,
+            }));
+
+            // The 'products' in the input must now match the sanitized version
+            const result = await productTroubleshoot({ products: sanitizedProducts });
+            setSuggestions(result as Suggestion);
         });
     };
     
@@ -198,7 +220,9 @@ export default function TroubleshootPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> AI-Powered Suggestions</CardTitle>
-                    <CardDescription>Use GenAI to get advanced merchandising and data quality recommendations for your live inventory.</CardDescription>
+                    <CardDescription>
+                        Use GenAI to get advanced merchandising and data quality recommendations for your live inventory. When you click the button, we send your current product list to a generative AI model, which provides custom-tailored advice to improve your product listings, enhance SEO, and suggest merchandising strategies.
+                    </CardDescription>
                 </CardHeader>
                 {canUseAIFeature ? (
                     <>
@@ -209,9 +233,21 @@ export default function TroubleshootPage() {
                                     <p className="text-muted-foreground">AI is analyzing your inventory...</p>
                                 </div>
                             ) : suggestions ? (
-                                <div className="prose prose-sm dark:prose-invert prose-headings:font-headline max-w-none text-foreground/90 whitespace-pre-wrap bg-muted/50 p-4 rounded-md">
-                                    <p>{suggestions.suggestions}</p>
-                                </div>
+                                <Accordion type="multiple" className="w-full space-y-2">
+                                    {suggestions.suggestions.map((suggestion, index) => (
+                                        <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-muted/50 px-4">
+                                            <AccordionTrigger className="py-3 hover:no-underline">
+                                                <div className="flex items-center gap-3">
+                                                    {severityIcons[suggestion.severity]}
+                                                    <span className="font-medium text-base">{suggestion.title}</span>
+                                                </div>
+                                            </AccordionTrigger>
+                                            <AccordionContent className="pb-4 text-muted-foreground">
+                                                {suggestion.description}
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
 
                             ) : (
                                 <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">

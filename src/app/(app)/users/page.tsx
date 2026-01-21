@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { UserProfile, Invitation, BusinessInstance } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -46,8 +46,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import PageTitle from '@/components/shared/page-title';
 
-// Hook to get current user's profile, including businessId and role
+
 function useCurrentUserProfile() {
     const { user } = useUser();
     const firestore = useFirestore();
@@ -88,35 +89,87 @@ function UserRowSkeleton() {
     )
 }
 
-export default function UsersPage() {
-  const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+function UsersPageSkeleton() {
+    return (
+        <>
+        <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
+        <div className="grid gap-6 md:grid-cols-2">
+            <Card className="w-full md:col-span-2">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <Skeleton className="h-7 w-64" />
+                            <Skeleton className="h-4 w-80 mt-2" />
+                        </div>
+                        <Skeleton className="h-9 w-28" />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <UserRowSkeleton />
+                            <UserRowSkeleton />
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            <Card className="md:col-span-2">
+                <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-72 mt-2" />
+                </CardHeader>
+                <CardContent className="text-center text-muted-foreground p-8">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                    <p className="mt-4">Loading invitations...</p>
+                </CardContent>
+            </Card>
+        </div>
+        </>
+    );
+}
+
+function UserManagementDashboard({ currentUser }: { currentUser: UserProfile }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
   const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
-  
+
   const businessDocRef = useMemoFirebase(() => {
-      if (!currentUser?.businessId || !firestore) return null;
+      if (!currentUser.businessId || !firestore) return null;
       return doc(firestore, 'businessInstances', currentUser.businessId);
-  }, [currentUser?.businessId, firestore]);
+  }, [currentUser.businessId, firestore]);
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
+  // This query is now safe because this component only renders for admins.
   const usersQuery = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore || currentUser.role !== 'admin') return null;
+    if (!currentUser.businessId || !firestore) return null;
     return query(collection(firestore, "users"), where("businessId", "==", currentUser.businessId));
-  }, [currentUser, firestore]);
+  }, [currentUser.businessId, firestore]);
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
   const invitationsQuery = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore) return null;
+    if (!currentUser.businessId || !firestore) return null;
     return query(collection(firestore, 'invitations'), where('businessId', '==', currentUser.businessId));
-  }, [currentUser?.businessId, firestore]);
+  }, [currentUser.businessId, firestore]);
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
   
-  const isLoading = isProfileLoading || areUsersLoading || areInvitationsLoading || isBusinessLoading;
-  const canManageUsers = currentUser?.role === 'admin';
+  const isLoading = areUsersLoading || areInvitationsLoading || isBusinessLoading;
+
+  const staffUsers = React.useMemo(() => {
+      if (!users) return [];
+      return users.filter(user => user.id !== currentUser.id);
+  }, [users, currentUser.id]);
 
   const handleRevokeInvitation = async () => {
     if (!invitationToRevoke || !firestore) return;
@@ -138,14 +191,7 @@ export default function UsersPage() {
     const newStatus = userToUpdate.action === 'activate' ? 'active' : 'inactive';
     
     try {
-        await runTransaction(firestore, async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            if (!userDoc.exists()) {
-                throw new Error("User does not exist.");
-            }
-            // This is a safe update that only modifies the status field.
-            transaction.update(userRef, { status: newStatus });
-        });
+        await updateDoc(userRef, { status: newStatus });
         toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
     } catch(e: any) {
         toast({ title: 'Error', description: e.message || 'Could not update user status.', variant: 'destructive' });
@@ -157,17 +203,18 @@ export default function UsersPage() {
 
   return (
     <>
+      <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="w-full md:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
                 <div>
-                    <CardTitle>User & Staff Management</CardTitle>
+                    <CardTitle>Your Staff</CardTitle>
                     <CardDescription>
-                    Invite and manage roles for your business.
+                        A list of all users in your business.
                     </CardDescription>
                 </div>
-                <Button size="lg" className="h-9 gap-1" disabled={!canManageUsers} onClick={() => setIsAddUserDialogOpen(true)}>
+                <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)}>
                     <PlusCircle className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                         Invite User
@@ -176,15 +223,6 @@ export default function UsersPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {!canManageUsers && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Permission Denied</AlertTitle>
-                <AlertDescription>
-                  You do not have permission to manage users. Please contact your business administrator.
-                </AlertDescription>
-              </Alert>
-            )}
             {isLoading ? (
                 <Table>
                     <TableHeader>
@@ -201,7 +239,7 @@ export default function UsersPage() {
                         <UserRowSkeleton />
                     </TableBody>
                 </Table>
-            ) : users && users.length > 0 ? (
+            ) : staffUsers && staffUsers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -213,7 +251,7 @@ export default function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {staffUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="font-medium">{user.name}</div>
@@ -236,7 +274,7 @@ export default function UsersPage() {
                                 aria-haspopup="true"
                                 size="icon"
                                 variant="ghost"
-                                disabled={!canManageUsers || currentUser.id === user.id}
+                                disabled={currentUser.id === user.id}
                             >
                                 <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">Toggle menu</span>
@@ -249,7 +287,7 @@ export default function UsersPage() {
                                         <UserCheck className="mr-2 h-4 w-4" /> Activate User
                                     </DropdownMenuItem>
                                 ) : (
-                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate'}); }}>
+                                    <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate'}); }}>
                                         <UserX className="mr-2 h-4 w-4" /> Deactivate User
                                     </DropdownMenuItem>
                                 )}
@@ -270,52 +308,50 @@ export default function UsersPage() {
           </CardContent>
         </Card>
 
-        {canManageUsers && (
-            <Card className="md:col-span-2">
-                <CardHeader>
-                    <CardTitle>Pending Invitations</CardTitle>
-                    <CardDescription>These users have been invited but have not yet signed up.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     {isLoading ? (
-                         <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
-                     ) : invitations && invitations.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Invited</TableHead>
-                                    <TableHead><span className="sr-only">Actions</span></TableHead>
+        <Card className="md:col-span-2">
+            <CardHeader>
+                <CardTitle>Pending Invitations</CardTitle>
+                <CardDescription>These users have been invited but have not yet signed up.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 {isLoading ? (
+                     <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
+                 ) : invitations && invitations.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Invited</TableHead>
+                                <TableHead><span className="sr-only">Actions</span></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {invitations.map(invitation => (
+                                <TableRow key={invitation.id}>
+                                    <TableCell className="font-medium">{invitation.email}</TableCell>
+                                    <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>
+                                    <TableCell className="text-muted-foreground">{invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {invitations.map(invitation => (
-                                    <TableRow key={invitation.id}>
-                                        <TableCell className="font-medium">{invitation.email}</TableCell>
-                                        <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>
-                                        <TableCell className="text-muted-foreground">{invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                     ) : (
-                        <div className="text-center text-muted-foreground p-8">
-                            <Mail className="mx-auto h-12 w-12 opacity-50" />
-                            <p className="mt-4">No pending invitations.</p>
-                        </div>
-                     )}
-                </CardContent>
-            </Card>
-        )}
+                            ))}
+                        </TableBody>
+                    </Table>
+                 ) : (
+                    <div className="text-center text-muted-foreground p-8">
+                        <Mail className="mx-auto h-12 w-12 opacity-50" />
+                        <p className="mt-4">No pending invitations.</p>
+                    </div>
+                 )}
+            </CardContent>
+        </Card>
       </div>
 
-      {currentUser?.businessId && (
+      {currentUser.businessId && (
         <AddUserDialog 
           isOpen={isAddUserDialogOpen}
           onOpenChange={setIsAddUserDialogOpen}
@@ -360,4 +396,29 @@ export default function UsersPage() {
       </AlertDialog>
     </>
   );
+}
+
+export default function UsersPage() {
+    const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+
+    if (isProfileLoading) {
+        return <UsersPageSkeleton />;
+    }
+
+    if (currentUser?.role !== 'admin') {
+        return (
+            <>
+                <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Permission Denied</AlertTitle>
+                    <AlertDescription>
+                        You do not have the required permissions to manage users. Please contact your business administrator.
+                    </AlertDescription>
+                </Alert>
+            </>
+        );
+    }
+
+    return <UserManagementDashboard currentUser={currentUser} />;
 }
