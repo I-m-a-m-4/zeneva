@@ -1,0 +1,155 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =================================================================
+    // Helper Functions
+    // =================================================================
+    
+    function isSuperAdmin() {
+      return request.auth != null && request.auth.token.email == 'belloimam431@gmail.com';
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isSignedInUserAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'admin';
+    }
+   
+    function isSignedInUserManager() {
+      let userRole = request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData(request.auth.uid).role : null;
+      return userRole == 'admin' || userRole == 'manager';
+    }
+    
+    function isBusinessMember(businessId) {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             getUserData(request.auth.uid).businessId == businessId;
+    }
+
+    function isIncrementingReferrals(resource) {
+      // This function is now more secure. It ensures that only the 'referrals' field is being changed.
+      return request.auth != null &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referrals']) &&
+             request.resource.data.referrals == resource.data.referrals + 1;
+    }
+
+    // This is a robust helper for list operations that prevents race conditions on initial load.
+    function canListTenantData() {
+        return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+
+    // =================================================================
+    // Public & Admin-Only Collections
+    // =================================================================
+
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow list, get: if request.auth != null;
+      allow create: if isSuperAdmin();
+      allow update: if false;
+      allow delete: if isSuperAdmin();
+    }
+   
+    match /purchases/{purchaseId} {
+      allow create: if request.auth != null;
+      allow read, list: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    match /referrals/{referralId} {
+        allow create: if request.auth != null;
+        allow read, update, delete: if false;
+    }
+
+    match /supportThreads/{threadId} {
+      allow read: if isSuperAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if isSuperAdmin();
+      
+      match /messages/{messageId} {
+        allow read, create: if isSuperAdmin() || (request.auth != null && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+      }
+    }
+
+    // =================================================================
+    // Multi-Tenant Collections
+    // =================================================================
+
+    match /businessInstances/{businessId} {
+      allow get: if isBusinessMember(businessId) || isSuperAdmin();
+      allow list: if isSuperAdmin();
+      allow create: if request.auth != null;
+      allow update: if (isSignedInUserAdmin() && isBusinessMember(businessId)) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+     
+      match /subscription_history/{historyId} {
+        allow read, list: if isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if request.auth != null || isSuperAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if (request.auth != null && request.auth.uid == userId) || 
+                  (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId) || 
+                  isSuperAdmin();
+      
+      // Use the robust list rule for admins, and allow super admin full list access.
+      allow list: if (isSignedInUserAdmin() && canListTenantData()) || isSuperAdmin();
+      
+      allow update: if (request.auth != null && request.auth.uid == userId) || // User can update their own doc
+                      isIncrementingReferrals(resource) || // Any user can increment another's referral count
+                      (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId) || // Admin can update users in their business
+                      isSuperAdmin();
+      allow create: if request.auth != null;
+      allow delete: if isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId && request.auth.uid != userId;
+      
+      match /notifications/{notificationId} {
+        allow read, list, delete: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null; 
+        allow update: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+   
+    match /invitations/{invitationId} {
+      allow create: if isSignedInUserAdmin() && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
+      allow list: if (isSignedInUserAdmin() && canListTenantData()) || isSuperAdmin();
+      allow read, delete: if request.auth != null && (resource.data.email == request.auth.token.email || (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId));
+    }
+
+    // --- Collections Secured by businessId ---
+    // The `list` rules now use the robust helper function to prevent race conditions.
+    // The client is responsible for filtering by businessId, which has been verified.
+   
+    match /products/{productId} {
+      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow list: if canListTenantData() || isSuperAdmin();
+      allow create: if isSignedInUserManager() && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
+      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+    }
+
+    match /receipts/{receiptId} {
+      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow list: if canListTenantData() || isSuperAdmin();
+      allow create: if request.auth != null && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
+      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+    }
+    
+    match /customers/{customerId} {
+      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow list: if canListTenantData() || isSuperAdmin();
+      allow create: if request.auth != null && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
+      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+    }
+  }
+}

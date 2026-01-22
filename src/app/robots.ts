@@ -16,6 +16,7 @@ export default function robots(): MetadataRoute.Robots {
         '/customers/',
         '/settings/',
         '/billing/',
+        '/onboarding/',
       ],
     },
     sitemap: `${siteUrl}/sitemap.xml`,
