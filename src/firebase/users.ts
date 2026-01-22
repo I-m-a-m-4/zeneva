@@ -1,4 +1,3 @@
-
 'use client';
 import {
   doc,
@@ -98,6 +97,10 @@ export const createUserProfileDocument = async (
     return;
   }
 
+  // --- Pre-Transaction: Find Referrer ---
+  // We do this read before the transaction to avoid read-after-write issues.
+  const referrerId = await findReferrerId(firestore, referralCodeInput);
+
   // --- Main User Creation Transaction ---
   try {
     const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
@@ -132,7 +135,7 @@ export const createUserProfileDocument = async (
         transaction.set(businessDocRef, newBusiness);
       }
 
-      // Create the new user's profile.
+      // Create the new user's profile, now including the referrerId if it exists.
       const userProfile: Omit<UserProfile, 'id'> = {
         email: user.email!,
         name: displayName,
@@ -144,64 +147,78 @@ export const createUserProfileDocument = async (
         referralCode: user.uid.substring(0, 8).toUpperCase(),
         referrals: 0,
         status: 'active',
+        // Add the referredBy field atomically
+        ...(referrerId && { referredBy: referrerId }),
       };
       transaction.set(userDocRef, userProfile);
     });
 
   } catch (error) {
     console.error("FATAL: User and Business creation failed.", error);
-    // Re-throw the error so the calling function knows signup failed.
     throw error;
   }
 
-  // --- Referral Logic (Post-Transaction, Non-blocking) ---
-  // Wrap the entire referral block in a try-catch to ensure it never crashes the signup process.
-  if (referralCodeInput) {
+  // --- Post-Transaction: Handle Referral Rewards & Notifications ---
+  // This block runs after the user is successfully created. It's wrapped in a 
+  // try/catch so that any failures here (like permission errors on updating the
+  // referrer's business) do not break the signup process for the new user.
+  if (referrerId && referrerId !== user.uid) {
     try {
-      const referrerId = await findReferrerId(firestore, referralCodeInput);
-      if (referrerId && referrerId !== user.uid) {
-        const referrerUserRef = doc(firestore, 'users', referrerId);
+      const referrerUserRef = doc(firestore, 'users', referrerId);
+      const referrerDoc = await getDoc(referrerUserRef);
+
+      if (referrerDoc.exists()) {
+        const referrerData = referrerDoc.data() as UserProfile;
         
-        // This getDoc will be denied by security rules, but we'll catch the error below.
-        // In a real production app, this logic should be moved to a secure Cloud Function.
-        const referrerDoc = await getDoc(referrerUserRef);
+        // Log the successful referral
+        await addDoc(collection(firestore, 'referrals'), {
+            referrerId: referrerId, 
+            referredUserId: user.uid, 
+            createdAt: serverTimestamp(),
+        });
+        
+        // Let the new user know the referral was successful
+        const newUserNotificationRef = collection(firestore, `users/${user.uid}/notifications`);
+        await addDoc(newUserNotificationRef, {
+            title: 'Referral Successful!',
+            body: `Your account has been successfully credited for using a referral code from ${referrerData.name}.`,
+            read: false, 
+            createdAt: serverTimestamp()
+        });
+        
+        // Attempt to update the referrer's data. This part may fail due to security rules, and that's okay.
+        
+        // 1. Increment referrer's count.
+        await updateDoc(referrerUserRef, { referrals: increment(1) });
+        
+        // 2. Notify the referrer.
+        const referrerNotificationRef = collection(firestore, `users/${referrerId}/notifications`);
+        await addDoc(referrerNotificationRef, {
+            title: 'New Referral!',
+            body: `Success! ${displayName} just signed up with your code.`,
+            read: false, 
+            createdAt: serverTimestamp()
+        });
 
-        if (referrerDoc.exists()) {
-          const referrerData = referrerDoc.data() as UserProfile;
-          if (referrerData.businessId) {
-            const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
-            const businessDoc = await getDoc(businessRef);
-            if (businessDoc.exists()) {
-              const businessData = businessDoc.data() as BusinessInstance;
-              const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
-              const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
-              const newExpiryDate = add(startDateForExtension, { days: 10 });
-              
-              await updateDoc(businessRef, { trialExpiresAt: newExpiryDate });
-
-              const notificationRef = collection(firestore, `users/${referrerId}/notifications`);
-              await addDoc(notificationRef, {
-                  title: 'Referral Reward!',
-                  body: `Success! A new user signed up with your code and your trial has been extended by 10 days.`,
-                  read: false, 
-                  createdAt: serverTimestamp()
-              });
+        // 3. Extend referrer's trial (This will likely FAIL due to security rules, which is the expected behavior on the client).
+        if (referrerData.businessId) {
+          const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
+          const businessDoc = await getDoc(businessRef);
+          if (businessDoc.exists()) {
+            const businessData = businessDoc.data() as BusinessInstance;
+            // Avoid extending lifetime accounts
+            if (businessData.accessLevel !== 'lifetime') {
+                const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
+                const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
+                const newExpiryDate = add(startDateForExtension, { days: 10 });
+                await updateDoc(businessRef, { trialExpiresAt: newExpiryDate });
             }
           }
-          // The referral count increment will also likely fail unless rules are specifically set up for it.
-          await updateDoc(referrerUserRef, { referrals: increment(1) });
-          await addDoc(collection(firestore, 'referrals'), {
-              referrerId: referrerId, 
-              referredUserId: user.uid, 
-              createdAt: serverTimestamp(),
-          });
-          await updateDoc(userDocRef, { referredBy: referrerId });
         }
       }
     } catch (referralError) {
         console.error("Non-critical error during referral processing:", referralError);
-        // This catch block ensures that even if the referral logic fails (e.g., due to permissions),
-        // the main signup process is not affected and does not show an error to the user.
+        // This failure is logged but does not interrupt the user's signup.
     }
   }
 };
