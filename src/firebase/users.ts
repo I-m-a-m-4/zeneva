@@ -1,3 +1,4 @@
+
 'use client';
 import {
   doc,
@@ -23,6 +24,8 @@ import type { UserProfile, UserRole, BusinessInstance } from '@/types';
 /**
  * Creates a new business instance and links it to an existing user.
  * This is used for reactivated users who need a fresh start.
+ * The function now uses set with merge to be more resilient, creating the user
+ * doc if it doesn't exist.
  * @param firestore The Firestore instance.
  * @param user The Firebase user object.
  */
@@ -43,11 +46,12 @@ export const createNewBusinessForUser = async (firestore: Firestore, user: User)
         settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
     });
 
-    batch.update(userDocRef, {
+    // Use set with merge to prevent "No document to update" errors.
+    batch.set(userDocRef, {
         businessId: businessDocRef.id,
         role: 'admin', // Ensure they are admin of the new business
         surveyCompleted: true, // This is now an automatic step
-    });
+    }, { merge: true });
 
     await batch.commit();
 };
@@ -89,16 +93,7 @@ export const createUserProfileDocument = async (
 ) => {
   const userDocRef = doc(firestore, `users/${user.uid}`);
   
-  const existingUserDoc = await getDoc(userDocRef);
-  if (existingUserDoc.exists()) {
-    if (!existingUserDoc.data().businessId) {
-        await createNewBusinessForUser(firestore, user);
-    }
-    return;
-  }
-
   // --- Pre-Transaction: Find Referrer ---
-  // We do this read before the transaction to avoid read-after-write issues.
   const referrerId = await findReferrerId(firestore, referralCodeInput);
 
   // --- Main User Creation Transaction ---
@@ -108,6 +103,13 @@ export const createUserProfileDocument = async (
     const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
 
     await runTransaction(firestore, async (transaction) => {
+      const userDoc = await transaction.get(userDocRef);
+      // If user document already exists, stop the transaction to prevent overwrites.
+      if (userDoc.exists()) {
+        console.log("User document already exists, skipping creation in this flow.");
+        return; 
+      }
+      
       let businessId: string;
       let userRole: UserRole;
 
@@ -159,9 +161,6 @@ export const createUserProfileDocument = async (
   }
 
   // --- Post-Transaction: Handle Referral Rewards & Notifications ---
-  // This block runs after the user is successfully created. It's wrapped in a 
-  // try/catch so that any failures here (like permission errors on updating the
-  // referrer's business) do not break the signup process for the new user.
   if (referrerId && referrerId !== user.uid) {
     try {
       const referrerUserRef = doc(firestore, 'users', referrerId);
@@ -186,12 +185,8 @@ export const createUserProfileDocument = async (
             createdAt: serverTimestamp()
         });
         
-        // Attempt to update the referrer's data. This part may fail due to security rules, and that's okay.
-        
-        // 1. Increment referrer's count.
         await updateDoc(referrerUserRef, { referrals: increment(1) });
         
-        // 2. Notify the referrer.
         const referrerNotificationRef = collection(firestore, `users/${referrerId}/notifications`);
         await addDoc(referrerNotificationRef, {
             title: 'New Referral!',
@@ -200,13 +195,11 @@ export const createUserProfileDocument = async (
             createdAt: serverTimestamp()
         });
 
-        // 3. Extend referrer's trial (This will likely FAIL due to security rules, which is the expected behavior on the client).
         if (referrerData.businessId) {
           const businessRef = doc(firestore, 'businessInstances', referrerData.businessId);
           const businessDoc = await getDoc(businessRef);
           if (businessDoc.exists()) {
             const businessData = businessDoc.data() as BusinessInstance;
-            // Avoid extending lifetime accounts
             if (businessData.accessLevel !== 'lifetime') {
                 const currentExpiry = businessData.trialExpiresAt?.toDate() ?? new Date();
                 const startDateForExtension = currentExpiry > new Date() ? currentExpiry : new Date();
@@ -218,7 +211,6 @@ export const createUserProfileDocument = async (
       }
     } catch (referralError) {
         console.error("Non-critical error during referral processing:", referralError);
-        // This failure is logged but does not interrupt the user's signup.
     }
   }
 };

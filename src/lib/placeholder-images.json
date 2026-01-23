@@ -51,7 +51,7 @@
     {
       "id": "jewelry-store",
       "description": "A display of fine jewelry.",
-      "imageUrl": "https://images.unsplash.com/photo-1611081682524-74b37ac3f4d7?q=80&w=2070&auto=format&fit=crop",
+      "imageUrl": "/jewllery.jpg",
       "imageHint": "jewelry rings"
     },
     {
