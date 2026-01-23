@@ -85,10 +85,11 @@ export function useCollection<T = any>(
       },
       (error: FirestoreError) => {
         if (error.code === 'permission-denied') {
-          console.warn("Firestore permission denied. This may be expected behavior.");
+          console.error(`Firestore permission denied for query. Path: ${(memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString()}`);
           setData(null);
           setIsLoading(false);
-          setError(null); // Treat as empty data, not a crash-worthy error
+          // Set an actual error so the UI can react if needed, instead of just showing "no data".
+          setError(new Error("You don't have permission to view this data.")); 
           return;
         }
 

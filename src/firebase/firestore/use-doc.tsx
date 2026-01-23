@@ -71,10 +71,10 @@ export function useDoc<T = any>(
       },
       (error: FirestoreError) => {
         if (error.code === 'permission-denied') {
-          console.warn(`Firestore permission denied for document: ${memoizedDocRef.path}. This may be expected behavior.`);
+          console.error(`Firestore permission denied for document: ${memoizedDocRef.path}.`);
           setData(null);
           setIsLoading(false);
-          setError(null); // Treat as a non-existent doc, not a crash-worthy error
+          setError(new Error(`You don't have permission to view this document: ${memoizedDocRef.path}`));
           return;
         }
 
