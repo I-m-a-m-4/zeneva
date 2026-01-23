@@ -39,6 +39,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
+import { createNewBusinessForUser } from '@/firebase/users';
+import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -81,6 +83,9 @@ export default function AppLayout({
   const router = useRouter();
   const firestore = useFirestore();
   const pathname = usePathname();
+  const { toast } = useToast();
+  const isCreatingBusiness = React.useRef(false);
+
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
   const [isMounted, setIsMounted] = React.useState(false);
@@ -136,10 +141,26 @@ export default function AppLayout({
     }
   }, [user, isUserLoading, router, isMounted]);
   
+  // Account Recovery Logic
+  React.useEffect(() => {
+    if (user && !isProfileLoading && !userProfile && !isCreatingBusiness.current && firestore) {
+        isCreatingBusiness.current = true;
+        toast({
+            title: "Account Recovery",
+            description: "Your workspace profile is missing. We're recreating it for you now.",
+        });
+        createNewBusinessForUser(firestore, user)
+            .catch(error => {
+                console.error("Failed to recreate business for user:", error);
+                toast({ variant: 'destructive', title: "Recovery Failed", description: "Could not restore your workspace. Please contact support." });
+                isCreatingBusiness.current = false;
+            });
+    }
+  }, [user, isProfileLoading, userProfile, firestore, toast]);
+
   const needsRoleUpgrade = React.useMemo(() => {
       return businessInstance?.ownerId === user?.uid && userProfile?.role !== 'admin';
   }, [businessInstance?.ownerId, user?.uid, userProfile?.role]);
-
 
   React.useEffect(() => {
     if (needsRoleUpgrade && firestore && user?.uid) {
@@ -148,7 +169,6 @@ export default function AppLayout({
       updateDoc(userToUpdateDocRef, { role: 'admin' }).catch(console.error);
     }
   }, [needsRoleUpgrade, firestore, user?.uid]);
-
 
   React.useEffect(() => {
       const down = (e: KeyboardEvent) => {
@@ -173,11 +193,8 @@ export default function AppLayout({
     await batch.commit().catch(console.error);
   }, [firestore, user, unreadCount, userNotifications]);
 
-  if (!isMounted) {
-    return <FullScreenLoader text="Initializing..." />;
-  }
-
-  if (isUserLoading) {
+  // --- Accurate Loading States ---
+  if (!isMounted || isUserLoading) {
     return <FullScreenLoader text="Authenticating..." />;
   }
 
@@ -188,10 +205,16 @@ export default function AppLayout({
   if (isProfileLoading) {
     return <FullScreenLoader text="Loading user profile..." />;
   }
-
+  
   if (!userProfile) {
-    return <FullScreenLoader text="Creating your workspace..." />;
+    return <FullScreenLoader text="Setting up your workspace..." />;
   }
+
+  if (isBusinessLoading) {
+    return <FullScreenLoader text="Loading your workspace..." />;
+  }
+
+  // --- End Loading States ---
 
   if (userProfile?.status === 'inactive') {
     return (
@@ -216,13 +239,7 @@ export default function AppLayout({
       </div>
     )
   }
-  
-  if (!userProfile.businessId) {
-      return <FullScreenLoader text="Setting up your workspace..." />;
-  }
 
-  if (isBusinessLoading) return <FullScreenLoader text="Loading your workspace..." />;
-  
   if (businessInstance?.status === 'deleted') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
@@ -474,3 +491,5 @@ export default function AppLayout({
     </POSProvider>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -79,11 +80,24 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     }
   }, [user, userProfile, businessInstance, isUserLoading, isProfileLoading, isBusinessLoading, firestore, toast, shouldFetchBusiness]);
 
-  const isOverallLoading = isUserLoading || (user && (isProfileLoading || (shouldFetchBusiness && isBusinessLoading)));
-  if (isOverallLoading) {
-    return <FullScreenLoader text="Getting things ready..." />;
+  // Refined Loading Logic
+  if (isUserLoading) {
+    return <FullScreenLoader text="Authenticating..." />;
+  }
+  
+  if (user) {
+    if (isProfileLoading) {
+      return <FullScreenLoader text="Loading user profile..." />;
+    }
+    if (!userProfile) {
+      return <FullScreenLoader text="Setting up your workspace..." />;
+    }
+    if (shouldFetchBusiness && isBusinessLoading) {
+      return <FullScreenLoader text="Loading your workspace..." />;
+    }
   }
 
+  // If no user, show the login/signup page.
   if (!user) {
     return <>{children}</>;
   }
@@ -114,3 +128,5 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
   return <FullScreenLoader text="Redirecting to dashboard..." />;
 }
+
+    
