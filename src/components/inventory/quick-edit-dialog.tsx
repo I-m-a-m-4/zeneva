@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,6 +23,7 @@ interface QuickEditDialogProps {
 
 const quickEditSchema = z.object({
     price: z.coerce.number().min(0, "Price must be a positive number."),
+    costPrice: z.coerce.number().min(0, "Cost price must be positive.").optional(),
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
 });
 
@@ -34,13 +34,13 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
   const firestore = useFirestore();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const canManageStock = userProfile?.role === 'admin';
-  const canManagePrice = userProfile?.role === 'admin' || userProfile?.role === 'manager';
+  const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
   const form = useForm<QuickEditFormValues>({
     resolver: zodResolver(quickEditSchema),
     defaultValues: {
         price: 0,
+        costPrice: 0,
         stock: 0,
     },
   });
@@ -50,10 +50,11 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
     if (product) {
       form.reset({
         price: product.price || 0,
+        costPrice: product.costPrice || 0,
         stock: product.stock || 0,
       });
     }
-  }, [product]);
+  }, [product, form]);
 
 
   const handleUpdate = async (values: QuickEditFormValues) => {
@@ -66,8 +67,11 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
             updatedAt: serverTimestamp(),
         };
 
-        if (canManagePrice) dataToUpdate.price = values.price;
-        if (canManageStock) dataToUpdate.stock = values.stock;
+        if (canManageProduct) {
+          dataToUpdate.price = values.price;
+          dataToUpdate.costPrice = values.costPrice;
+          dataToUpdate.stock = values.stock;
+        }
 
         await updateDoc(productRef, dataToUpdate);
 
@@ -94,7 +98,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         <DialogHeader>
           <DialogTitle>Quick Edit: {product?.name}</DialogTitle>
           <DialogDescription>
-            Quickly update the price and stock for this product.
+            Quickly update pricing and stock for this product.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -106,9 +110,21 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                         <FormItem>
                             <FormLabel>Price</FormLabel>
                             <FormControl>
-                                <Input type="number" step="0.01" {...field} disabled={!canManagePrice}/>
+                                <Input type="number" step="0.01" {...field} disabled={!canManageProduct}/>
                             </FormControl>
-                             {!canManagePrice && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit price.</p>}
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="costPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Cost Price</FormLabel>
+                            <FormControl>
+                                <Input type="number" step="0.01" {...field} disabled={!canManageProduct}/>
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -120,16 +136,16 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                         <FormItem>
                             <FormLabel>Stock</FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} disabled={!canManageStock}/>
+                                <Input type="number" {...field} disabled={!canManageProduct}/>
                             </FormControl>
-                            {!canManageStock && <p className="text-xs text-muted-foreground pt-1">Only admins can edit stock.</p>}
+                            {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit stock.</p>}
                             <FormMessage />
                         </FormItem>
                     )}
                 />
                  <DialogFooter className='mt-6'>
                     <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button type="submit" size="lg" disabled={isSubmitting}>
+                    <Button type="submit" size="lg" disabled={isSubmitting || !canManageProduct}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                         Save Changes
                     </Button>

@@ -36,7 +36,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -51,7 +56,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
-import type { Product } from '@/types';
+import type { Product, UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import ImportDialog from '@/components/inventory/import-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -63,6 +68,7 @@ import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import RefreshButton from '@/components/shared/refresh-button';
+import { logAuditEvent } from '@/lib/audit';
 
 function ProductRowSkeleton() {
     return (
@@ -107,6 +113,8 @@ export default function InventoryPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
+  const [stockFilter, setStockFilter] = React.useState('all');
+  const [categoryFilter, setCategoryFilter] = React.useState('all');
   
   React.useEffect(() => {
     if (business) {
@@ -130,13 +138,31 @@ export default function InventoryPage() {
 
   const filteredAndSortedProducts = React.useMemo(() => {
     if (!allProducts) return [];
-    return allProducts
+    let filtered = allProducts
       .filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allProducts, searchTerm]);
+      );
+
+    // Stock filter
+    if (stockFilter !== 'all') {
+        filtered = filtered.filter(p => {
+            const stock = p.stock || 0;
+            const lowStockThreshold = p.lowStockThreshold || 5; 
+            if (stockFilter === 'in-stock') return stock > 0;
+            if (stockFilter === 'out-of-stock') return stock <= 0;
+            if (stockFilter === 'low-stock') return stock > 0 && stock <= lowStockThreshold;
+            return true;
+        });
+    }
+
+    // Category filter
+    if (categoryFilter !== 'all') {
+        filtered = filtered.filter(p => p.category === categoryFilter);
+    }
+
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+  }, [allProducts, searchTerm, stockFilter, categoryFilter]);
 
   const pageCount = Math.ceil(filteredAndSortedProducts.length / PRODUCTS_PER_PAGE);
 
@@ -146,9 +172,8 @@ export default function InventoryPage() {
   }, [filteredAndSortedProducts, currentPage]);
 
   React.useEffect(() => {
-    // Reset to first page when search term changes
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, stockFilter, categoryFilter]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -167,12 +192,21 @@ export default function InventoryPage() {
   };
   
   const handleBulkDelete = async () => {
-    if (!firestore || selectedProductIds.length === 0) return;
+    if (!firestore || selectedProductIds.length === 0 || !business || !currentUserProfile) return;
 
     const batch = writeBatch(firestore);
     selectedProductIds.forEach(id => {
       const docRef = doc(firestore, 'products', id);
       batch.delete(docRef);
+
+      const deletedProduct = allProducts?.find(p => p.id === id);
+      if (deletedProduct) {
+        logAuditEvent(firestore, business.id, currentUserProfile, {
+            action: 'product.delete',
+            entity: { type: 'Product', id: id, name: deletedProduct.name },
+            details: { name: deletedProduct.name }
+        });
+      }
     });
 
     try {
@@ -224,6 +258,8 @@ export default function InventoryPage() {
     });
   };
 
+  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0);
+
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex items-center pb-4 gap-4">
@@ -246,6 +282,53 @@ export default function InventoryPage() {
                   </span>
               </Button>
           )}
+
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 gap-1">
+                        <ListFilter className="h-3.5 w-3.5" />
+                        <span className="sr-only sm:not-sr-only">Filter</span>
+                         {activeFilterCount > 0 && (
+                            <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">{activeFilterCount}</Badge>
+                        )}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
+                                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                             <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
+                                <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                                {business?.settings?.productCategories?.map(cat => (
+                                    <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    {activeFilterCount > 0 && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                Clear Filters
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
           <RefreshButton />
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
             <Download className="h-3.5 w-3.5" />
@@ -394,9 +477,9 @@ export default function InventoryPage() {
           ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg m-6">
                   <Inbox className="h-12 w-12 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mt-4">{searchTerm ? 'No Products Found' : 'No Products Yet'}</h3>
+                  <h3 className="text-xl font-semibold mt-4">{searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? 'No Products Found' : 'No Products Yet'}</h3>
                   <p className="text-muted-foreground mt-2 mb-4">
-                    {searchTerm ? `Your search for "${searchTerm}" did not match any products.` : 'Get started by adding your first product or importing a CSV file.'}
+                    {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? `Your search and filter criteria did not match any products.` : 'Get started by adding your first product or importing a CSV file.'}
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" asChild className="h-8 gap-1">

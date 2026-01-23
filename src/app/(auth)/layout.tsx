@@ -33,7 +33,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-  // Conditionally fetch business data only if the user is active.
   const shouldFetchBusiness = userProfile?.businessId && userProfile?.status !== 'inactive';
 
   const businessDocRef = useMemoFirebase(
@@ -42,29 +41,29 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   );
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
-  // This effect handles the redirection to the dashboard
   useEffect(() => {
     if (userProfile && userProfile.businessId && businessInstance && businessInstance.status !== 'deleted') {
       router.replace('/dashboard');
     }
   }, [userProfile, businessInstance, router]);
   
-  // This effect handles creating a new business for users without one OR whose business was deleted.
   useEffect(() => {
-    // Determine the effective loading state.
     const isStillLoading = isUserLoading || isProfileLoading || (shouldFetchBusiness && isBusinessLoading);
     if (isStillLoading) {
-      return;
+      return; 
     }
 
-    if (user && userProfile) {
-      const isBusinessDeleted = userProfile.businessId && businessInstance?.status === 'deleted';
-      const needsNewBusiness = !userProfile.businessId || isBusinessDeleted;
+    if (user) { 
+      const hasNoProfile = !userProfile;
+      const hasNoBusiness = userProfile && !userProfile.businessId;
+      const businessIsDeleted = userProfile && userProfile.businessId && businessInstance?.status === 'deleted';
+      
+      const needsNewBusiness = hasNoProfile || hasNoBusiness || businessIsDeleted;
       
       if (needsNewBusiness && !isCreatingBusiness.current && firestore) {
         isCreatingBusiness.current = true;
         
-        const toastMessage = isBusinessDeleted 
+        const toastMessage = businessIsDeleted 
           ? { title: "Welcome Back!", description: "Your previous business was deleted. Let's set up a new one for you." }
           : { title: "Welcome!", description: "Finalizing your account setup." };
         
@@ -80,20 +79,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     }
   }, [user, userProfile, businessInstance, isUserLoading, isProfileLoading, isBusinessLoading, firestore, toast, shouldFetchBusiness]);
 
-  // Render logic:
-  
-  // Show loader if we are still waiting on essential data.
   const isOverallLoading = isUserLoading || (user && (isProfileLoading || (shouldFetchBusiness && isBusinessLoading)));
   if (isOverallLoading) {
     return <FullScreenLoader text="Getting things ready..." />;
   }
 
-  // If there's no logged-in user, show the auth pages (login, signup).
   if (!user) {
     return <>{children}</>;
   }
 
-  // If the user is logged in but their profile is marked as inactive, show a dedicated screen.
   if (userProfile?.status === 'inactive') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
@@ -118,7 +112,5 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     )
   }
 
-  // If there IS a user, we should be either creating a business or getting ready to redirect.
-  // In either case, we show a loader to prevent a flash of content.
   return <FullScreenLoader text="Redirecting to dashboard..." />;
 }

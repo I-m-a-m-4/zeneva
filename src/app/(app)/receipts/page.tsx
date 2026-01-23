@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -28,6 +29,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
+import { logAuditEvent } from '@/lib/audit';
 
 // Hook to get current business ID and user profile
 function useCurrentUserProfile() {
@@ -80,7 +82,7 @@ export default function ReceiptsPage() {
   }, [business]);
 
   const handleDeleteReceipt = async () => {
-    if (!receiptToDelete || !firestore || !business) return;
+    if (!receiptToDelete || !firestore || !business || !currentUser) return;
     setIsDeleting(true);
 
     try {
@@ -124,6 +126,13 @@ export default function ReceiptsPage() {
 
             // 2c. Delete the receipt
             transaction.delete(receiptRef);
+        });
+
+        // Log audit event after successful void
+        logAuditEvent(firestore, business.id, currentUser, {
+            action: 'sale.void',
+            entity: { type: 'Receipt', id: receiptToDelete.id, name: `Receipt ${receiptToDelete.id.substring(0, 8)}` },
+            details: { total: receiptToDelete.total, reason: 'Manual void by user' }
         });
 
         toast({ title: 'Sale Voided', description: `Receipt ${receiptToDelete.id.substring(0,8)} has been voided and stock levels restored.`, variant: 'success' });

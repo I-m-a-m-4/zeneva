@@ -21,13 +21,29 @@ const plans = [
     {
         name: 'Pro',
         price: 10000,
-        features: ['Up to 1,500 products', 'Basic Sales Analytics', 'Customer Management (CRM)', 'Point of Sale (POS)'],
+        features: [
+            'Up to 1,500 products & 10 users',
+            'Advanced Point of Sale (POS)',
+            'Purchase Order Management',
+            'Product Bundling / Kits',
+            'Barcode Generation & Scanning',
+            'Profit & Loss Reporting',
+            'Public Storefront Page',
+        ],
         planId: 'pro',
     },
     {
         name: 'Business',
         price: 30000,
-        features: ['Everything in Pro', 'Unlimited products', 'Unlimited users', 'Advanced Sales Analytics', 'AI-Powered Troubleshooting', 'Priority Support'],
+        features: [
+            'Everything in Pro',
+            'Unlimited products & users',
+            'Advanced Customer Analytics (CRM+)',
+            'Secure Audit Log',
+            'Automated Email Receipts',
+            'Inventory Velocity Reports (Coming Soon)',
+            'Priority Phone & Email Support'
+        ],
         planId: 'business',
     }
 ];

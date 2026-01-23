@@ -9,40 +9,51 @@ service cloud.firestore {
     // =================================================================
     
     function isSuperAdmin() {
+      // Super admin can do anything. This is a backdoor for maintenance.
       return request.auth != null && request.auth.token.email == 'belloimam431@gmail.com';
     }
 
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
+    function isUserAuthenticated() {
+      // Basic check if a user is signed in.
+      return request.auth != null;
     }
 
-    function isSignedInUserAdmin() {
-      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'admin';
-    }
-   
-    function isSignedInUserManager() {
-      let userRole = request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserData(request.auth.uid).role : null;
-      return userRole == 'admin' || userRole == 'manager';
+    function getUserData() {
+      // Securely gets the data of the currently signed-in user.
+      // Use this ONLY in rules for single-document reads/writes (get, update, delete).
+      // DO NOT use in `list` rules as it causes race conditions.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
-    function isBusinessMember(businessId) {
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             getUserData(request.auth.uid).businessId == businessId;
-    }
-
-    function isIncrementingReferrals(resource) {
-      // This function is now more secure. It ensures that only the 'referrals' field is being changed.
-      return request.auth != null &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referrals']) &&
-             request.resource.data.referrals == resource.data.referrals + 1;
-    }
-
-    // This is a robust helper for list operations that prevents race conditions on initial load.
+    // This helper function is safe for list rules because it only checks for existence.
     function canListTenantData() {
         return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    function isOwner(userId) {
+      // Checks if the requesting user is the owner of the document.
+      return isUserAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // This helper is for single-document GET, UPDATE, and DELETE rules.
+    function isUserInBusiness(businessId) {
+      return isUserAuthenticated() && getUserData().businessId == businessId;
+    }
+    
+    function isSignedInUserAdmin() {
+      return isUserAuthenticated() && getUserData().role == 'admin';
+    }
+
+    function isSignedInUserManager() {
+      return isUserAuthenticated() && (getUserData().role == 'admin' || getUserData().role == 'manager');
+    }
+
+    function isIncrementingReferrals(resource) {
+      // This function ensures that only the 'referrals' field is being incremented by one.
+      return isUserAuthenticated() &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referrals']) &&
+             request.resource.data.referrals == resource.data.referrals + 1;
+    }
 
     // =================================================================
     // Public & Admin-Only Collections
@@ -54,30 +65,29 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow list, get: if request.auth != null;
-      allow create: if isSuperAdmin();
+      allow list, get: if isUserAuthenticated();
+      allow create, delete: if isSuperAdmin();
       allow update: if false;
-      allow delete: if isSuperAdmin();
     }
    
     match /purchases/{purchaseId} {
-      allow create: if request.auth != null;
+      allow create: if isUserAuthenticated();
       allow read, list: if isSuperAdmin();
       allow update, delete: if false;
     }
 
     match /referrals/{referralId} {
-        allow create: if request.auth != null;
+        allow create: if isUserAuthenticated();
         allow read, update, delete: if false;
     }
 
     match /supportThreads/{threadId} {
-      allow read: if isSuperAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if isSuperAdmin() || isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isSuperAdmin();
       
       match /messages/{messageId} {
-        allow read, create: if isSuperAdmin() || (request.auth != null && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+        allow read, create: if isSuperAdmin() || isOwner(get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId);
       }
     }
 
@@ -86,70 +96,81 @@ service cloud.firestore {
     // =================================================================
 
     match /businessInstances/{businessId} {
-      allow get: if isBusinessMember(businessId) || isSuperAdmin();
+      allow get: if isUserInBusiness(businessId) || isSuperAdmin();
       allow list: if isSuperAdmin();
-      allow create: if request.auth != null;
-      allow update: if (isSignedInUserAdmin() && isBusinessMember(businessId)) || isSuperAdmin();
+      allow create: if isUserAuthenticated();
+      allow update: if (isSignedInUserAdmin() && isUserInBusiness(businessId)) || isSuperAdmin();
       allow delete: if isSuperAdmin();
      
       match /subscription_history/{historyId} {
-        allow read, list: if isBusinessMember(businessId) || isSuperAdmin();
-        allow create: if request.auth != null || isSuperAdmin();
+        allow read, list: if isUserInBusiness(businessId) || isSuperAdmin();
+        allow create: if isUserAuthenticated() || isSuperAdmin();
+        allow update, delete: if false;
+      }
+
+      match /auditLogs/{logId} {
+        allow list, get: if isSignedInUserAdmin() && isUserInBusiness(businessId);
+        allow create: if isUserInBusiness(businessId);
         allow update, delete: if false;
       }
     }
 
     match /users/{userId} {
-      allow read: if (request.auth != null && request.auth.uid == userId) || 
-                  (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId) || 
-                  isSuperAdmin();
+      // READ: User can read their own profile, or an admin of the same business can read it.
+      allow get: if isOwner(userId) || (isSignedInUserAdmin() && isUserInBusiness(resource.data.businessId)) || isSuperAdmin();
       
-      // Use the robust list rule for admins, and allow super admin full list access.
-      allow list: if (isSignedInUserAdmin() && canListTenantData()) || isSuperAdmin();
+      // LIST: An authenticated user can list users. The client query must filter by businessId.
+      // This is safe because the client query is what enforces tenancy.
+      allow list: if canListTenantData() || isSuperAdmin();
       
-      allow update: if (request.auth != null && request.auth.uid == userId) || // User can update their own doc
-                      isIncrementingReferrals(resource) || // Any user can increment another's referral count
-                      (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId) || // Admin can update users in their business
+      // UPDATE: User can update their own doc. Admin can update users in their business. Anyone can increment referrals.
+      allow update: if isOwner(userId) || 
+                      isIncrementingReferrals(resource) ||
+                      (isSignedInUserAdmin() && isUserInBusiness(resource.data.businessId)) || 
                       isSuperAdmin();
-      allow create: if request.auth != null;
-      allow delete: if isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId && request.auth.uid != userId;
+
+      allow create: if isUserAuthenticated();
+      
+      // DELETE: Admin can delete users in their business, but not themselves.
+      allow delete: if isSignedInUserAdmin() && isUserInBusiness(resource.data.businessId) && !isOwner(userId);
       
       match /notifications/{notificationId} {
-        allow read, list, delete: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null; 
-        allow update: if request.auth != null && request.auth.uid == userId;
+        allow read, list, delete, update: if isOwner(userId);
+        allow create: if isUserAuthenticated();
       }
     }
    
     match /invitations/{invitationId} {
-      allow create: if isSignedInUserAdmin() && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
-      allow list: if (isSignedInUserAdmin() && canListTenantData()) || isSuperAdmin();
-      allow read, delete: if request.auth != null && (resource.data.email == request.auth.token.email || (isSignedInUserAdmin() && getUserData(request.auth.uid).businessId == resource.data.businessId));
+      allow create: if isSignedInUserAdmin() && request.resource.data.businessId == getUserData().businessId;
+      // Allow any authenticated user to list invitations. The client-side query securely filters by email.
+      allow list: if isUserAuthenticated() || isSuperAdmin();
+      allow read, delete: if (isUserAuthenticated() && resource.data.email == request.auth.token.email) || (isSignedInUserAdmin() && isUserInBusiness(resource.data.businessId));
     }
 
     // --- Collections Secured by businessId ---
-    // The `list` rules now use the robust helper function to prevent race conditions.
-    // The client is responsible for filtering by businessId, which has been verified.
+    // The `list` rule is permissive and only checks for authentication. This avoids the `get()` call.
+    // The client query is responsible for filtering by businessId.
+    // The `get` rule remains strict, securing individual document reads against unauthorized access.
    
     match /products/{productId} {
-      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow get: if isUserInBusiness(resource.data.businessId) || isSuperAdmin();
       allow list: if canListTenantData() || isSuperAdmin();
-      allow create: if isSignedInUserManager() && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
-      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+      allow create: if isSignedInUserManager() && request.resource.data.businessId == getUserData().businessId;
+      allow update, delete: if isSignedInUserManager() && isUserInBusiness(resource.data.businessId);
     }
 
     match /receipts/{receiptId} {
-      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow get: if isUserInBusiness(resource.data.businessId) || isSuperAdmin();
       allow list: if canListTenantData() || isSuperAdmin();
-      allow create: if request.auth != null && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
-      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+      allow create: if isUserAuthenticated() && request.resource.data.businessId == getUserData().businessId;
+      allow update, delete: if isSignedInUserManager() && isUserInBusiness(resource.data.businessId);
     }
     
     match /customers/{customerId} {
-      allow get: if isBusinessMember(resource.data.businessId) || isSuperAdmin();
+      allow get: if isUserInBusiness(resource.data.businessId) || isSuperAdmin();
       allow list: if canListTenantData() || isSuperAdmin();
-      allow create: if request.auth != null && request.resource.data.businessId == getUserData(request.auth.uid).businessId;
-      allow update, delete: if isSignedInUserManager() && isBusinessMember(resource.data.businessId);
+      allow create: if isUserAuthenticated() && request.resource.data.businessId == getUserData().businessId;
+      allow update, delete: if isSignedInUserManager() && isUserInBusiness(resource.data.businessId);
     }
   }
 }

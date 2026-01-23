@@ -1,11 +1,11 @@
+
 'use client';
 import { Check, Github, Linkedin, Mail, Phone, Send, Twitter, Loader2, Instagram } from "lucide-react";
 import BackToTopButton from '@/components/back-to-top-button';
 import Link from "next/link";
 import React, { useRef, useState } from 'react';
-import emailjs from '@emailjs/browser';
 import { useToast } from '@/hooks/use-toast';
-import { EMAILJS_TEMPLATES } from "@/lib/email-templates";
+import { sendContactFormEmail } from '@/lib/email';
 
 export default function MarketingFooter() {
   const form = useRef<HTMLFormElement>(null);
@@ -16,28 +16,14 @@ export default function MarketingFooter() {
     e.preventDefault();
 
     if (!form.current) return;
-
-    const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
-    const templateId = EMAILJS_TEMPLATES.CONTACT_US;
-    const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
-
-    if (!serviceId || !templateId || !publicKey || serviceId === 'your_service_id') {
-      toast({
-        variant: 'destructive',
-        title: 'EmailJS Not Configured',
-        description: 'The email service has not been configured by the administrator.',
-      });
-      return;
-    }
-
     setIsSending(true);
 
-    emailjs.sendForm(serviceId, templateId, form.current, publicKey)
+    sendContactFormEmail(form.current)
       .then((result) => {
         toast({ variant: 'success', title: 'Message Sent!', description: 'We will get back to you shortly.' });
         form.current?.reset();
       }, (error) => {
-        toast({ variant: 'destructive', title: 'Send Failed', description: 'Could not send message. Please try again later.' });
+        toast({ variant: 'destructive', title: 'Send Failed', description: error.message || 'Could not send message. Please try again later.' });
       })
       .finally(() => {
         setIsSending(false);
@@ -79,9 +65,9 @@ export default function MarketingFooter() {
                       </li>
                     </ul>
                     <div className="flex items-center gap-3 pt-2 text-sm">
-                      <a href="mailto:nexuscraftx@gmail.com" className="inline-flex items-center gap-2 transition hover:text-amber-300 text-white">nexuscraftx@gmail.com</a>
+                      <a href="mailto:zenevapos@gmail.com" className="inline-flex items-center gap-2 transition hover:text-primary text-white">zenevapos@gmail.com</a>
                       <span className="text-white/20">•</span>
-                      <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 transition text-white hover:text-amber-300">
+                      <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 transition text-white hover:text-primary">
                         <Phone className="w-4 h-4" />
                         +234 906 423 3805
                       </a>
@@ -91,19 +77,19 @@ export default function MarketingFooter() {
                   <form ref={form} onSubmit={sendEmail} className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 gap-x-4 gap-y-4" id="contact-form">
                     <div className="sm:col-span-1">
                       <label htmlFor="name" className="block text-xs font-medium mb-1 text-white/80">Your name</label>
-                      <input id="name" name="from_name" type="text" required placeholder="Jane Doe" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
+                      <input id="name" name="from_name" type="text" required placeholder="Jane Doe" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
                     </div>
                     <div className="sm:col-span-1">
                       <label htmlFor="email" className="block text-xs font-medium mb-1 text-white/80">Email</label>
-                      <input name="from_email" type="email" required placeholder="jane@company.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="email" />
+                      <input name="from_email" type="email" required placeholder="jane@company.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="email" />
                     </div>
                     <div className="sm:col-span-1">
                       <label htmlFor="company" className="block text-xs font-medium mb-1 text-white/80">Company</label>
-                      <input id="company" name="company" type="text" placeholder="Acme Inc." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
+                      <input id="company" name="company" type="text" placeholder="Acme Inc." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
                     </div>
                     <div className="sm:col-span-1">
                       <label htmlFor="project-type" className="block text-xs font-medium mb-1 text-white/80">Primary Goal</label>
-                      <select id="project-type" name="project_type" className="appearance-none outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10">
+                      <select id="project-type" name="project_type" className="appearance-none outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10">
                               <option className="bg-neutral-900" value="inventory">Inventory Management</option>
                               <option className="bg-neutral-900" value="pos">Point of Sale</option>
                               <option className="bg-neutral-900" value="analytics">Sales Analytics</option>
@@ -112,11 +98,11 @@ export default function MarketingFooter() {
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor="message" className="block text-xs font-medium mb-1 text-white/80">How can we help?</label>
-                      <textarea name="message" rows={4} placeholder="A few sentences about your business goals and current challenges." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="message"></textarea>
+                      <textarea name="message" rows={4} placeholder="A few sentences about your business goals and current challenges." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="message"></textarea>
                     </div>
                     <div className="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="flex gap-2 text-xs items-center text-white/70">
-                        <input id="nda" name="nda_request" type="checkbox" className="h-4 w-4 rounded focus:ring-amber-400/60 bg-white/10 border-white/20 text-amber-400" />
+                        <input id="nda" name="nda_request" type="checkbox" className="h-4 w-4 rounded focus:ring-primary/60 bg-white/10 border-white/20 text-primary" />
                         <label htmlFor="nda">Please send an NDA</label>
                       </div>
                       <div className="flex items-center gap-2">
@@ -163,7 +149,7 @@ export default function MarketingFooter() {
               <form id="subscribe" className="mt-3 flex items-center gap-2">
                 <div className="relative flex-1">
                   <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40" />
-                  <input type="email" name="subscribeEmail" required placeholder="you@example.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-300 transition text-xs w-full border rounded pt-2.5 pr-3 pb-2.5 pl-9 text-white bg-white/10 border-white/10" />
+                  <input type="email" name="subscribeEmail" required placeholder="you@example.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-xs w-full border rounded pt-2.5 pr-3 pb-2.5 pl-9 text-white bg-white/10 border-white/10" />
                 </div>
                 <button type="submit" className="inline-flex gap-2 transition text-xs font-medium ring-1 rounded pt-2.5 pr-3.5 pb-2.5 pl-3.5 gap-x-2 gap-y-2 items-center hover:bg-amber-300 hover:ring-amber-200 text-neutral-900 bg-white ring-white/80">
                       Join

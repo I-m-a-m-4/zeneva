@@ -3,23 +3,24 @@
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
-import type { Receipt } from '@/types';
+import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2 } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays } from 'date-fns';
-import RecentSalesTable from '@/components/reports/recent-sales-table';
 import TopCustomersList from '@/components/reports/top-customers-list';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import RefreshButton from '@/components/shared/refresh-button';
-import ReportsTeaser from '@/components/reports/reports-teaser';
 import Link from 'next/link';
+import ProfitLossChart from '@/components/reports/profit-loss-chart';
+import CustomerAnalytics from '@/components/reports/customer-analytics';
+import FeatureGate from '@/components/shared/feature-gate';
 
 function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
     return (
@@ -45,7 +46,7 @@ export default function ReportsDashboard() {
       to: new Date(),
     });
 
-    const isStarterPlan = business?.plan === 'starter' && business?.accessLevel !== 'lifetime';
+    const hasLifetimeAccess = business?.accessLevel === 'lifetime';
 
     const receipts = React.useMemo(() => {
         if (!allReceipts) return [];
@@ -76,7 +77,8 @@ export default function ReportsDashboard() {
         const totalSales = receipts.length;
         const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
         const inventoryValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
-        const totalProductsSold = receipts.reduce((sum, r) => sum + r.items.length, 0);
+        const totalProductsSold = receipts.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
+
 
         return {
             totalRevenue,
@@ -111,101 +113,108 @@ export default function ReportsDashboard() {
         }
     };
     
-    if (isStarterPlan) {
-        return (
-            <div className="flex flex-col gap-6">
-                <PageTitle title="Reports" subtitle="Upgrade to Pro or Business to unlock detailed analytics." />
-                <div className="relative">
-                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-                        <div className="text-center p-8 bg-card border rounded-lg shadow-lg max-w-md">
-                            <h3 className="text-2xl font-bold mb-2">Upgrade to Unlock Reports</h3>
-                            <p className="text-muted-foreground mb-6">Gain valuable insights into your business performance by upgrading to a Pro or Business plan.</p>
-                            <Button asChild size="lg">
-                                <Link href="/billing">View Plans & Upgrade</Link>
-                            </Button>
-                        </div>
-                    </div>
-                    <ReportsTeaser />
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
-            <PageTitle title="Reports" subtitle="Deep dive into your business performance.">
-                <div className="flex flex-wrap items-center gap-2 no-capture">
+            <PageTitle title="Reports" subtitle="Deep dive into your business performance." />
+            
+            <FeatureGate
+                requiredPlan="pro"
+                currentPlan={business?.plan}
+                hasLifetimeAccess={hasLifetimeAccess}
+                featureName="Advanced Reports"
+                featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
+                className="flex-grow flex flex-col"
+            >
+                <div className="flex flex-wrap items-center gap-2 no-capture mb-6">
                     <RefreshButton />
                     <DateRangePicker date={date} onDateChange={setDate} />
                     <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4"/>Download</Button>
                 </div>
-            </PageTitle>
-            
-            {isLoading ? (
-                <div className="flex h-64 items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : (
-             <>
-                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-                    <ReportStatCard 
-                        title="Total Revenue"
-                        value={`${currencySymbol}${reportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                        icon={DollarSign}
-                    />
-                    <ReportStatCard 
-                        title="Total Sales"
-                        value={reportData?.totalSales.toLocaleString() || '0'}
-                        icon={ShoppingCart}
-                    />
-                     <ReportStatCard 
-                        title="Avg. Order Value"
-                        value={`${currencySymbol}${reportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
-                        icon={FileText}
-                    />
-                    <ReportStatCard 
-                        title="Products Sold"
-                        value={reportData?.totalProductsSold.toLocaleString() || '0'}
-                        icon={Package}
-                    />
-                    <ReportStatCard 
-                        title="Total Customers"
-                        value={reportData?.totalCustomers.toLocaleString() || '0'}
-                        icon={Users}
-                    />
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    <div className="lg:col-span-3">
-                        <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} />
+                {isLoading ? (
+                    <div className="flex h-64 items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
-                    <div className="lg:col-span-2">
-                        <TopProductsChart receipts={receipts || []} />
+                ) : (
+                <div className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                        <ReportStatCard 
+                            title="Total Revenue"
+                            value={`${currencySymbol}${reportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                            icon={DollarSign}
+                        />
+                        <ReportStatCard 
+                            title="Total Sales"
+                            value={reportData?.totalSales.toLocaleString() || '0'}
+                            icon={ShoppingCart}
+                        />
+                        <ReportStatCard 
+                            title="Avg. Order Value"
+                            value={`${currencySymbol}${reportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
+                            icon={FileText}
+                        />
+                        <ReportStatCard 
+                            title="Products Sold"
+                            value={reportData?.totalProductsSold.toLocaleString() || '0'}
+                            icon={Package}
+                        />
+                        <ReportStatCard 
+                            title="Total Customers"
+                            value={reportData?.totalCustomers.toLocaleString() || '0'}
+                            icon={Users}
+                        />
                     </div>
-                </div>
 
-                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    <div className="lg:col-span-3">
-                        <RecentSalesTable receipts={receipts || []} currencySymbol={currencySymbol}/>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div className="lg:col-span-3">
+                            <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} />
+                        </div>
+                        <div className="lg:col-span-2">
+                            <TopProductsChart receipts={receipts || []} />
+                        </div>
                     </div>
-                    <div className="lg:col-span-2">
-                        <TopCustomersList receipts={receipts || []} currencySymbol={currencySymbol} />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div className="lg:col-span-3">
+                            <ProfitLossChart receipts={receipts || []} currencySymbol={currencySymbol} />
+                        </div>
+                        <div className="lg:col-span-2">
+                            <TopCustomersList receipts={receipts || []} currencySymbol={currencySymbol} />
+                        </div>
                     </div>
+                    
+                    <FeatureGate
+                        requiredPlan="business"
+                        currentPlan={business?.plan}
+                        hasLifetimeAccess={hasLifetimeAccess}
+                        featureName="Customer Intelligence"
+                        featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
+                    >
+                        <CustomerAnalytics customers={customers || []} receipts={receipts || []} currencySymbol={currencySymbol} />
+                    </FeatureGate>
+                    
+                    <FeatureGate
+                        requiredPlan="business"
+                        currentPlan={business?.plan}
+                        hasLifetimeAccess={hasLifetimeAccess}
+                        featureName="Inventory Velocity"
+                        featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
+                    >
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Inventory Velocity & ABC Analysis</CardTitle>
+                                <CardDescription>Identify your fastest-moving products and optimize stock levels.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="text-center py-12 text-muted-foreground">
+                                <BarChart className="mx-auto h-12 w-12 opacity-50" />
+                                <h3 className="mt-4 text-lg font-medium">Coming Soon!</h3>
+                                <p className="mt-2 max-w-md mx-auto">This Business-tier feature will help you understand product performance and make smarter purchasing decisions.</p>
+                            </CardContent>
+                        </Card>
+                    </FeatureGate>
                 </div>
-                
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Profit & Loss Report</CardTitle>
-                        <CardDescription>Analyze your profitability over time.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center py-12 text-muted-foreground">
-                        <PieChart className="mx-auto h-12 w-12 opacity-50" />
-                        <h3 className="mt-4 text-lg font-medium">Coming Soon!</h3>
-                        <p className="mt-2 max-w-md mx-auto">This feature requires a 'cost price' field for each product to calculate profit margins. We're working on adding this capability.</p>
-                    </CardContent>
-                </Card>
-             </>
-            )}
+                )}
+            </FeatureGate>
         </div>
     );
 }

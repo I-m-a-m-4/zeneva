@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -34,11 +35,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
+import { logAuditEvent } from '@/lib/audit';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
     description: z.string().optional(),
     price: z.coerce.number().min(0, "Price must be a positive number."),
+    costPrice: z.coerce.number().min(0, "Cost price must be a positive number.").optional(),
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
     sku: z.string().optional(),
     category: z.string().optional(),
@@ -69,6 +72,7 @@ export default function AddProductPage() {
             name: "",
             description: "",
             price: 0,
+            costPrice: 0,
             stock: 0,
             sku: "",
             category: "",
@@ -151,12 +155,19 @@ export default function AddProductPage() {
             }
 
             const productsCollection = collection(firestore, 'products');
-            await addDoc(productsCollection, {
+            const newDocRef = await addDoc(productsCollection, {
                 ...values,
                 businessId: userProfile.businessId,
                 imageUrl: imageUrl,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
+            });
+
+            // Log audit event (fire-and-forget)
+            logAuditEvent(firestore, business.id, userProfile, {
+                action: 'product.create',
+                entity: { type: 'Product', id: newDocRef.id, name: values.name },
+                details: { name: values.name, price: values.price, stock: values.stock }
             });
 
             toast({ variant: 'success', title: 'Product Saved', description: `${values.name} has been added to your inventory.` });
@@ -235,19 +246,19 @@ export default function AddProductPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Stock & Pricing</CardTitle>
+              <CardTitle>Stock &amp; Pricing</CardTitle>
               <CardDescription>
                 Manage inventory and pricing information for this product.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-6 sm:grid-cols-3">
+              <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-4">
                  <FormField
                     control={form.control}
                     name="sku"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>SKU (Optional)</FormLabel>
+                        <FormLabel>Barcode (SKU)</FormLabel>
                         <FormControl>
                             <Input placeholder="QHDM-001" {...field} />
                         </FormControl>
@@ -276,6 +287,19 @@ export default function AddProductPage() {
                         <FormLabel>Price</FormLabel>
                         <FormControl>
                             <Input type="number" step="0.01" placeholder="349.99" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                 />
+                 <FormField
+                    control={form.control}
+                    name="costPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Cost Price</FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.01" placeholder="250.00" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>

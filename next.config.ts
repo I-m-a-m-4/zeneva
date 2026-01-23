@@ -72,6 +72,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'skincare365ng.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async rewrites() {

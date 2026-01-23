@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -8,7 +9,8 @@ import * as z from "zod";
 import {
   ChevronLeft,
   Upload,
-  Loader2
+  Loader2,
+  Barcode
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,11 +38,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import type { UserProfile, Product } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBusiness } from '@/context/pos-context';
+import { logAuditEvent } from '@/lib/audit';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
     description: z.string().optional(),
     price: z.coerce.number().min(0, "Price must be a positive number."),
+    costPrice: z.coerce.number().min(0, "Cost price must be a positive number.").optional(),
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
     sku: z.string().optional(),
     category: z.string().optional(),
@@ -104,7 +108,7 @@ export default function EditProductPage() {
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
-        defaultValues: { name: "", description: "", price: 0, stock: 0, sku: "", category: "" },
+        defaultValues: { name: "", description: "", price: 0, costPrice: 0, stock: 0, sku: "", category: "" },
     });
 
     React.useEffect(() => {
@@ -140,7 +144,7 @@ export default function EditProductPage() {
     };
     
     const onSubmit = async (values: ProductFormValues) => {
-        if (!productDocRef) return;
+        if (!productDocRef || !product || !userProfile || !firestore || !business) return;
 
         setIsSaving(true);
         let imageUrl = product?.imageUrl || '';
@@ -157,11 +161,19 @@ export default function EditProductPage() {
                 imageUrl = result.data.url;
             }
 
+            const updatedValues = { ...values, imageUrl };
             await updateDoc(productDocRef, {
-                ...values,
-                imageUrl,
+                ...updatedValues,
                 updatedAt: serverTimestamp(),
             });
+
+            // Log audit event
+            logAuditEvent(firestore, business.id, userProfile, {
+                action: 'product.update',
+                entity: { type: 'Product', id: product.id, name: product.name },
+                details: { changes: Object.keys(values).filter(key => values[key as keyof typeof values] !== product[key as keyof typeof product])}
+            });
+
 
             toast({ variant: 'success', title: 'Product Updated', description: `${values.name} has been updated.` });
             router.push('/inventory');
@@ -176,7 +188,6 @@ export default function EditProductPage() {
     
     const isLoading = isProfileLoading || isProductLoading;
     const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
-    const canManageStock = userProfile?.role === 'admin';
 
     if (isLoading) {
         return <EditProductSkeleton />;
@@ -253,19 +264,19 @@ export default function EditProductPage() {
             </Card>
             <Card>
                 <CardHeader>
-                <CardTitle>Stock & Pricing</CardTitle>
+                <CardTitle>Stock &amp; Pricing</CardTitle>
                 <CardDescription>
                     Manage inventory and pricing information for this product.
                 </CardDescription>
                 </CardHeader>
                 <CardContent>
-                <div className="grid gap-6 sm:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-4">
                     <FormField
                         control={form.control}
                         name="sku"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>SKU (Optional)</FormLabel>
+                            <FormLabel>Barcode (SKU)</FormLabel>
                             <FormControl>
                                 <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct}/>
                             </FormControl>
@@ -280,9 +291,8 @@ export default function EditProductPage() {
                             <FormItem>
                             <FormLabel>Stock</FormLabel>
                             <FormControl>
-                                <Input type="number" placeholder="25" {...field} disabled={!canManageStock}/>
+                                <Input type="number" placeholder="25" {...field} disabled={!canManageProduct}/>
                             </FormControl>
-                            {!canManageStock && <p className="text-xs text-muted-foreground pt-1">Only admins can edit stock.</p>}
                             <FormMessage />
                             </FormItem>
                         )}
@@ -297,6 +307,19 @@ export default function EditProductPage() {
                                 <Input type="number" step="0.01" placeholder="349.99" {...field} disabled={!canManageProduct}/>
                             </FormControl>
                             <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="costPrice"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Cost Price</FormLabel>
+                            <FormControl>
+                                <Input type="number" step="0.01" placeholder="250.00" {...field} disabled={!canManageProduct}/>
+                            </FormControl>
+                             <FormMessage />
                             </FormItem>
                         )}
                     />

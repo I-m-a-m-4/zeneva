@@ -18,10 +18,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, KeyRound } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { UserProfile, Invitation, BusinessInstance, UserRole } from '@/types';
+import type { UserProfile, Invitation, BusinessInstance } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -47,84 +47,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
-import { OWNER_ACCESS_KEY_STORAGE } from '../settings/page';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-
-// --- Owner Access Gate Component ---
-interface OwnerAccessGateProps {
-    children: React.ReactNode;
-}
-
-function OwnerAccessGate({ children }: OwnerAccessGateProps) {
-    const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-    const [showAuthModal, setShowAuthModal] = React.useState(false);
-    const [passwordInput, setPasswordInput] = React.useState('');
-    const [authError, setAuthError] = React.useState('');
-    const { toast } = useToast();
-
-    React.useEffect(() => {
-        const ownerPassword = localStorage.getItem(OWNER_ACCESS_KEY_STORAGE);
-        if (ownerPassword) {
-            setShowAuthModal(true);
-        } else {
-            setIsAuthenticated(true);
-        }
-    }, []);
-
-    const handlePasswordSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const storedPassword = localStorage.getItem(OWNER_ACCESS_KEY_STORAGE);
-        if (passwordInput === storedPassword) {
-            setIsAuthenticated(true);
-            setShowAuthModal(false);
-            toast({ variant: 'success', title: 'Access Granted' });
-        } else {
-            setAuthError('Incorrect password. Please try again.');
-        }
-    };
-
-    if (!isAuthenticated) {
-        return (
-            <AlertDialog open={showAuthModal}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                           <KeyRound className="h-5 w-5 text-primary"/> Owner Access Required
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            To protect sensitive user management functions, please enter the Owner Access Password you set in the settings.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <form onSubmit={handlePasswordSubmit}>
-                        <div className="space-y-2">
-                            <Label htmlFor="owner-password">Password</Label>
-                            <Input
-                                id="owner-password"
-                                type="password"
-                                value={passwordInput}
-                                onChange={(e) => {
-                                    setPasswordInput(e.target.value);
-                                    setAuthError('');
-                                }}
-                                autoFocus
-                            />
-                            {authError && <p className="text-sm text-destructive">{authError}</p>}
-                        </div>
-                        <AlertDialogFooter className="mt-4">
-                            <Button type="submit">Unlock</Button>
-                        </AlertDialogFooter>
-                    </form>
-                </AlertDialogContent>
-            </AlertDialog>
-        );
-    }
-
-    return <>{children}</>;
-}
-
-
-// --- Main Page Components ---
 
 function useCurrentUserProfile() {
     const { user } = useUser();
@@ -279,7 +201,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
   }
 
   return (
-    <OwnerAccessGate>
+    <>
         <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
         <div className="grid gap-6 md:grid-cols-2">
             <Card className="w-full md:col-span-2">
@@ -471,7 +393,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-    </OwnerAccessGate>
+    </>
   );
 }
 
@@ -500,5 +422,3 @@ export default function UsersPage() {
 
     return <UserManagementDashboard businessId={currentUser.businessId} currentUserId={currentUser.id} inviterName={currentUser.name} />;
 }
-
-    

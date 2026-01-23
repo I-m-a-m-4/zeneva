@@ -7,6 +7,7 @@ export interface Product {
     sku: string;
     category: string;
     price: number;
+    costPrice?: number;
     stock: number;
     imageUrl?: string;
     imageHint?: string;
@@ -60,13 +61,16 @@ export interface Receipt {
         productId: string;
         name: string;
         quantity: number;
-        price: number
+        price: number;
+        costPrice?: number;
     }[];
     customer?: { id: string, name: string, email: string } | null;
     subtotal: number;
     tax: number;
     discount: number;
     total: number;
+    totalCost?: number;
+    profit?: number;
     paymentMethod: 'Cash' | 'Card' | 'Bank Transfer';
     createdAt: any; // Can be a Date or a Firestore Timestamp
     createdBy?: string;
@@ -212,4 +216,16 @@ export interface PressArticle {
     url: string;
 }
 
+export interface AuditLog {
+    id: string;
+    businessId: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    action: string; // e.g., 'product.create', 'sale.void'
+    entityType: string; // e.g., 'Product', 'Receipt'
+    entityId: string;
+    details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
+    createdAt: any; // Firestore Timestamp
+}
     

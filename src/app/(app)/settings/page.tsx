@@ -36,23 +36,6 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-const dummyVendorPolicyTemplate = `
-**Zeneva Inventory Vendor/Operator Agreement**
-
-This agreement outlines the terms and conditions for vendors/operators using the Zeneva Inventory system provided by [Business Name].
-
-**1. Access and Use:**
-   - Access is granted solely for performing assigned duties related to sales, inventory, or other specified tasks.
-   - User credentials (username/password) must be kept confidential and not shared.
-   - Unauthorized access or use of system features is strictly prohibited.
-
-**2. Data Integrity & Accuracy:**
-   - All data entered (sales, stock adjustments, customer information) must be accurate and truthful.
-   - Any discrepancies or errors identified must be reported to management immediately.
-`;
-
-export const OWNER_ACCESS_KEY_STORAGE = "zeneva-inventory-owner-access-key";
-
 // Inner component to hold form logic and state, preventing re-render loops.
 function SettingsForms({ business, userProfile, businessDocRef }: { business: BusinessInstance, userProfile: UserProfile, businessDocRef: any }) {
   const { toast } = useToast();
@@ -77,14 +60,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
   const [paymentBankAccountId, setPaymentBankAccountId] = React.useState(business.settings?.paymentBankAccountId || "");
   const [paymentBankName, setPaymentBankName] = React.useState(business.settings?.paymentBankName || "");
   const [paymentInstructions, setPaymentInstructions] = React.useState(business.settings?.paymentInstructions || "");
-
-  const [vendorPolicy, setVendorPolicy] = React.useState(business.settings?.vendorPolicyText || dummyVendorPolicyTemplate);
-  const [enableVendorPolicy, setEnableVendorPolicy] = React.useState(business.settings?.vendorPolicyEnabled || false);
-
-  const [newOwnerPassword, setNewOwnerPassword] = React.useState("");
-  const [confirmNewOwnerPassword, setConfirmNewOwnerPassword] = React.useState("");
-  const [showNewOwnerPassword, setShowNewOwnerPassword] = React.useState(false);
-  const [showConfirmNewOwnerPassword, setShowConfirmNewOwnerPassword] = React.useState(false);
 
   const [enableLoyaltyProgram, setEnableLoyaltyProgram] = React.useState(business.settings?.loyaltyProgramEnabled ?? true);
   const [pointsPerUnit, setPointsPerUnit] = React.useState(String(business.settings?.pointsPerUnit || 1));
@@ -121,26 +96,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
       setIsSaving(prev => ({ ...prev, [formName]: false }));
     }
   };
-  
-  const handleOwnerPasswordChangeSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (newOwnerPassword !== confirmNewOwnerPassword) {
-      toast({ variant: "destructive", title: "Password Mismatch", description: "New passwords do not match." });
-      return;
-    }
-    if (newOwnerPassword.length < 6) {
-        toast({ variant: "destructive", title: "Password Too Short", description: "Password must be at least 6 characters." });
-        return;
-    }
-    try {
-      localStorage.setItem(OWNER_ACCESS_KEY_STORAGE, newOwnerPassword);
-      toast({ variant: "success", title: "Owner Access Password Updated", description: "Locally stored password has been changed." });
-      setNewOwnerPassword("");
-      setConfirmNewOwnerPassword("");
-    } catch (error) {
-      toast({ variant: "destructive", title: "Storage Error", description: "Could not save password." });
-    }
-  };
 
   const handleLoyaltySettingsSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -150,19 +105,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
       "settings.loyaltyPointsForReward": parseInt(loyaltyPointsForReward) || 1000,
       "settings.loyaltyRewardDiscountPercentage": parseFloat(rewardDiscountPercentage) || 10,
     });
-  };
-
-  const handleDownloadPolicy = () => {
-    const blob = new Blob([vendorPolicy], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'zeneva_vendor_policy.txt');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast({ variant: "success", title: "Policy Downloaded" });
   };
   
     const handleAddCategory = () => {
@@ -417,34 +359,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
                 <div><Label htmlFor="paymentInstructions">Payment Instructions</Label><Textarea id="paymentInstructions" value={paymentInstructions} onChange={e => setPaymentInstructions(e.target.value)} /></div>
                 <Button type="submit" disabled={isSaving["Financials"]}>{isSaving["Financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials</Button>
             </form>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" />Owner Access Control</CardTitle>
-            <CardDescription>Set password for User & Staff Management access. <strong className="text-destructive">Saved in browser.</strong></CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleOwnerPasswordChangeSubmit} className="space-y-4">
-            <div><Label htmlFor="newOwnerPassword">New Access Password</Label><div className="relative"><Input id="newOwnerPassword" type={showNewOwnerPassword ? "text" : "password"} value={newOwnerPassword} onChange={(e) => setNewOwnerPassword(e.target.value)} /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowNewOwnerPassword(!showNewOwnerPassword)}>{showNewOwnerPassword ? <EyeOff/> : <Eye/>}</Button></div></div>
-            <div><Label htmlFor="confirmNewOwnerPassword">Confirm New Password</Label><div className="relative"><Input id="confirmNewOwnerPassword" type={showConfirmNewOwnerPassword ? "text" : "password"} value={confirmNewOwnerPassword} onChange={(e) => setConfirmNewOwnerPassword(e.target.value)} /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowConfirmNewOwnerPassword(!showConfirmNewOwnerPassword)}>{showConfirmNewOwnerPassword ? <EyeOff/> : <Eye/>}</Button></div></div>
-            <Button type="submit">Set Access Password</Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Vendor Policy Management</CardTitle>
-          <CardDescription>Define terms for vendors or staff operating the system.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Vendor Policy", { "settings.vendorPolicyEnabled": enableVendorPolicy, "settings.vendorPolicyText": vendorPolicy }); }} className="space-y-4">
-            <div><Label htmlFor="vendorPolicyText">Policy Document Text</Label><Textarea id="vendorPolicyText" value={vendorPolicy} onChange={(e) => setVendorPolicy(e.target.value)} className="min-h-[200px] font-mono text-xs"/></div>
-            <div className="flex items-center space-x-2"><Switch id="enableVendorPolicySwitch" checked={enableVendorPolicy} onCheckedChange={setEnableVendorPolicy}/><Label htmlFor="enableVendorPolicySwitch">Enable Vendor Policy Requirement</Label></div>
-            <div className="flex gap-2"><Button type="submit" disabled={isSaving["Vendor Policy"]}>{isSaving["Vendor Policy"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Policy</Button><Button type="button" variant="outline" onClick={handleDownloadPolicy}><DownloadCloud className="mr-2 h-4 w-4"/>Download</Button></div>
-          </form>
         </CardContent>
       </Card>
 

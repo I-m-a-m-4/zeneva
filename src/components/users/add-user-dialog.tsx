@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -71,11 +70,12 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
                 title: 'Invitation Sent!',
                 description: `${values.name} has been invited. They will be added to your business upon signing up with their email.`,
             });
-        } catch (emailError) {
+        } catch (emailError: any) {
             toast({
                 variant: 'warning',
                 title: 'Invitation Saved, Email Failed',
-                description: 'The invitation was created, but the email could not be sent. Please check your EmailJS configuration in the .env file.',
+                description: emailError?.message || 'The email could not be sent. Please check your EmailJS configuration.',
+                duration: 10000
             });
         }
 

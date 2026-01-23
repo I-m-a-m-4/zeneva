@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -30,11 +29,15 @@ type ParsedProduct = Partial<Omit<Product, 'id' | 'businessId' | 'imageHint' | '
 const HEADER_MAPPINGS: { [key: string]: string[] } = {
   name: ['Name', 'Product Name', 'Item Name', 'Title'],
   sku: ['SKU', 'Code', 'Item Code'],
-  category: ['Category', 'Product Category', 'Type'],
-  price: ['RetailPrice', 'Price', 'Sale Price', 'Regular Price'], // Added 'Regular Price'
-  stock: ['Stock', 'Quantity', 'In Stock', 'Qty'],
-  description: ['ShortDescription', 'Description', 'Details', 'Body HTML'],
-  imageUrl: ['Image URL', 'ImageURL', 'Image Link', 'Image Src', 'Image', 'Images'], // Added 'Images'
+  // Prioritize more specific category names by listing them first
+  category: ['Category', 'Categories', 'Product Category', 'Type'],
+  // Add plural and common variations for price
+  price: ['Price', 'Regular Price', 'Regular Prices', 'Sale Price', 'RetailPrice'],
+  costPrice: ['Cost Price', 'Cost', 'Purchase Price'],
+  stock: ['Stock', 'Quantity', 'In Stock', 'Qty', 'inventory'],
+  description: ['Description', 'Body HTML', 'Details', 'ShortDescription'],
+  // Add more image variations
+  imageUrl: ['Image URL', 'ImageURL', 'Image Link', 'Image Src', 'Image', 'Images', 'Image 1'],
 };
 
 const PRODUCT_LIMITS = {
@@ -85,7 +88,6 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
 
         const lowerCaseHeaders = headers.map(h => h.toLowerCase().trim());
         
-        // Function to find the first matching header from a list of possibilities
         const findHeader = (possibleNames: string[]): string | undefined => {
             for (const name of possibleNames) {
                 const lowerName = name.toLowerCase();
@@ -102,6 +104,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
             sku: findHeader(HEADER_MAPPINGS.sku),
             category: findHeader(HEADER_MAPPINGS.category),
             price: findHeader(HEADER_MAPPINGS.price),
+            costPrice: findHeader(HEADER_MAPPINGS.costPrice),
             stock: findHeader(HEADER_MAPPINGS.stock),
             description: findHeader(HEADER_MAPPINGS.description),
             imageUrl: findHeader(HEADER_MAPPINGS.imageUrl),
@@ -118,6 +121,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
           sku: mappedHeaders.sku ? row[mappedHeaders.sku] || '' : '',
           category: mappedHeaders.category ? row[mappedHeaders.category] || 'Uncategorized' : 'Uncategorized',
           price: parseFloat(String(row[mappedHeaders.price!]).replace(/[^0-9.-]+/g,"")) || 0,
+          costPrice: mappedHeaders.costPrice ? parseFloat(String(row[mappedHeaders.costPrice]).replace(/[^0-9.-]+/g,"")) || 0 : 0,
           stock: mappedHeaders.stock ? parseInt(row[mappedHeaders.stock], 10) || 0 : 0,
           description: mappedHeaders.description ? row[mappedHeaders.description] || '' : '',
           imageUrl: mappedHeaders.imageUrl ? row[mappedHeaders.imageUrl] || '' : '',
@@ -174,7 +178,6 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
 
       await batch.commit();
       
-      // Try to update categories in the business settings
       try {
         const businessDocRef = doc(firestore, 'businessInstances', businessId);
         const businessDocSnap = await getDoc(businessDocRef);
@@ -281,6 +284,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
                                         <TableHead>Name</TableHead>
                                         <TableHead>Category</TableHead>
                                         <TableHead>Price</TableHead>
+                                        <TableHead>Cost Price</TableHead>
                                         <TableHead>Stock</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -290,6 +294,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
                                             <TableCell>{p.name}</TableCell>
                                             <TableCell>{p.category}</TableCell>
                                             <TableCell>₦{p.price?.toFixed(2)}</TableCell>
+                                            <TableCell>₦{p.costPrice?.toFixed(2)}</TableCell>
                                             <TableCell>{p.stock}</TableCell>
                                         </TableRow>
                                     ))}

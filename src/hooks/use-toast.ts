@@ -10,7 +10,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 5000
+const TOAST_REMOVE_DELAY = 3000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -184,8 +184,8 @@ function useToast() {
       }
     }
   }, [state])
-
-  const dismiss = React.useCallback(
+  
+  const stableDismiss = React.useCallback(
     (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
     []
   )
@@ -193,7 +193,7 @@ function useToast() {
   return {
     ...state,
     toast,
-    dismiss,
+    dismiss: stableDismiss,
   }
 }
 

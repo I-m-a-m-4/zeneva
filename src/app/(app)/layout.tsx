@@ -1,6 +1,7 @@
+
 'use client';
 
-import * as React from 'react';
+import *as React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -18,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserX
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserX, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -47,6 +48,7 @@ const navItems = [
     { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
     { href: '/customers', icon: UsersIcon, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
     { href: '/users', icon: UsersIcon, label: 'Users', roles: ['admin'] },
+    { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
 ];
 
 const bottomLinks = [
@@ -56,7 +58,9 @@ const bottomLinks = [
     { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator'] },
 ];
 
-const moreNavLinks: { href: string; icon: React.ElementType; label: string; roles: string[]; }[] = [];
+const moreNavLinks: { href: string; icon: React.ElementType; label: string; roles: string[]; }[] = [
+    // This is intentionally left empty as items are now in the main nav.
+];
 
 // Helper component for full-screen loading
 function FullScreenLoader({ text }: { text: string }) {
@@ -170,12 +174,25 @@ export default function AppLayout({
   }, [firestore, user, unreadCount, userNotifications]);
 
   if (!isMounted) {
-    return <FullScreenLoader text="Getting things ready..." />;
+    return <FullScreenLoader text="Initializing..." />;
   }
 
-  if (isUserLoading || isProfileLoading) return <FullScreenLoader text="Getting things ready..." />;
-  if (!user) return <FullScreenLoader text="Redirecting to login..." />;
+  if (isUserLoading) {
+    return <FullScreenLoader text="Authenticating..." />;
+  }
+
+  if (!user) {
+    return <FullScreenLoader text="Redirecting to login..." />;
+  }
   
+  if (isProfileLoading) {
+    return <FullScreenLoader text="Loading user profile..." />;
+  }
+
+  if (!userProfile) {
+    return <FullScreenLoader text="Creating your workspace..." />;
+  }
+
   if (userProfile?.status === 'inactive') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
@@ -200,8 +217,8 @@ export default function AppLayout({
     )
   }
   
-  if (!userProfile || !userProfile.businessId) {
-      return <FullScreenLoader text="Creating your workspace..." />;
+  if (!userProfile.businessId) {
+      return <FullScreenLoader text="Setting up your workspace..." />;
   }
 
   if (isBusinessLoading) return <FullScreenLoader text="Loading your workspace..." />;
@@ -236,10 +253,14 @@ export default function AppLayout({
   const userRole = userProfile?.role;
   const primaryColor = businessInstance?.settings?.primaryColor;
   const plan = businessInstance?.plan || 'starter';
+  const hasLifetimeAccess = businessInstance?.accessLevel === 'lifetime';
 
   const filterNavByRole = (items: any[]) => {
     if (!userRole) return [];
-    return items.filter(item => !item.roles || (item.roles as string[]).includes(userRole));
+    return items.filter(item => {
+      const roleMatch = !item.roles || (item.roles as string[]).includes(userRole);
+      return roleMatch;
+    });
   };
   
   const visibleNavItems = filterNavByRole(navItems);
@@ -247,7 +268,7 @@ export default function AppLayout({
   const visibleMoreNavLinks = filterNavByRole(moreNavLinks);
 
   const mainMobileNavItems = visibleNavItems.filter(item => ['/dashboard', '/inventory', '/sales/pos/select-products'].includes(item.href));
-  const extraMobileNavItems = visibleNavItems.filter(item => ['/customers', '/users', '/receipts', '/reports'].includes(item.href));
+  const extraMobileNavItems = visibleNavItems.filter(item => !mainMobileNavItems.some(main => main.href === item.href));
   const allMoreNavItems = [...extraMobileNavItems, ...visibleBottomLinks, ...visibleMoreNavLinks];
 
   const isLinkActive = (linkHref: string, currentPathname: string) => {
@@ -311,7 +332,7 @@ export default function AppLayout({
                       <Separator className="my-2 bg-sidebar-border" />
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent">
+                              <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                                   <div className="flex items-center gap-2 w-full">
                                       <Avatar className="h-8 w-8">
                                           {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
@@ -405,7 +426,7 @@ export default function AppLayout({
                           <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                           <Avatar className="h-8 w-8">
                                 {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ""} />}
-                                <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                                <AvatarFallback className="text-foreground">{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
                           </Avatar>
                           </Button>
                       </DropdownMenuTrigger>

@@ -174,7 +174,7 @@ export default function Home() {
 
           {/* Right Column: UI Mockups */}
           <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-            <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
+            <Image src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/4aa0ba0f-cf6d-4050-bf33-824539eb56e0_1600w.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
           </div>
         </div>
       </main>
@@ -690,7 +690,7 @@ export default function Home() {
                 {/* Starter Plan */}
                 <div className="border border-slate-200 rounded-lg p-8 shadow-sm flex flex-col">
                     <h3 className="text-2xl font-bold font-dm-sans text-slate-900">Starter</h3>
-                    <p className="text-slate-500 mt-2">Explore core features with a free trial.</p>
+                    <p className="text-slate-500 mt-2">For new businesses getting started.</p>
                     <div className="mt-6">
                         <span className="text-5xl font-bold tracking-tight font-instrument-serif text-slate-900">₦0</span>
                         <span className="text-slate-500"> / for 30 days</span>
@@ -698,7 +698,7 @@ export default function Home() {
                     <ul className="mt-8 space-y-4 text-slate-600 flex-grow">
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>30-Day Free Trial of Pro features</span>
+                            <span>30-Day Free Trial</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
@@ -707,6 +707,10 @@ export default function Home() {
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
                             <span>Up to 500 products</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                            <Check className="w-5 h-5 text-primary" />
+                            <span>Core Inventory & POS</span>
                         </li>
                     </ul>
                     <Link href="/signup" className="mt-8 block text-center bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
@@ -720,15 +724,15 @@ export default function Home() {
                         <div className="inline-flex items-center text-xs font-semibold px-3 py-1 bg-primary text-primary-foreground rounded-full">Most Popular</div>
                     </div>
                     <h3 className="text-2xl font-bold font-dm-sans text-slate-900">Pro</h3>
-                    <p className="text-slate-500 mt-2">For growing small businesses and startups.</p>
+                    <p className="text-slate-500 mt-2">For growing businesses that need more power.</p>
                     <div className="mt-6">
                         <span className="text-5xl font-bold tracking-tight font-instrument-serif text-slate-900">₦10,000</span>
                         <span className="text-slate-500"> / month</span>
                     </div>
                     <ul className="mt-8 space-y-4 text-slate-600 flex-grow">
-                        <li className="flex items-center gap-3">
+                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Cloud Point of Sale (POS)</span>
+                            <span>Everything in Starter, plus:</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
@@ -736,15 +740,19 @@ export default function Home() {
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Seamless CSV Product Import</span>
+                            <span>Purchase Order System</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Top-Notch Customer Management (CRM)</span>
+                            <span>Product Bundling</span>
+                        </li>
+                        <li className="flex items-center gap-3">
+                            <Check className="w-5 h-5 text-primary" />
+                            <span>Barcode Generation</span>
                         </li>
                          <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Basic Sales Analytics</span>
+                            <span>Profit & Loss Reports</span>
                         </li>
                     </ul>
                     <div className="mt-8">
@@ -762,7 +770,7 @@ export default function Home() {
                 {/* Business Plan */}
                 <div className="border border-slate-200 rounded-lg p-8 shadow-sm flex flex-col">
                     <h3 className="text-2xl font-bold font-dm-sans text-slate-900">Business</h3>
-                    <p className="text-slate-500 mt-2">For established businesses and teams.</p>
+                    <p className="text-slate-500 mt-2">For scaling businesses that need advanced tools.</p>
                     <div className="mt-6">
                         <span className="text-5xl font-bold tracking-tight font-instrument-serif text-slate-900">₦30,000</span>
                         <span className="text-slate-500"> / month</span>
@@ -770,23 +778,23 @@ export default function Home() {
                     <ul className="mt-8 space-y-4 text-slate-600 flex-grow">
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Everything in Pro</span>
+                            <span>Everything in Pro, plus:</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Unlimited products</span>
+                            <span>Unlimited products & users</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Unlimited users & roles</span>
+                            <span>Advanced Customer Analytics</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>Advanced Sales Analytics & Reports</span>
+                            <span>Automated Email Receipts</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
-                            <span>AI-Powered Inventory Troubleshooting</span>
+                            <span>Secure Audit Log</span>
                         </li>
                         <li className="flex items-center gap-3">
                             <Check className="w-5 h-5 text-primary" />
