@@ -149,10 +149,10 @@ export default function SelectProductsPage() {
                     </div>
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="hidden sm:inline-flex h-10">
-                                <ListFilter className="h-4 w-4 mr-2" />
-                                Filter
-                                {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-2">1</Badge>}
+                            <Button variant="outline" size="sm" className="h-10 gap-1.5">
+                                <ListFilter className="h-4 w-4" />
+                                <span className="sr-only sm:not-sr-only">Filter</span>
+                                {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">1</Badge>}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
