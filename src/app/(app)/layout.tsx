@@ -27,19 +27,18 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import CommandMenu from '@/components/layout/command-menu';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
-import { POSProvider } from '@/context/pos-context';
+import { POSProvider, usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
-import { createNewBusinessForUser } from '@/firebase/users';
 import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
@@ -74,47 +73,60 @@ function FullScreenLoader({ text }: { text: string }) {
   );
 }
 
-export default function AppLayout({
+// Renamed from AppLayout to avoid confusion
+function AuthenticatedLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, isUserLoading } = useUser();
+  const { user } = useUser();
   const router = useRouter();
-  const firestore = useFirestore();
   const pathname = usePathname();
   const { toast } = useToast();
-  const isCreatingBusiness = React.useRef(false);
+  const firestore = useFirestore();
+  
+  // Use the data from the context
+  const {
+    isLoading,
+    currentUserProfile: userProfile,
+    business: businessInstance
+  } = usePOS();
+
 
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
-  const [isMounted, setIsMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const userDocRef = useMemoFirebase(
-    () => (user?.uid && firestore ? doc(firestore, 'users', user.uid) : null), 
-    [user?.uid, firestore]
-  );
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
-  const businessDocRef = useMemoFirebase(
-    () => (userProfile?.businessId ? doc(firestore, 'businessInstances', userProfile.businessId) : null),
-    [userProfile?.businessId, firestore]
-  );
-  const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
+  const [hasLoggedOut, setHasLoggedOut] = React.useState(false);
+  React.useEffect(() => {
+    if (hasLoggedOut) return;
 
+    if (!isLoading && user && !userProfile) {
+      setHasLoggedOut(true);
+      toast({
+        variant: 'destructive',
+        title: 'Account Profile Not Found',
+        description: 'Your user profile could not be loaded. This can happen if account setup was interrupted. You will be logged out.',
+        duration: 8000,
+      });
+      
+      signOut(getAuth()).then(() => {
+        router.push('/signup');
+      });
+    }
+  }, [isLoading, user, userProfile, router, toast, hasLoggedOut]);
+  
+  // STALE DATA GUARD: Ensure the user notifications query only runs when the profile is fully ready and matches the current user.
+  const isProfileReadyForNotifications = userProfile && user && userProfile.id === user.uid;
   const userNotificationsQuery = useMemoFirebase(
-      () => (user?.uid ? query(collection(firestore, `users/${user.uid}/notifications`), orderBy('createdAt', 'desc')) : null),
-      [user?.uid, firestore]
+      () => (isProfileReadyForNotifications ? query(collection(firestore, `users/${userProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
+      [isProfileReadyForNotifications, firestore, userProfile?.id]
   );
   const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
-
+  
+  // Admin notifications can be loaded anytime a user is logged in.
   const adminNotificationsQuery = useMemoFirebase(
-      () => (user?.uid ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
-      [user?.uid, firestore]
+      () => (user ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
+      [user, firestore]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
   
@@ -126,7 +138,7 @@ export default function AppLayout({
     combined.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
+        return dateB.getTime() - a.getTime();
     });
     return combined.slice(0, 20);
   }, [userNotifications, adminNotifications]);
@@ -135,40 +147,6 @@ export default function AppLayout({
       return (userNotifications || []).filter(n => !n.read).length;
   }, [userNotifications]);
   
-  React.useEffect(() => {
-    if (isMounted && !isUserLoading && !user) {
-      router.replace('/login');
-    }
-  }, [user, isUserLoading, router, isMounted]);
-  
-  // Account Recovery Logic
-  React.useEffect(() => {
-    if (user && !isProfileLoading && !userProfile && !isCreatingBusiness.current && firestore) {
-        isCreatingBusiness.current = true;
-        toast({
-            title: "Account Recovery",
-            description: "Your workspace profile is missing. We're recreating it for you now.",
-        });
-        createNewBusinessForUser(firestore, user)
-            .catch(error => {
-                console.error("Failed to recreate business for user:", error);
-                toast({ variant: 'destructive', title: "Recovery Failed", description: "Could not restore your workspace. Please contact support." });
-                isCreatingBusiness.current = false;
-            });
-    }
-  }, [user, isProfileLoading, userProfile, firestore, toast]);
-
-  const needsRoleUpgrade = React.useMemo(() => {
-      return businessInstance?.ownerId === user?.uid && userProfile?.role !== 'admin';
-  }, [businessInstance?.ownerId, user?.uid, userProfile?.role]);
-
-  React.useEffect(() => {
-    if (needsRoleUpgrade && firestore && user?.uid) {
-      const userToUpdateDocRef = doc(firestore, 'users', user.uid);
-      console.log("Attempting to upgrade user to admin...");
-      updateDoc(userToUpdateDocRef, { role: 'admin' }).catch(console.error);
-    }
-  }, [needsRoleUpgrade, firestore, user?.uid]);
 
   React.useEffect(() => {
       const down = (e: KeyboardEvent) => {
@@ -191,30 +169,15 @@ export default function AppLayout({
       }
     });
     await batch.commit().catch(console.error);
-  }, [firestore, user, unreadCount, userNotifications]);
+  }, [user, unreadCount, userNotifications, firestore]);
 
-  // --- Accurate Loading States ---
-  if (!isMounted || isUserLoading) {
-    return <FullScreenLoader text="Authenticating..." />;
-  }
-
-  if (!user) {
-    return <FullScreenLoader text="Redirecting to login..." />;
-  }
-  
-  if (isProfileLoading) {
-    return <FullScreenLoader text="Loading user profile..." />;
-  }
-  
-  if (!userProfile) {
-    return <FullScreenLoader text="Setting up your workspace..." />;
-  }
-
-  if (isBusinessLoading) {
+  if (isLoading) {
     return <FullScreenLoader text="Loading your workspace..." />;
   }
 
-  // --- End Loading States ---
+  if (!userProfile) {
+    return <FullScreenLoader text="Verifying user profile..." />;
+  }
 
   if (userProfile?.status === 'inactive') {
     return (
@@ -295,48 +258,28 @@ export default function AppLayout({
   };
   
   return (
-    <POSProvider>
-      <TooltipProvider>
-        <SidebarProvider defaultOpen={true}>
-          <div 
-            className="relative flex h-screen w-full overflow-hidden"
-            style={primaryColor ? { '--primary': primaryColor } as React.CSSProperties : {}}
-          >
-            <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
-                <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
-                    <Link href="/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground h-10 w-full">
-                        <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={28} height={28} className="shrink-0" />
-                        <span className="text-xl font-semibold group-data-[state=collapsed]:hidden font-display">Zeneva</span>
-                    </Link>
-                </SidebarHeader>
-                <SidebarContent className="flex-1 p-2">
-                    <ScrollArea className="h-full">
-                      <SidebarMenu>
-                          {visibleNavItems.map((link) => (
-                              <SidebarMenuItem key={link.href}>
-                                <SidebarMenuButton
-                                      asChild
-                                      tooltip={{children: link.label, side: 'right', sideOffset: 10}} 
-                                      isActive={isLinkActive(link.href, pathname)}
-                                  >
-                                      <Link href={link.href}>
-                                          <link.icon className="h-5 w-5" />
-                                          <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
-                                      </Link>
-                                  </SidebarMenuButton>
-                              </SidebarMenuItem>
-                          ))}
-                      </SidebarMenu>
-                    </ScrollArea>
-                </SidebarContent>
-                <SidebarFooter className="p-2">
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={true}>
+        <div 
+          className="relative flex h-screen w-full overflow-hidden"
+          style={primaryColor ? { '--primary': primaryColor } as React.CSSProperties : {}}
+        >
+          <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
+              <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
+                  <Link href="/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground h-10 w-full">
+                      <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={28} height={28} className="shrink-0" />
+                      <span className="text-xl font-semibold group-data-[state=collapsed]:hidden font-display">Zeneva</span>
+                  </Link>
+              </SidebarHeader>
+              <SidebarContent className="flex-1 p-2">
+                  <ScrollArea className="h-full">
                     <SidebarMenu>
-                        {visibleBottomLinks.map((link) => (
+                        {visibleNavItems.map((link) => (
                             <SidebarMenuItem key={link.href}>
-                                <SidebarMenuButton
-                                  asChild
-                                  tooltip={{children: link.label, side: 'right', sideOffset: 10}}
-                                  isActive={pathname.startsWith(link.href)}
+                              <SidebarMenuButton
+                                    asChild
+                                    tooltip={{children: link.label, side: 'right', sideOffset: 10}} 
+                                    isActive={isLinkActive(link.href, pathname)}
                                 >
                                     <Link href={link.href}>
                                         <link.icon className="h-5 w-5" />
@@ -346,150 +289,181 @@ export default function AppLayout({
                             </SidebarMenuItem>
                         ))}
                     </SidebarMenu>
-                      <Separator className="my-2 bg-sidebar-border" />
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
-                                  <div className="flex items-center gap-2 w-full">
-                                      <Avatar className="h-8 w-8">
-                                          {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
-                                          <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
-                                      </Avatar>
-                                      <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
-                                          <span className="truncate text-sm font-medium" title={user?.displayName || user?.email || ''}>{user?.displayName || user?.email}</span>
-                                           {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
-                                      </div>
-                                  </div>
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="right" align="start" className="w-56">
-                              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              {userRole === 'admin' && (
-                                <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem>Support</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
-                                <LogOut className="mr-2 h-4 w-4" />
-                                <span>Logout</span>
-                              </DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                </SidebarFooter>
-            </Sidebar>
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
-                  <SidebarTrigger className="hidden md:flex"/>
-                    <div className="relative flex-1">
-                      <Button variant="outline" className="w-full justify-start text-muted-foreground md:w-[200px] lg:w-[336px]" onClick={() => setOpenCommandMenu(true)}>
-                          <SearchIcon className="mr-2 h-4 w-4" />
-                          <span>Search...</span>
-                      </Button>
-                  </div>
-                  <div className="flex items-center gap-1 md:gap-2 ml-auto">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Calculator" onClick={() => setIsCalculatorOpen(true)}>
-                            <CalculatorIcon className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Calculator</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
+                  </ScrollArea>
+              </SidebarContent>
+              <SidebarFooter className="p-2">
+                  <SidebarMenu>
+                      {visibleBottomLinks.map((link) => (
+                          <SidebarMenuItem key={link.href}>
+                              <SidebarMenuButton
+                                asChild
+                                tooltip={{children: link.label, side: 'right', sideOffset: 10}}
+                                isActive={pathname.startsWith(link.href)}
+                              >
+                                  <Link href={link.href}>
+                                      <link.icon className="h-5 w-5" />
+                                      <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
+                                  </Link>
+                              </SidebarMenuButton>
+                          </SidebarMenuItem>
+                      ))}
+                  </SidebarMenu>
+                    <Separator className="my-2 bg-sidebar-border" />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                                <div className="flex items-center gap-2 w-full">
+                                    <Avatar className="h-8 w-8">
+                                        {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
+                                        <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
+                                        <span className="truncate text-sm font-medium" title={user?.displayName || user?.email || ''}>{user?.displayName || user?.email}</span>
+                                         {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
+                                    </div>
+                                </div>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" className="w-56">
+                            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {userRole === 'admin' && (
+                              <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem>Support</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
+                              <LogOut className="mr-2 h-4 w-4" />
+                              <span>Logout</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+              </SidebarFooter>
+          </Sidebar>
+          <div className="flex-1 flex flex-col overflow-hidden">
+              <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
+                <SidebarTrigger className="hidden md:flex"/>
+                  <div className="relative flex-1">
+                    <Button variant="outline" className="w-full justify-start text-muted-foreground md:w-[200px] lg:w-[336px]" onClick={() => setOpenCommandMenu(true)}>
+                        <SearchIcon className="mr-2 h-4 w-4" />
+                        <span>Search...</span>
+                    </Button>
+                </div>
+                <div className="flex items-center gap-1 md:gap-2 ml-auto">
+                    <Tooltip>
                       <TooltipTrigger asChild>
-                          <Popover>
-                          <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-                                <Bell className="h-5 w-5" />
-                                {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span>}
-                              </Button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="w-96 p-0">
-                              <div className="flex items-center justify-between p-4 border-b">
-                                <p className="font-medium">Notifications</p>
-                                {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAsRead}>Mark all as read</Button>}
-                              </div>
-                              <ScrollArea className="h-[300px]">
-                                  {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary"/></div> : allNotifications && allNotifications.length > 0 ? (
-                                      allNotifications.map(notif => (
-                                          <div key={notif.id} className={`p-4 border-b last:border-b-0 ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
-                                              <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
-                                                  {notif.isGlobal && <Globe className="inline-block h-4 w-4 mr-2 text-muted-foreground" />}
-                                                  {notif.title}
-                                              </p>
-                                              <p className="text-xs text-muted-foreground">{notif.body}</p>
-                                              <p className="text-xs text-muted-foreground/80 mt-1">
-                                                  {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
-                                              </p>
-                                          </div>
-                                      ))
-                                  ) : (
-                                      <p className="p-4 text-sm text-muted-foreground text-center">No new notifications.</p>
-                                  )}
-                              </ScrollArea>
-                          </PopoverContent>
-                          </Popover>
+                        <Button variant="ghost" size="icon" aria-label="Calculator" onClick={() => setIsCalculatorOpen(true)}>
+                          <CalculatorIcon className="h-5 w-5" />
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                          <p>Notifications</p>
+                        <p>Calculator</p>
                       </TooltipContent>
-                      </Tooltip>
-
-                      <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
-                          <Avatar className="h-8 w-8">
-                                {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ""} />}
-                                <AvatarFallback className="text-foreground">{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-56" align="end" forceMount>
-                          <DropdownMenuLabel className="font-normal">
-                            <div className="flex flex-col space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <p className="text-sm font-medium leading-none truncate">{user?.displayName || "Zeneva User"}</p>
-                                  {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
-                                </div>
-                                <p className="text-xs leading-none text-muted-foreground">
-                                {user?.email}
-                                </p>
+                    </Tooltip>
+                    <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+                              <Bell className="h-5 w-5" />
+                              {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-96 p-0">
+                            <div className="flex items-center justify-between p-4 border-b">
+                              <p className="font-medium">Notifications</p>
+                              {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAsRead}>Mark all as read</Button>}
                             </div>
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          {userRole === 'admin' && (
-                            <DropdownMenuItem asChild>
-                                <Link href="/settings">
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    <span>Settings</span>
-                                </Link>
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          <span>Log out</span>
+                            <ScrollArea className="h-[300px]">
+                                {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary"/></div> : allNotifications && allNotifications.length > 0 ? (
+                                    allNotifications.map(notif => (
+                                        <div key={notif.id} className={`p-4 border-b last:border-b-0 ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
+                                            <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
+                                                {notif.isGlobal && <Globe className="inline-block h-4 w-4 mr-2 text-muted-foreground" />}
+                                                {notif.title}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">{notif.body}</p>
+                                            <p className="text-xs text-muted-foreground/80 mt-1">
+                                                {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
+                                            </p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="p-4 text-sm text-muted-foreground text-center">No new notifications.</p>
+                                )}
+                            </ScrollArea>
+                        </PopoverContent>
+                        </Popover>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Notifications</p>
+                    </TooltipContent>
+                    </Tooltip>
+
+                    <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
+                        <Avatar className="h-8 w-8">
+                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ""} />}
+                              <AvatarFallback className="text-foreground">{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                        <DropdownMenuLabel className="font-normal">
+                          <div className="flex flex-col space-y-2">
+                              <div className="flex justify-between items-center">
+                                <p className="text-sm font-medium leading-none truncate">{user?.displayName || "Zeneva User"}</p>
+                                {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
+                              </div>
+                              <p className="text-xs leading-none text-muted-foreground">
+                              {user?.email}
+                              </p>
+                          </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {userRole === 'admin' && (
+                          <DropdownMenuItem asChild>
+                              <Link href="/settings">
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  <span>Settings</span>
+                              </Link>
                           </DropdownMenuItem>
-                      </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-                  </header>
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
-                    {children}
-                </main>
-            </div>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                </header>
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
+                  {children}
+              </main>
           </div>
-          <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
-          <NetworkStatusIndicator />
-          <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
-          <CommandMenu open={openCommandMenu} onOpenChange={setOpenCommandMenu}/>
-        </SidebarProvider>
-      </TooltipProvider>
-    </POSProvider>
+        </div>
+        <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
+        <NetworkStatusIndicator />
+        <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
+        <CommandMenu open={openCommandMenu} onOpenChange={setOpenCommandMenu}/>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }
 
-    
+
+export default function AppLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <POSProvider>
+        <AuthenticatedLayout>
+            {children}
+        </AuthenticatedLayout>
+    </POSProvider>
+  )
+}

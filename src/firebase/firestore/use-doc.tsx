@@ -8,6 +8,9 @@ import {
   FirestoreError,
   DocumentSnapshot,
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -71,15 +74,16 @@ export function useDoc<T = any>(
       },
       (error: FirestoreError) => {
         if (error.code === 'permission-denied') {
-          console.error(`Firestore permission denied for document: ${memoizedDocRef.path}.`);
-          setData(null);
-          setIsLoading(false);
-          setError(new Error(`You don't have permission to view this document: ${memoizedDocRef.path}`));
-          return;
+          const permissionError = new FirestorePermissionError({
+            path: memoizedDocRef.path,
+            operation: 'get',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          setError(permissionError);
+        } else {
+          console.error(`useDoc error for path ${memoizedDocRef.path}:`, error);
+          setError(error);
         }
-
-        console.error(`useDoc error for path ${memoizedDocRef.path}:`, error);
-        setError(error);
         setData(null);
         setIsLoading(false);
       }

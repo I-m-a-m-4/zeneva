@@ -1,11 +1,10 @@
-
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import *as React from "react";
@@ -17,6 +16,8 @@ import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 function ProductCardSkeleton() {
     return (
@@ -84,6 +85,7 @@ export default function SelectProductsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
     
@@ -106,9 +108,22 @@ export default function SelectProductsPage() {
 
     const filteredProducts = React.useMemo(() => {
         if (!products) return [];
-        if (!searchTerm) return products;
-        return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [products, searchTerm]);
+        
+        let filtered = products;
+
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(p => p.category === categoryFilter);
+        }
+        
+        if (searchTerm) {
+            filtered = filtered.filter(p => 
+                p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+        }
+        
+        return filtered;
+    }, [products, searchTerm, categoryFilter]);
     
     const handleAddToCart = (product: Product) => {
         addToCart(product);
@@ -126,12 +141,31 @@ export default function SelectProductsPage() {
                     <div className="relative w-full">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input 
-                            placeholder="Search products..."
+                            placeholder="Search by name or SKU..."
                             className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="hidden sm:inline-flex h-10">
+                                <ListFilter className="h-4 w-4 mr-2" />
+                                Filter
+                                {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-2">1</Badge>}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
+                                <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                                {business?.settings?.productCategories?.map(cat => (
+                                    <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                      <Select onValueChange={setColumnClass} defaultValue={columnClass}>
                         <SelectTrigger className="w-[150px] hidden lg:flex">
                            <Columns className="h-4 w-4 mr-2" />
@@ -185,9 +219,9 @@ export default function SelectProductsPage() {
                             <PackageOpen className="h-12 w-12 text-muted-foreground" />
                             <h3 className="text-xl font-semibold mt-4">No Products Found</h3>
                             <p className="text-muted-foreground mt-2 mb-4">
-                                {searchTerm ? `No products match "${searchTerm}".` : "You haven't added any products yet."}
+                                {searchTerm || categoryFilter !== 'all' ? `No products match your search or filter criteria.` : "You haven't added any products yet."}
                             </p>
-                            {!searchTerm && (
+                            {!searchTerm && categoryFilter === 'all' && (
                                 <Button size="sm" asChild className="h-8 gap-1">
                                     <Link href="/inventory/add">
                                     <PlusCircle className="h-3.5 w-3.5" />

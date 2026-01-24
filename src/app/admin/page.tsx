@@ -1,5 +1,4 @@
 
-
 'use client';
 import {
   Card,
@@ -180,13 +179,18 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
 
   const analyticsData = useMemo(() => {
-    const totalUsers = users?.length || 0;
-    const totalBusinesses = businesses?.length || 0;
+    const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
+    const allUsers = users || [];
+    const activeUsers = allUsers.filter(u => u.status === 'active' || typeof u.status === 'undefined');
+    const inactiveUsers = allUsers.filter(u => u.status === 'inactive' || u.status === 'deleted');
+
+    const totalUsers = activeUsers.length;
+    const totalBusinesses = activeBusinesses.length;
+
     const totalProducts = products?.length || 0;
     const totalReceipts = receipts?.length || 0;
     const now = new Date();
     
-    // Revenue calculations from purchases (subscriptions)
     const totalRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
     const platformAOV = totalReceipts > 0 ? (receipts?.reduce((sum, r) => sum + r.total, 0) || 0) / totalReceipts : 0;
     const averageRevenuePerBusiness = totalBusinesses > 0 ? totalRevenue / totalBusinesses : 0;
@@ -200,20 +204,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
     const topBusinesses = Object.entries(businessRevenue)
         .map(([businessId, revenue]) => {
-            const business = businesses?.find(b => b.id === businessId);
-            const owner = users?.find(u => u.businessId === businessId && u.role === 'admin');
+            const business = activeBusinesses?.find(b => b.id === businessId);
+            const owner = activeUsers?.find(u => u.businessId === businessId && u.role === 'admin');
             return { id: businessId, name: business?.name || 'Unknown Business', revenue: revenue, ownerName: owner?.name || 'N/A' }
         })
         .sort((a,b) => b.revenue - a.revenue)
         .slice(0, 5);
     
-    const mrr = (businesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (businesses?.filter(b => b.plan === 'business').length || 0) * 30000;
+    const mrr = (activeBusinesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (activeBusinesses?.filter(b => b.plan === 'business').length || 0) * 30000;
     const arr = mrr * 12;
-
-    const activeUsers = (users || []).filter(u => u.status === 'active' || typeof u.status === 'undefined');
-    const inactiveUsers = (users || []).filter(u => u.status === 'inactive');
     
-    const usersByDate = (users || []).reduce((acc, user) => {
+    const usersByDate = (activeUsers || []).reduce((acc, user) => {
         if (user.createdAt?.seconds) {
           const date = format(new Date(user.createdAt.seconds * 1000), 'MMM d');
           acc[date] = (acc[date] || 0) + 1;
@@ -238,9 +239,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     }, {} as Record<string, number>);
     const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({name, value})).sort((a,b) => b.value - a.value).slice(0, 5);
     
-    const activeSubscriptions = businesses?.filter(b => b.plan === 'pro' || b.plan === 'business').length || 0;
-    const trialingUsers = businesses?.filter(b => b.trialExpiresAt?.toDate() > now && b.plan === 'starter').length || 0;
-    const subscriptionStatus = (businesses || []).reduce((acc, business) => {
+    const activeSubscriptions = activeBusinesses?.filter(b => b.plan === 'pro' || b.plan === 'business').length || 0;
+    
+    const trialingBusinessIds = new Set((activeBusinesses || []).filter(b => b.trialExpiresAt?.toDate() > now && (b.plan === 'starter' || !b.plan)).map(b => b.id));
+    const trialingUsers = (activeUsers || []).filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
+    
+    const subscriptionStatus = (activeBusinesses || []).reduce((acc, business) => {
         if (business.accessLevel === 'lifetime') acc.Lifetime = (acc.Lifetime || 0) + 1;
         else if (business.plan && business.plan !== 'starter') acc.Subscribed = (acc.Subscribed || 0) + 1;
         else if (business.trialExpiresAt?.toDate() > now) acc.Trial = (acc.Trial || 0) + 1;
@@ -249,14 +253,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     }, {} as Record<string, number>);
     const subscriptionStatusData = Object.entries(subscriptionStatus).map(([name, value]) => ({name, value}));
     
-    const planCounts = (businesses || []).reduce((acc, business) => {
+    const planCounts = (activeBusinesses || []).reduce((acc, business) => {
         const plan = business.plan || 'Free';
         acc[plan] = (acc[plan] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
     const planDistributionData = Object.entries(planCounts).map(([name, value]) => ({name: name.charAt(0).toUpperCase() + name.slice(1), value}));
 
-    const userRoleCounts = (users || []).reduce((acc, user) => {
+    const userRoleCounts = (activeUsers || []).reduce((acc, user) => {
         const role = user.role || 'unknown';
         acc[role] = (acc[role] || 0) + 1;
         return acc;
@@ -670,11 +674,3 @@ export default function AdminDashboardPage() {
 
   return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} />
 }
-
-    
-
-    
-
-    
-
-

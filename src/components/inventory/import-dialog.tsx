@@ -1,13 +1,14 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
-import { Loader2, UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, Package } from 'lucide-react';
 import Papa from 'papaparse';
 import { Product } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -281,6 +282,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>Image</TableHead>
                                         <TableHead>Name</TableHead>
                                         <TableHead>Category</TableHead>
                                         <TableHead>Price</TableHead>
@@ -291,6 +293,21 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
                                 <TableBody>
                                     {parsedData.slice(0, 10).map((p, i) => (
                                         <TableRow key={i}>
+                                            <TableCell>
+                                                {p.imageUrl ? (
+                                                    <Image
+                                                        src={p.imageUrl}
+                                                        alt={p.name || 'Product Image'}
+                                                        width={40}
+                                                        height={40}
+                                                        className="aspect-square rounded-md object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
+                                                        <Package/>
+                                                    </div>
+                                                )}
+                                            </TableCell>
                                             <TableCell>{p.name}</TableCell>
                                             <TableCell>{p.category}</TableCell>
                                             <TableCell>₦{p.price?.toFixed(2)}</TableCell>

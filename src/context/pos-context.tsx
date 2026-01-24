@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
@@ -42,7 +43,7 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, isUserLoading: isAuthLoading } = useUser();
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -50,7 +51,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // --- Centralized Data Fetching ---
   const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
-  const businessId = currentUserProfile?.businessId;
+
+  // STALE DATA GUARD: Ensure the profile belongs to the current user before proceeding.
+  const isProfileReady = user && currentUserProfile && !isProfileLoading && user.uid === currentUserProfile.id;
+  
+  const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
   const { data: business, isLoading: isLoadingBusiness } = useDoc<BusinessInstance>(businessDocRef);
@@ -64,7 +69,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
   
-  const isLoading = isProfileLoading || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers;
+  const isLoading = isAuthLoading || isProfileLoading || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers;
   
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -142,7 +147,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     products,
     receipts,
     customers,
-    currentUserProfile,
+    currentUserProfile: isProfileReady ? currentUserProfile : null,
     isLoading,
     cart,
     addToCart,
@@ -164,7 +169,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     currencySymbol,
     currencyCode,
     triggerRefresh,
-  }), [business, products, receipts, customers, currentUserProfile, isLoading, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh]);
+  }), [business, products, receipts, customers, isProfileReady, currentUserProfile, isLoading, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 };

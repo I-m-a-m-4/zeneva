@@ -9,6 +9,8 @@ import {
   QuerySnapshot,
   CollectionReference,
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -85,16 +87,16 @@ export function useCollection<T = any>(
       },
       (error: FirestoreError) => {
         if (error.code === 'permission-denied') {
-          console.error(`Firestore permission denied for query. Path: ${(memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString()}`);
-          setData(null);
-          setIsLoading(false);
-          // Set an actual error so the UI can react if needed, instead of just showing "no data".
-          setError(new Error("You don't have permission to view this data.")); 
-          return;
+          const permissionError = new FirestorePermissionError({
+            path: (memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString(),
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          setError(permissionError);
+        } else {
+          console.error("useCollection error:", error);
+          setError(error);
         }
-
-        console.error("useCollection error:", error);
-        setError(error);
         setData(null);
         setIsLoading(false);
       }
