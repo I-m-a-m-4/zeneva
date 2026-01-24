@@ -240,10 +240,12 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Import Products from CSV</DialogTitle>
-          <DialogDescription>
-            Upload a CSV file to bulk-add products. Your file must have columns for at least **Name** and **Price**. We also support common variations like 'Regular Price' (from WooCommerce) and various 'Image' headers.
-            For more details on formatting, visit our <Link href="/support#csv-formatting" className="text-primary underline" onClick={() => onOpenChange(false)}>Support page</Link>.
-          </DialogDescription>
+           <DialogDescription asChild>
+            <div className="text-sm text-muted-foreground">
+                <p>Upload a CSV file to bulk-add products. Your file must have columns for at least <strong>Name</strong> and <strong>Price</strong>. We also support common variations like 'Regular Price' (from WooCommerce) and various 'Image' headers.</p>
+                <p>For more details on formatting, visit our <Link href="/support#csv-formatting" className="text-primary underline" onClick={() => onOpenChange(false)}>Support page</Link>.</p>
+            </div>
+           </DialogDescription>
         </DialogHeader>
         
         {!file ? (

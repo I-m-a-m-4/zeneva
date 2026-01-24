@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { createUserProfileDocument } from '@/firebase/users';
+import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader, ChevronLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -61,8 +61,12 @@ export default function SignupPage() {
       // Step 3: Create all associated Firestore documents (user profile, business, etc.)
       await createUserProfileDocument(firestore, userCredential.user, data.name, data.phone);
 
-      // On success, do nothing. The auth layout will detect the state
-      // change and handle the redirection automatically.
+      // Step 4: Wait for the user profile to be available to prevent race conditions
+      await waitForUserProfile(firestore, userCredential.user.uid);
+      
+      // Step 5: Now that the backend is ready, redirect to the dashboard.
+      router.push('/dashboard');
+
     } catch (error: any) {
        let description = "Please try again.";
       if (error.code === 'auth/email-already-in-use') {

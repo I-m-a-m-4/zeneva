@@ -26,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
@@ -84,51 +84,29 @@ function AuthenticatedLayout({
   const { toast } = useToast();
   const firestore = useFirestore();
   
-  // Use the data from the context
   const {
     isLoading,
-    currentUserProfile: userProfile,
+    currentUserProfile,
+    user,
     business: businessInstance,
-    isProfileReady
   } = usePOS();
 
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
   
-  const [hasLoggedOut, setHasLoggedOut] = React.useState(false);
-  
+  // --- Start of Unconditional Hooks ---
+  // All hooks must be called before any conditional returns.
   const userNotificationsQuery = useMemoFirebase(
-      () => (isProfileReady && userProfile ? query(collection(firestore, `users/${userProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
-      [isProfileReady, firestore, userProfile?.id]
+      () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
+      [firestore, currentUserProfile?.id]
   );
   const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
   
-  // Admin notifications can be loaded anytime a user is logged in.
   const adminNotificationsQuery = useMemoFirebase(
-      () => (userProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
-      [userProfile, firestore]
+      () => (currentUserProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
+      [currentUserProfile, firestore]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
-  
-  React.useEffect(() => {
-    if (hasLoggedOut) return;
-    
-    // When finished loading auth state, but profile is not ready (i.e. not found in DB)
-    if (!isLoading && !isProfileReady && userProfile === null) {
-      setHasLoggedOut(true); 
-      toast({
-        variant: 'destructive',
-        title: 'Account Profile Not Found',
-        description: 'Your user profile could not be loaded. This can happen if account setup was interrupted. You will be logged out.',
-        duration: 8000,
-      });
-      
-      signOut(getAuth()).then(() => {
-        router.push('/signup');
-      });
-    }
-  }, [isLoading, isProfileReady, userProfile, router, toast, hasLoggedOut]);
-
 
   const allNotifications = React.useMemo(() => {
     const combined = [
@@ -146,7 +124,6 @@ function AuthenticatedLayout({
   const unreadCount = React.useMemo(() => {
       return (userNotifications || []).filter(n => !n.read).length;
   }, [userNotifications]);
-  
 
   React.useEffect(() => {
       const down = (e: KeyboardEvent) => {
@@ -160,26 +137,35 @@ function AuthenticatedLayout({
   }, []);
 
   const handleMarkAsRead = React.useCallback(async () => {
-    if (!userProfile || unreadCount === 0 || !userNotifications || !firestore) return;
+    if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
     const batch = writeBatch(firestore);
     userNotifications.forEach(notif => {
       if (!notif.read) {
-        const notifRef = doc(firestore, `users/${userProfile.id}/notifications`, notif.id);
+        const notifRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, notif.id);
         batch.update(notifRef, { read: true });
       }
     });
     await batch.commit().catch(console.error);
-  }, [userProfile, unreadCount, userNotifications, firestore]);
+  }, [currentUserProfile, unreadCount, userNotifications, firestore]);
+  // --- End of Unconditional Hooks ---
 
+
+  // Show a loader while the initial auth state and user profile are being fetched.
   if (isLoading) {
-    return <FullScreenLoader text="Loading your workspace..." />;
+    return <FullScreenLoader text="Finalizing session..." />;
   }
   
-  if (!userProfile) {
-      return <FullScreenLoader text="Verifying user profile..." />;
+  // If loading is done and there's still no user, they are logged out.
+  // The <AuthLayout> will handle the redirect. This component just shows a loader in the meantime.
+  if (!user || !currentUserProfile) {
+    // This case should ideally not be hit for a valid user because of the robust signup flow.
+    // If it is, it indicates a genuine problem, and logging out is the safest action.
+    signOut(getAuth());
+    return <FullScreenLoader text="Session error, logging out..." />;
   }
 
-  if (userProfile?.status === 'inactive') {
+  // --- Start of Checks for Active/Valid Accounts ---
+  if (currentUserProfile.status === 'inactive') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md text-center shadow-lg">
@@ -229,8 +215,9 @@ function AuthenticatedLayout({
       </div>
     );
   }
-  
-  const userRole = userProfile?.role;
+   // --- End of Checks ---
+
+  const userRole = currentUserProfile.role;
   const primaryColor = businessInstance?.settings?.primaryColor;
   const plan = businessInstance?.plan || 'starter';
   const hasLifetimeAccess = businessInstance?.accessLevel === 'lifetime';
@@ -314,11 +301,11 @@ function AuthenticatedLayout({
                             <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                                 <div className="flex items-center gap-2 w-full">
                                     <Avatar className="h-8 w-8">
-                                        {(userProfile as any)?.photoURL && <AvatarImage src={(userProfile as any).photoURL} alt={userProfile?.name || ''} />}
-                                        <AvatarFallback>{(userProfile?.name || userProfile?.email || 'U').charAt(0)}</AvatarFallback>
+                                        {(currentUserProfile as any)?.photoURL && <AvatarImage src={(currentUserProfile as any).photoURL} alt={currentUserProfile?.name || ''} />}
+                                        <AvatarFallback>{(currentUserProfile?.name || currentUserProfile?.email || 'U').charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
-                                        <span className="truncate text-sm font-medium" title={userProfile?.name || userProfile?.email || ''}>{userProfile?.name || userProfile?.email}</span>
+                                        <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
                                          {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                                     </div>
                                 </div>
@@ -404,8 +391,8 @@ function AuthenticatedLayout({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                         <Avatar className="h-8 w-8">
-                              {(userProfile as any)?.photoURL && <AvatarImage src={(userProfile as any).photoURL} alt={userProfile?.name || ""} />}
-                              <AvatarFallback className="text-foreground">{(userProfile?.name || userProfile?.email || 'U').charAt(0)}</AvatarFallback>
+                              {(currentUserProfile as any)?.photoURL && <AvatarImage src={(currentUserProfile as any).photoURL} alt={currentUserProfile?.name || ""} />}
+                              <AvatarFallback className="text-foreground">{(currentUserProfile?.name || currentUserProfile?.email || 'U').charAt(0)}</AvatarFallback>
                         </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
@@ -413,11 +400,11 @@ function AuthenticatedLayout({
                         <DropdownMenuLabel className="font-normal">
                           <div className="flex flex-col space-y-2">
                               <div className="flex justify-between items-center">
-                                <p className="text-sm font-medium leading-none truncate">{userProfile?.name || "Zeneva User"}</p>
+                                <p className="text-sm font-medium leading-none truncate">{currentUserProfile?.name || "Zeneva User"}</p>
                                 {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                               </div>
                               <p className="text-xs leading-none text-muted-foreground">
-                              {userProfile?.email}
+                              {currentUserProfile?.email}
                               </p>
                           </div>
                         </DropdownMenuLabel>
