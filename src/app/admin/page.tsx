@@ -181,8 +181,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
   const analyticsData = useMemo(() => {
     const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
     const allUsers = users || [];
-    const activeUsers = allUsers.filter(u => u.status === 'active' || typeof u.status === 'undefined');
-    const inactiveUsers = allUsers.filter(u => u.status === 'inactive' || u.status === 'deleted');
+    const activeUsers = allUsers.filter(u => u.status === 'active' || u.status === undefined || !u.status);
+    const inactiveUsers = allUsers.filter(u => u.status === 'inactive');
 
     const totalUsers = activeUsers.length;
     const totalBusinesses = activeBusinesses.length;
@@ -242,7 +242,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const activeSubscriptions = activeBusinesses?.filter(b => b.plan === 'pro' || b.plan === 'business').length || 0;
     
     const trialingBusinessIds = new Set((activeBusinesses || []).filter(b => b.trialExpiresAt?.toDate() > now && (b.plan === 'starter' || !b.plan)).map(b => b.id));
-    const trialingUsers = (activeUsers || []).filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
+    const trialingUsers = activeUsers.filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
     
     const subscriptionStatus = (activeBusinesses || []).reduce((acc, business) => {
         if (business.accessLevel === 'lifetime') acc.Lifetime = (acc.Lifetime || 0) + 1;
@@ -400,7 +400,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         { title: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
         { title: "Total Products", value: analyticsData.totalProducts.toLocaleString(), icon: Package },
         { title: "Active Subscriptions", value: analyticsData.activeSubscriptions.toLocaleString(), icon: UserCheck, description: 'Pro + Business plans' },
-        { title: "Trialing Users", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
+        { title: "Trialing Businesses", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
         { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
         { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
       ];

@@ -1,13 +1,12 @@
 
 'use client';
 import *as React from 'react';
+import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
-import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, Trophy, PlusCircle, Download } from 'lucide-react';
-import DashboardClientContent from '@/components/dashboard/dashboard-client-content';
+import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import type { TopSellingItem, UserProfile } from '@/types';
+import type { TopSellingItem } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,87 +16,16 @@ import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
 import RefreshButton from '@/components/shared/refresh-button';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { query, collection, where } from 'firebase/firestore';
 
-// NEW: Admin-only component for the referral leaderboard
-const ReferralLeaderboardCard = () => {
-    const firestore = useFirestore();
-    const { business, currentUserProfile } = usePOS();
-    const { user } = useUser(); // Get the current authenticated user
+const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[350px] lg:col-span-2" />
+});
 
-    // This query now lives inside the admin-only component.
-    const usersQuery = useMemoFirebase(() => {
-        // 1. BASIC CHECKS
-        if (!business?.id || !firestore || !currentUserProfile) return null;
-
-        // 2. THE FIX: Stale Data Prevention
-        // Check if the loaded profile actually belongs to the currently logged-in user.
-        // If IDs don't match, the profile is from the previous session (stale). Don't trust it.
-        if (user?.uid && currentUserProfile.id && user.uid !== currentUserProfile.id) {
-            return null;
-        }
-
-        // 3. ROLE CHECK
-        // Now we can trust the role. Only Admins can list users.
-        if (currentUserProfile.role !== 'admin') return null;
-        
-        // 4. CONSTRUCT QUERY
-        return query(collection(firestore, "users"), where("businessId", "==", business.id));
-    }, [business?.id, firestore, currentUserProfile?.id, currentUserProfile?.role, user?.uid]);
-
-    const { data: businessUsers, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
-    
-    const topReferrers = React.useMemo(() => {
-        if (!businessUsers) return [];
-        return [...businessUsers]
-            .filter(u => u.referrals && u.referrals > 0)
-            .sort((a, b) => (b.referrals || 0) - (a.referrals || 0))
-            .slice(0, 3);
-    }, [businessUsers]);
-
-    return (
-        <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-primary" />
-                    Referral Leaderboard
-                </CardTitle>
-                <CardDescription>Your business's top referrers.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isLoadingUsers ? (
-                    <div className="space-y-3">
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                ) : topReferrers.length > 0 ? (
-                    <ul className="space-y-3">
-                        {topReferrers.map(referrer => (
-                            <li key={referrer.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <Avatar className="h-8 w-8 flex-shrink-0">
-                                        <AvatarFallback>{(referrer.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium truncate" title={referrer.name}>{referrer.name || 'Unknown User'}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                    <p className="text-sm font-semibold text-primary">{referrer.referrals || 0} referrals</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No referrals made in your business yet.</p>
-                )}
-            </CardContent>
-        </Card>
-    );
-};
-
+const CategoryPieChart = dynamic(() => import('@/components/dashboard/category-pie-chart'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[350px]" />
+});
 
 function DashboardSkeleton() {
   return (
@@ -133,10 +61,9 @@ export default function DashboardPage() {
   
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  // REMOVED `businessUsers` and `isLoadingUsers` from here.
-  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, currentUserProfile } = usePOS();
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business } = usePOS();
   
-  const isLoading = isPosLoading; // Simplified loading state.
+  const isLoading = isPosLoading;
 
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];
@@ -319,10 +246,15 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <DashboardClientContent />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
+        </div>
+        <CategoryPieChart products={products || []} />
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Award className="h-5 w-5 text-primary" />
@@ -360,28 +292,7 @@ export default function DashboardPage() {
             </CardContent>
         </Card>
         
-        {/* Conditionally render the admin-only component */}
-        {currentUserProfile?.role === 'admin' && (
-          <ReferralLeaderboardCard />
-        )}
-        
-        <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
-          <CardHeader>
-             <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-                Your Referrals
-              </CardTitle>
-              <CardDescription>Keep track of your own referral count.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-                 <p className="text-6xl font-bold">{currentUserProfile?.referrals || 0}</p>
-                  <p className="text-sm text-muted-foreground">successful referrals</p>
-                  <Button variant="link" size="sm" asChild className="mt-2">
-                      <Link href="/settings">Get Your Code</Link>
-                  </Button>
-          </CardContent>
-        </Card>
-        <Card className="shadow-md md:col-span-1 transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+        <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -421,5 +332,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

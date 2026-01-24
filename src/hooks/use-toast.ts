@@ -153,10 +153,18 @@ function toast({ ...props }: Toast) {
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
+  const toastProps = { ...props };
+
+  // If a destructive toast is shown and no specific duration is provided, default it to 3 seconds.
+  // This can be overridden by explicitly setting duration: Infinity for toasts that should persist.
+  if (toastProps.variant === "destructive" && toastProps.duration === undefined) {
+    toastProps.duration = 3000;
+  }
+
   dispatch({
     type: "ADD_TOAST",
     toast: {
-      ...props,
+      ...toastProps,
       id,
       open: true,
       onOpenChange: (open) => {

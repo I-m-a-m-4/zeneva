@@ -36,9 +36,6 @@ export interface UserProfile {
     createdAt?: any;
     surveyCompleted?: boolean;
     status?: 'active' | 'inactive' | 'deleted';
-    referralCode?: string;
-    referredBy?: string;
-    referrals?: number;
     lastSeen?: any;
 }
 
@@ -167,23 +164,6 @@ export interface AdminNotification {
     title: string;
     body: string;
     sentBy: string;
-    createdAt: any;
-}
-
-// User-specific notifications
-export interface UserNotification {
-    id: string;
-    title: string;
-    body: string;
-    link?: string;
-    read: boolean;
-    createdAt: any;
-}
-
-export interface Referral {
-    id: string;
-    referrerId: string;
-    referredUserId: string;
     createdAt: any;
 }
 

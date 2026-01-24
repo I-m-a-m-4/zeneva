@@ -69,8 +69,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
   const [categories, setCategories] = React.useState<string[]>(business.settings?.productCategories || []);
   const [categoryInput, setCategoryInput] = React.useState('');
   
-  const referralLink = userProfile?.referralCode ? `https://zeneva.vercel.app/signup?ref=${userProfile.referralCode}` : '';
-
   const handleSettingsSubmit = async (formName: string, dataToSave: any) => {
     if (!businessDocRef) {
       toast({ variant: "destructive", title: "Error", description: "No active business selected." });
@@ -139,47 +137,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
         setCategoryInput('');
     };
 
-    const handleCopyLink = () => {
-        if (referralLink) {
-            navigator.clipboard.writeText(referralLink)
-                .then(() => {
-                    toast({ variant: 'success', title: 'Copied!', description: 'Referral link copied to clipboard.' });
-                })
-                .catch(() => {
-                    toast({ variant: 'destructive', title: 'Failed to Copy' });
-                });
-        }
-    };
-
-    const handleCopyCode = (code?: string) => {
-        if (code) {
-            navigator.clipboard.writeText(code)
-                .then(() => {
-                    toast({ variant: 'success', title: 'Copied!', description: 'Referral code copied to clipboard.' });
-                })
-                .catch(() => {
-                    toast({ variant: 'destructive', title: 'Failed to Copy' });
-                });
-        }
-    };
-
-    const handleShareLink = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Join me on Zeneva!',
-                    text: `Sign up for Zeneva using my referral link and get started with the best inventory management platform.`,
-                    url: referralLink,
-                });
-            } catch (error) {
-                console.log('Error sharing:', error);
-            }
-        } else {
-            handleCopyLink();
-            toast({ title: 'Share not supported', description: 'Referral link copied to clipboard instead.' });
-        }
-    };
-
     const handleDeleteAccount = async () => {
         if (!firestore || !userProfile || !businessDocRef) return;
         const userDocRef = doc(firestore, 'users', userProfile.id);
@@ -228,40 +185,6 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
     <div className="flex flex-col gap-6">
       <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
       
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary" />Referral Program</CardTitle>
-          <CardDescription>Share your code to earn rewards. For every new user that signs up with your code, you get 10 extra days of trial.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="referralLink">Your Shareable Link</Label>
-                    <div className="flex items-center gap-2">
-                        <Input id="referralLink" value={userProfile.referralCode ? referralLink : 'Generating...'} readOnly className="font-mono text-sm" />
-                        <Button variant="outline" size="icon" onClick={handleCopyLink} disabled={!userProfile.referralCode}>
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                        {typeof navigator !== 'undefined' && !!navigator.share && (
-                            <Button variant="outline" size="icon" onClick={handleShareLink} disabled={!userProfile.referralCode}>
-                                <Share2 className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="referralCode">Your Referral Code</Label>
-                    <div className="flex items-center gap-2">
-                        <Input id="referralCode" value={userProfile.referralCode || 'Generating...'} readOnly className="font-mono text-sm text-center tracking-widest" />
-                         <Button variant="outline" size="icon" onClick={() => handleCopyCode(userProfile?.referralCode)} disabled={!userProfile.referralCode}>
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Business Details</CardTitle>
@@ -433,22 +356,6 @@ export default function SettingsPage() {
   const businessDocRef = useMemoFirebase(() => userProfile ? doc(firestore, 'businessInstances', userProfile.businessId) : null, [userProfile, firestore]);
   const { data: currentBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
   
-  React.useEffect(() => {
-    if (user && userProfile && !isProfileLoading && !userProfile.referralCode && firestore) {
-        const generateAndSaveCode = async () => {
-            const newCode = user.uid.substring(0, 8).toUpperCase();
-            const userRef = doc(firestore, 'users', user.uid);
-            try {
-                await updateDoc(userRef, { referralCode: newCode });
-                // Do not toast here, it's a background process
-            } catch (e) {
-                console.error("Could not save referral code:", e);
-            }
-        };
-        generateAndSaveCode();
-    }
-  }, [user, userProfile, isProfileLoading, firestore]);
-
   const isLoading = isUserLoading || isProfileLoading || isBusinessLoading;
 
   if (isLoading || !currentBusiness || !userProfile) {

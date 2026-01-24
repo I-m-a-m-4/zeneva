@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
@@ -15,6 +14,7 @@ interface POSContextType {
   customers: Customer[] | null;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
+  isProfileReady: boolean; // Expose readiness status
 
   // POS State
   cart: CartItem[];
@@ -47,16 +47,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
-
   // --- Centralized Data Fetching ---
   const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-  // STALE DATA GUARD: Ensure the profile belongs to the current user before proceeding.
-  const isProfileReady = user && currentUserProfile && !isProfileLoading && user.uid === currentUserProfile.id;
+  // STALE DATA GUARD: This is the critical fix.
+  // It ensures we only proceed when the auth state and the loaded profile match.
+  const isProfileReady = !!(user && currentUserProfile && !isProfileLoading && user.uid === currentUserProfile.id);
   
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
+  // All subsequent queries are now gated by businessId, which is only available when isProfileReady is true.
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
   const { data: business, isLoading: isLoadingBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
@@ -69,7 +70,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
   
-  const isLoading = isAuthLoading || isProfileLoading || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers;
+  // The overall loading state now correctly depends on whether a businessId is even present.
+  const isLoading = isAuthLoading || isProfileLoading || (!!user && !isProfileReady) || (!!businessId && (isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers));
   
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -149,6 +151,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     customers,
     currentUserProfile: isProfileReady ? currentUserProfile : null,
     isLoading,
+    isProfileReady,
     cart,
     addToCart,
     removeFromCart,

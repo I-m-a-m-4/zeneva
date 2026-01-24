@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -22,7 +23,6 @@ const signupSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   phone: z.string().optional(),
-  referralCode: z.string().optional(),
 });
 
 type SignupFormValues = z.infer<typeof signupSchema>;
@@ -38,14 +38,10 @@ export default function SignupPage() {
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', name: '', phone: '', referralCode: '' },
+    defaultValues: { email: '', password: '', name: '', phone: '' },
   });
 
   useEffect(() => {
-    const refCode = searchParams.get('ref');
-    if (refCode) {
-        form.setValue('referralCode', refCode);
-    }
     const emailFromQuery = searchParams.get('email');
     if (emailFromQuery) {
         form.setValue('email', emailFromQuery);
@@ -63,14 +59,14 @@ export default function SignupPage() {
       await updateProfile(userCredential.user, { displayName: data.name });
 
       // Step 3: Create all associated Firestore documents (user profile, business, etc.)
-      await createUserProfileDocument(firestore, userCredential.user, data.name, data.referralCode, data.phone);
+      await createUserProfileDocument(firestore, userCredential.user, data.name, data.phone);
 
       // On success, do nothing. The auth layout will detect the state
       // change and handle the redirection automatically.
     } catch (error: any) {
        let description = "Please try again.";
       if (error.code === 'auth/email-already-in-use') {
-          description = "This email is already in use. Please log in instead.";
+          description = "This email is already registered. Please log in instead.";
       }
       toast({ variant: "destructive", title: "Signup Failed", description });
       setIsLoading(false); // Only set loading to false on failure
@@ -159,19 +155,6 @@ export default function SignupPage() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="referralCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label>Referral Code (Optional)</Label>
-                    <FormControl>
-                      <Input placeholder="Enter referral code" {...field} disabled={!!searchParams.get('ref')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

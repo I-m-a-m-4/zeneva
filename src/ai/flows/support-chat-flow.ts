@@ -52,9 +52,8 @@ const prompt = ai.definePrompt({
 *   **Receipts:** A page that lists all past transactions. Admins and Managers can "Void" a sale, which deletes the receipt and restores the inventory stock.
 *   **Customers:** A basic CRM to manage customer information (name, email, phone).
 *   **User Management (Admin only):** Admins can invite new users (Managers, Vendor Operators) to their business via email.
-*   **Settings:** Users can manage business details, payment info, and their referral code.
-*   **Referral Program:** Every user gets a unique referral code/link. When a new user signs up with the code, the referrer gets a 10-day trial extension, and this is confirmed via a notification.
-*   **Support:** A page with FAQs and an AI chat assistant (you).
+*   **Settings:** Users can manage business details, payment info, and product categories.
+*   **Support:** A page with FAQs and a support chat to talk with the team.
 
 ---
 Now, answer the following user question based *only* on the information above.

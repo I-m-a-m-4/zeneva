@@ -26,8 +26,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import CommandMenu from '@/components/layout/command-menu';
@@ -79,7 +79,6 @@ function AuthenticatedLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -89,19 +88,34 @@ function AuthenticatedLayout({
   const {
     isLoading,
     currentUserProfile: userProfile,
-    business: businessInstance
+    business: businessInstance,
+    isProfileReady
   } = usePOS();
-
 
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
   
   const [hasLoggedOut, setHasLoggedOut] = React.useState(false);
+  
+  const userNotificationsQuery = useMemoFirebase(
+      () => (isProfileReady && userProfile ? query(collection(firestore, `users/${userProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
+      [isProfileReady, firestore, userProfile?.id]
+  );
+  const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
+  
+  // Admin notifications can be loaded anytime a user is logged in.
+  const adminNotificationsQuery = useMemoFirebase(
+      () => (userProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
+      [userProfile, firestore]
+  );
+  const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
+  
   React.useEffect(() => {
     if (hasLoggedOut) return;
-
-    if (!isLoading && user && !userProfile) {
-      setHasLoggedOut(true);
+    
+    // When finished loading auth state, but profile is not ready (i.e. not found in DB)
+    if (!isLoading && !isProfileReady && userProfile === null) {
+      setHasLoggedOut(true); 
       toast({
         variant: 'destructive',
         title: 'Account Profile Not Found',
@@ -113,23 +127,9 @@ function AuthenticatedLayout({
         router.push('/signup');
       });
     }
-  }, [isLoading, user, userProfile, router, toast, hasLoggedOut]);
-  
-  // STALE DATA GUARD: Ensure the user notifications query only runs when the profile is fully ready and matches the current user.
-  const isProfileReadyForNotifications = userProfile && user && userProfile.id === user.uid;
-  const userNotificationsQuery = useMemoFirebase(
-      () => (isProfileReadyForNotifications ? query(collection(firestore, `users/${userProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
-      [isProfileReadyForNotifications, firestore, userProfile?.id]
-  );
-  const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
-  
-  // Admin notifications can be loaded anytime a user is logged in.
-  const adminNotificationsQuery = useMemoFirebase(
-      () => (user ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
-      [user, firestore]
-  );
-  const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
-  
+  }, [isLoading, isProfileReady, userProfile, router, toast, hasLoggedOut]);
+
+
   const allNotifications = React.useMemo(() => {
     const combined = [
         ...(userNotifications || []).map(n => ({...n, isGlobal: false})),
@@ -138,7 +138,7 @@ function AuthenticatedLayout({
     combined.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-        return dateB.getTime() - a.getTime();
+        return dateB.getTime() - dateA.getTime();
     });
     return combined.slice(0, 20);
   }, [userNotifications, adminNotifications]);
@@ -160,23 +160,23 @@ function AuthenticatedLayout({
   }, []);
 
   const handleMarkAsRead = React.useCallback(async () => {
-    if (!user || unreadCount === 0 || !userNotifications || !firestore) return;
+    if (!userProfile || unreadCount === 0 || !userNotifications || !firestore) return;
     const batch = writeBatch(firestore);
     userNotifications.forEach(notif => {
       if (!notif.read) {
-        const notifRef = doc(firestore, `users/${user.uid}/notifications`, notif.id);
+        const notifRef = doc(firestore, `users/${userProfile.id}/notifications`, notif.id);
         batch.update(notifRef, { read: true });
       }
     });
     await batch.commit().catch(console.error);
-  }, [user, unreadCount, userNotifications, firestore]);
+  }, [userProfile, unreadCount, userNotifications, firestore]);
 
   if (isLoading) {
     return <FullScreenLoader text="Loading your workspace..." />;
   }
-
+  
   if (!userProfile) {
-    return <FullScreenLoader text="Verifying user profile..." />;
+      return <FullScreenLoader text="Verifying user profile..." />;
   }
 
   if (userProfile?.status === 'inactive') {
@@ -314,11 +314,11 @@ function AuthenticatedLayout({
                             <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                                 <div className="flex items-center gap-2 w-full">
                                     <Avatar className="h-8 w-8">
-                                        {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ''} />}
-                                        <AvatarFallback>{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                                        {(userProfile as any)?.photoURL && <AvatarImage src={(userProfile as any).photoURL} alt={userProfile?.name || ''} />}
+                                        <AvatarFallback>{(userProfile?.name || userProfile?.email || 'U').charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
-                                        <span className="truncate text-sm font-medium" title={user?.displayName || user?.email || ''}>{user?.displayName || user?.email}</span>
+                                        <span className="truncate text-sm font-medium" title={userProfile?.name || userProfile?.email || ''}>{userProfile?.name || userProfile?.email}</span>
                                          {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                                     </div>
                                 </div>
@@ -404,8 +404,8 @@ function AuthenticatedLayout({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                         <Avatar className="h-8 w-8">
-                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || ""} />}
-                              <AvatarFallback className="text-foreground">{(user?.displayName || user?.email || 'U').charAt(0)}</AvatarFallback>
+                              {(userProfile as any)?.photoURL && <AvatarImage src={(userProfile as any).photoURL} alt={userProfile?.name || ""} />}
+                              <AvatarFallback className="text-foreground">{(userProfile?.name || userProfile?.email || 'U').charAt(0)}</AvatarFallback>
                         </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
@@ -413,11 +413,11 @@ function AuthenticatedLayout({
                         <DropdownMenuLabel className="font-normal">
                           <div className="flex flex-col space-y-2">
                               <div className="flex justify-between items-center">
-                                <p className="text-sm font-medium leading-none truncate">{user?.displayName || "Zeneva User"}</p>
+                                <p className="text-sm font-medium leading-none truncate">{userProfile?.name || "Zeneva User"}</p>
                                 {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                               </div>
                               <p className="text-xs leading-none text-muted-foreground">
-                              {user?.email}
+                              {userProfile?.email}
                               </p>
                           </div>
                         </DropdownMenuLabel>
