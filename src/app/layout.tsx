@@ -1,11 +1,12 @@
 
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
+import { Suspense } from 'react';
 
 const siteUrl = 'https://zeneva.vercel.app';
 
@@ -54,7 +55,9 @@ export default function RootLayout({
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
           <Loader />
-          <NavigationEvents />
+          <Suspense fallback={null}>
+            <NavigationEvents />
+          </Suspense>
           {children}
         </FirebaseClientProvider>
         <Toaster />
