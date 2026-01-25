@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,7 +14,7 @@ import Papa from 'papaparse';
 import { Product } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
-import { useBusiness } from '@/context/pos-context';
+import { useBusiness, usePOS } from '@/context/pos-context';
 import Link from 'next/link';
 
 interface ImportDialogProps {
@@ -51,6 +52,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
   const { toast } = useToast();
   const firestore = useFirestore();
   const business = useBusiness();
+  const { triggerConfetti } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedProduct[]>([]);
@@ -178,6 +180,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
       });
 
       await batch.commit();
+      triggerConfetti();
       
       try {
         const businessDocRef = doc(firestore, 'businessInstances', businessId);

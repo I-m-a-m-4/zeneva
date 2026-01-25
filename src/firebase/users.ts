@@ -1,3 +1,4 @@
+
 'use client';
 import {
   doc,
@@ -51,6 +52,7 @@ export const createUserProfileDocument = async (
       
       let businessId: string;
       let userRole: UserRole;
+      let surveyCompleted = true; // Default for invited users
 
       if (invitationDoc) {
         const invitationData = invitationDoc.data();
@@ -61,6 +63,7 @@ export const createUserProfileDocument = async (
         const businessDocRef = doc(collection(firestore, 'businessInstances'));
         businessId = businessDocRef.id;
         userRole = 'admin';
+        surveyCompleted = false; // New businesses must go through onboarding
         const trialEndDate = add(new Date(), { days: 30 });
         const newBusiness: Omit<BusinessInstance, 'id'> = {
           name: `${displayName}'s Business`,
@@ -81,7 +84,7 @@ export const createUserProfileDocument = async (
         createdAt: serverTimestamp(),
         businessId: businessId,
         role: userRole,
-        surveyCompleted: true,
+        surveyCompleted: surveyCompleted,
         status: 'active',
       };
       transaction.set(userDocRef, userProfile);

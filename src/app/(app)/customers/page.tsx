@@ -18,31 +18,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, Edit, Trash2, Upload } from "lucide-react";
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, deleteDoc } from 'firebase/firestore';
-import type { Customer, UserProfile } from '@/types';
+import { PlusCircle, User, Upload, ChevronRight } from "lucide-react";
+import { useFirestore } from '@/firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
+import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
-import { useBusiness, CURRENCY_SYMBOLS } from '@/context/pos-context';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
 import RefreshButton from '@/components/shared/refresh-button';
-
-// Hook to get current user's profile
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-    return { profile: userProfile, isLoading };
-}
+import { useRouter } from 'next/navigation';
 
 function CustomerRowSkeleton() {
     return (
@@ -74,42 +62,33 @@ function CustomerRowSkeleton() {
 
 
 export default function CustomersPage() {
-  const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+  const { customers, receipts, isLoading, business, currentUserProfile: currentUser } = usePOS();
   const firestore = useFirestore();
-  const business = useBusiness();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
-  const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
-  const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
 
-  const customersQuery = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore) return null;
-    return query(collection(firestore, "customers"), where("businessId", "==", currentUser.businessId));
-  }, [currentUser?.businessId, firestore]);
-
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  const customerTotals = React.useMemo(() => {
+    const totals: Record<string, { total: number }> = {};
+    if (receipts) {
+      for (const receipt of receipts) {
+        if (receipt.customer?.id) {
+          if (!totals[receipt.customer.id]) {
+            totals[receipt.customer.id] = { total: 0 };
+          }
+          totals[receipt.customer.id].total += receipt.total;
+        }
+      }
+    }
+    return totals;
+  }, [receipts]);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
     return CURRENCY_SYMBOLS[code] || '₦';
   }, [business]);
-
-  const isLoading = isProfileLoading || isLoadingCustomers;
-
-  const handleDeleteCustomer = async () => {
-    if (!customerToDelete || !firestore) return;
-    const customerRef = doc(firestore, 'customers', customerToDelete.id);
-    try {
-        await deleteDoc(customerRef);
-        toast({ title: 'Customer Deleted', description: `${customerToDelete.name} has been removed.`, variant: 'success' });
-    } catch (e) {
-        toast({ title: 'Error', description: 'Could not delete customer.', variant: 'destructive' });
-    } finally {
-        setCustomerToDelete(null);
-    }
-  };
 
   return (
     <>
@@ -169,37 +148,25 @@ export default function CustomersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.map((customer) => (
-              <TableRow key={customer.id}>
+            {customers.map((customer) => {
+              const totalSpent = customerTotals[customer.id]?.total ?? 0;
+              return (
+              <TableRow key={customer.id} className="cursor-pointer" onClick={() => router.push(`/customers/${customer.id}`)}>
                 <TableCell>
                   <div className="font-medium">{customer.name}</div>
                   <div className="text-sm text-muted-foreground">{customer.email}</div>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
                 <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
-                <TableCell className="text-right">{currencySymbol}0.00</TableCell>
+                <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                 <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setCustomerToEdit(customer); }}>
-                            <Edit className="mr-2 h-4 w-4"/> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setCustomerToDelete(customer); }}>
-                            <Trash2 className="mr-2 h-4 w-4"/> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button variant="ghost" size="icon">
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
                 </TableCell>
               </TableRow>
-            ))}
+              )
+            })}
           </TableBody>
         </Table>
         ) : (
@@ -235,23 +202,6 @@ export default function CustomersPage() {
             onSuccess={() => setIsImportOpen(false)}
         />
      )}
-    <EditCustomerDialog
-        isOpen={!!customerToEdit}
-        onOpenChange={(open) => !open && setCustomerToEdit(null)}
-        customer={customerToEdit}
-    />
-    <AlertDialog open={!!customerToDelete} onOpenChange={(open) => !open && setCustomerToDelete(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>This will permanently delete the customer <strong>{customerToDelete?.name}</strong>. This action cannot be undone.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteCustomer} className="bg-destructive hover:bg-destructive/90">Delete Customer</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
     </>
   );
 }

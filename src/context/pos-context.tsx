@@ -2,10 +2,10 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
-import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile } from '@/types';
+import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy } from 'firebase/firestore';
 
 interface POSContextType {
   // Business Data
@@ -13,7 +13,9 @@ interface POSContextType {
   products: Product[] | null;
   receipts: Receipt[] | null;
   customers: Customer[] | null;
+  onlineOrders: OnlineOrder[] | null;
   currentUserProfile: UserProfile | null;
+  users: UserProfile[] | null;
   isLoading: boolean;
   user: any; // Make user available in context
 
@@ -38,6 +40,11 @@ interface POSContextType {
   currencySymbol: string;
   currencyCode: string;
   triggerRefresh: () => void;
+
+  // UI State
+  isConfettiActive: boolean;
+  triggerConfetti: () => void;
+  setIsConfettiActive: (active: boolean) => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -47,6 +54,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // --- UI State ---
+  const [isConfettiActive, setIsConfettiActive] = useState(false);
 
   // --- Centralized Data Fetching ---
   const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore, refreshKey]);
@@ -62,17 +72,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
 
-  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
+  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc")) : null), [businessId, firestore, refreshKey]);
   const { data: receipts, isLoading: isLoadingReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+
+  const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
+  const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
   
-  // Composite loading state: true if auth is loading OR if a user is logged in but their profile is still loading.
-  const isLoading = isUserLoading || (!!user && isProfileLoading);
+  const usersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "users"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
+  const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
+
+  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingUsers;
   
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
+  }, []);
+
+  const triggerConfetti = useCallback(() => {
+    setIsConfettiActive(true);
   }, []);
 
   // --- POS State Management ---
@@ -93,19 +112,30 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const addToCart = (product: Product) => {
-    const existingItem = cart.find((item) => item.product.id === product.id);
+    const existingItem = cart.find(item => item.product.id === product.id);
+
     if (existingItem) {
-        if (existingItem.quantity >= (product.stock || 0)) {
-            toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'destructive' });
-            return;
-        }
-        setCart(prev => prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+      if (existingItem.quantity >= (product.stock || 0)) {
+        toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
+        return;
+      }
+      setCart(prev =>
+        prev.map(item =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
     } else {
-        if ((product.stock || 0) <= 0) {
-            toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
-            return;
-        }
-        setCart(prev => [...prev, { product, quantity: 1 }]);
+      if ((product.stock || 0) <= 0) {
+        toast({
+          title: 'Out of stock',
+          description: `${product.name} is out of stock.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setCart(prev => [...prev, { product, quantity: 1 }]);
     }
   };
 
@@ -147,7 +177,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     products,
     receipts,
     customers,
+    onlineOrders,
     currentUserProfile,
+    users,
     isLoading,
     user,
     cart,
@@ -170,7 +202,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     currencySymbol,
     currencyCode,
     triggerRefresh,
-  }), [business, products, receipts, customers, currentUserProfile, isLoading, user, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh]);
+    isConfettiActive,
+    triggerConfetti,
+    setIsConfettiActive,
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, users, isLoading, user, cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh, isConfettiActive, triggerConfetti]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 };
@@ -196,4 +231,3 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
     'NGN': '₦',
     'USD': '$',
 };
-    

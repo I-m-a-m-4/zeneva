@@ -23,7 +23,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 22 90% 55%;
     --radius: 0.5rem;
 
     --chart-1: 220 80% 60%;
@@ -61,7 +61,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 22 90% 55%;
 
     --chart-1: 220 80% 70%;
     --chart-2: 160 70% 60%;
@@ -80,36 +80,14 @@
   }
 
   /* Custom scrollbar to match premium feel */
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background-color: #e5e7eb; border-radius: 20px; }
+  ::-webkit-scrollbar-thumb { background-color: hsl(var(--primary) / 0.5); border-radius: 20px; border: 2px solid hsl(var(--background)); }
+  ::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--primary)); }
   
   ::selection {
     background: hsl(var(--primary) / 0.3);
     color: hsl(var(--foreground));
-  }
-
-  .codepen-button {
-    display: block;
-    cursor: pointer;
-    color: #fff;
-    position: relative;
-    text-decoration: none;
-    font-weight: 600;
-    overflow: hidden;
-    padding: 2px;
-    isolation: isolate
-  }
-
-  .codepen-button span {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 1rem 1rem;
-    font-size: 1.1rem;
-    height: 100%
   }
 
   .pattern-bg {
@@ -132,6 +110,16 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  .grid-lines {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
   }
 }
  
@@ -227,12 +215,6 @@
   }
 }
 
-@keyframes border-shift {
-  to {
-    transform: translateX(-25%)
-  }
-}
-
 /* NProgress styles */
 #nprogress {
   pointer-events: none;
@@ -271,4 +253,35 @@ body {
 /* Ensure the portal container itself doesn't block clicks */
 [data-radix-portal] {
   pointer-events: all;
+}
+
+@keyframes confetti-blast-left {
+  from {
+    transform: translateY(0) translateX(0) rotate(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-110vh) translateX(-25vw) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-blast-right {
+  from {
+    transform: translateY(0) translateX(0) rotate(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-110vh) translateX(25vw) rotate(-720deg);
+    opacity: 0;
+  }
+}
+
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 16px;
+  opacity: 0;
+  transform-origin: center center;
 }

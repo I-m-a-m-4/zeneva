@@ -1,8 +1,7 @@
-
 'use client';
 
 import { collection, addDoc, serverTimestamp, type Firestore } from 'firebase/firestore';
-import type { UserProfile, User } from '@/types';
+import type { UserProfile } from '@/types';
 
 type AuditAction = 
     | 'product.create' | 'product.update' | 'product.delete'
@@ -24,7 +23,7 @@ interface AuditEvent {
 export const logAuditEvent = async (
     firestore: Firestore,
     businessId: string,
-    user: UserProfile | User,
+    user: UserProfile,
     event: AuditEvent
 ) => {
     try {

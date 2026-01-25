@@ -47,6 +47,7 @@ import {
   Ban,
   Briefcase,
   UserX,
+  ShieldCheck,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect } from 'react';
@@ -271,11 +272,19 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         acc[item.name] = (acc[item.name] || 0) + item.quantity;
         return acc;
     }, {} as Record<string, number>);
-
+    
     const topSellingProducts = Object.entries(platformTopItems).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+    const totalProductsSold = receipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
+    const businessesOnPro = activeBusinesses.filter(b => b.plan === 'pro').length;
+    const businessesOnBusiness = activeBusinesses.filter(b => b.plan === 'business').length;
+    const lifetimeBusinesses = activeBusinesses.filter(b => b.accessLevel === 'lifetime').length;
+    const inactiveUsersCount = inactiveUsers.length;
 
-    return { totalUsers, totalBusinesses, totalProducts, totalRevenue, totalReceipts, platformAOV, averageRevenuePerBusiness, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, topBusinesses, categoryData, subscriptionStatusData, planDistributionData, userRoleData, activeSubscriptions, trialingUsers, topSellingProducts };
+    return { 
+        totalUsers, totalBusinesses, totalProducts, totalRevenue, totalReceipts, platformAOV, averageRevenuePerBusiness, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, topBusinesses, categoryData, subscriptionStatusData, planDistributionData, userRoleData, activeSubscriptions, trialingUsers, topSellingProducts,
+        totalProductsSold, businessesOnPro, businessesOnBusiness, lifetimeBusinesses, inactiveUsersCount
+    };
   }, [users, businesses, products, receipts, purchases]);
 
 
@@ -395,15 +404,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     };
 
     const statCards = [
-        { title: "Total Revenue", value: `₦${analyticsData.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign },
+        { title: "Total Revenue", value: `₦${analyticsData.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign, description: "From Subscriptions" },
         { title: "Total Businesses", value: analyticsData.totalBusinesses.toLocaleString(), icon: Building },
         { title: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
         { title: "Total Products", value: analyticsData.totalProducts.toLocaleString(), icon: Package },
+        { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
+        { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
         { title: "Active Subscriptions", value: analyticsData.activeSubscriptions.toLocaleString(), icon: UserCheck, description: 'Pro + Business plans' },
         { title: "Trialing Businesses", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
-        { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
-        { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
-      ];
+        { title: "Total Products Sold", value: analyticsData.totalProductsSold.toLocaleString(), icon: ShoppingCart, description: "Across all businesses" },
+        { title: "Businesses on Pro", value: analyticsData.businessesOnPro.toLocaleString(), icon: TrendingUp },
+        { title: "Businesses on Business", value: analyticsData.businessesOnBusiness.toLocaleString(), icon: Crown },
+        { title: "Lifetime Deals", value: analyticsData.lifetimeBusinesses.toLocaleString(), icon: ShieldCheck },
+        { title: "Inactive Users", value: analyticsData.inactiveUsersCount.toLocaleString(), icon: UserX },
+    ];
     
       return (
         <div className="p-4 md:p-6 lg:p-8 space-y-6">
@@ -414,7 +428,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             </p>
           </div>
     
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {statCards.map(card => <StatCard key={card.title} {...card} />)}
           </div>
     

@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={32} height={32} />
+                <Image src="https://i.ibb.co/chgNZKyX/zeneva-logo.png" alt="Zeneva Logo" width={32} height={32} />
                 <span className="text-3xl font-bold tracking-tighter text-foreground font-display">
                     Zeneva
                 </span>

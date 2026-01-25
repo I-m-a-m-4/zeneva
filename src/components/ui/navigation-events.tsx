@@ -9,7 +9,11 @@ export function NavigationEvents() {
   const searchParams = useSearchParams()
  
   useEffect(() => {
-    NProgress.done()
+    // Only call NProgress.done() if NProgress has been started.
+    // This prevents errors if the component re-renders without a preceding NProgress.start().
+    if (NProgress.isStarted()) {
+        NProgress.done();
+    }
   }, [pathname, searchParams])
  
   return null

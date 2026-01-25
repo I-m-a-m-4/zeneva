@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import * as React from 'react';
@@ -9,36 +10,42 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { PieChart as PieChartIcon } from "lucide-react";
 import type { Product } from '@/types';
 
-const chartConfig = {
-  electronics: { label: "Electronics", color: "hsl(var(--chart-1))" },
-  apparel: { label: "Apparel", color: "hsl(var(--chart-2))" },
-  accessories: { label: "Accessories", color: "hsl(var(--chart-3))" },
-  "home-goods": { label: "Home Goods", color: "hsl(var(--chart-4))" },
-  office: { label: "Office", color: "hsl(var(--chart-5))" },
-  other: { label: "Other", color: "hsl(var(--muted))" },
-} satisfies ChartConfig;
-
 interface CategoryPieChartProps {
   products: Product[];
 }
 
 export default function CategoryPieChart({ products }: CategoryPieChartProps) {
-  const chartData = React.useMemo(() => {
-    if (!products) return [];
+    const chartDataResult = React.useMemo(() => {
+    if (!products) return { data: [], config: {} };
 
     const categoryCounts: Record<string, number> = {};
     products.forEach(product => {
-      const categoryKey = product.category?.toLowerCase() || 'other';
-      const validCategoryKey = Object.keys(chartConfig).includes(categoryKey) ? categoryKey : 'other';
-      categoryCounts[validCategoryKey] = (categoryCounts[validCategoryKey] || 0) + (product.stock || 0);
+      const categoryKey = product.category || 'Uncategorized';
+      categoryCounts[categoryKey] = (categoryCounts[categoryKey] || 0) + (product.stock || 0);
     });
-
-    return Object.entries(categoryCounts).map(([name, items]) => ({
-      name: chartConfig[name as keyof typeof chartConfig]?.label || name.charAt(0).toUpperCase() + name.slice(1),
-      items,
-      fill: chartConfig[name as keyof typeof chartConfig]?.color || "hsl(var(--muted))",
-    }));
+    
+    const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--accent))"];
+    
+    const sortedData = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .map(([name, items], index) => ({
+            name,
+            items,
+            fill: chartColors[index % chartColors.length],
+        }));
+    
+    const newConfig: ChartConfig = {};
+    sortedData.forEach(item => {
+        newConfig[item.name] = {
+            label: item.name,
+            color: item.fill,
+        }
+    });
+    
+    return { data: sortedData, config: newConfig };
   }, [products]);
+
+  const { data: chartData, config: chartConfig } = chartDataResult;
 
   const totalItems = React.useMemo(() => {
     return products.reduce((acc, curr) => acc + (curr.stock || 0), 0);

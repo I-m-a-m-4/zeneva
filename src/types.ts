@@ -13,6 +13,7 @@ export interface Product {
     imageHint?: string;
     description?: string;
     lowStockThreshold?: number;
+    createdAt?: any;
 }
 export type InventoryItem = Product;
 export interface CartItem {
@@ -73,6 +74,26 @@ export interface Receipt {
     createdBy?: string;
 }
 
+export interface OnlineOrder {
+    id: string;
+    businessId: string;
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+    customerAddress: string;
+    items: {
+        productId: string;
+        name: string;
+        quantity: number;
+        price: number;
+    }[];
+    total: number;
+    status: 'pending' | 'paid' | 'shipped' | 'cancelled';
+    paymentMethod?: 'Paystack' | 'Bank Transfer';
+    paymentReference?: string;
+    createdAt: any;
+}
+
 export interface AISuggestion {
     title: string;
     description: string;
@@ -102,9 +123,11 @@ export interface BusinessInstance {
         timezone?: string;
         defaultTaxRate?: number;
         primaryColor?: string;
+        logoUrl?: string;
         paymentBankAccountId?: string;
         paymentBankName?: string;
         paymentInstructions?: string;
+        paystackSubaccount?: string;
         vendorPolicyEnabled?: boolean;
         vendorPolicyText?: string;
         loyaltyProgramEnabled?: boolean;
@@ -113,6 +136,31 @@ export interface BusinessInstance {
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
         aiTroubleshootSuggestions?: AISuggestions;
+        publicStore?: {
+            enabled?: boolean;
+            headline?: string;
+            slug?: string;
+            bannerImageUrl?: string;
+            desktopColumns?: 3 | 4 | 5;
+            footerText?: string;
+            description?: string;
+            socialTwitter?: string;
+            socialInstagram?: string;
+            socialFacebook?: string;
+            socialWhatsapp?: string;
+            hideOutOfStock?: boolean;
+            officeLocations?: string;
+            contactPhone?: string;
+            contactEmail?: string;
+            businessHours?: string;
+            googleMapsLink?: string;
+        },
+        industry?: string;
+        language?: string;
+        inventoryStartDate?: any;
+        fiscalYearStart?: string;
+        state?: string;
+        country?: string;
     };
 }
 
@@ -208,4 +256,3 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
-    

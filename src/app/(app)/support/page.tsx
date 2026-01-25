@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -6,7 +7,7 @@ import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { Bot, HelpCircle, Loader2, Send } from 'lucide-react';
+import { Bot, HelpCircle, Loader2, Send, MessageSquare } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, setDoc, orderBy } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
@@ -16,18 +17,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import Link from 'next/link';
+import { zenevaSupportChat, type ZenevaSupportChatInput } from '@/ai/flows/support-chat-flow';
+import AIChat from '@/components/support/ai-chat';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
   {
     question: "How do I add a new product to my inventory?",
     answer: (
         <p>Navigate to the 'Inventory' page from the sidebar menu. In the top-right corner, click the 'Add Product' button. This will take you to a form where you can fill in the product's details such as Name, Description, Price, Stock quantity, SKU (Stock Keeping Unit), and assign it to a Category. Once you're done, click 'Save Product'.</p>
-    )
-  },
-  {
-    question: "Can I import products in bulk?",
-    answer: (
-        <p>Yes. On the 'Inventory' page, click the 'Import' button located in the action bar at the top. This will open a dialog where you can upload a CSV file containing all your product data. This is the most efficient way to add a large number of products at once.</p>
     )
   },
   {
@@ -73,13 +71,7 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
       </>
     )
   },
-  {
-    question: "How do I manage staff roles and permissions?",
-    answer: (
-        <p>As an 'admin', you can invite new users from the 'Users' page. You can assign them roles like 'Manager' (who can manage products and view most reports) or 'Vendor Operator' (who can primarily use the POS). Permissions are pre-set for each role to ensure security.</p>
-    )
-  },
-  {
+    {
     question: "How do I see my sales reports?",
     answer: (
         <p>If you are on a Pro or Business plan, you can access the 'Reports' page. This dashboard provides detailed analytics on your sales revenue, top-selling products, and top customers. You can filter all reports by a specific date range to analyze performance over time.</p>
@@ -88,10 +80,79 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
   {
     question: "How can I upgrade or manage my subscription?",
     answer: (
-        <p>Navigate to the 'Billing' page. Here, you can view your current plan, see your payment history, and choose to upgrade to a higher tier to unlock more features like advanced reporting and AI troubleshooting.</p>
+        <p>Navigate to the 'Billing' page from the main menu. Here, you can view your current plan, see your payment history, and choose to upgrade to a higher tier to unlock more features like advanced reporting and a public storefront.</p>
+    )
+  },
+    {
+    question: "What is the AI Troubleshoot feature?",
+    answer: (
+      <p>You can find this feature in the 'Inventory' section under the 'Troubleshoot' tab. Zen AI analyzes all your product data for issues like missing prices, short descriptions, or missing categories. It provides a prioritized list of actionable suggestions to help you improve your data quality and sell more effectively. This is a Pro and Business plan feature.</p>
+    )
+  },
+  {
+    question: "How do I customize my public storefront?",
+    answer: (
+      <p>If you are on a Pro or Business plan, you can access the 'Storefront' page. This is your mission control for your online store. You can enable or disable the store, set a custom URL (slug), change the theme color, upload a banner image, and add social media links. It provides a live preview so you can see your changes as you make them.</p>
+    )
+  },
+  {
+    question: "How do I manage staff roles and permissions?",
+    answer: (
+        <p>As an 'admin', you can invite new users from the 'Users' page. You can assign them roles like 'Manager' (who can manage products and view most reports) or 'Vendor Operator' (who can primarily use the POS). Permissions are pre-set for each role to ensure security.</p>
     )
   },
 ];
+
+type Message = {
+    sender: 'user' | 'ai';
+    text: string;
+};
+
+function ZenAIChatBot() {
+    const [messages, setMessages] = React.useState<Message[]>([]);
+    const [input, setInput] = React.useState('');
+    const [isLoading, setIsLoading] = React.useState(false);
+    const { toast } = useToast();
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim()) return;
+
+        const userMessage: Message = { sender: 'user', text: input };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+
+        try {
+            const response = await zenevaSupportChat({ query: input });
+            const aiMessage: Message = { sender: 'ai', text: response.answer };
+            setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+            console.error("AI chat error:", error);
+            toast({
+                variant: 'destructive',
+                title: 'AI Error',
+                description: 'Could not get a response from the AI. Please try again.'
+            });
+            // Remove the user's message if the AI fails
+            setMessages(prev => prev.filter(m => m !== userMessage));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    return (
+        <AIChat
+            messages={messages}
+            input={input}
+            onInputChange={setInput}
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+            className="h-[60vh]"
+        />
+    )
+}
+
 
 function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const firestore = useFirestore();
@@ -232,7 +293,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                  <div className="space-y-4">
                     {isLoadingMessages && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
                     {messages?.map(msg => (
-                        <div key={msg.id} className={`flex items-start gap-3 ${msg.senderId === userProfile.id ? 'justify-end' : ''}`}>
+                        <div key={msg.id} className={`flex items-start gap-3 ${msg.senderId === userProfile.id ? 'justify-end' : 'justify-start'}`}>
                              {msg.senderId !== userProfile.id && (
                                 <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                                     <AvatarFallback><Bot /></AvatarFallback>
@@ -276,39 +337,64 @@ export default function SupportPage() {
         <div className="space-y-8">
             <PageTitle title="Help & Support" subtitle="Find answers to your questions and get assistance." />
             
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><HelpCircle />Frequently Asked Questions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Accordion type="multiple" className="w-full">
-                        {faqItems.map((item, index) => (
-                            <AccordionItem key={index} value={`item-${index}`} id={item.id}>
-                                <AccordionTrigger>{item.question}</AccordionTrigger>
-                                <AccordionContent className="prose prose-sm dark:prose-invert max-w-none">
-                                    {item.answer}
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                </CardContent>
-            </Card>
+            <Accordion type="multiple" defaultValue={['faq']} className="w-full space-y-6">
+                <Card>
+                    <AccordionItem value="ai-chat" className="border-b-0">
+                        <AccordionTrigger className="p-6 text-lg hover:no-underline">
+                             <div className="flex items-center gap-3">
+                                <Bot className="h-6 w-6 text-primary" />
+                                <span>Chat with Zen AI</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-6 pt-0">
+                            <ZenAIChatBot />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+                
+                <Card>
+                     <AccordionItem value="human-support" className="border-b-0">
+                        <AccordionTrigger className="p-6 text-lg hover:no-underline">
+                             <div className="flex items-center gap-3">
+                                <MessageSquare className="h-6 w-6 text-primary" />
+                                <span>Contact Human Support</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-6 pt-0 h-[60vh]">
+                            {isLoading ? (
+                                <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                            ) : userProfile ? (
+                                <UserSupportChat userProfile={userProfile} />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
+                            )}
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
 
-            <Card className="flex flex-col h-[70vh]">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Bot />Support Chat</CardTitle>
-                    <CardDescription>Talk directly with our support team.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-hidden">
-                        {isLoading ? (
-                        <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    ) : userProfile ? (
-                        <UserSupportChat userProfile={userProfile} />
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
-                    )}
-                </CardContent>
-            </Card>
+                <Card>
+                    <AccordionItem value="faq" className="border-b-0">
+                        <AccordionTrigger className="p-6 text-lg hover:no-underline">
+                            <div className="flex items-center gap-3">
+                                <HelpCircle className="h-6 w-6 text-primary" />
+                                <span>Frequently Asked Questions</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-6 pt-0">
+                             <Accordion type="single" collapsible className="w-full">
+                                {faqItems.map((item, index) => (
+                                    <AccordionItem key={index} value={`faq-${index}`} id={item.id}>
+                                        <AccordionTrigger>{item.question}</AccordionTrigger>
+                                        <AccordionContent className="prose prose-sm dark:prose-invert max-w-none">
+                                            {item.answer}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+            </Accordion>
         </div>
     );
 }

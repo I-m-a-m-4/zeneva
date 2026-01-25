@@ -4,7 +4,7 @@ import *as React from 'react';
 import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
-import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download } from 'lucide-react';
+import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download, Globe } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { TopSellingItem } from '@/types';
 import Link from 'next/link';
@@ -61,7 +61,7 @@ export default function DashboardPage() {
   
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business } = usePOS();
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders } = usePOS();
   
   const isLoading = isPosLoading;
 
@@ -69,6 +69,7 @@ export default function DashboardPage() {
     const inventoryItems = products || [];
     const safeReceipts = receipts || [];
     const safeCustomers = customers || [];
+    const safeOnlineOrders = onlineOrders || [];
 
     const totalStock = inventoryItems.reduce((sum, item) => sum + (item.stock || 0), 0);
     const uniqueSkus = inventoryItems.length;
@@ -77,6 +78,9 @@ export default function DashboardPage() {
     const totalSalesValue = safeReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
     const totalReceiptsCount = safeReceipts.length;
 
+    const totalOnlineSalesValue = safeOnlineOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalOnlineOrdersCount = safeOnlineOrders.length;
+    
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentOrdersLast7Days = safeReceipts.filter(r => new Date(r.createdAt.toDate()) > sevenDaysAgo).length;
@@ -111,11 +115,13 @@ export default function DashboardPage() {
       lowStockItems,
       totalSalesValue,
       totalReceipts: totalReceiptsCount,
+      totalOnlineSalesValue,
+      totalOnlineOrdersCount,
       recentOrdersLast7Days,
       topSellingItems,
       topLoyaltyCustomers,
     };
-  }, [products, receipts, customers]);
+  }, [products, receipts, customers, onlineOrders]);
   
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;
@@ -142,7 +148,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers } = dashboardData;
+  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers } = dashboardData;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
@@ -160,10 +166,16 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
-          title="Total Sales"
+          title="Total Sales (POS)"
           value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
           icon={DollarSign}
           description={`${totalReceipts} transactions`}
+        />
+        <SummaryCard
+          title="Online Sales"
+          value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+          icon={Globe}
+          description={`${totalOnlineOrdersCount} online orders`}
         />
         <SummaryCard
           title="Total Inventory Units"
@@ -176,12 +188,6 @@ export default function DashboardPage() {
           value={lowStockItems}
           icon={AlertCircle}
           description={lowStockItems > 0 ? `${lowStockItems} items needing attention` : "All stock levels healthy"}
-        />
-        <SummaryCard
-          title="Recent Orders"
-          value={recentOrdersLast7Days}
-          icon={ShoppingCart}
-          description="In the last 7 days"
         />
       </div>
 
@@ -332,3 +338,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

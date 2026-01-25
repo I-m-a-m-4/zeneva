@@ -1,4 +1,3 @@
-
 'use client';
 
 import *as React from 'react';
@@ -19,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserX, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserX, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -27,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import CommandMenu from '@/components/layout/command-menu';
@@ -40,11 +39,15 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
 import { useToast } from '@/hooks/use-toast';
+import Confetti from '@/components/shared/confetti';
+import { AppConfig } from '@/lib/config';
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
     { href: '/inventory', icon: Package, label: 'Inventory', roles: ['admin', 'manager', 'vendor_operator'] },
     { href: '/sales/pos/select-products', icon: ShoppingCart, label: 'POS', roles: ['admin', 'manager', 'vendor_operator'] },
+    { href: '/storefront', icon: Paintbrush, label: 'Storefront', roles: ['admin'] },
+    { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
     { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager'] },
     { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
     { href: '/customers', icon: UsersIcon, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -89,13 +92,17 @@ function AuthenticatedLayout({
     currentUserProfile,
     user,
     business: businessInstance,
+    isConfettiActive,
+    triggerConfetti,
+    setIsConfettiActive,
   } = usePOS();
 
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+
+  // All hooks must be called before any conditional returns.
   const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
-  
-  // --- Start of Unconditional Hooks ---
-  // All hooks must be called before any conditional returns.
+
   const userNotificationsQuery = useMemoFirebase(
       () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
       [firestore, currentUserProfile?.id]
@@ -107,8 +114,9 @@ function AuthenticatedLayout({
       [currentUserProfile, firestore]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
-
+  
   const allNotifications = React.useMemo(() => {
+    if (isLoadingUserNotifications || isLoadingAdminNotifications) return [];
     const combined = [
         ...(userNotifications || []).map(n => ({...n, isGlobal: false})),
         ...(adminNotifications || []).map(n => ({...n, read: true, isGlobal: true }))
@@ -119,22 +127,12 @@ function AuthenticatedLayout({
         return dateB.getTime() - dateA.getTime();
     });
     return combined.slice(0, 20);
-  }, [userNotifications, adminNotifications]);
+  }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
   const unreadCount = React.useMemo(() => {
-      return (userNotifications || []).filter(n => !n.read).length;
+      if (!userNotifications) return 0;
+      return userNotifications.filter(n => !n.read).length;
   }, [userNotifications]);
-
-  React.useEffect(() => {
-      const down = (e: KeyboardEvent) => {
-          if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              setOpenCommandMenu((open) => !open);
-          }
-      };
-      document.addEventListener("keydown", down);
-      return () => document.removeEventListener("keydown", down);
-  }, []);
 
   const handleMarkAsRead = React.useCallback(async () => {
     if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
@@ -147,24 +145,74 @@ function AuthenticatedLayout({
     });
     await batch.commit().catch(console.error);
   }, [currentUserProfile, unreadCount, userNotifications, firestore]);
-  // --- End of Unconditional Hooks ---
-
-
-  // Show a loader while the initial auth state and user profile are being fetched.
-  if (isLoading) {
-    return <FullScreenLoader text="Finalizing session..." />;
-  }
   
-  // If loading is done and there's still no user, they are logged out.
-  // The <AuthLayout> will handle the redirect. This component just shows a loader in the meantime.
-  if (!user || !currentUserProfile) {
-    // This case should ideally not be hit for a valid user because of the robust signup flow.
-    // If it is, it indicates a genuine problem, and logging out is the safest action.
-    signOut(getAuth());
-    return <FullScreenLoader text="Session error, logging out..." />;
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    signOut(getAuth())
+      .then(() => {
+        // No need to redirect here. The auth listener will handle it.
+      })
+      .catch((error) => {
+        toast({
+          variant: "destructive",
+          title: "Logout Failed",
+          description: "An unexpected error occurred. Please try again.",
+        });
+        setIsLoggingOut(false);
+      });
+  };
+
+  React.useEffect(() => {
+      const down = (e: KeyboardEvent) => {
+          if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              setOpenCommandMenu((open) => !open);
+          }
+      };
+      document.addEventListener("keydown", down);
+      return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  React.useEffect(() => {
+    // If loading is complete and there's no authenticated user, redirect to login.
+    if (!isLoading && !user) {
+      router.replace('/login');
+    }
+
+    if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding') {
+      router.replace('/onboarding');
+    }
+  }, [isLoading, user, currentUserProfile, pathname, router]);
+  
+  const getInitials = (name?: string) => {
+    if (!name?.trim()) return "";
+    const names = name.trim().split(' ').filter(Boolean);
+    if (names.length > 1) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    if (names.length === 1) {
+      return names[0][0].toUpperCase();
+    }
+    return "";
+  };
+  const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
+
+  if (isLoggingOut) {
+    return <FullScreenLoader text="Logging out..." />;
+  }
+
+  // Show a loader while the initial auth state and user profile are being fetched,
+  // or while waiting for the redirect to happen.
+  if (isLoading || !user || !currentUserProfile) {
+    return <FullScreenLoader text="Loading your workspace..." />;
   }
 
   // --- Start of Checks for Active/Valid Accounts ---
+
+  if (currentUserProfile.surveyCompleted === false && pathname !== '/onboarding') {
+    return <FullScreenLoader text="Finalizing your setup..." />;
+  }
+  
   if (currentUserProfile.status === 'inactive') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
@@ -179,7 +227,7 @@ function AuthenticatedLayout({
             </CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button onClick={() => signOut(getAuth()).then(() => router.push('/'))} className="w-full">
+            <Button onClick={handleLogout} className="w-full">
               <LogOut className="mr-2 h-4 w-4" />
               Logout & Return Home
             </Button>
@@ -206,7 +254,7 @@ function AuthenticatedLayout({
              <p className="text-sm text-muted-foreground">For security, you have been logged out. If you believe this is an error, please contact your business administrator.</p>
           </CardContent>
           <CardFooter>
-            <Button onClick={() => signOut(getAuth()).then(() => router.push('/'))} className="w-full">
+            <Button onClick={handleLogout} className="w-full">
               <LogOut className="mr-2 h-4 w-4" />
               Logout & Return Home
             </Button>
@@ -217,8 +265,11 @@ function AuthenticatedLayout({
   }
    // --- End of Checks ---
 
+  if (pathname === '/onboarding') {
+    return <main className="p-4 sm:p-6">{children}</main>;
+  }
+
   const userRole = currentUserProfile.role;
-  const primaryColor = businessInstance?.settings?.primaryColor;
   const plan = businessInstance?.plan || 'starter';
   const hasLifetimeAccess = businessInstance?.accessLevel === 'lifetime';
 
@@ -241,6 +292,7 @@ function AuthenticatedLayout({
   const isLinkActive = (linkHref: string, currentPathname: string) => {
     if (linkHref === '/dashboard') return currentPathname === linkHref;
     if (linkHref === '/inventory') return currentPathname.startsWith('/inventory') && !currentPathname.startsWith('/inventory/troubleshoot');
+    if (linkHref === '/storefront') return currentPathname.startsWith('/storefront');
     return currentPathname.startsWith(linkHref);
   };
   
@@ -249,12 +301,12 @@ function AuthenticatedLayout({
       <SidebarProvider defaultOpen={true}>
         <div 
           className="relative flex h-screen w-full overflow-hidden"
-          style={primaryColor ? { '--primary': primaryColor } as React.CSSProperties : {}}
         >
+          <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
           <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
               <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
                   <Link href="/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground h-10 w-full">
-                      <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={28} height={28} className="shrink-0" />
+                      <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} className="shrink-0" />
                       <span className="text-xl font-semibold group-data-[state=collapsed]:hidden font-display">Zeneva</span>
                   </Link>
               </SidebarHeader>
@@ -301,8 +353,8 @@ function AuthenticatedLayout({
                             <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                                 <div className="flex items-center gap-2 w-full">
                                     <Avatar className="h-8 w-8">
-                                        {(currentUserProfile as any)?.photoURL && <AvatarImage src={(currentUserProfile as any).photoURL} alt={currentUserProfile?.name || ''} />}
-                                        <AvatarFallback>{(currentUserProfile?.name || currentUserProfile?.email || 'U').charAt(0)}</AvatarFallback>
+                                        {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
+                                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{fallbackInitials}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
                                         <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
@@ -314,12 +366,13 @@ function AuthenticatedLayout({
                         <DropdownMenuContent side="right" align="start" className="w-56">
                             <DropdownMenuLabel>My Account</DropdownMenuLabel>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild><Link href="/achievements"><Award className="mr-2 h-4 w-4"/>Achievements</Link></DropdownMenuItem>
                             {userRole === 'admin' && (
                               <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
                             )}
                             <DropdownMenuItem>Support</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
+                            <DropdownMenuItem onClick={handleLogout}>
                               <LogOut className="mr-2 h-4 w-4" />
                               <span>Logout</span>
                             </DropdownMenuItem>
@@ -349,11 +402,11 @@ function AuthenticatedLayout({
                     </Tooltip>
                     <Tooltip>
                     <TooltipTrigger asChild>
-                        <Popover>
+                        <Popover onOpenChange={(open) => { if (open) handleMarkAsRead()}}>
                         <PopoverTrigger asChild>
                             <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
                               <Bell className="h-5 w-5" />
-                              {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span>}
+                              {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent align="end" className="w-96 p-0">
@@ -391,8 +444,8 @@ function AuthenticatedLayout({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                         <Avatar className="h-8 w-8">
-                              {(currentUserProfile as any)?.photoURL && <AvatarImage src={(currentUserProfile as any).photoURL} alt={currentUserProfile?.name || ""} />}
-                              <AvatarFallback className="text-foreground">{(currentUserProfile?.name || currentUserProfile?.email || 'U').charAt(0)}</AvatarFallback>
+                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
+                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{fallbackInitials}</AvatarFallback>
                         </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
@@ -409,6 +462,7 @@ function AuthenticatedLayout({
                           </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild><Link href="/achievements"><Award className="mr-2 h-4 w-4"/>Achievements</Link></DropdownMenuItem>
                         {userRole === 'admin' && (
                           <DropdownMenuItem asChild>
                               <Link href="/settings">
@@ -418,7 +472,7 @@ function AuthenticatedLayout({
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => signOut(getAuth()).then(() => router.push('/login'))}>
+                        <DropdownMenuItem onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
                         </DropdownMenuItem>

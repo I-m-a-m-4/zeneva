@@ -16,33 +16,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Eye, Inbox, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, runTransaction, orderBy } from 'firebase/firestore';
-import type { Receipt, UserProfile } from '@/types';
+import { useFirestore } from '@/firebase';
+import { doc, runTransaction } from 'firebase/firestore';
+import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBusiness, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
-
-// Hook to get current business ID and user profile
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile } = useDoc<UserProfile>(userDocRef);
-
-    return { profile: userProfile, isLoading: !userProfile };
-}
 
 function ReceiptRowSkeleton() {
     return (
@@ -58,28 +44,12 @@ function ReceiptRowSkeleton() {
 }
 
 export default function ReceiptsPage() {
-  const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+  const { receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol } = usePOS();
   const firestore = useFirestore();
-  const business = useBusiness();
   const { toast } = useToast();
   
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
-
-  const receiptsQuery = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore) return null;
-    // Restore the orderBy clause to sort receipts chronologically
-    return query(collection(firestore, "receipts"), where("businessId", "==", currentUser.businessId), orderBy("createdAt", "desc"));
-  }, [currentUser?.businessId, firestore]);
-
-  const { data: receipts, isLoading: isReceiptsLoading } = useCollection<Receipt>(receiptsQuery);
-
-  const isLoading = isProfileLoading || isReceiptsLoading;
-
-  const currencySymbol = React.useMemo(() => {
-    const code = business?.settings?.currency || 'NGN';
-    return CURRENCY_SYMBOLS[code] || '₦';
-  }, [business]);
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;

@@ -21,6 +21,7 @@ import Link from 'next/link';
 import ProfitLossChart from '@/components/reports/profit-loss-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
 import FeatureGate from '@/components/shared/feature-gate';
+import AbcAnalysis from '@/components/reports/abc-analysis';
 
 function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
     return (
@@ -200,17 +201,7 @@ export default function ReportsDashboard() {
                         featureName="Inventory Velocity"
                         featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
                     >
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Inventory Velocity & ABC Analysis</CardTitle>
-                                <CardDescription>Identify your fastest-moving products and optimize stock levels.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-center py-12 text-muted-foreground">
-                                <BarChart className="mx-auto h-12 w-12 opacity-50" />
-                                <h3 className="mt-4 text-lg font-medium">Coming Soon!</h3>
-                                <p className="mt-2 max-w-md mx-auto">This Business-tier feature will help you understand product performance and make smarter purchasing decisions.</p>
-                            </CardContent>
-                        </Card>
+                       <AbcAnalysis receipts={receipts || []} products={products || []} currencySymbol={currencySymbol} />
                     </FeatureGate>
                 </div>
                 )}
@@ -218,3 +209,5 @@ export default function ReportsDashboard() {
         </div>
     );
 }
+
+    

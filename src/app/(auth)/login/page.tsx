@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -10,6 +11,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
 import React, { useState } from "react";
+import { AppConfig } from "@/lib/config";
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -36,10 +38,14 @@ export default function LoginPage() {
         // any flashes of content or layout shifts.
       })
       .catch((error) => {
+         let description = "Invalid email or password. Please try again.";
+          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+              description = "Invalid email or password. Please check your credentials and try again.";
+          }
          toast({
           variant: 'destructive',
           title: 'Login Failed',
-          description: 'Invalid email or password. Please try again.',
+          description: description,
         });
         setIsLoading(false); // Only set loading to false on failure.
       });
@@ -59,7 +65,7 @@ export default function LoginPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={32} height={32} />
+                <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
                 <span className="text-3xl font-bold tracking-tighter text-foreground font-display">
                     Zeneva
                 </span>
@@ -121,7 +127,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      <div className="hidden bg-muted lg:block relative">
+       <div className="hidden bg-muted lg:block relative">
         <Image
           src="https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidXNpbmVzcyUyMG1hbmFnZW1lbnR8ZW58MHx8fHwxNzY4NTkyNzUyfDA&ixlib=rb-4.1.0&q=80&w=1080"
           alt="A modern business management software interface on a laptop."

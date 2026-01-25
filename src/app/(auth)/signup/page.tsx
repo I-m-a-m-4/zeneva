@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { Eye, EyeOff, Loader, ChevronLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { AppConfig } from '@/lib/config';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.'}),
@@ -64,8 +65,8 @@ export default function SignupPage() {
       // Step 4: Wait for the user profile to be available to prevent race conditions
       await waitForUserProfile(firestore, userCredential.user.uid);
       
-      // Step 5: Now that the backend is ready, redirect to the dashboard.
-      router.push('/dashboard');
+      // Step 5: Now that the backend is ready, redirect to the new onboarding flow.
+      router.push('/onboarding');
 
     } catch (error: any) {
        let description = "Please try again.";
@@ -91,7 +92,7 @@ export default function SignupPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={32} height={32} />
+                <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
                 <span className="text-3xl font-bold tracking-tighter text-foreground font-display">
                     Zeneva
                 </span>

@@ -136,7 +136,7 @@ export default function AddProductPage() {
                 const formData = new FormData();
                 formData.append('image', imageFile);
                 
-                const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+                const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
                 if (!apiKey || apiKey === "your_api_key_here") {
                     throw new Error("ImgBB API key is not configured.");
                 }

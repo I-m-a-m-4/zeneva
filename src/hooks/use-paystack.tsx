@@ -12,6 +12,7 @@ interface PaystackSetupConfig {
   currency?: string;
   ref?: string;
   reference?: string;
+  subaccount?: string;
   callback: (transaction: any) => void;
   onClose: () => void;
   [key: string]: any; // Allow other properties
@@ -25,6 +26,7 @@ interface PaystackHookConfig {
   currency?: string;
   ref?: string;
   reference?: string;
+  subaccount?: string;
   onSuccess: (transaction: any) => void;
   onClose: () => void;
   [key: string]: any; // Allow other properties
@@ -135,15 +137,14 @@ const usePaystack = () => {
       return;
     }
     
-    // Explicitly build the config object for Paystack to ensure correctness.
-    // This is safer than using a spread operator which might pass unexpected props.
+    // Build the config object for Paystack, including the subaccount
     const paystackConfig: PaystackSetupConfig = {
       key: config.key,
       email: config.email,
       amount: config.amount,
       currency: config.currency || 'NGN',
       ref: config.reference || config.ref,
-      // The crucial part: ensuring callback and onClose are valid functions before passing.
+      subaccount: config.subaccount,
       callback: (transaction: any) => {
         if (config.onSuccess && typeof config.onSuccess === 'function') {
           config.onSuccess(transaction);
@@ -165,4 +166,3 @@ const usePaystack = () => {
 };
 
 export default usePaystack;
-

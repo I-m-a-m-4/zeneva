@@ -121,27 +121,27 @@ export default function MarketingFooter() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 pt-12">
             <div className="">
-              <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Services</h4>
+              <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Features</h4>
               <ul className="mt-3 space-y-2 text-sm">
                 <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Inventory</a></li>
-                <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Sales</a></li>
-                <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Customers</a></li>
+                <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Point of Sale</a></li>
+                <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">AI Insights</a></li>
               </ul>
             </div>
             <div className="">
               <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Resources</h4>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><Link href="#" className="transition text-neutral-300 hover:text-white">Case Studies</Link></li>
                 <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">Blog</Link></li>
-                <li><Link href="#" className="transition text-neutral-300 hover:text-white">Open Source</Link></li>
+                <li><a href="#faq" className="transition text-neutral-300 hover:text-white">FAQ</a></li>
               </ul>
             </div>
             <div className="">
               <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Company</h4>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><Link href="#" className="transition text-neutral-300 hover:text-white">About</Link></li>
-                <li><Link href="#" className="transition text-neutral-300 hover:text-white">Principles</Link></li>
+                <li><Link href="/about/our-mission" className="transition text-neutral-300 hover:text-white">Our Mission</Link></li>
                 <li><Link href="#contact" className="transition text-neutral-300 hover:text-white">Contact</Link></li>
+                <li><Link href="/legal/privacy-policy" className="transition text-neutral-300 hover:text-white">Privacy Policy</Link></li>
+                <li><Link href="/legal/terms-of-service" className="transition text-neutral-300 hover:text-white">Terms of Service</Link></li>
               </ul>
             </div>
             <div className="">

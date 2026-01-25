@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser } from '@/firebase';
@@ -10,6 +11,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Button } from '../ui/button';
+import { AppConfig } from '@/lib/config';
 
 export default function MarketingHeader() {
   const { user } = useUser();
@@ -30,20 +32,19 @@ export default function MarketingHeader() {
 
   const navLinks = [
     { href: "/#features", label: "Features" },
+    { href: "/about/our-mission", label: "Our Mission" },
     { href: "/#pricing", label: "Pricing" },
-    { href: "/#testimonials", label: "Testimonials" },
     { href: "/blog", label: "Blog" },
-    { href: "/#faq", label: "FAQ" },
   ];
 
   return (
     <>
-      <header className="fixed top-0 z-50 w-full border-b border-stone-200/80 bg-amber-50/80 backdrop-blur-lg">
+      <header className="fixed top-0 z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg">
         <nav className="flex max-w-7xl mr-auto ml-auto py-3 sm:py-5 px-6 items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center justify-center gap-2" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
-              <Image src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={32} height={32} />
+              <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
               <span className="text-4xl font-bold text-black font-instrument-serif">Zeneva</span>
             </Link>
           </div>

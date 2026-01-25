@@ -28,8 +28,48 @@
           "description": "The current subscription status of the business."
         },
         "settings": {
-          "type": "string",
-          "description": "Settings object, holds configuration for the business instance."
+            "type": "object",
+            "description": "Settings object, holds configuration for the business instance.",
+            "properties": {
+                "publicStore": {
+                    "type": "object",
+                    "properties": {
+                        "slug": {
+                            "type": "string",
+                            "description": "The URL-friendly slug for the public store."
+                        },
+                        "socialTwitter": { "type": "string" },
+                        "socialInstagram": { "type": "string" },
+                        "socialFacebook": { "type": "string" },
+                        "socialWhatsapp": { "type": "string" }
+                    }
+                },
+                "industry": {
+                    "type": "string",
+                    "description": "The industry the business operates in."
+                },
+                "language": {
+                    "type": "string",
+                    "description": "The default language for the business."
+                },
+                "inventoryStartDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The date inventory tracking starts."
+                },
+                "fiscalYearStart": {
+                    "type": "string",
+                    "description": "The starting month of the fiscal year."
+                },
+                "state": {
+                    "type": "string",
+                    "description": "The state or province of the business."
+                },
+                "country": {
+                    "type": "string",
+                    "description": "The country of the business."
+                }
+            }
         }
       },
       "required": [

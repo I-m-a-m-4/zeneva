@@ -19,9 +19,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { UserProfile, Invitation, BusinessInstance } from '@/types';
+import type { UserProfile, Invitation } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -47,18 +47,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
+import { usePOS } from '@/context/pos-context';
 
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user?.uid, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-
-    return { profile: userProfile, isLoading };
-}
 
 function UserRowSkeleton() {
     return (
@@ -144,26 +134,15 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
 
-  const businessDocRef = useMemoFirebase(() => {
-      if (!businessId || !firestore) return null;
-      return doc(firestore, 'businessInstances', businessId);
-  }, [businessId, firestore]);
-  const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
-
-  const usersQuery = useMemoFirebase(() => {
-    if (!businessId || !firestore) return null;
-    return query(collection(firestore, "users"), where("businessId", "==", businessId));
-  }, [businessId, firestore]);
+  const { users, business: businessInstance, isLoading: areUsersLoading } = usePOS();
   
-  const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
-
   const invitationsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return query(collection(firestore, 'invitations'), where('businessId', '==', businessId));
   }, [businessId, firestore]);
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
   
-  const isLoading = areUsersLoading || areInvitationsLoading || isBusinessLoading;
+  const isLoading = areUsersLoading || areInvitationsLoading;
 
   const staffUsers = React.useMemo(() => {
       if (!users) return [];
@@ -398,8 +377,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 }
 
 export default function UsersPage() {
-    const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
-    const { user: authUser } = useUser();
+    const { currentUserProfile: currentUser, isLoading: isProfileLoading, user: authUser } = usePOS();
 
     if (isProfileLoading || !currentUser || !authUser || authUser.uid !== currentUser.id) {
         return <UsersPageSkeleton />;

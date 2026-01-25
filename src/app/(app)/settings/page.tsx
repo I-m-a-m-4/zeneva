@@ -1,15 +1,15 @@
 
-
-"use client";
+'use client';
 
 import *as React from 'react';
+import Image from 'next/image';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Paintbrush, Briefcase, Percent, Building, UserCircle, Bell, DollarSign, ShieldCheck, FileText, DownloadCloud, Eye, EyeOff, KeyRound, Gift, Trophy, Loader2, Clock, History, Tag, X, Copy, Share2, Trash2, Zap, BarChart2, ShoppingCart, Users } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -18,11 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, deleteDoc, setDoc } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { BusinessInstance, UserProfile } from '@/types';
-import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +34,15 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
+const months = [
+    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const industries = [
+    'Retail & E-commerce', 'Fashion & Apparel', 'Electronics', 'Food & Beverage', 'Health & Beauty', 'Home & Furniture', 'Other'
+];
+
+
 // Inner component to hold form logic and state, preventing re-render loops.
 function SettingsForms({ business, userProfile, businessDocRef }: { business: BusinessInstance, userProfile: UserProfile, businessDocRef: any }) {
   const { toast } = useToast();
@@ -47,11 +54,20 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
   
+  const [logoFile, setLogoFile] = React.useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = React.useState<string | null>(business.settings?.logoUrl || null);
+
   // Initialize state directly from props. This happens once per mount/key-change.
   const [businessName, setBusinessName] = React.useState(business.name || "My Store");
   const [businessAddress, setBusinessAddress] = React.useState(business.address || "");
   const [businessPhone, setBusinessPhone] = React.useState(business.settings?.phone || "");
   const [businessEmail, setBusinessEmail] = React.useState(business.settings?.email || "");
+
+  const [industry, setIndustry] = React.useState(business.settings?.industry || "");
+  const [country, setCountry] = React.useState(business.settings?.country || "Nigeria");
+  const [state, setState] = React.useState(business.settings?.state || "");
+  const [fiscalYearStart, setFiscalYearStart] = React.useState(business.settings?.fiscalYearStart || "January");
+
 
   const [currency, setCurrency] = React.useState(business.settings?.currency || "NGN");
   const [timezone, setTimezone] = React.useState(business.settings?.timezone || "Africa/Lagos");
@@ -60,24 +76,56 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
   const [paymentBankAccountId, setPaymentBankAccountId] = React.useState(business.settings?.paymentBankAccountId || "");
   const [paymentBankName, setPaymentBankName] = React.useState(business.settings?.paymentBankName || "");
   const [paymentInstructions, setPaymentInstructions] = React.useState(business.settings?.paymentInstructions || "");
+  const [paystackSubaccount, setPaystackSubaccount] = React.useState(business.settings?.paystackSubaccount || "");
 
-  const [enableLoyaltyProgram, setEnableLoyaltyProgram] = React.useState(business.settings?.loyaltyProgramEnabled ?? true);
-  const [pointsPerUnit, setPointsPerUnit] = React.useState(String(business.settings?.pointsPerUnit || 1));
-  const [loyaltyPointsForReward, setLoyaltyPointsForReward] = React.useState(String(business.settings?.loyaltyPointsForReward || 1000));
-  const [rewardDiscountPercentage, setRewardDiscountPercentage] = React.useState(String(business.settings?.loyaltyRewardDiscountPercentage || 10));
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
-  const [categories, setCategories] = React.useState<string[]>(business.settings?.productCategories || []);
-  const [categoryInput, setCategoryInput] = React.useState('');
-  
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ variant: 'destructive', title: 'Image Too Large', description: 'Please select an image smaller than 2MB.'});
+        event.target.value = '';
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSettingsSubmit = async (formName: string, dataToSave: any) => {
     if (!businessDocRef) {
       toast({ variant: "destructive", title: "Error", description: "No active business selected." });
       return;
     }
     setIsSaving(prev => ({ ...prev, [formName]: true }));
+    
+    let finalData = { ...dataToSave };
+
+    if (formName === "Business Details" && logoFile) {
+        try {
+            const formData = new FormData();
+            formData.append('image', logoFile);
+            const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
+            if (!apiKey || apiKey === "your_api_key_here") throw new Error("ImgBB API key is not configured.");
+
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error?.message || 'Image upload failed.');
+            finalData['settings.logoUrl'] = result.data.url;
+            setLogoFile(null); // Clear file after successful upload
+        } catch (error: any) {
+             console.error(`Error uploading logo:`, error);
+             toast({ variant: "destructive", title: "Logo Upload Failed", description: error.message || 'Could not upload the business logo.' });
+             setIsSaving(prev => ({ ...prev, [formName]: false }));
+             return;
+        }
+    }
 
     try {
-      await updateDoc(businessDocRef, dataToSave);
+      await updateDoc(businessDocRef, finalData);
       toast({
         variant: "success",
         title: `${formName} Settings Saved`,
@@ -94,70 +142,21 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
       setIsSaving(prev => ({ ...prev, [formName]: false }));
     }
   };
-
-  const handleLoyaltySettingsSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    handleSettingsSubmit("Loyalty Program", {
-      "settings.loyaltyProgramEnabled": enableLoyaltyProgram,
-      "settings.pointsPerUnit": parseFloat(pointsPerUnit) || 1,
-      "settings.loyaltyPointsForReward": parseInt(loyaltyPointsForReward) || 1000,
-      "settings.loyaltyRewardDiscountPercentage": parseFloat(rewardDiscountPercentage) || 10,
-    });
-  };
   
-    const handleAddCategory = () => {
-        const newCategory = categoryInput.trim();
-        if (newCategory && !categories.includes(newCategory)) {
-            setCategories([...categories, newCategory]);
-        }
-        setCategoryInput(''); // Clear input
-    };
-
-    const handleCategoryInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleAddCategory();
-        }
-    };
-
-    const handleRemoveCategory = (categoryToRemove: string) => {
-        setCategories(categories.filter(cat => cat !== categoryToRemove));
-    };
-
-    const handleCategorySettingsSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const finalCategories = [...categories];
-        const newCategory = categoryInput.trim();
-        if (newCategory && !finalCategories.includes(newCategory)) {
-            finalCategories.push(newCategory);
-        }
-        handleSettingsSubmit("Product Categories", {
-            "settings.productCategories": [...new Set(finalCategories)],
-        });
-        setCategoryInput('');
-    };
-
     const handleDeleteAccount = async () => {
         if (!firestore || !userProfile || !businessDocRef) return;
-        const userDocRef = doc(firestore, 'users', userProfile.id);
         setIsDeleting(true);
 
         try {
-            const batch = writeBatch(firestore);
-            
-            // Mark the business as deleted
-            batch.update(businessDocRef, {
+            await updateDoc(businessDocRef, {
                 status: 'deleted',
                 deletedAt: serverTimestamp(),
             });
 
-            // Set user status to 'inactive', allowing admin to reactivate
-            batch.update(userDocRef, {
+            await updateDoc(doc(firestore, 'users', userProfile.id), {
                 status: 'inactive',
             });
             
-            await batch.commit();
-
             toast({
                 variant: "success",
                 title: "Account Deletion Successful",
@@ -188,104 +187,100 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Business Details</CardTitle>
-          <CardDescription>Manage your store's fundamental information.</CardDescription>
+          <CardDescription>Manage your store's fundamental information and branding.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Business Details", { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail }); }} className="space-y-4">
-            <div><Label htmlFor="businessName">Business Name</Label><Input id="businessName" value={businessName} onChange={e => setBusinessName(e.target.value)} className="mt-1"/></div>
-            <div><Label htmlFor="businessAddress">Business Address</Label><Textarea id="businessAddress" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="123 Main St, Anytown, Country" className="mt-1"/></div>
-            <div><Label htmlFor="businessPhone">Business Phone</Label><Input id="businessPhone" type="tel" value={businessPhone} onChange={e => setBusinessPhone(e.target.value)} placeholder="+2348012345678" className="mt-1"/></div>
-            <div><Label htmlFor="businessEmail">Business Email</Label><Input id="businessEmail" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)} placeholder="contact@mystore.com" className="mt-1"/></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className='md:col-span-2 space-y-4'>
+                <div><Label htmlFor="businessName">Business Name</Label><Input id="businessName" value={businessName} onChange={e => setBusinessName(e.target.value)} className="mt-1"/></div>
+                <div><Label htmlFor="businessAddress">Business Address</Label><Textarea id="businessAddress" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="123 Main St, Anytown, Country" className="mt-1"/></div>
+                <div><Label htmlFor="businessPhone">Business Phone</Label><Input id="businessPhone" type="tel" value={businessPhone} onChange={e => setBusinessPhone(e.target.value)} placeholder="+2348012345678" className="mt-1"/></div>
+                <div><Label htmlFor="businessEmail">Business Email</Label><Input id="businessEmail" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)} placeholder="contact@mystore.com" className="mt-1"/></div>
+              </div>
+              <div>
+                <Label>Business Logo</Label>
+                 <div className="mt-1 w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
+                    {logoPreview ? (
+                        <Image src={logoPreview} alt="Business logo preview" fill style={{objectFit: "cover"}} />
+                    ) : (
+                        <div className="text-center text-muted-foreground">
+                            <Upload className="mx-auto h-8 w-8" />
+                            <p className="mt-2 text-sm">Click to upload</p>
+                        </div>
+                    )}
+                    <Input id="logo-upload" type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/png, image/jpeg, image/gif" onChange={handleLogoChange} />
+                 </div>
+                 <p className="text-xs text-muted-foreground mt-2">Recommended: Square image, max 2MB.</p>
+              </div>
+            </div>
             <Button type="submit" disabled={isSaving["Business Details"]}>{isSaving["Business Details"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Business Details</Button>
           </form>
         </CardContent>
       </Card>
-
-      <Card id="product-categories">
+      
+      <Card>
         <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5 text-primary" />Product Categories</CardTitle>
-            <CardDescription>Manage the categories used for your products. Add one and press Enter.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary" />Organization & Financials</CardTitle>
+          <CardDescription>Manage your business's industry, location, and financial year settings.</CardDescription>
         </CardHeader>
         <CardContent>
-            <form onSubmit={handleCategorySettingsSubmit} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Organization", { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart }); }} className="space-y-6">
+                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div><Label htmlFor="industry">Industry</Label><Select name="industry" value={industry} onValueChange={setIndustry}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                    <div><Label htmlFor="country">Country</Label><Select name="country" value={country} onValueChange={setCountry}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem><SelectItem value="Ghana">Ghana</SelectItem></SelectContent></Select></div>
+                    <div><Label htmlFor="state">State/Province</Label><Input id="state" value={state} onChange={e => setState(e.target.value)} /></div>
+                    <div><Label htmlFor="fiscalYearStart">Fiscal Year Start</Label><Select name="fiscalYearStart" value={fiscalYearStart} onValueChange={setFiscalYearStart}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                 </div>
+                  <Button type="submit" disabled={isSaving["Organization"]}>{isSaving["Organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Organization Settings</Button>
+            </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+          <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-primary" />Regional & Payment Settings</CardTitle>
+              <CardDescription>Manage currency, taxes, and payment details.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Financials", { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentBankName": paymentBankName, "settings.paymentInstructions": paymentInstructions }); }} className="space-y-6">
+                  <div className="grid md:grid-cols-3 gap-4">
+                      <div><Label htmlFor="currency">Currency</Label><Select name="currency" value={currency} onValueChange={setCurrency}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent></Select></div>
+                      <div><Label htmlFor="timezone">Timezone</Label><Select name="timezone" value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem><SelectItem value="America/New_York">America/New_York</SelectItem></SelectContent></Select></div>
+                      <div><Label htmlFor="defaultTaxRate">Default Tax Rate (%)</Label><Input id="defaultTaxRate" type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                      <div><Label htmlFor="paymentBankName">Bank Name (for Bank Transfer)</Label><Input id="paymentBankName" value={paymentBankName} onChange={e => setPaymentBankName(e.target.value)} /></div>
+                      <div><Label htmlFor="paymentBankAccountId">Bank Account Number</Label><Input id="paymentBankAccountId" value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
+                  </div>
+                  <div><Label htmlFor="paymentInstructions">Payment Instructions</Label><Textarea id="paymentInstructions" value={paymentInstructions} onChange={e => setPaymentInstructions(e.target.value)} placeholder="For online orders, instruct customers on how to pay." /></div>
+                  <Button type="submit" disabled={isSaving["Financials"]}>{isSaving["Financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Payment Settings</Button>
+              </form>
+          </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" />Payment Gateway</CardTitle>
+            <CardDescription>Connect your Paystack account to receive payments directly from your storefront.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Payment Gateway", { "settings.paystackSubaccount": paystackSubaccount }); }} className="space-y-4">
                 <div>
-                    <Label htmlFor="category-input">Add a category</Label>
-                    <div className="flex gap-2 mt-1">
-                        <Input
-                            id="category-input"
-                            value={categoryInput}
-                            onChange={(e) => setCategoryInput(e.target.value)}
-                            onKeyDown={handleCategoryInputKeyDown}
-                            placeholder="e.g., Electronics"
-                        />
-                        <Button type="button" variant="secondary" onClick={handleAddCategory}>Add</Button>
-                    </div>
+                    <Label htmlFor="paystackSubaccount">Paystack Subaccount Code</Label>
+                    <Input id="paystackSubaccount" value={paystackSubaccount} onChange={e => setPaystackSubaccount(e.target.value)} placeholder="ACCT_xxxxxxxxxxxxxxx" />
+                    <p className="text-xs text-muted-foreground mt-2">Create a Subaccount on your Paystack dashboard and paste the code here. This allows Zeneva to securely process payments directly into your account.</p>
                 </div>
-                {categories.length > 0 && (
-                    <div className="space-y-2">
-                        <Label>Your Categories</Label>
-                        <div className="flex flex-wrap gap-2 rounded-md border p-4 min-h-24">
-                            {categories.map(cat => (
-                                <Badge key={cat} variant="secondary" className="py-1 px-3 text-sm">
-                                    {cat}
-                                    <button type="button" onClick={() => handleRemoveCategory(cat)} className="ml-2 rounded-full hover:bg-destructive/20 p-0.5 focus:outline-none focus:ring-1 focus:ring-destructive">
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                <Button type="submit" disabled={isSaving["Product Categories"]}>
-                    {isSaving["Product Categories"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                    Save Categories
+                <Button type="submit" disabled={isSaving["Payment Gateway"]}>
+                    {isSaving["Payment Gateway"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    Save Paystack Settings
                 </Button>
             </form>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" />Loyalty & Rewards Program</CardTitle>
-          <CardDescription>Configure your customer loyalty program.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLoyaltySettingsSubmit} className="space-y-6">
-            <div className="flex items-center space-x-2 pb-4 border-b"><Switch id="enableLoyaltyProgram" checked={enableLoyaltyProgram} onCheckedChange={setEnableLoyaltyProgram}/><Label htmlFor="enableLoyaltyProgram" className="text-base">Enable Loyalty Program</Label></div>
-            {enableLoyaltyProgram && (
-              <>
-                <div className="space-y-2"><h4 className="font-medium text-md flex items-center gap-2"><Gift className="h-4 w-4 text-primary"/>How Points Are Earned:</h4><Label htmlFor="pointsPerUnit">Points per currency unit spent</Label><Input id="pointsPerUnit" type="number" value={pointsPerUnit} onChange={(e) => setPointsPerUnit(e.target.value)} className="w-24" /></div>
-                <div className="space-y-4"><h4 className="font-medium text-md">Defining Rewards:</h4><Label>Default Reward Tier</Label><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="space-y-1"><Label htmlFor="loyaltyPointsForReward">Points Needed</Label><Input id="loyaltyPointsForReward" type="number" value={loyaltyPointsForReward} onChange={(e) => setLoyaltyPointsForReward(e.target.value)} /></div><div className="space-y-1"><Label htmlFor="rewardDiscountPercentage">Reward: Discount (%)</Label><Input id="rewardDiscountPercentage" type="number" value={rewardDiscountPercentage} onChange={(e) => setRewardDiscountPercentage(e.target.value)} /></div></div></div>
-              </>
-            )}
-            <Button type="submit" disabled={isSaving["Loyalty Program"]}>{isSaving["Loyalty Program"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Loyalty Settings</Button>
-          </form>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-primary" />Regional & Financial Settings</CardTitle>
-            <CardDescription>Manage currency, taxes, and payment details.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); handleSettingsSubmit("Financials", { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentBankName": paymentBankName, "settings.paymentInstructions": paymentInstructions }); }} className="space-y-6">
-                <div className="grid md:grid-cols-3 gap-4">
-                    <div><Label htmlFor="currency">Currency</Label><Select name="currency" value={currency} onValueChange={setCurrency}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent></Select></div>
-                    <div><Label htmlFor="timezone">Timezone</Label><Select name="timezone" value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem><SelectItem value="America/New_York">America/New_York</SelectItem></SelectContent></Select></div>
-                    <div><Label htmlFor="defaultTaxRate">Default Tax Rate (%)</Label><Input id="defaultTaxRate" type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div><Label htmlFor="paymentBankName">Bank Name</Label><Input id="paymentBankName" value={paymentBankName} onChange={e => setPaymentBankName(e.target.value)} /></div>
-                    <div><Label htmlFor="paymentBankAccountId">Bank Account Number</Label><Input id="paymentBankAccountId" value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
-                </div>
-                <div><Label htmlFor="paymentInstructions">Payment Instructions</Label><Textarea id="paymentInstructions" value={paymentInstructions} onChange={e => setPaymentInstructions(e.target.value)} /></div>
-                <Button type="submit" disabled={isSaving["Financials"]}>{isSaving["Financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials</Button>
-            </form>
-        </CardContent>
-      </Card>
-
-      <Card id="danger-zone" className="border-destructive">
+      <Card id="danger-zone" className="border-destructive/50 bg-destructive/5">
           <CardHeader>
               <CardTitle className="text-destructive flex items-center gap-2"><Trash2/> Danger Zone</CardTitle>
               <CardDescription>This action is permanent and cannot be undone.</CardDescription>
@@ -294,7 +289,11 @@ function SettingsForms({ business, userProfile, businessDocRef }: { business: Bu
               <p className="text-sm text-muted-foreground mb-4">Deleting your business will make its data inaccessible and disable your user account. An administrator can reactivate your account later.</p>
           </CardContent>
           <CardFooter>
-                <Button variant="destructive" onClick={() => setIsDeleteAlertOpen(true)} disabled={userProfile?.role !== 'admin'}>
+                <Button 
+                    variant="outline" 
+                    className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setIsDeleteAlertOpen(true)} 
+                    disabled={userProfile?.role !== 'admin'}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete My Business
                 </Button>

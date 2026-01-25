@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, ChevronRight, Loader2, User } from 'lucide-react';
+import { Bot, ChevronRight, Loader2, User, Send } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -19,10 +19,9 @@ interface AIChatProps {
     onSendMessage: (e: React.FormEvent) => void;
     isLoading: boolean;
     className?: string;
-    isExpanded?: boolean;
 }
 
-export default function AIChat({ messages, input, onInputChange, onSendMessage, isLoading, className, isExpanded = false }: AIChatProps) {
+export default function AIChat({ messages, input, onInputChange, onSendMessage, isLoading, className }: AIChatProps) {
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
@@ -41,11 +40,11 @@ export default function AIChat({ messages, input, onInputChange, onSendMessage, 
                 {messages.map((message, index) => (
                     <div key={index} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
                         {message.sender === 'ai' && (
-                            <Avatar className="h-8 w-8">
+                            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                                 <AvatarFallback><Bot /></AvatarFallback>
                             </Avatar>
                         )}
-                        <div className={`rounded-lg p-3 max-w-[80%] ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                        <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                             <p className="text-sm">{message.text}</p>
                         </div>
                         {message.sender === 'user' && (
@@ -57,7 +56,7 @@ export default function AIChat({ messages, input, onInputChange, onSendMessage, 
                 ))}
                  {isLoading && (
                     <div className="flex items-start gap-3">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                             <AvatarFallback><Bot /></AvatarFallback>
                         </Avatar>
                         <div className="rounded-lg p-3 bg-muted flex items-center">
@@ -71,12 +70,12 @@ export default function AIChat({ messages, input, onInputChange, onSendMessage, 
                 <Input
                     value={input}
                     onChange={(e) => onInputChange(e.target.value)}
-                    placeholder="Ask a question..."
+                    placeholder="Ask Zen AI a question..."
                     disabled={isLoading}
                     className="flex-1"
                 />
                 <Button type="submit" disabled={isLoading || !input.trim()}>
-                   <ChevronRight className="h-5 w-5"/>
+                   <Send className="h-5 w-5"/>
                 </Button>
             </form>
         </div>

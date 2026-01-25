@@ -191,7 +191,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
   
   const stableDismiss = React.useCallback(
     (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
