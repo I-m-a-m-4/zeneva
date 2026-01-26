@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -550,7 +549,7 @@ export default function PublicStorePage() {
                             <SelectTrigger className="h-12 text-base w-full sm:w-64">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent style={storeStyle}>
                                 <SelectItem value="all">All Categories</SelectItem>
                                 {business?.settings?.productCategories?.map(cat => (
                                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -567,7 +566,7 @@ export default function PublicStorePage() {
                                 <SlidersHorizontal className="h-4 w-4 mr-2" />
                                 <SelectValue placeholder="Sort by..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent style={storeStyle}>
                                 <SelectItem value="default">Default</SelectItem>
                                 <SelectItem value="newest">Newest Arrivals</SelectItem>
                                 <SelectItem value="price-asc">Price: Low to High</SelectItem>
