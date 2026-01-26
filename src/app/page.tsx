@@ -177,6 +177,7 @@ export default function Home() {
                             <span className="block">The <span className="text-slate-400">AI-Powered</span> Commerce</span>
                             <span className="block">Platform for <span className="text-slate-400">Growth.</span></span>
                         </h1>
+                        
                         <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-10 text-slate-900">
                             Zeneva is the AI-powered operating system for modern commerce. Go beyond simple tracking with predictive insights, automated workflows, and a customizable storefront to maximize profit and eliminate stockouts.
                         </p>
@@ -517,40 +518,40 @@ export default function Home() {
                 </div>
             </section>
 
-            <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
-                <div className="max-w-7xl mx-auto">
-                    <div className="text-center max-w-2xl mx-auto mb-16">
-                        <h2 className="text-4xl font-light text-slate-900 tracking-tight font-instrument-serif mb-4">
-                            Perfect for Your Business
-                        </h2>
-                        <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
-                            Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                        {businessTypes.map((type) => {
-                            const image = PlaceHolderImages.find(p => p.id === type.imageId);
-                            if (!image) return null;
-                            return (
-                                <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
-                                    <Image
-                                        src={image.imageUrl}
-                                        alt={type.name}
-                                        fill
-                                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                        data-ai-hint={image.imageHint}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-                                    <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
-                                        <h3 className="text-2xl font-light tracking-tight font-instrument-serif">{type.name}</h3>
-                                        <p className="mt-1 text-sm text-white/90">{type.description}</p>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
+           <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="text-4xl font-light text-slate-900 tracking-tight font-display mb-4">
+            Perfect for Your Business
+          </h2>
+          <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
+            Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+          {businessTypes.map((type) => {
+              const image = PlaceHolderImages.find(p => p.id === type.imageId);
+              if (!image) return null;
+              return (
+                <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
+                  <Image
+                    src={image.imageUrl}
+                    alt={type.name}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    data-ai-hint={image.imageHint}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+                  <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
+                    <h3 className="text-2xl font-light tracking-tight font-display">{type.name}</h3>
+                    <p className="mt-1 text-sm text-white/90">{type.description}</p>
+                  </div>
                 </div>
-            </section>
+              )
+            })}
+        </div>
+      </div>
+    </section>
 
             <section className="z-10 animate-[fadeInUp_1s_ease-out_1.2s_forwards] relative" style={{ transform: "translateY(0px)" }}>
                 <div className="max-w-7xl mx-auto pt-16 pb-16 px-6">
