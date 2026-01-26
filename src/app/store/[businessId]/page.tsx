@@ -91,7 +91,7 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
             </Link>
             <CardFooter className="p-4 flex flex-col items-start gap-2 mt-auto bg-muted/50">
                 <span className="text-lg font-bold text-primary">₦{product.price.toLocaleString()}</span>
-                 <Button variant="outline" size="sm" className="w-full h-9 hover:bg-primary hover:text-primary-foreground" onClick={handleAddToCartClick} disabled={isOutOfStock}>
+                 <Button variant="default" size="sm" className="w-full h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAddToCartClick} disabled={isOutOfStock}>
                     Add to Cart
                  </Button>
             </CardFooter>
@@ -298,12 +298,18 @@ export default function PublicStorePage() {
                 element.setAttribute('content', content);
             };
 
-            setMeta('og:title', business.name);
-            setMeta('og:description', business.settings?.publicStore?.description || `Check out our products!`);
-            setMeta('og:image', business.settings?.logoUrl || business.settings?.publicStore?.bannerImageUrl || AppConfig.logoUrl);
-            setMeta('twitter:title', business.name);
-            setMeta('twitter:description', business.settings?.publicStore?.description || `Check out our products!`);
-            setMeta('twitter:image', business.settings?.logoUrl || business.settings?.publicStore?.bannerImageUrl || AppConfig.logoUrl);
+            const title = business.name;
+            const description = business.settings?.publicStore?.description || `Check out the amazing products at ${business.name}!`;
+            const imageUrl = business.settings?.publicStore?.bannerImageUrl || business.settings?.logoUrl || AppConfig.logoUrl;
+
+
+            setMeta('og:title', title);
+            setMeta('twitter:title', title);
+            setMeta('og:description', description);
+            setMeta('twitter:description', description);
+            setMeta('og:image', imageUrl);
+            setMeta('twitter:image', imageUrl);
+            setMeta('og:url', window.location.href);
 
         } else if (!businessLoading) {
             document.title = 'Store Not Found | Zeneva';

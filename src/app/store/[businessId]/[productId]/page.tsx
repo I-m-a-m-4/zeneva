@@ -154,7 +154,7 @@ export default function ProductDetailPage() {
                         <div className="mt-6 space-y-2">
                             <h3 className="text-xl font-semibold">Product Description</h3>
                             <div className="prose dark:prose-invert max-w-full">
-                                <p>{product.description?.replace(/\\n/g, ' ').replace(/<[^>]*>?/gm, '')}</p>
+                                <p>{product.description?.replace(/\\n/g, ' ').replace(/<[^>]*>?/gm, '') || 'No description available.'}</p>
                             </div>
                         </div>
 
