@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -16,14 +17,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import type { Customer } from '@/types';
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   businessId: string;
+  customers: Customer[] | null;
 }
 
-export default function AddCustomerDialog({ isOpen, onOpenChange, businessId }: AddCustomerDialogProps) {
+export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers }: AddCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [name, setName] = React.useState('');
@@ -48,6 +51,13 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId }: 
         toast({ title: 'Error', description: 'Business ID is missing.', variant: 'destructive' });
         return;
     }
+
+    const emailExists = customers?.some(customer => customer.email.toLowerCase() === email.toLowerCase());
+    if (emailExists) {
+        toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
+        return;
+    }
+
     setIsSaving(true);
     try {
       await addDoc(collection(firestore, 'customers'), {

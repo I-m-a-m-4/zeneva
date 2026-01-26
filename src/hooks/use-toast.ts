@@ -155,9 +155,9 @@ function toast({ ...props }: Toast) {
 
   const toastProps = { ...props };
 
-  // If a destructive toast is shown and no specific duration is provided, default it to 3 seconds.
-  // This can be overridden by explicitly setting duration: Infinity for toasts that should persist.
-  if (toastProps.variant === "destructive" && toastProps.duration === undefined) {
+  // If no duration is provided, default to 3 seconds.
+  // This can be overridden by explicitly setting duration.
+  if (toastProps.duration === undefined) {
     toastProps.duration = 3000;
   }
 

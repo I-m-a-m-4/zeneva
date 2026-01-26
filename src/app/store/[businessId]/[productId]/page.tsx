@@ -151,8 +151,11 @@ export default function ProductDetailPage() {
                            )}
                         </div>
 
-                        <div className="mt-6 prose dark:prose-invert max-w-full">
-                            <p>{product.description?.replace(/\\n/g, ' ').replace(/<[^>]*>?/gm, '')}</p>
+                        <div className="mt-6 space-y-2">
+                            <h3 className="text-xl font-semibold">Product Description</h3>
+                            <div className="prose dark:prose-invert max-w-full">
+                                <p>{product.description?.replace(/\\n/g, ' ').replace(/<[^>]*>?/gm, '')}</p>
+                            </div>
                         </div>
 
                         <div className="mt-8">

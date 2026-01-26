@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -9,6 +8,7 @@ import { doc, collection, query, where, orderBy, deleteDoc } from 'firebase/fire
 import type { Customer, Receipt } from '@/types';
 import { getCustomerInsights } from '@/ai/flows/customer-insights-flow';
 import type { CustomerInsightsOutput } from '@/ai/flows/customer-insights-types';
+import NProgress from 'nprogress';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { logAuditEvent } from '@/lib/audit';
 
 export default function CustomerDetailPage() {
     const params = useParams();
@@ -38,10 +39,8 @@ export default function CustomerDetailPage() {
 
     const { firestore, currencySymbol, customers, isLoading: isPosLoading, currentUserProfile } = usePOS();
     
-    // Get customer from the context to avoid re-fetching and fix the bug
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
 
-    // Fetch customer's receipts
     const receiptsQuery = useMemoFirebase(() => {
         if (!firestore || !customerId) return null;
         return query(
@@ -54,7 +53,7 @@ export default function CustomerDetailPage() {
 
     const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+    const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const handleGenerateInsights = async () => {
@@ -77,27 +76,6 @@ export default function CustomerDetailPage() {
         }
     };
     
-    const handleDeleteCustomer = async () => {
-        if (!firestore || !customer) return;
-        setIsDeleting(true);
-        try {
-            await deleteDoc(doc(firestore, 'customers', customer.id));
-            toast({
-                variant: 'success',
-                title: 'Customer Deleted',
-                description: `${customer.name} has been removed.`
-            });
-            router.push('/customers');
-        } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Delete Failed',
-                description: 'Could not delete customer.'
-            });
-             setIsDeleting(false);
-        }
-    }
-    
     const isLoading = isPosLoading || isLoadingReceipts;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
@@ -118,7 +96,7 @@ export default function CustomerDetailPage() {
         return (
             <div className="text-center p-8">
                  <p className="font-bold text-lg">Customer not found.</p>
-                 <Button variant="ghost" onClick={() => router.push('/customers')} className="mt-4">
+                 <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mt-4">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Customers
                 </Button>
             </div>
@@ -129,7 +107,7 @@ export default function CustomerDetailPage() {
 
     return (
         <div className="space-y-6">
-            <Button variant="ghost" onClick={() => router.push('/customers')} className="mb-4">
+            <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Customers
             </Button>
 
@@ -157,7 +135,7 @@ export default function CustomerDetailPage() {
                     </CardContent>
                     {canDelete && (
                         <CardFooter>
-                            <Button variant="destructive" className="w-full" onClick={() => setIsDeleteDialogOpen(true)}>
+                            <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(customer)} disabled={isDeleting}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
                             </Button>
                         </CardFooter>
@@ -232,17 +210,64 @@ export default function CustomerDetailPage() {
                 </CardContent>
             </Card>
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog open={!!customerToDelete} onOpenChange={(open) => { if (!open) setCustomerToDelete(null); }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete {customer.name} from your customer records. This action cannot be undone.
+                            This will permanently delete {customerToDelete?.name} from your customer records. This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteCustomer} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+                        <AlertDialogCancel disabled={isDeleting} onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={async () => {
+                                if (!customerToDelete || !firestore || !currentUserProfile) {
+                                    toast({
+                                        variant: 'destructive',
+                                        title: 'Delete Failed',
+                                        description: 'Could not perform deletion. User or customer data is missing. Please try refreshing the page.',
+                                        duration: 5000,
+                                    });
+                                    setIsDeleting(false);
+                                    return;
+                                }
+
+                                setIsDeleting(true);
+                                try {
+                                    const customerRef = doc(firestore, 'customers', customerToDelete.id);
+                                    await deleteDoc(customerRef);
+
+                                    await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
+                                        action: 'customer.delete',
+                                        entity: { type: 'Customer', id: customerToDelete.id, name: customerToDelete.name },
+                                        details: { customerName: customerToDelete.name, customerEmail: customerToDelete.email }
+                                    });
+
+                                    toast({
+                                        variant: 'success',
+                                        title: 'Customer Deleted',
+                                        description: `${customerToDelete.name} has been removed.`
+                                    });
+                                    
+                                    setCustomerToDelete(null);
+                                    NProgress.start();
+                                    router.push('/customers');
+
+                                } catch (error: any) {
+                                    console.error("Failed to delete customer:", error);
+                                    toast({
+                                        variant: 'destructive',
+                                        title: 'Delete Failed',
+                                        description: error.message || 'Could not delete customer.'
+                                    });
+                                } finally {
+                                    setIsDeleting(false);
+                                }
+                            }}
+                            className="bg-destructive hover:bg-destructive/90" 
+                            disabled={isDeleting}
+                        >
                             {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Delete
                         </AlertDialogAction>

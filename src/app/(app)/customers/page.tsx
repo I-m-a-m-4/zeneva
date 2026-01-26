@@ -18,23 +18,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, Upload, ChevronRight } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { useFirestore } from '@/firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
 import RefreshButton from '@/components/shared/refresh-button';
 import { useRouter } from 'next/navigation';
+import NProgress from 'nprogress';
+import { logAuditEvent } from '@/lib/audit';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function CustomerRowSkeleton() {
     return (
         <TableRow>
+            <TableCell className="w-12"><Skeleton className="h-4 w-4" /></TableCell>
             <TableCell>
                 <div className="flex items-center gap-3">
                     <Skeleton className="h-10 w-10 rounded-full" />
@@ -60,7 +63,6 @@ function CustomerRowSkeleton() {
     )
 }
 
-
 export default function CustomersPage() {
   const { customers, receipts, isLoading, business, currentUserProfile: currentUser } = usePOS();
   const firestore = useFirestore();
@@ -69,6 +71,8 @@ export default function CustomersPage() {
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
+  const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
 
   const customerTotals = React.useMemo(() => {
     const totals: Record<string, { total: number }> = {};
@@ -90,6 +94,53 @@ export default function CustomersPage() {
     return CURRENCY_SYMBOLS[code] || '₦';
   }, [business]);
 
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedCustomerIds(customers?.map(c => c.id) || []);
+    } else {
+      setSelectedCustomerIds([]);
+    }
+  };
+
+  const handleRowSelect = (customerId: string) => {
+    setSelectedCustomerIds(prev => 
+      prev.includes(customerId) 
+        ? prev.filter(id => id !== customerId) 
+        : [...prev, customerId]
+    );
+  };
+  
+  const handleBulkDelete = async () => {
+    if (!firestore || selectedCustomerIds.length === 0 || !business || !currentUser) {
+        toast({ title: 'Error', description: 'Could not perform deletion. Session data missing.', variant: 'destructive' });
+        return;
+    }
+
+    const batch = writeBatch(firestore);
+    selectedCustomerIds.forEach(id => {
+      const docRef = doc(firestore, 'customers', id);
+      batch.delete(docRef);
+
+      const deletedCustomer = customers?.find(p => p.id === id);
+      if (deletedCustomer) {
+        logAuditEvent(firestore, business.id, currentUser, {
+            action: 'customer.delete',
+            entity: { type: 'Customer', id: id, name: deletedCustomer.name },
+            details: { customerName: deletedCustomer.name, customerEmail: deletedCustomer.email }
+        });
+      }
+    });
+
+    try {
+      await batch.commit();
+      toast({ variant: 'success', title: 'Customers Deleted', description: `${selectedCustomerIds.length} customers have been removed.` });
+      setSelectedCustomerIds([]);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete customers.' });
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
   return (
     <>
     <Card className="w-full">
@@ -102,6 +153,14 @@ export default function CustomersPage() {
                 </CardDescription>
             </div>
              <div className="flex items-center gap-2">
+                {selectedCustomerIds.length > 0 && (
+                    <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                            Delete ({selectedCustomerIds.length})
+                        </span>
+                    </Button>
+                )}
                 <RefreshButton />
                 <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                     <Upload className="h-3.5 w-3.5" />
@@ -123,6 +182,7 @@ export default function CustomersPage() {
              <Table>
                 <TableHeader>
                     <TableRow>
+                    <TableHead className="w-12"><Checkbox disabled/></TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead className="hidden sm:table-cell">Phone</TableHead>
                     <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
@@ -140,6 +200,12 @@ export default function CustomersPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                   <Checkbox
+                      checked={customers.length > 0 && selectedCustomerIds.length === customers.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
+                      onCheckedChange={handleSelectAll}
+                    />
+              </TableHead>
               <TableHead>Name</TableHead>
               <TableHead className="hidden sm:table-cell">Phone</TableHead>
               <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
@@ -151,16 +217,27 @@ export default function CustomersPage() {
             {customers.map((customer) => {
               const totalSpent = customerTotals[customer.id]?.total ?? 0;
               return (
-              <TableRow key={customer.id} className="cursor-pointer" onClick={() => router.push(`/customers/${customer.id}`)}>
+              <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
                 <TableCell>
-                  <div className="font-medium">{customer.name}</div>
-                  <div className="text-sm text-muted-foreground">{customer.email}</div>
+                    <Checkbox
+                      checked={selectedCustomerIds.includes(customer.id)}
+                      onCheckedChange={() => handleRowSelect(customer.id)}
+                    />
+                </TableCell>
+                <TableCell>
+                    <div 
+                        className="font-medium hover:underline cursor-pointer"
+                        onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}
+                    >
+                        {customer.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{customer.email}</div>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
                 <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
                 <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                 <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
                         <ChevronRight className="h-4 w-4" />
                     </Button>
                 </TableCell>
@@ -186,11 +263,28 @@ export default function CustomersPage() {
         )}
       </CardContent>
     </Card>
+
+    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedCustomerIds.length} customer(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     {currentUser?.businessId && (
         <AddCustomerDialog
             isOpen={isAddCustomerOpen}
             onOpenChange={setIsAddCustomerOpen}
             businessId={currentUser.businessId}
+            customers={customers}
         />
     )}
      {currentUser?.businessId && (

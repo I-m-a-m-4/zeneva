@@ -19,7 +19,13 @@ import {
   BarChart2,
   AlertTriangle,
   ChevronRight,
-  Bot
+  Bot,
+  ShoppingCart,
+  Shirt,
+  Coffee,
+  Sparkles,
+  BookOpen,
+  Smartphone,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -100,26 +106,26 @@ export default function OurMissionPage() {
 
           <div className="bg-white w-full z-20 rounded-t-[40px] pt-12 pb-12 relative shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
             <section className="max-w-[1600px] mx-auto w-full mb-16 lg:mb-24 px-6 lg:px-12">
-              <p className="text-left text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">Trusted by forward-thinking companies</p>
+              <p className="text-left text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">Powering various high-growth businesses</p>
               <div className="overflow-hidden w-full relative">
                 <div className="z-10 bg-gradient-to-r to-transparent w-12 lg:w-40 h-full absolute top-0 left-0 from-white"></div>
                 <div className="bg-gradient-to-l to-transparent w-12 lg:w-40 h-full z-10 absolute top-0 right-0 from-white"></div>
                 <div className="flex w-max animate-marquee hover:[animation-play-state:paused]">
                   <div className="flex items-center gap-12 lg:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><CloudLightning /> SaaSforce</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Cpu /> TechFlow</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Database /> DataScale</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Globe /> VentureCorp</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Server /> CloudNine</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Zap /> BoltSoft</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><ShoppingCart /> Online Retailers</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Shirt /> Fashion Boutiques</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Coffee /> Coffee Shops</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Sparkles /> Skincare Brands</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><BookOpen /> Book Stores</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Smartphone /> Electronics Shops</div>
                   </div>
                   <div className="flex items-center gap-12 lg:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-500 ml-12 lg:ml-24">
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><CloudLightning /> SaaSforce</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Cpu /> TechFlow</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Database /> DataScale</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Globe /> VentureCorp</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Server /> CloudNine</div>
-                    <div className="flex items-center gap-2 text-xl lg:text-2xl font-bold font-sans"><Zap /> BoltSoft</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><ShoppingCart /> Online Retailers</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Shirt /> Fashion Boutiques</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Coffee /> Coffee Shops</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Sparkles /> Skincare Brands</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><BookOpen /> Book Stores</div>
+                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Smartphone /> Electronics Shops</div>
                   </div>
                 </div>
               </div>

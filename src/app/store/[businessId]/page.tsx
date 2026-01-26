@@ -89,9 +89,9 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
                      <CardTitle className="text-base font-semibold leading-snug line-clamp-2">{product.name}</CardTitle>
                 </CardContent>
             </Link>
-            <CardFooter className="p-4 flex justify-between items-center mt-auto bg-muted/50">
+            <CardFooter className="p-4 flex flex-col items-start gap-2 mt-auto bg-muted/50">
                 <span className="text-lg font-bold text-primary">₦{product.price.toLocaleString()}</span>
-                 <Button variant="outline" size="sm" className="h-9 hover:bg-primary hover:text-primary-foreground" onClick={handleAddToCartClick} disabled={isOutOfStock}>
+                 <Button variant="outline" size="sm" className="w-full h-9 hover:bg-primary hover:text-primary-foreground" onClick={handleAddToCartClick} disabled={isOutOfStock}>
                     Add to Cart
                  </Button>
             </CardFooter>
