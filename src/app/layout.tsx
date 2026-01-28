@@ -48,7 +48,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="WGdoPB1C5sq9ITs96lwQAtR1DRpLwcKfDCN9-taB9e8" />
-        <link rel="icon" href="https://i.ibb.co/N29B5tzr/Group-174.png" type="image/png" />
+        <link rel="icon" href="/zeneva-logo.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />

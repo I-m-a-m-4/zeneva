@@ -62,7 +62,7 @@ export default function ReviewPage() {
     };
 
 
-    const handleCompleteSale = async () => {
+    const handleCompleteSale = () => {
         if (!firestore || !business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
             return;
@@ -79,125 +79,123 @@ export default function ReviewPage() {
         
         setIsCompleting(true);
         
+        // Generate the new receipt reference locally to get the ID
         const newReceiptRef = doc(collection(firestore, 'receipts'));
+        
+        // Immediately navigate to the optimistic receipt page and clear the POS state
+        router.push(`/receipts/${newReceiptRef.id}`);
+        resetPOS();
 
-        try {
-            // Using writeBatch for offline capability
-            const batch = writeBatch(firestore);
+        // Perform all database operations in the background as a fire-and-forget async task
+        (async () => {
+            try {
+                // Using writeBatch for offline capability
+                const batch = writeBatch(firestore);
 
-            let totalCost = 0;
-            const itemsForReceipt = cart.map(cartItem => {
-                const product = products.find(p => p.id === cartItem.product.id);
-                const costPrice = product?.costPrice || 0;
-                totalCost += costPrice * cartItem.quantity;
+                let totalCost = 0;
+                const itemsForReceipt = cart.map(cartItem => {
+                    const product = products.find(p => p.id === cartItem.product.id);
+                    const costPrice = product?.costPrice || 0;
+                    totalCost += costPrice * cartItem.quantity;
 
-                // Decrement stock for each product in the batch
-                const productRef = doc(firestore, 'products', cartItem.product.id);
-                const newStock = (product?.stock || 0) - cartItem.quantity;
-                batch.update(productRef, { stock: newStock });
+                    // Decrement stock for each product in the batch
+                    const productRef = doc(firestore, 'products', cartItem.product.id);
+                    const newStock = (product?.stock || 0) - cartItem.quantity;
+                    batch.update(productRef, { stock: newStock });
 
-                return { 
-                    productId: cartItem.product.id, 
-                    name: cartItem.product.name, 
-                    quantity: cartItem.quantity, 
-                    price: cartItem.product.price,
-                    costPrice: costPrice,
-                };
-            });
-            const profit = total - totalCost;
-            
-            // Update customer loyalty points in the batch
-            if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
-                const customerRef = doc(firestore, 'customers', selectedCustomer.id);
-                const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                const pointsEarned = Math.floor(total * pointsPerUnit);
-
-                // Use cached customer data instead of fetching from the network
-                const customerFromContext = customers?.find(c => c.id === selectedCustomer.id);
-                const currentPoints = customerFromContext?.loyaltyPoints || 0;
-                
-                batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
-            }
-
-            // Create the new receipt in the batch
-            const receiptData = {
-                businessId: business.id,
-                receiptNumber: displayReceipt.receiptNumber,
-                items: itemsForReceipt,
-                customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
-                subtotal, tax, discount, total, totalCost, profit, paymentMethod,
-                createdAt: serverTimestamp(),
-                createdBy: user.uid,
-            };
-            batch.set(newReceiptRef, receiptData);
-
-            // Commit the batch. This works offline.
-            await batch.commit();
-            
-            // Log audit event after successful transaction
-            logAuditEvent(firestore, business.id, currentUserProfile, {
-                action: 'sale.create',
-                entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
-                details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
-            });
-
-            toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
-            
-            // Navigate immediately
-            router.push(`/receipts/${newReceiptRef.id}`);
-            resetPOS();
-
-            // Send email in the background (fire-and-forget)
-            const canSendEmail = (business.plan === 'business' || business.accessLevel === 'lifetime');
-
-            if (canSendEmail && shouldSendEmail && selectedCustomer?.email) {
-                const items_html = `
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                      <tr>
-                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Item</th>
-                        <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${cart.map(item => `
-                        <tr>
-                          <td style="padding: 8px;">
-                            <div style="font-weight: 500;">${item.product.name}</div>
-                            <div style="font-size: 12px; color: #666;">${item.quantity} x ${currencySymbol}${item.product.price.toFixed(2)}</div>
-                          </td>
-                          <td style="padding: 8px; text-align:right;">${currencySymbol}${(item.quantity * item.product.price).toFixed(2)}</td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                `;
-                
-                sendReceiptEmail({
-                    to_email: selectedCustomer.email,
-                    to_name: selectedCustomer.name,
-                    business_name: business.name,
-                    receipt_id: newReceiptRef.id.substring(0, 8),
-                    items_html,
-                    currency_symbol: currencySymbol,
-                    subtotal: subtotal.toFixed(2),
-                    tax: tax.toFixed(2),
-                    discount: discount.toFixed(2),
-                    total: total.toFixed(2),
-                }).then(() => {
-                    toast({ title: 'Email Sent', description: `Receipt sent to ${selectedCustomer.email}.` });
-                }).catch((emailError: any) => {
-                    const errorMessage = emailError?.message || 'An unknown email error occurred.';
-                    console.error("Email sending failed:", errorMessage);
-                    toast({ variant: 'warning', title: 'Could Not Send Email', description: `Sale completed, but email failed. Reason: ${errorMessage}`, duration: 10000 });
+                    return { 
+                        productId: cartItem.product.id, 
+                        name: cartItem.product.name, 
+                        quantity: cartItem.quantity, 
+                        price: cartItem.product.price,
+                        costPrice: costPrice,
+                    };
                 });
-            }
+                const profit = total - totalCost;
+                
+                // Update customer loyalty points in the batch
+                if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
+                    const customerRef = doc(firestore, 'customers', selectedCustomer.id);
+                    const pointsPerUnit = business.settings.pointsPerUnit || 0;
+                    const pointsEarned = Math.floor(total * pointsPerUnit);
+                    const customerFromContext = customers?.find(c => c.id === selectedCustomer.id);
+                    const currentPoints = customerFromContext?.loyaltyPoints || 0;
+                    batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
+                }
 
-        } catch (error: any) {
-            console.error("Sale completion failed:", error);
-            toast({ variant: 'destructive', title: 'Sale Failed', description: error.message || 'An unexpected error occurred.' });
-            setIsCompleting(false);
-        }
+                // Create the new receipt in the batch
+                const receiptData = {
+                    businessId: business.id,
+                    receiptNumber: displayReceipt.receiptNumber,
+                    items: itemsForReceipt,
+                    customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
+                    subtotal, tax, discount, total, totalCost, profit, paymentMethod,
+                    createdAt: serverTimestamp(),
+                    createdBy: user.uid,
+                };
+                batch.set(newReceiptRef, receiptData);
+
+                await batch.commit();
+                
+                logAuditEvent(firestore, business.id, currentUserProfile, {
+                    action: 'sale.create',
+                    entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
+                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
+                });
+
+                toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
+                
+                // Send email (fire-and-forget)
+                const canSendEmail = (business.plan === 'business' || business.accessLevel === 'lifetime');
+                if (canSendEmail && shouldSendEmail && selectedCustomer?.email) {
+                    // ... email sending logic
+                    const items_html = `
+                      <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                          <tr>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Item</th>
+                            <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${cart.map(item => `
+                            <tr>
+                              <td style="padding: 8px;">
+                                <div style="font-weight: 500;">${item.product.name}</div>
+                                <div style="font-size: 12px; color: #666;">${item.quantity} x ${currencySymbol}${item.product.price.toFixed(2)}</div>
+                              </td>
+                              <td style="padding: 8px; text-align:right;">${currencySymbol}${(item.quantity * item.product.price).toFixed(2)}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    `;
+                    
+                    sendReceiptEmail({
+                        to_email: selectedCustomer.email,
+                        to_name: selectedCustomer.name,
+                        business_name: business.name,
+                        receipt_id: newReceiptRef.id.substring(0, 8),
+                        items_html,
+                        currency_symbol: currencySymbol,
+                        subtotal: subtotal.toFixed(2),
+                        tax: tax.toFixed(2),
+                        discount: discount.toFixed(2),
+                        total: total.toFixed(2),
+                    }).then(() => {
+                        toast({ title: 'Email Sent', description: `Receipt sent to ${selectedCustomer.email}.` });
+                    }).catch((emailError: any) => {
+                        const errorMessage = emailError?.message || 'An unknown email error occurred.';
+                        console.error("Email sending failed:", errorMessage);
+                        toast({ variant: 'warning', title: 'Could Not Send Email', description: `Sale completed, but email failed. Reason: ${errorMessage}`, duration: 10000 });
+                    });
+                }
+
+            } catch (error: any) {
+                console.error("Background sale completion failed:", error);
+                toast({ variant: 'destructive', title: 'Sale Sync Failed', description: error.message || 'The sale was completed locally but could not be saved to the cloud. It will sync automatically when you are back online.', duration: 8000 });
+            }
+        })(); // Immediately invoke the async function
     }
     
     const canSendEmail = (business?.plan === 'business' || business?.accessLevel === 'lifetime');
@@ -248,3 +246,5 @@ export default function ReviewPage() {
         </div>
     )
 }
+
+    

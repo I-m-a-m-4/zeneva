@@ -1,3 +1,4 @@
+
 export interface Product {
     id: string;
     businessId: string;
@@ -300,3 +301,5 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
+
+    

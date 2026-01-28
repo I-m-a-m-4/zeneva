@@ -231,8 +231,8 @@ function BusinessPerformanceTab() {
 
     if (isPending) {
         setProgress(10);
-        setStatusText(statuses[0]);
         let statusIndex = 0;
+        setStatusText(statuses[statusIndex]);
 
         timer = setInterval(() => {
             setProgress(prev => {
@@ -250,7 +250,6 @@ function BusinessPerformanceTab() {
             statusIndex = (statusIndex + 1) % statuses.length;
             setStatusText(statuses[statusIndex]);
         }, 1200);
-
     }
     return () => {
         clearInterval(timer);
