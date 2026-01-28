@@ -176,7 +176,7 @@ export default function Home() {
                         {/* Left Column: Copy & Form */}
                         <div className="max-w-xl z-10">
                             <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
-                            <h1 className="leading-[0.95] lg:text-7xl xl:text-8xl text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
+                            <h1 className="leading-[0.95] lg:text-5xl xl:text-6xl text-4xl font-medium text-foreground tracking-tighter font-display mb-8">
                                 The AI-Powered Commerce<br/>
                                 Platform for <span className="text-muted-foreground/80 relative inline-block">Growth.
                                 <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
@@ -194,9 +194,9 @@ export default function Home() {
       value={email}
       onChange={(e) => setEmail(e.target.value)}
       className="
-        !h-20
+        !h-18
         !min-h-[6rem]
-        !py-6
+        !py-4
         !leading-tight
         placeholder-slate-400
         focus:outline-none
