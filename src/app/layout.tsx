@@ -47,6 +47,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
         <meta name="google-site-verification" content="WGdoPB1C5sq9ITs96lwQAtR1DRpLwcKfDCN9-taB9e8" />
         <link rel="icon" href="https://i.ibb.co/N29B5tzr/Group-174.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
