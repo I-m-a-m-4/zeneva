@@ -8,7 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   ChevronLeft,
-  Upload
+  Upload,
+  CalendarIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,9 +34,13 @@ import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -45,6 +50,7 @@ const productSchema = z.object({
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
     sku: z.string().optional(),
     category: z.string().optional(),
+    expiryDate: z.date().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -305,6 +311,49 @@ export default function AddProductPage() {
                         </FormItem>
                     )}
                  />
+              </div>
+               <div className="mt-6">
+                <FormField
+                    control={form.control}
+                    name="expiryDate"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel>Expiry Date</FormLabel>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-[240px] pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                >
+                                {field.value ? (
+                                    format(field.value, "PPP")
+                                ) : (
+                                    <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                initialFocus
+                            />
+                            </PopoverContent>
+                        </Popover>
+                        <FormDescription>
+                            Optional: For perishable goods.
+                        </FormDescription>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
               </div>
             </CardContent>
           </Card>

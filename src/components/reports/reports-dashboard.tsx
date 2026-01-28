@@ -8,7 +8,7 @@ import { collection, query, where } from 'firebase/firestore';
 import type { Receipt } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2 } from 'lucide-react';
+import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2, Bot } from 'lucide-react';
 import SalesOverTimeChart from './sales-over-time-chart';
 import TopProductsChart from './top-products-chart';
 import { DateRangePicker } from './date-range-picker';
@@ -34,6 +34,23 @@ function ReportStatCard({ title, value, icon: Icon }: { title: string, value: st
         </Card>
     )
 }
+
+function PlaceholderChart({ title, description }: { title: string, description: string }) {
+    return (
+         <Card>
+            <CardHeader>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px] flex items-center justify-center bg-muted/50 rounded-b-lg">
+                <div className="text-center text-muted-foreground p-4">
+                    <div className="font-semibold flex items-center justify-center gap-2 mb-2"><Bot className="h-4 w-4 text-primary"/> Zen AI</div>
+                    <p className="text-sm">Once your first sale is made, this report will automatically activate. Upgrade your plan for more detailed analytics.</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading } = usePOS();
@@ -175,9 +192,8 @@ export default function ReportsDashboard() {
                         <CardDescription>Analyze your profitability over time.</CardDescription>
                     </CardHeader>
                     <CardContent className="text-center py-12 text-muted-foreground">
-                        <PieChart className="mx-auto h-12 w-12 opacity-50" />
-                        <h3 className="mt-4 text-lg font-medium">Coming Soon!</h3>
-                        <p className="mt-2 max-w-md mx-auto">This feature requires a 'cost price' field for each product to calculate profit margins. We're working on adding this capability.</p>
+                        <div className="font-semibold flex items-center justify-center gap-2 mb-2"><Bot className="h-4 w-4 text-primary"/> Zen AI</div>
+                        <p className="text-sm">This feature requires a 'cost price' field for each product to calculate profit margins. We're working on adding this capability.</p>
                     </CardContent>
                 </Card>
              </>
@@ -185,3 +201,4 @@ export default function ReportsDashboard() {
         </div>
     );
 }
+

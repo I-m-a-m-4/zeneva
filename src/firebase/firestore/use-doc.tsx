@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   DocumentReference,
-  onSnapshot,
+  getDoc, // Changed from onSnapshot
   DocumentData,
   FirestoreError,
   DocumentSnapshot,
@@ -26,8 +26,9 @@ export interface UseDocResult<T> {
 }
 
 /**
- * React hook to subscribe to a single Firestore document in real-time.
- * Handles nullable references.
+ * React hook to fetch a single Firestore document once.
+ * This has been optimized to use a one-time 'get' request instead of a real-time listener
+ * to reduce database reads and costs. Data can be refreshed using the global Refresh button.
  * 
  * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
  * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
@@ -49,30 +50,25 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    if (!memoizedDocRef) {
+    const fetchData = async () => {
+      if (!memoizedDocRef) {
+        setData(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+      setIsLoading(true);
       setData(null);
-      setIsLoading(false);
       setError(null);
-      return;
-    }
 
-    setIsLoading(true);
-    setData(null); // FIX: Clear previous data to prevent using stale data during re-fetch
-    setError(null);
-
-    const unsubscribe = onSnapshot(
-      memoizedDocRef,
-      (snapshot: DocumentSnapshot<DocumentData>) => {
+      try {
+        const snapshot = await getDoc(memoizedDocRef);
         if (snapshot.exists()) {
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
-          // Document does not exist
-          setData(null);
+          setData(null); // Document does not exist
         }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
-        setIsLoading(false);
-      },
-      (error: FirestoreError) => {
+      } catch (error: any) {
         if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: memoizedDocRef.path,
@@ -85,11 +81,13 @@ export function useDoc<T = any>(
           setError(error);
         }
         setData(null);
+      } finally {
         setIsLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchData();
+    // This hook now fetches data once. It will re-run if memoizedDocRef changes.
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 
   return { data, isLoading, error };

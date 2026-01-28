@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
+import { POSProvider } from '@/context/pos-context';
 
 const siteUrl = 'https://zeneva.vercel.app';
 
@@ -37,6 +38,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -53,11 +55,13 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
-          <Loader />
-          <Suspense>
-            <NavigationEvents />
-          </Suspense>
-          {children}
+          <POSProvider>
+            <Loader />
+            <Suspense>
+              <NavigationEvents />
+            </Suspense>
+            {children}
+          </POSProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>

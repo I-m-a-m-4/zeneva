@@ -3,8 +3,7 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
-import { useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc } from 'firebase/firestore';
 import type { Customer, Receipt } from '@/types';
 import { getCustomerInsights } from '@/ai/flows/customer-insights-flow';
 import type { CustomerInsightsOutput } from '@/ai/flows/customer-insights-types';
@@ -37,19 +36,14 @@ export default function CustomerDetailPage() {
     const customerId = params.id as string;
     const { toast } = useToast();
 
-    const { firestore, currencySymbol, customers, isLoading: isPosLoading, currentUserProfile } = usePOS();
+    const { firestore, currencySymbol, customers, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile } = usePOS();
     
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
 
-    const receiptsQuery = useMemoFirebase(() => {
-        if (!firestore || !customerId) return null;
-        return query(
-            collection(firestore, "receipts"),
-            where("customer.id", "==", customerId),
-            orderBy("createdAt", "desc")
-        );
-    }, [firestore, customerId]);
-    const { data: receipts, isLoading: isLoadingReceipts } = useCollection<Receipt>(receiptsQuery);
+    const receipts = React.useMemo(() => {
+        if (!allReceipts) return [];
+        return allReceipts.filter(r => r.customer?.id === customerId);
+    }, [allReceipts, customerId]);
 
     const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
@@ -76,7 +70,7 @@ export default function CustomerDetailPage() {
         }
     };
     
-    const isLoading = isPosLoading || isLoadingReceipts;
+    const isLoading = isPosLoading;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
@@ -92,7 +86,7 @@ export default function CustomerDetailPage() {
         );
     }
     
-    if (!customer) {
+    if (!customer && !isLoading) {
         return (
             <div className="text-center p-8">
                  <p className="font-bold text-lg">Customer not found.</p>

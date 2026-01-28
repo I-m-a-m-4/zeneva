@@ -79,8 +79,9 @@ service cloud.firestore {
     // =================================================================
 
     match /businessInstances/{businessId} {
-      // Allow get for public storefronts, or private read for members. Safe access for nested properties.
-      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || isRequestingUserMemberOf(businessId) || isBusinessOwner(businessId) || isSuperAdmin();
+      // Allow get for public storefronts, or private read for members.
+      // FIX: Optimized owner check to prevent race conditions during auth token refresh.
+      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || isRequestingUserMemberOf(businessId) || (isUserAuthenticated() && resource.data.ownerId == request.auth.uid) || isSuperAdmin();
       
       // Allow list only for Super Admin or for slug checking.
       allow list: if request.query.limit <= 1 || isSuperAdmin();
@@ -110,27 +111,26 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // GET: A user can always get their own document. An admin can get any user within their business.
-      allow get: if (isUserAuthenticated() && request.auth.uid == userId) || 
-                  (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId) || 
-                  isSuperAdmin();
+      allow get: if isSuperAdmin() || 
+                    (isUserAuthenticated() && request.auth.uid == userId) || 
+                    (isUserAuthenticated() && exists(/databases/$(database)/documents/users/$(userId)) && getRequestingUserData().businessId == resource.data.businessId);
 
-      // LIST: Admins can list users in their business. Super Admins can list all.
       allow list: if isRequestingUserAdmin() || isSuperAdmin();
       
-      // UPDATE: A user can update their own document. An admin can update any user within their business.
-      allow update: if (isUserAuthenticated() && request.auth.uid == userId) || 
-                      (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId) ||
-                      isSuperAdmin();
+      allow update: if isSuperAdmin() ||
+                       (isUserAuthenticated() && request.auth.uid == userId) || 
+                       (isRequestingUserAdmin() && exists(/databases/$(database)/documents/users/$(userId)) && getRequestingUserData().businessId == resource.data.businessId);
 
-      // CREATE: A user can create their own document during signup.
       allow create: if isUserAuthenticated() && request.auth.uid == userId;
       
-      // DELETE: An admin can delete a user in their business (but not themselves).
-      allow delete: if (isRequestingUserAdmin() && request.auth.uid != userId && getRequestingUserData().businessId == resource.data.businessId) || isSuperAdmin();
+      allow delete: if isSuperAdmin() ||
+                       (isRequestingUserAdmin() && request.auth.uid != userId && exists(/databases/$(database)/documents/users/$(userId)) && getRequestingUserData().businessId == resource.data.businessId);
       
       match /notifications/{notificationId} {
-          allow read, list, create, update, delete: if isUserAuthenticated() && request.auth.uid == userId;
+        allow get, create, update, delete: if isUserAuthenticated() && request.auth.uid == userId;
+      }
+      match /notifications {
+        allow list: if isUserAuthenticated() && request.auth.uid == userId;
       }
     }
    

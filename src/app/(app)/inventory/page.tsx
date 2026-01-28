@@ -69,6 +69,7 @@ import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import RefreshButton from '@/components/shared/refresh-button';
 import { logAuditEvent } from '@/lib/audit';
+import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
 
 function ProductRowSkeleton() {
     return (
@@ -111,6 +112,7 @@ export default function InventoryPage() {
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   const [stockFilter, setStockFilter] = React.useState('all');
@@ -223,6 +225,10 @@ export default function InventoryPage() {
     setIsImportOpen(false);
   };
 
+  const handleBulkEditSuccess = () => {
+    setSelectedProductIds([]);
+  }
+
   const handleExport = () => {
     if (!allProducts) {
         toast({
@@ -275,12 +281,20 @@ export default function InventoryPage() {
         </div>
         <div className="flex items-center gap-2">
           {selectedProductIds.length > 0 && (
-              <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                      Delete ({selectedProductIds.length})
-                  </span>
-              </Button>
+            <>
+                <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
+                    <Edit className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                        Bulk Edit ({selectedProductIds.length})
+                    </span>
+                </Button>
+                <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                        Delete ({selectedProductIds.length})
+                    </span>
+                </Button>
+            </>
           )}
 
             <DropdownMenu>
@@ -557,6 +571,14 @@ export default function InventoryPage() {
                 setQuickEditProduct(null);
               }
             }}
+        />
+      )}
+      {currentUserProfile && (
+        <BulkEditDialog
+            productIds={selectedProductIds}
+            isOpen={isBulkEditDialogOpen}
+            onOpenChange={setIsBulkEditDialogOpen}
+            onSuccess={handleBulkEditSuccess}
         />
       )}
     </div>

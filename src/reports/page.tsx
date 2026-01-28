@@ -39,7 +39,7 @@ function ReportStatCard({ title, value, icon: Icon }: { title: string, value: st
 
 const PlaceholderChart = ({ title, description }: { title: string, description: string }) => {
     return (
-        <Card>
+         <Card>
             <CardHeader>
                 <CardTitle>{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>
@@ -51,7 +51,7 @@ const PlaceholderChart = ({ title, description }: { title: string, description: 
                 </div>
             </CardContent>
         </Card>
-    );
+    )
 };
 
 const ReportsPlaceholder = () => (
@@ -156,7 +156,7 @@ export default function ReportsDashboard() {
                 featureName="Advanced Reports"
                 featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
                 className="flex-grow flex flex-col"
-                placeholderContent={<ReportsPlaceholder />}
+                 placeholderContent={<ReportsPlaceholder />}
             >
                 <div className="flex flex-wrap items-center gap-2 no-capture mb-6">
                     <RefreshButton />

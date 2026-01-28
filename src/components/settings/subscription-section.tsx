@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -24,11 +25,10 @@ const plans = [
         features: [
             'Up to 1,500 products & 10 users',
             'Advanced Point of Sale (POS)',
-            'Purchase Order Management',
-            'Product Bundling / Kits',
-            'Barcode Generation & Scanning',
-            'Profit & Loss Reporting',
-            'Public Storefront Page',
+            'Customizable Public Storefront',
+            'Advanced Reports & Analytics',
+            'AI Product Data Troubleshooter',
+            'Secure Audit Log',
         ],
         planId: 'pro',
     },
@@ -38,10 +38,10 @@ const plans = [
         features: [
             'Everything in Pro',
             'Unlimited products & users',
-            'Advanced Customer Analytics (CRM+)',
-            'Secure Audit Log',
+            'AI Business Performance Dashboard',
+            'Advanced Customer Intelligence (CRM+)',
+            'Inventory Velocity Reports (ABC Analysis)',
             'Automated Email Receipts',
-            'Inventory Velocity Reports (Coming Soon)',
             'Priority Phone & Email Support'
         ],
         planId: 'business',

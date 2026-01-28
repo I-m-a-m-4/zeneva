@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import *as React from 'react';
@@ -6,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, XAxis, YAxis, Bar, CartesianGrid, ResponsiveContainer } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Bot } from "lucide-react";
 import type { Receipt } from '@/types';
 
 const chartConfig = {
@@ -53,10 +54,12 @@ export default function OverviewChart({ receipts, currencySymbol }: OverviewChar
       </CardHeader>
       <CardContent>
         {noData ? (
-          <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground">
+          <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground p-4">
             <TrendingUp className="h-16 w-16 opacity-50 mb-4" />
-            <p className="text-lg font-medium">No Sales Data Available</p>
-            <p className="text-sm">Sales will appear here once transactions are recorded.</p>
+            <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
+                <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
+                <p>This chart will track your revenue over time once you complete your first sale through the POS.</p>
+            </div>
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="h-[300px] w-full">

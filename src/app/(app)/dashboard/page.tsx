@@ -4,9 +4,9 @@ import *as React from 'react';
 import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
-import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download, Globe } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { TopSellingItem } from '@/types';
+import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download, Globe, Bot, ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import type { TopSellingItem, BusinessAnalysis } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +16,10 @@ import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
 import RefreshButton from '@/components/shared/refresh-button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -53,6 +57,42 @@ function DashboardSkeleton() {
       </div>
     </div>
   );
+}
+
+function ZenAiSummaryCard({ analysis }: { analysis: BusinessAnalysis | null | undefined }) {
+    if (!analysis || !analysis.health) {
+        return null;
+    }
+    const { health } = analysis;
+
+    return (
+        <div className="md:col-span-2 lg:col-span-4">
+            <Link href="/ai-insights" className="block w-full">
+                <Card className={cn(
+                    "shadow-lg transition-all duration-300 hover:shadow-xl cursor-pointer hover:-translate-y-1 relative overflow-hidden",
+                    "bg-slate-900 text-primary-foreground sidebar-wavy-pattern"
+                )}>
+                    <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4 relative z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 bg-white/10 backdrop-blur-sm p-2 rounded-lg">
+                                <Bot className="h-6 w-6"/>
+                            </div>
+                            <div>
+                                <CardTitle className="text-base font-semibold">Zen AI Summary</CardTitle>
+                                <Badge variant="secondary" className="mt-1 bg-white/90 text-slate-900 hover:bg-white">
+                                    {health.status}
+                                </Badge>
+                            </div>
+                        </div>
+                        <p className="text-sm text-white/80 flex-1 leading-snug sm:ml-4 sm:border-l sm:border-white/20 sm:pl-4">
+                            {health.summary}
+                        </p>
+                        <ArrowRight className="h-5 w-5 text-white/70 hidden sm:block" />
+                    </CardContent>
+                </Card>
+            </Link>
+        </div>
+    );
 }
 
 export default function DashboardPage() {
@@ -164,32 +204,41 @@ export default function DashboardPage() {
         </div>
       </PageTitle>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 auto-rows-fr">
         <SummaryCard
           title="Total Sales (POS)"
           value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
           icon={DollarSign}
           description={`${totalReceipts} transactions`}
+          href="/reports"
         />
         <SummaryCard
           title="Online Sales"
           value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
           icon={Globe}
           description={`${totalOnlineOrdersCount} online orders`}
+          href="/online-orders"
         />
         <SummaryCard
           title="Total Inventory Units"
           value={totalStock.toLocaleString()}
           icon={Archive}
           description={`${uniqueSkus} unique SKUs`}
+          href="/inventory"
         />
         <SummaryCard
           title="Low Stock Alerts"
           value={lowStockItems}
           icon={AlertCircle}
           description={lowStockItems > 0 ? `${lowStockItems} items needing attention` : "All stock levels healthy"}
+          href="/inventory"
         />
       </div>
+
+       <div className="grid grid-cols-1">
+        <ZenAiSummaryCard analysis={business?.settings?.businessAnalysis} />
+      </div>
+
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2 shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
@@ -211,11 +260,6 @@ export default function DashboardPage() {
                 <FileDigit className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
                 <p className="text-xs text-muted-foreground">To be Invoiced</p>
-              </div>
-              <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
-                <PackageSearch className="h-8 w-8 text-primary mb-2" />
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">To be Delivered</p>
               </div>
                <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <PackageSearch className="h-8 w-8 text-primary mb-2" />
@@ -333,10 +377,9 @@ export default function DashboardPage() {
             isOpen={isAddCustomerOpen}
             onOpenChange={setIsAddCustomerOpen}
             businessId={business.id}
+            customers={customers}
         />
       )}
     </div>
   );
 }
-
-    

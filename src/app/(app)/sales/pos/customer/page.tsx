@@ -36,6 +36,7 @@ function useCurrentUserProfile() {
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: () => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { triggerRefresh } = usePOS();
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [phone, setPhone] = React.useState('');
@@ -58,6 +59,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
                 createdAt: serverTimestamp(),
             });
             toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
+            triggerRefresh();
             onCustomerAdded();
         } catch (error) {
             toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
@@ -93,19 +95,12 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 }
 
 export default function CustomerPage() {
-    const { selectedCustomer, selectCustomer } = usePOS();
+    const { selectedCustomer, selectCustomer, customers, isLoading: areCustomersLoading } = usePOS();
     const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
-    const firestore = useFirestore();
     const router = useRouter();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
     const [isNavigating, setIsNavigating] = React.useState(false);
-
-    const customersQuery = useMemoFirebase(() => {
-        if (!currentUser?.businessId || !firestore) return null;
-        return query(collection(firestore, "customers"), where("businessId", "==", currentUser.businessId));
-    }, [currentUser?.businessId, firestore]);
-    const { data: customers, isLoading: areCustomersLoading } = useCollection<Customer>(customersQuery);
 
     const filteredCustomers = React.useMemo(() => {
         if (!customers) return [];

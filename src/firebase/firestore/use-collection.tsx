@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Query,
-  onSnapshot,
+  getDocs, // Changed from onSnapshot
   DocumentData,
   FirestoreError,
   QuerySnapshot,
@@ -38,9 +38,9 @@ export interface InternalQuery extends Query<DocumentData> {
 }
 
 /**
- * React hook to subscribe to a Firestore collection or query in real-time.
- * Handles nullable references/queries.
- * 
+ * React hook to fetch a Firestore collection or query once.
+ * This has been optimized to use a one-time 'get' request instead of a real-time listener
+ * to reduce database reads and costs. Data can be refreshed using the global Refresh button.
  *
  * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
  * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
@@ -62,30 +62,26 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    if (!memoizedTargetRefOrQuery) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    setIsLoading(true);
-    setData(null); // FIX: Clear previous data to prevent using stale data during re-fetch
-    setError(null);
-
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
-    const unsubscribe = onSnapshot(
-      memoizedTargetRefOrQuery,
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
-        }
-        setData(results);
-        setError(null);
+    const fetchData = async () => {
+      if (!memoizedTargetRefOrQuery) {
+        setData(null);
         setIsLoading(false);
-      },
-      (error: FirestoreError) => {
+        setError(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setData(null);
+      setError(null);
+
+      try {
+        const snapshot = await getDocs(memoizedTargetRefOrQuery);
+        const results: WithId<T>[] = snapshot.docs.map((doc) => ({
+          ...(doc.data() as T),
+          id: doc.id,
+        }));
+        setData(results);
+      } catch (error: any) {
         if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: (memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString(),
@@ -94,16 +90,20 @@ export function useCollection<T = any>(
           errorEmitter.emit('permission-error', permissionError);
           setError(permissionError);
         } else {
-          console.error("useCollection error:", error);
+          console.error('useCollection error:', error);
           setError(error);
         }
         setData(null);
+      } finally {
         setIsLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+    fetchData();
+    // This hook now fetches data once. It will re-run if memoizedTargetRefOrQuery changes.
+    // The dependency array correctly handles re-fetching.
+  }, [memoizedTargetRefOrQuery]);
+  
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
     throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
   }

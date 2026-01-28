@@ -1,4 +1,5 @@
 
+
 'use client';
 import {
   Card,
@@ -48,6 +49,11 @@ import {
   Briefcase,
   UserX,
   ShieldCheck,
+  HeartPulse,
+  Bot,
+  BarChart2,
+  AlertTriangle,
+  Heart,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect } from 'react';
@@ -62,7 +68,7 @@ import {
   addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, subDays } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
     Table,
@@ -76,6 +82,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
@@ -144,7 +157,62 @@ const UserPresence = ({ lastSeen }: { lastSeen: any }) => {
     );
 };
 
-const PIE_CHART_COLORS = ['hsl(var(--primary))', '#60a5fa', '#a78bfa', '#facc15', '#fb923c', '#4ade80'];
+const PIE_CHART_COLORS = {
+    Healthy: 'hsl(var(--chart-2))',
+    'Needs Attention': 'hsl(var(--chart-3))',
+    'At Risk': 'hsl(var(--chart-5))',
+    Pro: 'hsl(var(--chart-1))',
+    Business: 'hsl(var(--chart-4))',
+    Starter: 'hsl(var(--muted))',
+    Lifetime: 'hsl(var(--chart-2))'
+};
+
+function BusinessDetailDialog({ open, onOpenChange, title, description, businesses, users }: { open: boolean, onOpenChange: (open: boolean) => void, title: string, description: string, businesses: BusinessInstance[], users: UserProfile[] | null }) {
+  const businessOwners = useMemo(() => {
+    if (!users) return {};
+    return businesses.reduce((acc, b) => {
+      const owner = users.find(u => u.id === b.ownerId);
+      acc[b.id] = owner?.name || 'N/A';
+      return acc;
+    }, {} as Record<string, string>);
+  }, [businesses, users]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-96">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Business Name</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Trial Expires</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {businesses.map(b => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium">{b.name}</TableCell>
+                  <TableCell>{businessOwners[b.id]}</TableCell>
+                  <TableCell><Badge variant="secondary" className="capitalize">{b.accessLevel === 'lifetime' ? 'Lifetime' : b.plan || 'starter'}</Badge></TableCell>
+                  <TableCell>{b.trialExpiresAt ? format(b.trialExpiresAt.toDate(), 'PPP') : 'N/A'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function AdminDashboardContent({ users, businesses, products, receipts, purchases }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null }) {
   const firestore = useFirestore();
@@ -160,23 +228,84 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
   const [planUserEmail, setPlanUserEmail] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
   const [isAssigningPlan, setIsAssigningPlan] = useState(false);
-
+  const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[] }>({ open: false, title: '', description: '', businesses: [] });
 
   const userOptions = useMemo(() => (users || []).map(user => ({
       value: user.email,
       label: `${user.name} (${user.email})`
   })), [users]);
 
-    const purchasesWithUserInfo = useMemo(() => {
-        if (!purchases || !users) return [];
-        return purchases.map(purchase => {
-        const user = users.find(u => u.id === purchase.userId);
-        return {
-            ...purchase,
-            userProfile: user,
-        };
+  const platformAnalytics = useMemo(() => {
+        const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
+        const productsByBusiness = (products || []).reduce((acc, p) => {
+            if (!acc[p.businessId]) acc[p.businessId] = [];
+            acc[p.businessId].push(p);
+            return acc;
+        }, {} as Record<string, Product[]>);
+
+        const receiptsByBusiness = (receipts || []).reduce((acc, r) => {
+            if (!acc[r.businessId]) acc[r.businessId] = [];
+            acc[r.businessId].push(r);
+            return acc;
+        }, {} as Record<string, Receipt[]>);
+        
+        const activatedBusinessesList = activeBusinesses.filter(b => {
+            const busProducts = productsByBusiness[b.id] || [];
+            const busReceipts = receiptsByBusiness[b.id] || [];
+            return busProducts.length >= 10 && busReceipts.length >= 1;
         });
-    }, [purchases, users]);
+
+        const fourteenDaysAgo = subDays(new Date(), 14);
+        const businessesWithRecentSales = new Set(
+            (receipts || []).filter(r => r.createdAt.toDate() > fourteenDaysAgo).map(r => r.businessId)
+        );
+        const atRiskBusinesses = activeBusinesses.filter(b => !businessesWithRecentSales.has(b.id));
+        
+        const payingBusinessesList = activeBusinesses.filter(b => {
+            if (b.accessLevel === 'lifetime') return false;
+            if (b.plan !== 'pro' && b.plan !== 'business') return false;
+            if (b.trialExpiresAt && b.trialExpiresAt.toDate() > new Date()) return false;
+            return true;
+        });
+
+        const healthScores = activeBusinesses.map(b => b.settings?.businessAnalysis?.health?.score ?? -1);
+        const healthDistribution = {
+            healthy: healthScores.filter(s => s >= 70).length,
+            attention: healthScores.filter(s => s >= 40 && s < 70).length,
+            atRisk: healthScores.filter(s => s >= 0 && s < 40).length,
+        };
+        const healthDistributionData = [
+            { name: 'Healthy', value: healthDistribution.healthy, fill: PIE_CHART_COLORS.Healthy },
+            { name: 'Needs Attention', value: healthDistribution.attention, fill: PIE_CHART_COLORS['Needs Attention'] },
+            { name: 'At Risk', value: healthDistribution.atRisk, fill: PIE_CHART_COLORS['At Risk'] },
+        ];
+        
+        const sevenDaysAgo = subDays(new Date(), 7);
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        const aiUsersLast7Days = new Set(activeBusinesses.filter(b => b.settings?.businessAnalysis?.createdAt?.toDate() > sevenDaysAgo || b.settings?.aiTroubleshootSuggestions?.createdAt?.toDate() > sevenDaysAgo).map(b => b.id)).size;
+        const aiUsersLast30Days = new Set(activeBusinesses.filter(b => b.settings?.businessAnalysis?.createdAt?.toDate() > thirtyDaysAgo || b.settings?.aiTroubleshootSuggestions?.createdAt?.toDate() > thirtyDaysAgo).map(b => b.id)).size;
+        
+        const businessAnalysisUsers = activeBusinesses.filter(b => b.settings?.businessAnalysis).length;
+        const troubleshootUsers = activeBusinesses.filter(b => b.settings?.aiTroubleshootSuggestions).length;
+
+        const aiAdoption7 = activeBusinesses.length > 0 ? (aiUsersLast7Days / activeBusinesses.length) * 100 : 0;
+        const aiAdoption30 = activeBusinesses.length > 0 ? (aiUsersLast30Days / activeBusinesses.length) * 100 : 0;
+
+        return {
+            totalActiveBusinesses: activeBusinesses.length,
+            activatedBusinessesCount: activatedBusinessesList.length,
+            activatedBusinessesList,
+            atRiskBusinesses,
+            payingBusinessesCount: payingBusinessesList.length,
+            payingBusinessesList,
+            healthDistribution,
+            healthDistributionData,
+            aiAdoption7,
+            aiAdoption30,
+            businessAnalysisUsers,
+            troubleshootUsers,
+        }
+  }, [businesses, products, receipts]);
 
 
   const analyticsData = useMemo(() => {
@@ -192,27 +321,22 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const totalReceipts = receipts?.length || 0;
     const now = new Date();
     
-    const totalRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
-    const platformAOV = totalReceipts > 0 ? (receipts?.reduce((sum, r) => sum + r.total, 0) || 0) / totalReceipts : 0;
-    const averageRevenuePerBusiness = totalBusinesses > 0 ? totalRevenue / totalBusinesses : 0;
+    const platformGmv = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
     
-    const businessRevenue = (purchases || []).reduce((acc, purchase) => {
-        if (purchase.businessId) {
-            acc[purchase.businessId] = (acc[purchase.businessId] || 0) + purchase.amount;
-        }
-        return acc;
-    }, {} as Record<string, number>);
+    const totalProductsSold = receipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
 
-    const topBusinesses = Object.entries(businessRevenue)
-        .map(([businessId, revenue]) => {
-            const business = activeBusinesses?.find(b => b.id === businessId);
-            const owner = activeUsers?.find(u => u.businessId === businessId && u.role === 'admin');
-            return { id: businessId, name: business?.name || 'Unknown Business', revenue: revenue, ownerName: owner?.name || 'N/A' }
-        })
-        .sort((a,b) => b.revenue - a.revenue)
-        .slice(0, 5);
+    const totalSubscriptionRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
     
-    const mrr = (activeBusinesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (activeBusinesses?.filter(b => b.plan === 'business').length || 0) * 30000;
+    const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
+    
+    const payingBusinesses = activeBusinesses?.filter(b => {
+        if (b.accessLevel === 'lifetime') return false;
+        if (b.plan !== 'pro' && b.plan !== 'business') return false;
+        if (b.trialExpiresAt && b.trialExpiresAt.toDate() > now) return false;
+        return true;
+    });
+
+    const mrr = (payingBusinesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (payingBusinesses?.filter(b => b.plan === 'business').length || 0) * 30000;
     const arr = mrr * 12;
     
     const usersByDate = (activeUsers || []).reduce((acc, user) => {
@@ -240,53 +364,61 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     }, {} as Record<string, number>);
     const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({name, value})).sort((a,b) => b.value - a.value).slice(0, 5);
     
-    const activeSubscriptions = activeBusinesses?.filter(b => b.plan === 'pro' || b.plan === 'business').length || 0;
+    const activeSubscriptions = payingBusinesses?.length || 0;
     
     const trialingBusinessIds = new Set((activeBusinesses || []).filter(b => b.trialExpiresAt?.toDate() > now && (b.plan === 'starter' || !b.plan)).map(b => b.id));
     const trialingUsers = activeUsers.filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
     
-    const subscriptionStatus = (activeBusinesses || []).reduce((acc, business) => {
-        if (business.accessLevel === 'lifetime') acc.Lifetime = (acc.Lifetime || 0) + 1;
-        else if (business.plan && business.plan !== 'starter') acc.Subscribed = (acc.Subscribed || 0) + 1;
-        else if (business.trialExpiresAt?.toDate() > now) acc.Trial = (acc.Trial || 0) + 1;
-        else acc.Expired = (acc.Expired || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-    const subscriptionStatusData = Object.entries(subscriptionStatus).map(([name, value]) => ({name, value}));
-    
     const planCounts = (activeBusinesses || []).reduce((acc, business) => {
-        const plan = business.plan || 'Free';
+        const plan = business.accessLevel === 'lifetime' ? 'Lifetime' : business.plan || 'Starter';
         acc[plan] = (acc[plan] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
-    const planDistributionData = Object.entries(planCounts).map(([name, value]) => ({name: name.charAt(0).toUpperCase() + name.slice(1), value}));
+    const planDistributionData = Object.entries(planCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1), 
+      value,
+      fill: PIE_CHART_COLORS[name as keyof typeof PIE_CHART_COLORS] || '#ccc'
+    }));
 
-    const userRoleCounts = (activeUsers || []).reduce((acc, user) => {
+    const userRoleData = (activeUsers || []).reduce((acc, user) => {
         const role = user.role || 'unknown';
         acc[role] = (acc[role] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
-    const userRoleData = Object.entries(userRoleCounts).map(([name, value]) => ({name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()), value}));
-
-    const platformTopItems = (receipts || []).flatMap(r => r.items).reduce((acc, item) => {
-        acc[item.name] = (acc[item.name] || 0) + item.quantity;
-        return acc;
-    }, {} as Record<string, number>);
-    
-    const topSellingProducts = Object.entries(platformTopItems).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    const totalProductsSold = receipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
-    const businessesOnPro = activeBusinesses.filter(b => b.plan === 'pro').length;
-    const businessesOnBusiness = activeBusinesses.filter(b => b.plan === 'business').length;
-    const lifetimeBusinesses = activeBusinesses.filter(b => b.accessLevel === 'lifetime').length;
-    const inactiveUsersCount = inactiveUsers.length;
 
     return { 
-        totalUsers, totalBusinesses, totalProducts, totalRevenue, totalReceipts, platformAOV, averageRevenuePerBusiness, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, topBusinesses, categoryData, subscriptionStatusData, planDistributionData, userRoleData, activeSubscriptions, trialingUsers, topSellingProducts,
-        totalProductsSold, businessesOnPro, businessesOnBusiness, lifetimeBusinesses, inactiveUsersCount
+        totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue
     };
   }, [users, businesses, products, receipts, purchases]);
 
+    const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying') => {
+        let modalData = { open: true, title: '', description: '', businesses: [] as BusinessInstance[] };
+        const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
+        
+        switch (type) {
+            case 'active':
+                modalData.title = 'All Active Businesses';
+                modalData.description = 'A list of all businesses on the platform that have not been deleted.';
+                modalData.businesses = activeBusinesses;
+                break;
+            case 'activated':
+                modalData.title = 'Activated Businesses';
+                modalData.description = 'Businesses with at least 10 products and at least 1 sale.';
+                modalData.businesses = platformAnalytics.activatedBusinessesList;
+                break;
+            case 'atRisk':
+                modalData.title = 'Businesses At Risk';
+                modalData.description = 'Businesses with no sales in the last 14 days.';
+                modalData.businesses = platformAnalytics.atRiskBusinesses;
+                break;
+            case 'paying':
+                modalData.title = 'Paying Businesses';
+                modalData.description = 'Businesses on a Pro or Business plan whose trial has expired.';
+                modalData.businesses = platformAnalytics.payingBusinessesList;
+                break;
+        }
+        setDetailModalState(modalData);
+    };
 
   const handleGrantAccess = async () => {
     if (!grantEmail) {
@@ -310,7 +442,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const historyColRef = collection(firestore, 'businessInstances', userData.businessId, 'subscription_history');
 
         if (grantLifetime) {
-            await updateDoc(businessDocRef, { accessLevel: 'lifetime', trialExpiresAt: null });
+            await updateDoc(businessDocRef, { accessLevel: 'lifetime', trialExpiresAt: null, plan: 'business' });
             await addDoc(historyColRef, {
                 action: 'Admin Grant: Lifetime access',
                 amount: 0,
@@ -402,22 +534,6 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             setIsAssigningPlan(false);
         }
     };
-
-    const statCards = [
-        { title: "Total Revenue", value: `₦${analyticsData.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign, description: "From Subscriptions" },
-        { title: "Total Businesses", value: analyticsData.totalBusinesses.toLocaleString(), icon: Building },
-        { title: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
-        { title: "Total Products", value: analyticsData.totalProducts.toLocaleString(), icon: Package },
-        { title: "Total POS Sales", value: analyticsData.totalReceipts.toLocaleString(), icon: FileText },
-        { title: "Platform AOV", value: `₦${analyticsData.platformAOV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: ShoppingCart, description: "Avg. POS Value" },
-        { title: "Active Subscriptions", value: analyticsData.activeSubscriptions.toLocaleString(), icon: UserCheck, description: 'Pro + Business plans' },
-        { title: "Trialing Businesses", value: analyticsData.trialingUsers.toLocaleString(), icon: Clock },
-        { title: "Total Products Sold", value: analyticsData.totalProductsSold.toLocaleString(), icon: ShoppingCart, description: "Across all businesses" },
-        { title: "Businesses on Pro", value: analyticsData.businessesOnPro.toLocaleString(), icon: TrendingUp },
-        { title: "Businesses on Business", value: analyticsData.businessesOnBusiness.toLocaleString(), icon: Crown },
-        { title: "Lifetime Deals", value: analyticsData.lifetimeBusinesses.toLocaleString(), icon: ShieldCheck },
-        { title: "Inactive Users", value: analyticsData.inactiveUsersCount.toLocaleString(), icon: UserX },
-    ];
     
       return (
         <div className="p-4 md:p-6 lg:p-8 space-y-6">
@@ -427,10 +543,96 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
               Platform-wide overview of Zeneva.
             </p>
           </div>
-    
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {statCards.map(card => <StatCard key={card.title} {...card} />)}
-          </div>
+          
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <HeartPulse className="h-5 w-5 text-primary" />
+                        Platform Health Overview
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
+                        <StatCard title="Total Active Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
+                    </button>
+                    <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
+                        <StatCard title="Activated Businesses" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products & >=1 sale"/>
+                    </button>
+                    <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
+                        <StatCard title="Businesses At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales in 14 days" />
+                    </button>
+                     <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
+                        <StatCard title="Paying Businesses" value={platformAnalytics.payingBusinessesCount} icon={ShieldCheck} description="Pro + Business Plans" />
+                    </button>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <BarChart2 className="h-5 w-5 text-primary" />
+                        Platform Activity Overview
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold"/>
+                    <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales"/>
+                    <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
+                    <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
+                </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChart2 className="h-5 w-5 text-primary" />
+                            Business Health Distribution
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                         <ResponsiveContainer width="100%" height={200}>
+                            <RePieChart>
+                            <Pie data={platformAnalytics.healthDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} labelLine={false} >
+                                {platformAnalytics.healthDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
+                            </Pie>
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend iconSize={10} />
+                            </RePieChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+                <div className="lg:col-span-2 relative overflow-hidden rounded-lg border bg-card">
+                    <div className="grid-bg opacity-30 absolute inset-0 z-0"></div>
+                    <div className="relative z-10">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Bot className="h-5 w-5 text-primary" />
+                                Zen AI Adoption & Impact
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                           <div className="text-center">
+                               <p className="text-3xl font-bold">{platformAnalytics.aiAdoption7.toFixed(1)}%</p>
+                               <p className="text-sm text-muted-foreground">Adoption (7 days)</p>
+                           </div>
+                           <div className="text-center">
+                               <p className="text-3xl font-bold">{platformAnalytics.aiAdoption30.toFixed(1)}%</p>
+                               <p className="text-sm text-muted-foreground">Adoption (30 days)</p>
+                           </div>
+                           <div className="text-center">
+                               <p className="text-3xl font-bold">{platformAnalytics.businessAnalysisUsers}</p>
+                               <p className="text-sm text-muted-foreground">Used Business Analysis</p>
+                           </div>
+                           <div className="text-center">
+                               <p className="text-3xl font-bold">{platformAnalytics.troubleshootUsers}</p>
+                               <p className="text-sm text-muted-foreground">Used Troubleshooter</p>
+                           </div>
+                        </CardContent>
+                    </div>
+                </div>
+            </div>
+
     
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
              <Card>
@@ -464,37 +666,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
           </div>
     
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-1">
+                <Card>
                     <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><TrendingUp className="text-amber-500"/>Top 5 Selling Products</CardTitle>
-                        <CardDescription>Platform-wide product sales from POS transactions.</CardDescription>
+                        <CardTitle className='flex items-center gap-2'><Layers className="text-primary"/>Plan Distribution</CardTitle>
                     </CardHeader>
                     <CardContent>
-                         <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Product Name</TableHead>
-                                    <TableHead className="text-right">Quantity Sold</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {analyticsData.topSellingProducts.map(([name, quantity]) => (
-                                    <TableRow key={name}>
-                                        <TableCell className="font-medium">{name}</TableCell>
-                                        <TableCell className="text-right font-semibold">{quantity.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                         </Table>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><PieChartIcon className="text-primary"/>User Role Distribution</CardTitle></CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
+                         <ResponsiveContainer width="100%" height={200}>
                             <RePieChart>
-                            <Pie data={analyticsData.userRoleData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                {analyticsData.userRoleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
+                            <Pie data={analyticsData.planDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                {analyticsData.planDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
                             </Pie>
                             <Tooltip content={<CustomTooltip />} />
                             <Legend iconSize={10} />
@@ -502,21 +682,24 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <div className="space-y-6">
-                  <Card>
-                      <CardHeader><CardTitle className="flex items-center gap-2"><Layers className="text-primary"/>Plan Distribution</CardTitle></CardHeader>
-                      <CardContent>
-                          <ResponsiveContainer width="100%" height={150}>
-                             <RePieChart>
-                               <Pie data={analyticsData.planDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
-                                  {analyticsData.planDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />))}
-                               </Pie>
-                               <Tooltip content={<CustomTooltip />} />
-                               <Legend iconSize={10} />
-                             </RePieChart>
-                          </ResponsiveContainer>
-                      </CardContent>
-                  </Card>
+                <Card>
+                    <CardHeader><CardTitle className="flex items-center gap-2"><PieChartIcon className="text-primary"/>User Role Distribution</CardTitle></CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                            <ReBarChart data={Object.entries(analyticsData.userRoleData).map(([name, value]) => ({name: name.charAt(0).toUpperCase() + name.slice(1).replace('_', ' '), value}))} layout="vertical" margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} style={{ fontSize: '12px' }}/>
+                                <XAxis type="number" hide />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.1)'}} />
+                                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                            </ReBarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+                 <div className="space-y-6">
+                  <StatCard title="Subscription Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} />
+                  <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={TrendingUp} />
+                  <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={CalendarIcon} />
                 </div>
            </div>
            
@@ -524,8 +707,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Active Accounts</CardTitle>
-                            <CardDescription>List of all users with an active status on the platform.</CardDescription>
+                            <CardTitle>All Accounts</CardTitle>
+                            <CardDescription>List of all users on the platform.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ScrollArea className="h-[330px]">
@@ -632,30 +815,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </CardContent>
                         <CardFooter><Button onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className='w-full'>{isUpdatingStatus && <Loader className='mr-2 h-4 w-4 animate-spin' />}{isUserActive ? <Check className='mr-2 h-4 w-4'/> : <Ban className='mr-2 h-4 w-4'/>}Set Status</Button></CardFooter>
                     </Card>
-                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Newspaper/>Blog Management</CardTitle>
-                            <CardDescription>Create and manage blog posts for the platform.</CardDescription>
-                        </CardHeader>
-                        <CardFooter>
-                            <Button className="w-full" asChild>
-                                <Link href="/admin-imamshaffy/blog">Go to Blog Posts</Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Send/>Notifications</CardTitle>
-                            <CardDescription>Send platform-wide announcements to all users.</CardDescription>
-                        </CardHeader>
-                        <CardFooter>
-                             <Button className="w-full" asChild>
-                                <Link href="/admin-imamshaffy/notifications">Send Notification</Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
                 </div>
           </div>
+          <BusinessDetailDialog
+            open={detailModalState.open}
+            onOpenChange={(open) => setDetailModalState(prev => ({...prev, open}))}
+            title={detailModalState.title}
+            description={detailModalState.description}
+            businesses={detailModalState.businesses}
+            users={users}
+          />
         </div>
       );
 }

@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
-import { PieChart as PieChartIcon } from "lucide-react";
+import { PieChart as PieChartIcon, Bot } from "lucide-react";
 import type { Product } from '@/types';
 
 interface CategoryPieChartProps {
@@ -63,8 +63,10 @@ export default function CategoryPieChart({ products }: CategoryPieChartProps) {
         {noData ? (
           <div className="h-[250px] flex flex-col items-center justify-center text-center text-muted-foreground">
             <PieChartIcon className="h-16 w-16 opacity-50 mb-4" />
-            <p className="text-lg font-medium">No Data to Display</p>
-            <p className="text-sm">Add products with categories to see this chart.</p>
+            <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
+                <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
+                <p>Add products with categories to see your stock distribution here.</p>
+            </div>
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[250px]">

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBusiness } from '@/context/pos-context';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid'; // To generate a unique receipt number
 import { sendReceiptEmail } from '@/lib/email';
@@ -22,7 +22,7 @@ import { logAuditEvent } from '@/lib/audit';
 export default function ReviewPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
@@ -67,73 +67,72 @@ export default function ReviewPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
             return;
         }
+
+        // Pre-flight check for stock against the cached product data
+        for (const cartItem of cart) {
+            const productFromCache = products.find(p => p.id === cartItem.product.id);
+            if (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity) {
+                 toast({ variant: 'destructive', title: 'Stock Error', description: `Not enough stock for ${cartItem.product.name}. Please adjust the quantity.` });
+                 return;
+            }
+        }
+        
         setIsCompleting(true);
         
         const newReceiptRef = doc(collection(firestore, 'receipts'));
 
         try {
-            await runTransaction(firestore, async (transaction) => {
-                const productRefs = cart.map(item => doc(firestore, 'products', item.product.id));
-                const readPromises: Promise<DocumentSnapshot>[] = productRefs.map(ref => transaction.get(ref));
+            // Using writeBatch for offline capability
+            const batch = writeBatch(firestore);
 
-                let customerRef: DocumentReference | null = null;
-                if (selectedCustomer) {
-                    customerRef = doc(firestore, 'customers', selectedCustomer.id);
-                    readPromises.push(transaction.get(customerRef));
-                }
+            let totalCost = 0;
+            const itemsForReceipt = cart.map(cartItem => {
+                const product = products.find(p => p.id === cartItem.product.id);
+                const costPrice = product?.costPrice || 0;
+                totalCost += costPrice * cartItem.quantity;
 
-                const allDocs = await Promise.all(readPromises);
-                const productDocs = allDocs.slice(0, cart.length);
-                const customerDoc = customerRef ? allDocs[allDocs.length - 1] : null;
+                // Decrement stock for each product in the batch
+                const productRef = doc(firestore, 'products', cartItem.product.id);
+                const newStock = (product?.stock || 0) - cartItem.quantity;
+                batch.update(productRef, { stock: newStock });
 
-                for (let i = 0; i < productDocs.length; i++) {
-                    const productDoc = productDocs[i];
-                    const cartItem = cart[i];
-                    if (!productDoc.exists() || (productDoc.data().stock || 0) < cartItem.quantity) {
-                        throw new Error(`Not enough stock for ${cartItem.product.name}.`);
-                    }
-                }
-
-                let totalCost = 0;
-                const itemsForReceipt = cart.map(cartItem => {
-                    const product = products.find(p => p.id === cartItem.product.id);
-                    const costPrice = product?.costPrice || 0;
-                    totalCost += costPrice * cartItem.quantity;
-                    return { 
-                        productId: cartItem.product.id, 
-                        name: cartItem.product.name, 
-                        quantity: cartItem.quantity, 
-                        price: cartItem.product.price,
-                        costPrice: costPrice,
-                    };
-                });
-                const profit = total - totalCost;
-
-                for (let i = 0; i < productDocs.length; i++) {
-                    const productDoc = productDocs[i];
-                    const cartItem = cart[i];
-                    const newStock = productDoc.data()!.stock - cartItem.quantity;
-                    transaction.update(productDoc.ref, { stock: newStock });
-                }
-
-                if (customerDoc && customerDoc.exists() && business.settings?.loyaltyProgramEnabled) {
-                    const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                    const pointsEarned = Math.floor(total * pointsPerUnit);
-                    const currentPoints = customerDoc.data()?.loyaltyPoints || 0;
-                    transaction.update(customerDoc.ref, { loyaltyPoints: currentPoints + pointsEarned });
-                }
-
-                const receiptData = {
-                    businessId: business.id,
-                    receiptNumber: displayReceipt.receiptNumber,
-                    items: itemsForReceipt,
-                    customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
-                    subtotal, tax, discount, total, totalCost, profit, paymentMethod,
-                    createdAt: serverTimestamp(),
-                    createdBy: user.uid,
+                return { 
+                    productId: cartItem.product.id, 
+                    name: cartItem.product.name, 
+                    quantity: cartItem.quantity, 
+                    price: cartItem.product.price,
+                    costPrice: costPrice,
                 };
-                transaction.set(newReceiptRef, receiptData);
             });
+            const profit = total - totalCost;
+            
+            // Update customer loyalty points in the batch
+            if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
+                const customerRef = doc(firestore, 'customers', selectedCustomer.id);
+                const pointsPerUnit = business.settings.pointsPerUnit || 0;
+                const pointsEarned = Math.floor(total * pointsPerUnit);
+
+                // Use cached customer data instead of fetching from the network
+                const customerFromContext = customers?.find(c => c.id === selectedCustomer.id);
+                const currentPoints = customerFromContext?.loyaltyPoints || 0;
+                
+                batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
+            }
+
+            // Create the new receipt in the batch
+            const receiptData = {
+                businessId: business.id,
+                receiptNumber: displayReceipt.receiptNumber,
+                items: itemsForReceipt,
+                customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
+                subtotal, tax, discount, total, totalCost, profit, paymentMethod,
+                createdAt: serverTimestamp(),
+                createdBy: user.uid,
+            };
+            batch.set(newReceiptRef, receiptData);
+
+            // Commit the batch. This works offline.
+            await batch.commit();
             
             // Log audit event after successful transaction
             logAuditEvent(firestore, business.id, currentUserProfile, {
@@ -213,7 +212,7 @@ export default function ReviewPage() {
                  <div className="p-4 rounded-lg bg-card border space-y-4">
                      <h3 className="text-lg font-semibold">Ready to Complete?</h3>
                      <p className="text-sm text-muted-foreground">
-                         This will finalize the sale, generate a receipt, and update your inventory.
+                         This will finalize the sale, generate a receipt, and update your inventory. This action works offline.
                      </p>
 
                     {selectedCustomer?.email && canSendEmail && (

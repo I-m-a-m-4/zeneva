@@ -5,7 +5,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, CartesianGrid, XAxis, YAxis, Line, Legend } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
 
@@ -65,18 +65,20 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
             <CardHeader>
                 <CardTitle>Profit & Loss</CardTitle>
                 <CardDescription>
-                    {hasCostData
-                        ? "Revenue, cost of goods sold, and profit for the current year."
-                        : "Your profit is calculated as revenue minus the 'Cost Price' of items sold. Add cost prices to your products for an accurate report."
+                    {!hasCostData && !noData
+                        ? "Your profit is calculated as revenue minus the 'Cost Price' of items sold. Add cost prices to your products for an accurate report."
+                        : "Revenue, cost of goods sold, and profit for the current year."
                     }
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {noData ? (
-                    <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground">
+                    <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                         <TrendingUp className="h-16 w-16 opacity-50 mb-4" />
-                        <p className="text-lg font-medium">No P&L Data Available</p>
-                        <p className="text-sm">This chart will populate once sales are recorded.</p>
+                         <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
+                             <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
+                            <p>No sales were recorded in this period. To see your profitability, add a 'Cost Price' to your products and start making sales.</p>
+                        </div>
                     </div>
                 ) : (
                     <ChartContainer config={chartConfig} className="h-[300px] w-full">

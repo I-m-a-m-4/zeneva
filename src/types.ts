@@ -1,5 +1,3 @@
-
-
 export interface Product {
     id: string;
     businessId: string;
@@ -14,6 +12,7 @@ export interface Product {
     description?: string;
     lowStockThreshold?: number;
     createdAt?: any;
+    expiryDate?: any;
 }
 export type InventoryItem = Product;
 export interface CartItem {
@@ -105,6 +104,50 @@ export interface AISuggestions {
     createdAt: any; // Firestore Timestamp
 }
 
+export type TopPerformer = {
+    productId: string;
+    name: string;
+    reason: string;
+};
+
+export type Underperformer = {
+    productId: string;
+    name: string;
+    reason: string;
+};
+
+export type RestockSuggestion = {
+    productId: string;
+    name: string;
+    reason: string;
+};
+
+export type BusinessAnalysis = {
+    health: {
+        score: number;
+        status: string;
+        summary: string;
+    };
+    keyInsights: {
+        title: string;
+        description: string;
+        actionText: string;
+        link: string;
+    }[];
+    actionableSuggestions: {
+        priority: number;
+        title: string;
+        description: string;
+        actionText: string;
+        link: string;
+    }[];
+    whatIsWorking?: TopPerformer[];
+    whatIsWastingMoney?: Underperformer[];
+    whatToRestock?: RestockSuggestion[];
+    createdAt: any; // Can be Date or Firestore Timestamp
+};
+
+
 export interface BusinessInstance {
     id: string;
     name: string;
@@ -136,6 +179,7 @@ export interface BusinessInstance {
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
         aiTroubleshootSuggestions?: AISuggestions;
+        businessAnalysis?: BusinessAnalysis;
         publicStore?: {
             enabled?: boolean;
             headline?: string;

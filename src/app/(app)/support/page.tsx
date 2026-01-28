@@ -96,6 +96,37 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
     )
   },
   {
+    id: 'paystack-setup',
+    question: 'How do I set up Paystack for my online store?',
+    answer: (
+      <>
+        <p>
+          Zeneva allows you to accept online payments directly into your own Paystack account using their "Subaccounts" feature. This is secure and ensures you receive your funds directly. Here's how to set it up:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 mt-4">
+          <li>
+            <strong>Log in to your Paystack Dashboard.</strong> If you don't have one, you'll need to create a Paystack account for your business.
+          </li>
+          <li>
+            <strong>Navigate to Subaccounts:</strong> In your Paystack dashboard menu, find and click on "Subaccounts".
+          </li>
+          <li>
+            <strong>Create a New Subaccount:</strong> Click the "New Subaccount" button. You'll need to provide your business bank account details for verification.
+          </li>
+          <li>
+            <strong>Get the Subaccount Code:</strong> Once the subaccount is created and activated, Paystack will provide you with a unique "Subaccount Code". It will look something like <code>ACCT_xxxxxxxxxxxxxxx</code>.
+          </li>
+          <li>
+            <strong>Paste the Code in Zeneva:</strong> Copy this code. In your Zeneva dashboard, go to <strong>Settings {'->'} Payment Gateway</strong>. Paste the code into the "Paystack Subaccount Code" field and click "Save".
+          </li>
+        </ol>
+        <p className="mt-4">
+          Once saved, your online storefront will be ready to securely process card payments directly to you via Paystack.
+        </p>
+      </>
+    ),
+  },
+  {
     question: "How do I manage staff roles and permissions?",
     answer: (
         <p>As an 'admin', you can invite new users from the 'Users' page. You can assign them roles like 'Manager' (who can manage products and view most reports) or 'Vendor Operator' (who can primarily use the POS). Permissions are pre-set for each role to ensure security.</p>

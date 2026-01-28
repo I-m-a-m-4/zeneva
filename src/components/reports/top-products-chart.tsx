@@ -5,7 +5,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
-import { Package, TrendingUp } from 'lucide-react';
+import { Package, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
 
@@ -45,16 +45,18 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
             </CardHeader>
             <CardContent>
                  {noData ? (
-                    <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground">
+                    <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                         <Package className="h-16 w-16 opacity-50 mb-4" />
-                        <p className="text-lg font-medium">No Product Sales Data</p>
-                        <p className="text-sm">This chart will populate as you sell products.</p>
+                        <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
+                             <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
+                            <p>This chart will highlight your bestsellers once you start making sales through the POS.</p>
+                        </div>
                     </div>
                 ) : (
                     <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                             <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={8} width={80} />
+                             <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={8} width={80} interval={0} style={{ fontSize: '12px' }}/>
                              <XAxis type="number" hide />
                              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                              <Bar dataKey="quantity" fill="var(--color-quantity)" radius={4} />

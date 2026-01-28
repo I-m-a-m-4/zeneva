@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -18,6 +17,7 @@ import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import type { Customer } from '@/types';
+import { usePOS } from '@/context/pos-context';
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
@@ -29,6 +29,7 @@ interface AddCustomerDialogProps {
 export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers }: AddCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { triggerRefresh } = usePOS();
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
@@ -69,6 +70,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         createdAt: serverTimestamp(),
       });
       toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
+      triggerRefresh();
       onOpenChange(false);
       resetForm();
     } catch (error) {

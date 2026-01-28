@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser } from '@/firebase';
@@ -45,7 +44,7 @@ export default function MarketingHeader() {
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center justify-center gap-2" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
               <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
-              <span className="text-4xl font-bold text-black font-instrument-serif">Zeneva</span>
+              <span className="text-4xl font-bold text-black font-bricolage">Zeneva</span>
             </Link>
           </div>
 

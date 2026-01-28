@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -22,7 +23,7 @@ export default function NetworkStatusIndicator() {
       toast({
         title: 'No Internet Connection',
         description: 'You are currently offline. Changes will be saved locally and synced when you reconnect.',
-        variant: 'destructive',
+        variant: 'warning',
         duration: Infinity, // Keep the toast until back online
       });
     };

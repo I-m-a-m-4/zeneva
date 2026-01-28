@@ -164,6 +164,11 @@
         "category": {
           "type": "string",
           "description": "Category of the product."
+        },
+        "expiryDate": {
+            "type": "string",
+            "format": "date",
+            "description": "The expiration date of the product, for perishable goods."
         }
       },
       "required": [

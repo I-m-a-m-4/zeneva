@@ -1,3 +1,4 @@
+
 'use client';
 
 import *as React from 'react';
@@ -29,11 +30,10 @@ import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
-import CommandMenu from '@/components/layout/command-menu';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
-import { POSProvider, usePOS } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,7 @@ import NetworkStatusIndicator from '@/components/shared/network-status-indicator
 import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
+import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -50,13 +51,13 @@ const navItems = [
     { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
     { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager'] },
     { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
+    { href: '/ai-insights', icon: Bot, label: 'AI Insights', roles: ['admin', 'manager'] },
     { href: '/customers', icon: UsersIcon, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
     { href: '/users', icon: UsersIcon, label: 'Users', roles: ['admin'] },
     { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
 ];
 
 const bottomLinks = [
-    { href: '/inventory/troubleshoot', icon: Bot, label: 'Troubleshoot', roles: ['admin', 'manager'] },
     { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['admin'] },
     { href: '/settings', icon: Settings, label: 'Settings', roles: ['admin'] },
     { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -76,8 +77,7 @@ function FullScreenLoader({ text }: { text: string }) {
   );
 }
 
-// Renamed from AppLayout to avoid confusion
-function AuthenticatedLayout({
+export default function AuthenticatedLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -100,7 +100,6 @@ function AuthenticatedLayout({
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   // All hooks must be called before any conditional returns.
-  const [openCommandMenu, setOpenCommandMenu] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
 
   const userNotificationsQuery = useMemoFirebase(
@@ -163,26 +162,17 @@ function AuthenticatedLayout({
   };
 
   React.useEffect(() => {
-      const down = (e: KeyboardEvent) => {
-          if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              setOpenCommandMenu((open) => !open);
-          }
-      };
-      document.addEventListener("keydown", down);
-      return () => document.removeEventListener("keydown", down);
-  }, []);
-
-  React.useEffect(() => {
     // If loading is complete and there's no authenticated user, redirect to login.
     if (!isLoading && !user) {
       router.replace('/login');
     }
+  }, [isLoading, user, router]);
 
+  React.useEffect(() => {
     if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding') {
-      router.replace('/onboarding');
+        router.replace('/onboarding');
     }
-  }, [isLoading, user, currentUserProfile, pathname, router]);
+  }, [isLoading, currentUserProfile, pathname, router]);
   
   const getInitials = (name?: string) => {
     if (!name?.trim()) return "";
@@ -201,9 +191,8 @@ function AuthenticatedLayout({
     return <FullScreenLoader text="Logging out..." />;
   }
 
-  // Show a loader while the initial auth state and user profile are being fetched,
-  // or while waiting for the redirect to happen.
-  if (isLoading || !user || !currentUserProfile) {
+  // Show full-screen loader ONLY on initial load OR if core data is missing after load.
+  if (isLoading || !currentUserProfile || !user) {
     return <FullScreenLoader text="Loading your workspace..." />;
   }
 
@@ -291,8 +280,9 @@ function AuthenticatedLayout({
 
   const isLinkActive = (linkHref: string, currentPathname: string) => {
     if (linkHref === '/dashboard') return currentPathname === linkHref;
-    if (linkHref === '/inventory') return currentPathname.startsWith('/inventory') && !currentPathname.startsWith('/inventory/troubleshoot');
+    if (linkHref === '/inventory') return currentPathname.startsWith('/inventory');
     if (linkHref === '/storefront') return currentPathname.startsWith('/storefront');
+    if (linkHref === '/ai-insights') return currentPathname.startsWith('/ai-insights');
     return currentPathname.startsWith(linkHref);
   };
   
@@ -383,12 +373,8 @@ function AuthenticatedLayout({
           <div className="flex-1 flex flex-col overflow-hidden">
               <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex"/>
-                  <div className="relative flex-1">
-                    <Button variant="outline" className="w-full justify-start text-muted-foreground md:w-[200px] lg:w-[336px]" onClick={() => setOpenCommandMenu(true)}>
-                        <SearchIcon className="mr-2 h-4 w-4" />
-                        <span>Search...</span>
-                    </Button>
-                </div>
+                <BusinessHealthIndicator />
+                <div className="flex-1" />
                 <div className="flex items-center gap-1 md:gap-2 ml-auto">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -488,23 +474,7 @@ function AuthenticatedLayout({
         <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
         <NetworkStatusIndicator />
         <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
-        <CommandMenu open={openCommandMenu} onOpenChange={setOpenCommandMenu}/>
       </SidebarProvider>
     </TooltipProvider>
   );
-}
-
-
-export default function AppLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <POSProvider>
-        <AuthenticatedLayout>
-            {children}
-        </AuthenticatedLayout>
-    </POSProvider>
-  )
 }

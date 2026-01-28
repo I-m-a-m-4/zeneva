@@ -51,7 +51,7 @@
     {
       "id": "jewelry-store",
       "description": "A display of fine jewelry.",
-      "imageUrl": "/jewllery.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1611081682524-74b37ac3f4d7?q=80&w=2070&auto=format&fit=crop",
       "imageHint": "jewelry rings"
     },
     {
@@ -117,7 +117,7 @@
     {
       "id": "skin-care",
       "description": "A collection of skin care products.",
-      "imageUrl": "/skincare-cream.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxza2luJTIwY2FyZXxlbnwwfHx8fDE3Njg5NTEzNzZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "skin care"
     },
     {
