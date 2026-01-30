@@ -10,7 +10,9 @@ service cloud.firestore {
     
     function isSuperAdmin() {
       // Super admin backdoor
-      return request.auth != null && request.auth.token.email == 'belloimam431@gmail.com';
+      return request.auth != null && 
+             request.auth.token != null &&
+             request.auth.token.email == 'belloimam431@gmail.com';
     }
 
     function isUserAuthenticated() {
@@ -116,8 +118,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isSuperAdmin() ||
-                    (isUserAuthenticated() && request.auth.uid == userId);
+      allow get: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
                     
 
       allow list: if isRequestingUserAdmin() || isSuperAdmin();

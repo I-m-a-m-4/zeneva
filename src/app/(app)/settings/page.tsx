@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -38,6 +38,7 @@ import { useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ThemeSwitcher } from '@/components/settings/theme-switcher';
 
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
@@ -141,7 +142,6 @@ function SettingsPageContent() {
     const [paymentBankCode, setPaymentBankCode] = React.useState('');
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
     const [verifiedAccountName, setVerifiedAccountName] = React.useState('');
-    const [paystackSubaccount, setPaystackSubaccount] = React.useState('');
 
     const [industry, setIndustry] = React.useState('');
     const [country, setCountry] = React.useState('Nigeria');
@@ -162,7 +162,6 @@ function SettingsPageContent() {
             setDefaultTaxRate(String(business.settings?.defaultTaxRate || 0));
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');
-            setPaystackSubaccount(business.settings?.paystackSubaccount || '');
             setVerifiedAccountName(''); // Reset on load
 
             setIndustry(business.settings?.industry || '');
@@ -246,45 +245,6 @@ function SettingsPageContent() {
                 toast({ variant: "destructive", title: "Logo Upload Failed", description: error.message });
                 setIsSaving(prev => ({ ...prev, [formName]: false }));
                 return;
-            }
-        }
-        
-        if (formName === "financials") {
-            const hasBankDetails = dataToSave['settings.paymentBankCode'] && dataToSave['settings.paymentBankAccountId'];
-            if (hasBankDetails) {
-                 try {
-                    const subaccountResponse = await fetch('/api/paystack/create-subaccount', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            business_name: businessName,
-                            bank_code: dataToSave['settings.paymentBankCode'],
-                            account_number: dataToSave['settings.paymentBankAccountId'],
-                        }),
-                    });
-
-                    const subaccountData = await subaccountResponse.json();
-
-                    if (!subaccountResponse.ok || !subaccountData.subaccount_code) {
-                        throw new Error(subaccountData.message || 'Failed to link account with Paystack and retrieve subaccount code.');
-                    }
-                    
-                    finalData['settings.paystackSubaccount'] = subaccountData.subaccount_code;
-                    setPaystackSubaccount(subaccountData.subaccount_code); // Update local state
-                    toast({
-                        variant: "success",
-                        title: "Paystack Account Linked",
-                        description: "Your bank account can now receive card payments via Paystack.",
-                    });
-
-                } catch (error: any) {
-                    toast({ variant: "destructive", title: "Paystack Link Failed", description: error.message, duration: 7000 });
-                    setIsSaving(prev => ({ ...prev, [formName]: false }));
-                    return; // Stop the save process if linking fails
-                }
-            } else {
-                finalData['settings.paystackSubaccount'] = '';
-                setPaystackSubaccount(''); // Clear local state
             }
         }
 
@@ -388,19 +348,9 @@ function SettingsPageContent() {
                                 {verifiedAccountName && <div><Label>Account Name</Label><Input value={verifiedAccountName} readOnly className="bg-muted"/></div>}
                             </div>
                          </div>
-                         <Separator />
-                         <div>
-                            <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><CreditCard className="h-5 w-5 text-muted-foreground"/>Card Payments (via Paystack)</h4>
-                            <p className="text-sm text-muted-foreground mb-4">To accept card payments on your storefront, your bank account must be linked with Paystack. Saving your financials will attempt to do this automatically.</p>
-                            <div className="space-y-2">
-                                <Label>Paystack Subaccount Code</Label>
-                                <Input value={paystackSubaccount} readOnly placeholder="Generated automatically upon saving financials" className="bg-muted"/>
-                                 <p className="text-xs text-muted-foreground">This code is created when you save valid bank details and is used to route card payments to you.</p>
-                            </div>
-                         </div>
                     </CardContent>
                     <CardFooter>
-                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paystackSubaccount": paystackSubaccount })} disabled={isSaving["financials"]}>
+                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
                         </Button>
                     </CardFooter>
@@ -424,6 +374,16 @@ function SettingsPageContent() {
                             {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Organization
                         </Button>
                     </CardFooter>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
+                        <CardDescription>Customize the look and feel of your dashboard.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ThemeSwitcher />
+                    </CardContent>
                 </Card>
 
                 <Card id="danger-zone" className="border-destructive/50 bg-destructive/5">

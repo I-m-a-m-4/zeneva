@@ -3,7 +3,7 @@ import type {Config} from 'tailwindcss';
 const plugin = require('tailwindcss/plugin');
 
 export default {
-  darkMode: ['class'],
+  darkMode: "class",
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -101,7 +101,7 @@ export default {
         },
         marquee: {
           '0%': { transform: 'translateX(0%)' },
-          '100%': { transform: 'translateX(-50%)' },
+          '100%': { transform: 'translateX(-100%)' },
         },
         clipIn: {
           '0%': { opacity: '0', clipPath: 'inset(0 0 100% 0)' },

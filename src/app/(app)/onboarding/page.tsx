@@ -96,7 +96,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { business, currentUserProfile } = usePOS();
+  const { business, currentUserProfile, triggerRefresh } = usePOS();
   
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -142,6 +142,8 @@ export default function OnboardingPage() {
       await updateDoc(userDocRef, {
         surveyCompleted: true,
       });
+
+      triggerRefresh();
 
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       router.push('/dashboard');
