@@ -388,15 +388,93 @@ export default function Home() {
                             </p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                            {features.map((feature, index) => (
-                                <div key={index} className="p-8 bg-slate-50/50 backdrop-blur-sm border border-slate-100 rounded-2xl hover:bg-slate-100/70 transition-colors cursor-pointer relative group">
-                                    <div className={`w-12 h-12 ${feature.bgColor} ${feature.iconColor} rounded-xl flex items-center justify-center mb-6`}>
+                            {[
+                                {
+                                    icon: ShoppingCart,
+                                    title: "Blazing-Fast POS",
+                                    description: "A modern Point of Sale system that's intuitive, fast, and works seamlessly even when you're offline.",
+                                    bgColor: "bg-blue-100",
+                                    iconColor: "text-blue-600",
+                                    hoverBg: "bg-[#EFF6FF]" // Light Blue
+                                },
+                                {
+                                    icon: Globe,
+                                    title: "E-Commerce Storefront",
+                                    description: "Launch a beautiful, customizable online store in minutes. Your products sync automatically.",
+                                    bgColor: "bg-green-100",
+                                    iconColor: "text-green-600",
+                                    hoverBg: "bg-[#FFF1F2]" // Light Pink
+                                },
+                                {
+                                    icon: Bot,
+                                    title: "AI-Powered Insights",
+                                    description: "Go beyond simple reports. Zen AI acts as a sentinel for your business, identifying your most valuable products.",
+                                    bgColor: "bg-purple-100",
+                                    iconColor: "text-purple-600",
+                                    hoverBg: "bg-[#FAFAF9]" // Light Stone/White
+                                },
+                                {
+                                    icon: Users,
+                                    title: "Integrated CRM",
+                                    description: "Build lasting relationships. Every sale is linked to a customer profile to power your loyalty programs.",
+                                    bgColor: "bg-pink-100",
+                                    iconColor: "text-pink-600",
+                                    hoverBg: "bg-[#FFFBEB]" // Light Cream/Yellow
+                                },
+                                {
+                                    icon: BarChart2,
+                                    title: "Advanced Reporting",
+                                    description: "Deep-dive into your business performance with detailed reports on sales, profit & loss, and top products.",
+                                    bgColor: "bg-sky-100",
+                                    iconColor: "text-sky-600",
+                                    hoverBg: "bg-[#EFF6FF]" // Light Blue
+                                },
+                                {
+                                    icon: UserCog,
+                                    title: "User & Role Management",
+                                    description: "Securely manage your team by inviting staff and assigning roles with specific permissions.",
+                                    bgColor: "bg-yellow-100",
+                                    iconColor: "text-yellow-600",
+                                    hoverBg: "bg-[#FFF1F2]" // Light Pink
+                                },
+                                {
+                                    icon: WifiOff,
+                                    title: "Robust Offline Mode",
+                                    description: "Never miss a sale. The Zeneva POS is built to work perfectly offline, saving all transactions locally.",
+                                    bgColor: "bg-gray-200",
+                                    iconColor: "text-gray-700",
+                                    hoverBg: "bg-[#FFFBEB]" // Light Cream/Yellow
+                                },
+                                {
+                                    icon: Download,
+                                    title: "Bulk Data Tools",
+                                    description: "Migrate your existing inventory effortlessly with our smart CSV importer. Export your data at any time.",
+                                    bgColor: "bg-teal-100",
+                                    iconColor: "text-teal-600",
+                                    hoverBg: "bg-[#EFF6FF]" // Light Blue
+                                },
+                                {
+                                    icon: ShieldCheck,
+                                    title: "Security & Audit Log",
+                                    description: "Enhance security with a detailed record of all critical events, complete with automated issue scanning.",
+                                    bgColor: "bg-red-100",
+                                    iconColor: "text-red-600",
+                                    hoverBg: "bg-[#FAFAF9]" // Light Stone/White
+                                }
+                            ].map((feature, index) => (
+                                <div key={index} className="group relative p-8 bg-slate-50/50 backdrop-blur-sm border border-slate-100 rounded-2xl overflow-hidden transition-all duration-300 isolate cursor-pointer">
+                                    {/* Slide-in Background Animation */}
+                                    <div className={`absolute inset-0 w-0 group-hover:w-full transition-all duration-500 ease-out ${feature.hoverBg} -z-10`}></div>
+
+                                    <div className={`w-12 h-12 ${feature.bgColor} ${feature.iconColor} rounded-xl flex items-center justify-center mb-6 relative z-10 transition-colors duration-300 group-hover:bg-white/80`}>
                                         <feature.icon width="24" height="24" />
                                     </div>
-                                    <h3 className="text-xl font-semibold text-slate-900 mb-2">{feature.title}</h3>
-                                    <p className="text-slate-500 text-sm leading-relaxed">{feature.description}</p>
-                                    <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300 transition-opacity duration-300"></div>
-                                    <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300 transition-opacity duration-300"></div>
+                                    <h3 className="text-xl font-semibold text-slate-900 mb-2 relative z-10">{feature.title}</h3>
+                                    <p className="text-slate-500 text-sm leading-relaxed relative z-10 group-hover:text-slate-700 transition-colors">{feature.description}</p>
+
+                                    {/* Always visible corner accents */}
+                                    <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300 z-10"></div>
+                                    <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300 z-10"></div>
                                 </div>
                             ))}
                         </div>
@@ -498,21 +576,21 @@ export default function Home() {
                                             </defs>
 
                                             <g filter="url(#dropShadow)">
-                                                <path d="M 100 55 
+                                                <path d="M 100 55
                                                         A 35 35 0 1 0 100 125
-                                                        A 35 35 0 1 0 100 55 
-                                                        Z 
-                                                        M 100 63 
-                                                        A 27 27 0 1 1 100 117 
-                                                        A 27 27 0 1 1 100 63 
+                                                        A 35 35 0 1 0 100 55
+                                                        Z
+                                                        M 100 63
+                                                        A 27 27 0 1 1 100 117
+                                                        A 27 27 0 1 1 100 63
                                                         Z"
                                                     fill="url(#thickBlueGradient)"
                                                     stroke="#1e293b"
                                                     strokeWidth="0.5" />
 
-                                                <path d="M 60 127 
-                                                        Q 100 154 140 127 
-                                                        Q 100 142 60 127 
+                                                <path d="M 60 127
+                                                        Q 100 154 140 127
+                                                        Q 100 142 60 127
                                                         Z"
                                                     fill="url(#thickBlueGradient)"
                                                     stroke="#1e293b"
