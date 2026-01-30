@@ -78,6 +78,22 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
     )
   },
   {
+    id: "audit-log-guide",
+    question: "How do I use the Audit Log?",
+    answer: (
+      <>
+        <p>The Audit Log, available on Pro and Business plans, is a crucial security feature that records important actions taken within your business. It helps you track changes and investigate potential issues.</p>
+        <ol className="list-decimal list-inside space-y-2 mt-2">
+            <li><strong>Access the Log:</strong> Navigate to the 'Audit Log' page from the sidebar.</li>
+            <li><strong>Review Events:</strong> The log shows a chronological list of events, including who performed the action, what they did (e.g., 'product.create', 'sale.void'), and when it happened. Click on any row to see more details in a pop-up modal.</li>
+            <li><strong>Scan for Issues:</strong> Click the "Scan for Issues" button. The system will instantly analyze your logs for common suspicious patterns, such as a sale being voided immediately after it was created, and present them to you for review. This can help you identify potential theft or operational mistakes quickly.</li>
+            <li><strong>Investigate:</strong> Use the information to investigate any discrepancies. For example, if you see an unusual number of voided sales by a specific staff member, you can cross-reference it with your cash drawer records.</li>
+        </ol>
+        <p className="mt-2">Regularly reviewing your audit log is a good practice for maintaining the security and integrity of your business operations.</p>
+      </>
+    )
+  },
+  {
     question: "How can I upgrade or manage my subscription?",
     answer: (
         <p>Navigate to the 'Billing' page from the main menu. Here, you can view your current plan, see your payment history, and choose to upgrade to a higher tier to unlock more features like advanced reporting and a public storefront.</p>
@@ -86,7 +102,7 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
     {
     question: "What is the AI Troubleshoot feature?",
     answer: (
-      <p>You can find this feature in the 'Inventory' section under the 'Troubleshoot' tab. Zen AI analyzes all your product data for issues like missing prices, short descriptions, or missing categories. It provides a prioritized list of actionable suggestions to help you improve your data quality and sell more effectively. This is a Pro and Business plan feature.</p>
+      <p>You can find this feature in the 'Zen AI' section under the 'Product Data Quality' tab. Our system analyzes all your product data for issues like missing prices, short descriptions, or missing categories. It provides a prioritized list of actionable suggestions to help you improve your data quality and sell more effectively. This is a Pro and Business plan feature.</p>
     )
   },
   {
@@ -97,31 +113,28 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
   },
   {
     id: 'paystack-setup',
-    question: 'How do I set up Paystack for my online store?',
+    question: 'How do I set up my account for online payments?',
     answer: (
       <>
         <p>
-          Zeneva allows you to accept online payments directly into your own Paystack account using their "Subaccounts" feature. This is secure and ensures you receive your funds directly. Here's how to set it up:
+          Zeneva makes it easy to accept payments for your online store. For bank transfers, funds go to the account you set. For card payments, we integrate with Paystack to send funds directly to you. Here's how it works:
         </p>
         <ol className="list-decimal list-inside space-y-2 mt-4">
           <li>
-            <strong>Log in to your Paystack Dashboard.</strong> If you don't have one, you'll need to create a Paystack account for your business.
+            <strong>Provide Your Bank Details:</strong> In Zeneva, go to <strong>Settings {'->'} Financials</strong>. Fill in your business's bank name and account number. Our system will verify the account name for you. This is the account where funds from "Bank Transfer" orders will go.
           </li>
           <li>
-            <strong>Navigate to Subaccounts:</strong> In your Paystack dashboard menu, find and click on "Subaccounts".
+            <strong>(For Card Payments) Create a Paystack Subaccount:</strong> To accept credit/debit cards, you need a Paystack account. Inside your Paystack dashboard, create a "Subaccount" for your Zeneva store.
           </li>
           <li>
-            <strong>Create a New Subaccount:</strong> Click the "New Subaccount" button. You'll need to provide your business bank account details for verification.
+            <strong>Set Transaction Split:</strong> When creating the subaccount, Paystack will ask how to split the money. Set <strong>"Subaccount gets" to 100%</strong>. Zeneva does not take a commission on your sales.
           </li>
           <li>
-            <strong>Get the Subaccount Code:</strong> Once the subaccount is created and activated, Paystack will provide you with a unique "Subaccount Code". It will look something like <code>ACCT_xxxxxxxxxxxxxxx</code>.
-          </li>
-          <li>
-            <strong>Paste the Code in Zeneva:</strong> Copy this code. In your Zeneva dashboard, go to <strong>Settings {'->'} Payment Gateway</strong>. Paste the code into the "Paystack Subaccount Code" field and click "Save".
+            <strong>Get the Subaccount Code:</strong> Paystack will give you a code that looks like `ACCT_xxxxxxxxxxxxxxx`. Go to Zeneva's <strong>Settings {'->'} Financials</strong> page and paste this code into the "Paystack Subaccount" field.
           </li>
         </ol>
         <p className="mt-4">
-          Once saved, your online storefront will be ready to securely process card payments directly to you via Paystack.
+          By providing your bank details, you can receive orders via manual bank transfer. Adding a Paystack subaccount enables direct card payments for your customers on your online store.
         </p>
       </>
     ),

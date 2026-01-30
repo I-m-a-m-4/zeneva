@@ -59,42 +59,6 @@ function DashboardSkeleton() {
   );
 }
 
-function ZenAiSummaryCard({ analysis }: { analysis: BusinessAnalysis | null | undefined }) {
-    if (!analysis || !analysis.health) {
-        return null;
-    }
-    const { health } = analysis;
-
-    return (
-        <div className="md:col-span-2 lg:col-span-4">
-            <Link href="/ai-insights" className="block w-full">
-                <Card className={cn(
-                    "shadow-lg transition-all duration-300 hover:shadow-xl cursor-pointer hover:-translate-y-1 relative overflow-hidden",
-                    "bg-slate-900 text-primary-foreground sidebar-wavy-pattern"
-                )}>
-                    <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0 bg-white/10 backdrop-blur-sm p-2 rounded-lg">
-                                <Bot className="h-6 w-6"/>
-                            </div>
-                            <div>
-                                <CardTitle className="text-base font-semibold">Zen AI Summary</CardTitle>
-                                <Badge variant="secondary" className="mt-1 bg-white/90 text-slate-900 hover:bg-white">
-                                    {health.status}
-                                </Badge>
-                            </div>
-                        </div>
-                        <p className="text-sm text-white/80 flex-1 leading-snug sm:ml-4 sm:border-l sm:border-white/20 sm:pl-4">
-                            {health.summary}
-                        </p>
-                        <ArrowRight className="h-5 w-5 text-white/70 hidden sm:block" />
-                    </CardContent>
-                </Card>
-            </Link>
-        </div>
-    );
-}
-
 export default function DashboardPage() {
   const { toast } = useToast();
   const dashboardRef = React.useRef<HTMLDivElement>(null);
@@ -235,10 +199,12 @@ export default function DashboardPage() {
         />
       </div>
 
-       <div className="grid grid-cols-1">
-        <ZenAiSummaryCard analysis={business?.settings?.businessAnalysis} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
+        </div>
+        <CategoryPieChart products={products || []} />
       </div>
-
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2 shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
@@ -294,13 +260,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
-        </div>
-        <CategoryPieChart products={products || []} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

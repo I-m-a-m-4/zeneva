@@ -3,7 +3,6 @@
 
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { POSProvider } from "@/context/pos-context";
 
 const steps = [
   { name: "Select Products", path: "/sales/pos/select-products" },
@@ -17,7 +16,6 @@ export default function POSLayout({ children }: { children: React.ReactNode }) {
   const currentStepIndex = steps.findIndex((step) => pathname === step.path);
 
   return (
-    <POSProvider>
       <div className="p-4 sm:p-6">
         <nav aria-label="Progress" className="mb-8">
           <ol role="list" className="flex items-center">
@@ -74,7 +72,5 @@ export default function POSLayout({ children }: { children: React.ReactNode }) {
         </nav>
         {children}
       </div>
-    </POSProvider>
   );
 }
-

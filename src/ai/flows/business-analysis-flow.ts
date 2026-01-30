@@ -2,10 +2,9 @@
 'use server';
 
 /**
- * @fileOverview A comprehensive AI agent for generating deep business insights.
+ * @fileOverview An AI agent for generating high-impact, financially-focused business insights.
  *
- * - businessAnalysisFlow - A function that analyzes business data to provide a health score,
- *   summaries, and actionable recommendations.
+ * - businessAnalysis - Analyzes sales and inventory to identify money locked in stock and sales at risk.
  */
 
 import { ai } from '@/ai/genkit';
@@ -26,7 +25,9 @@ const prompt = ai.definePrompt({
   name: 'businessAnalysisPrompt',
   input: { schema: BusinessAnalysisInputSchema },
   output: { schema: BusinessAnalysisOutputSchema },
-  prompt: `You are Zen AI, an expert business analyst and consultant for a small-to-medium retail business. Your analysis must be calm, clear, non-technical, and actionable. Your primary goal is to provide a concise executive briefing, not a long report.
+  prompt: `You are Zen AI, a sharp, no-nonsense business advisor for a retail business owner. Your analysis must be direct, financially focused, and immediately actionable. Forget jargon. Talk about money lost and money at risk.
+
+**Core Objective:** Tell the user where they are losing money and what to do about it.
 
 **Valid Application Links:**
 - Inventory Page: /inventory
@@ -34,54 +35,45 @@ const prompt = ai.definePrompt({
 - Reports Page: /reports
 - Settings Page: /settings
 
-When providing a 'link' in your response, you MUST use one of the valid links from the list above. For example, if suggesting a review of inventory, use the "/inventory" link. Do not invent new links.
-
 **Analysis Period:** The data provided is for the last 90 days.
 
 **Your Task:**
 Generate a structured JSON object that strictly follows the output schema.
 
-**PART 1: High-Level Executive Summary**
+**PART 1: Business Health Score**
+1.  Calculate a single score from 0-100 reflecting overall business health. 
+    *   **Factors:** Sales velocity (are sales increasing?), inventory health (is money locked in dead stock?), product data quality (are there many products with missing prices/descriptions?).
+    *   **Weighting:** Prioritize sales velocity and inventory health. A business with high sales but poor data is healthier than one with perfect data but no sales.
+2.  Assign a one-word \`status\` based on the score:
+    *   80-100: 'Healthy'
+    *   50-79: 'Needs Attention'
+    *   0-49: 'At Risk'
+3.  Write a concise 2-sentence \`summary\` explaining the score, mentioning the biggest positive and negative factors.
 
-1.  **Health Score & Summary:**
-    *   Calculate a business health score from 0-100 based on sales momentum, inventory efficiency, and data integrity.
-    *   Provide a one-word status: 'Healthy', 'Needs Attention', or 'At Risk'.
-    *   Write a single, concise sentence explaining the score. Example: "Your business is stable, but sales momentum is slow and several products are at risk of expiring."
+**PART 2: Money Locked in Stock**
+1.  Identify products that are "dead stock" (not sold in 90 days) or "slow-moving" (sold very few times).
+2.  For each, calculate the \`valueLocked\` (current stock quantity * cost price). If cost price is 0 or missing, use 0.5 * price as an estimate.
+3.  Calculate the \`totalValueLocked\` by summing the \`valueLocked\` of all identified slow/dead products.
+4.  Populate the \`moneyLockedInStock\` object with the total and the top 3-5 items trapping the most cash. If none, do not include this field in the output.
 
-2.  **Key Insights (Top 3):**
-    *   Identify the top 3 most impactful observations ("What is working?", "What is wasting money?", "Why did this change?"). Each should be a distinct issue.
-    *   For each insight, provide a short title, a 1-2 sentence description, a clear call-to-action text, and a direct link from the valid links list.
+**PART 3: Sales You Are About to Miss (Sales at Risk)**
+1.  Identify fast-selling products with low stock levels.
+2.  Estimate when they will stock out based on recent sales velocity (\`estimatedStockoutDays\`). Be realistic.
+3.  Estimate the \`potentialLostRevenue\` per month if they stock out. (e.g., if it sells 10 units/week at ₦1000, monthly revenue is ~₦40,000).
+4.  Calculate the \`potentialMonthlyRevenueLoss\` by summing the potential loss for all at-risk products.
+5.  Populate the \`salesAtRisk\` object with the total and the top 1-3 most critical items. If none, do not include this field in the output.
 
-3.  **Actionable Suggestions (Top 3):**
-    *   Provide the top 3 most important actions the user should take next ("What to focus on?", "What should I change?").
-    *   Rank them by priority (1 = highest).
-    *   For each suggestion, provide a clear action title, a brief description of the suggestion, a button text, and a link from the valid links list.
+**PART 4: Actionable Insights**
+Based on the above analysis, provide the top 2-3 most important, non-obvious actions the user should take. Frame them as direct advice.
+*   Example 1 (If money is locked in stock): Title: "Free up ₦XXX in cash", Description: "You have a significant amount of cash tied up in products that aren't selling. Consider running a clearance sale on these items to liquidate them and reinvest the capital into your bestsellers.", link: "/inventory", linkText: "View Slow-Moving Stock".
+*   Example 2 (If sales are at risk): Title: "Prevent ₦XXX in Lost Sales", Description: "Your top-performing products are at risk of stocking out, which could cost you significant revenue. Reorder these items immediately to keep your sales momentum going.", link: "/inventory", linkText: "Check Low Stock Items".
 
-**PART 2: Detailed Analysis Breakdown**
-
-Based on the data, answer the following questions with specific product examples.
-
-4.  **What is working?**
-    *   Identify the top 2-3 products that are performing best by revenue and/or sales volume.
-    *   For each, explain *why* it's a top performer (e.g., "accounts for 25% of total revenue").
-    *   Populate the 'whatIsWorking' array.
-
-5.  **What is wasting money?**
-    *   Identify the top 2-3 products that are dead stock or slow-moving and are tying up capital.
-    *   For each, explain *why* it's a problem (e.g., "hasn't sold in 90 days and represents 10% of inventory value").
-    *   Populate the 'whatIsWastingMoney' array.
-
-6.  **What should I restock soon?**
-    *   Based on recent sales velocity and current stock levels, identify 1-2 products that are at risk of selling out soon.
-    *   For each, explain the urgency (e.g., "demand is high, likely to stock out in 7 days").
-    *   Populate the 'whatToRestock' array.
-
-**Input Data (DO NOT analyze product creation dates):**
+**Input Data:**
 - Currency: {{currencySymbol}}
 - Products: {{json products}}
 - Receipts (last 90 days): {{json receipts}}
 
-Your entire response MUST be a single, valid JSON object matching the defined output schema. Do not add any text or formatting outside of the JSON structure.
+Your entire response MUST be a single, valid JSON object matching the defined output schema.
 `,
 });
 
@@ -96,5 +88,4 @@ const businessAnalysisFlow = ai.defineFlow(
     return output!;
   }
 );
-
     

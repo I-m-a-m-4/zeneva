@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from "next/link";
@@ -36,7 +35,7 @@ export default function StoreFooter({ business }: { business: BusinessInstance |
                     {/* Column 1: Business Info */}
                     <div className="lg:col-span-2 space-y-4">
                          <div className="flex items-center gap-2">
-                             <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-8 w-8" />
+                             <img src={business.settings?.logoUrl || AppConfig.logoIconUrl} alt={`${businessName} Logo`} className="h-8 w-8" />
                             <h3 className="font-instrument-serif text-2xl font-semibold tracking-tight">{businessName}</h3>
                         </div>
                         <p className="text-sm text-muted-foreground">{description || 'Your one-stop shop for quality products.'}</p>

@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader } from "lucide-react";
+import { Loader, ChevronLeft } from "lucide-react";
 import React, { useState } from "react";
+import { AppConfig } from "@/lib/config";
 import Image from "next/image";
 
 export default function ForgotPasswordPage() {
@@ -51,10 +52,7 @@ export default function ForgotPasswordPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <Image src="https://i.ibb.co/chgNZKyX/zeneva-logo.png" alt="Zeneva Logo" width={32} height={32} />
-                <span className="text-3xl font-bold tracking-tighter text-foreground font-display">
-                    Zeneva
-                </span>
+                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
             <h1 className="text-3xl font-bold">Forgot Password</h1>
             <p className="text-balance text-muted-foreground">

@@ -1,7 +1,7 @@
-
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { FileSearch } from 'lucide-react'
+import { AppConfig } from '@/lib/config';
 
 // This page is a Server Component and has no client-side dependencies.
 // This prevents the "useFirebase must be used within a FirebaseProvider" error during Vercel's build process.
@@ -13,9 +13,8 @@ export default function NotFound() {
       <header className="fixed top-0 z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg">
         <nav className="flex max-w-7xl mr-auto ml-auto py-3 sm:py-5 px-6 items-center justify-between">
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center justify-center gap-2">
-              <img src="https://i.ibb.co/JjLC3Ff1/Trolley.png" alt="Zeneva Logo" width={32} height={32} />
-              <span className="text-4xl font-bold text-black font-instrument-serif">Zeneva</span>
+            <Link href="/" className="flex items-center justify-center">
+              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-10 w-auto" />
             </Link>
           </div>
           <div className="flex items-center gap-2">

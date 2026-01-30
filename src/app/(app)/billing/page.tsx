@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -13,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, History, ShieldCheck } from 'lucide-react';
 import TrialCountdown from '@/components/settings/trial-countdown';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SubscriptionSection = dynamic(
     () => import('@/components/settings/subscription-section'),
@@ -20,18 +22,45 @@ const SubscriptionSection = dynamic(
         ssr: false,
         loading: () => (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-                <div className="flex flex-col justify-center items-center h-80 rounded-lg bg-muted border animate-pulse">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="mt-4 text-muted-foreground">Loading Plans...</p>
-                </div>
-                <div className="flex flex-col justify-center items-center h-80 rounded-lg bg-muted border animate-pulse">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="mt-4 text-muted-foreground">Loading Plans...</p>
-                </div>
+                <Card className="h-96"><CardContent className="p-6 h-full flex flex-col justify-between"><div className="space-y-4"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-5 w-1/2" /><Skeleton className="h-12 w-1/3" /></div><div className="space-y-4"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div><Skeleton className="h-12 w-full" /></CardContent></Card>
+                <Card className="h-96"><CardContent className="p-6 h-full flex flex-col justify-between"><div className="space-y-4"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-5 w-1/2" /><Skeleton className="h-12 w-1/3" /></div><div className="space-y-4"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div><Skeleton className="h-12 w-full" /></CardContent></Card>
             </div>
         ),
     }
 );
+
+function BillingPageSkeleton() {
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-80" />
+            </div>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-72" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-20 w-full" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                        <Skeleton className="h-96" />
+                        <Skeleton className="h-96" />
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-64" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-40 w-full" />
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
 
 const LifetimeAccessStatus = () => (
     <div className="flex items-center gap-3">
@@ -63,11 +92,11 @@ function BillingPage() {
   const isLoading = isUserLoading || isBusinessLoading || isHistoryLoading;
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Billing Information...</span></div>;
+    return <BillingPageSkeleton />;
   }
   
   if (!currentBusiness || !userProfile) {
-    return <div className="text-center">Could not load business information.</div>
+    return <BillingPageSkeleton />;
   }
 
   return (

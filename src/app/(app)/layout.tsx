@@ -17,9 +17,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users as UsersIcon, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserX, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -42,6 +41,25 @@ import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
+import { POSProvider } from '@/context/pos-context';
+
+const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="10" r="6" />
+      <path d="M5 16a10 10 0 0 0 14 0" />
+    </svg>
+  );
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -51,9 +69,9 @@ const navItems = [
     { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
     { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager'] },
     { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
-    { href: '/ai-insights', icon: Bot, label: 'AI Insights', roles: ['admin', 'manager'] },
-    { href: '/customers', icon: UsersIcon, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
-    { href: '/users', icon: UsersIcon, label: 'Users', roles: ['admin'] },
+    { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
+    { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
+    { href: '/users', icon: UserRound, label: 'Users', roles: ['admin'] },
     { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
 ];
 
@@ -77,7 +95,7 @@ function FullScreenLoader({ text }: { text: string }) {
   );
 }
 
-export default function AuthenticatedLayout({
+function AuthenticatedLayoutContent({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -123,7 +141,7 @@ export default function AuthenticatedLayout({
     combined.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
+        return dateB.getTime() - a.getTime();
     });
     return combined.slice(0, 20);
   }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
@@ -208,7 +226,7 @@ export default function AuthenticatedLayout({
         <Card className="w-full max-w-md text-center shadow-lg">
           <CardHeader>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
-               <UserX className="h-10 w-10 text-destructive" />
+               <UserCog className="h-10 w-10 text-destructive" />
             </div>
             <CardTitle className="text-2xl font-bold">Account Inactive</CardTitle>
             <CardDescription>
@@ -295,9 +313,35 @@ export default function AuthenticatedLayout({
           <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
           <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
               <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
-                  <Link href="/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground h-10 w-full">
-                      <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} className="shrink-0" />
-                      <span className="text-xl font-semibold group-data-[state=collapsed]:hidden font-display">Zeneva</span>
+                  <Link href="/dashboard" className="flex items-center justify-center h-12 w-full">
+                      {/* Expanded state logo */}
+                      <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="w-32 h-auto group-data-[state=expanded]:block hidden" />
+                      {/* Collapsed state logo */}
+                        <div className="w-12 h-12 group-data-[state=collapsed]:block hidden">
+                            <svg width="48" height="48" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <linearGradient id="zenevaOrangeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style={{stopColor:'#ff9933',stopOpacity:1}} />
+                                    <stop offset="100%" style={{stopColor:'#cc5200',stopOpacity:1}} />
+                                    </linearGradient>
+                                    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/> 
+                                    <feOffset dx="0" dy="2" result="offsetblur"/> 
+                                    <feComponentTransfer>
+                                        <feFuncA type="linear" slope="0.3"/> 
+                                    </feComponentTransfer>
+                                    <feMerge> 
+                                        <feMergeNode/> 
+                                        <feMergeNode in="SourceGraphic"/> 
+                                    </feMerge>
+                                    </filter>
+                                </defs>
+                                <g filter="url(#dropShadow)">
+                                    <path d="M 100 55 A 35 35 0 1 0 100 125 A 35 35 0 1 0 100 55 Z M 100 63 A 27 27 0 1 1 100 117 A 27 27 0 1 1 100 63 Z" fill="url(#zenevaOrangeGradient)" stroke="#cc5200" strokeWidth="0.5" />
+                                    <path d="M 60 127 Q 100 154 140 127 Q 100 142 60 127 Z" fill="url(#zenevaOrangeGradient)" stroke="#cc5200" strokeWidth="0.5" />
+                                </g>
+                            </svg>
+                        </div>
                   </Link>
               </SidebarHeader>
               <SidebarContent className="flex-1 p-2">
@@ -478,3 +522,18 @@ export default function AuthenticatedLayout({
     </TooltipProvider>
   );
 }
+
+
+export default function AuthenticatedLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <POSProvider>
+      <AuthenticatedLayoutContent>{children}</AuthenticatedLayoutContent>
+    </POSProvider>
+  )
+}
+
+    

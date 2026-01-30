@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -16,8 +15,8 @@ import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users'
 import Link from 'next/link';
 import { Eye, EyeOff, Loader, ChevronLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
 import { AppConfig } from '@/lib/config';
+import Image from 'next/image';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.'}),
@@ -92,10 +91,7 @@ export default function SignupPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
-                <span className="text-3xl font-bold tracking-tighter text-foreground font-display">
-                    Zeneva
-                </span>
+                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
             <h1 className="text-3xl font-bold">Create an account</h1>
             <p className="text-balance text-muted-foreground">

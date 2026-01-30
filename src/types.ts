@@ -1,4 +1,7 @@
 
+
+
+
 export interface Product {
     id: string;
     businessId: string;
@@ -105,48 +108,44 @@ export interface AISuggestions {
     createdAt: any; // Firestore Timestamp
 }
 
-export type TopPerformer = {
-    productId: string;
-    name: string;
-    reason: string;
-};
+export interface MoneyLockedInStockItem {
+  productId: string;
+  name: string;
+  valueLocked: number;
+  daysSinceLastSale: number;
+}
 
-export type Underperformer = {
-    productId: string;
-    name: string;
-    reason: string;
-};
+export interface SalesAtRiskItem {
+  productId: string;
+  name: string;
+  estimatedStockoutDays: number;
+  potentialLostRevenue: number;
+}
 
-export type RestockSuggestion = {
-    productId: string;
-    name: string;
-    reason: string;
-};
+export interface ActionableInsight {
+  title: string;
+  description: string;
+  link: string;
+  linkText: string;
+}
 
-export type BusinessAnalysis = {
-    health: {
+export interface BusinessAnalysis {
+    health?: {
         score: number;
-        status: string;
+        status: 'Healthy' | 'Needs Attention' | 'At Risk';
         summary: string;
     };
-    keyInsights: {
-        title: string;
-        description: string;
-        actionText: string;
-        link: string;
-    }[];
-    actionableSuggestions: {
-        priority: number;
-        title: string;
-        description: string;
-        actionText: string;
-        link: string;
-    }[];
-    whatIsWorking?: TopPerformer[];
-    whatIsWastingMoney?: Underperformer[];
-    whatToRestock?: RestockSuggestion[];
+    moneyLockedInStock?: {
+        totalValueLocked: number;
+        items: MoneyLockedInStockItem[];
+    };
+    salesAtRisk?: {
+        potentialMonthlyRevenueLoss: number;
+        items: SalesAtRiskItem[];
+    };
+    actionableInsights?: ActionableInsight[];
     createdAt: any; // Can be Date or Firestore Timestamp
-};
+}
 
 
 export interface BusinessInstance {
@@ -170,6 +169,7 @@ export interface BusinessInstance {
         logoUrl?: string;
         paymentBankAccountId?: string;
         paymentBankName?: string;
+        paymentBankCode?: string;
         paymentInstructions?: string;
         paystackSubaccount?: string;
         vendorPolicyEnabled?: boolean;
@@ -301,5 +301,6 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
+    
 
     

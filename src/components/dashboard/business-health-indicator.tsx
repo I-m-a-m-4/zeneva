@@ -18,7 +18,6 @@ export default function BusinessHealthIndicator() {
   const analysis: BusinessAnalysis | undefined = business?.settings?.businessAnalysis;
 
   const score = analysis?.health?.score ?? 0;
-  const summary = analysis?.health?.summary ?? 'No analysis yet.';
 
   return (
     <TooltipProvider>
@@ -38,15 +37,17 @@ export default function BusinessHealthIndicator() {
         </TooltipTrigger>
         <TooltipContent side="bottom" align="end" className="max-w-xs">
             {analysis ? (
-                <div>
-                    <p className="font-semibold mb-1">Performance Summary:</p>
-                    <p className="text-sm text-muted-foreground">{summary}</p>
+                 <div>
+                    <p className="font-semibold mb-1">Business Health: {score}%</p>
+                    <p className="text-sm text-muted-foreground">Click to view detailed insights.</p>
                 </div>
             ) : (
-                <p className="text-sm text-muted-foreground">Generate your first analysis on the AI Insights page to see your score.</p>
+                <p className="text-sm text-muted-foreground">Generate an analysis to see your score.</p>
             )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
 }
+
+    

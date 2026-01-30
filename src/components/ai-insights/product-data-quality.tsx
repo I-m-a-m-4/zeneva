@@ -24,11 +24,12 @@ import {
   Package,
   FileText,
   DollarSign,
-  BarChart,
+  Barcode,
   Edit,
   Flame,
   ShieldAlert,
   Info,
+  ImageIcon,
 } from "lucide-react";
 import React, { useState, useTransition, useMemo, useEffect } from "react";
 import Link from "next/link";
@@ -107,6 +108,7 @@ function IssueDetailsDialog({
 function IssueCard({
   icon: Icon,
   title,
+  description,
   count,
   items,
   unit = "items",
@@ -114,6 +116,7 @@ function IssueCard({
 }: {
   icon: React.ElementType;
   title: string;
+  description: string;
   count: number;
   items: Product[];
   unit?: string;
@@ -127,73 +130,50 @@ function IssueCard({
           <Icon className="h-5 w-5 text-destructive" />
           {title}
         </CardTitle>
+        <CardDescription className="text-xs">{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
         <p className="text-3xl font-bold text-destructive">{count}</p>
         <p className="text-xs text-muted-foreground">{unit} with this issue</p>
-        {items.length > 0 && (
-          <ul className="text-xs text-muted-foreground mt-4 space-y-1">
-            {items.slice(0, 2).map((p) => (
-              <li key={p.id} className="truncate" title={p.name}>
-                - {p.name}
-              </li>
-            ))}
-            {items.length > 2 && <li>...and {items.length - 2} more</li>}
-          </ul>
-        )}
       </CardContent>
       <CardFooter>
         <Button variant="secondary" className="w-full" onClick={onFixClick}>
           <Edit className="h-4 w-4 mr-2" />
-          View & Fix
+          View & Fix All
         </Button>
       </CardFooter>
     </Card>
   );
 }
 
-const severityIcons = {
-  High: <Flame className="h-5 w-5 text-destructive" />,
-  Medium: <ShieldAlert className="h-5 w-5 text-amber-500" />,
-  Low: <Info className="h-5 w-5 text-sky-500" />,
-};
 
 export default function ProductDataQualityTab() {
-  const [isPending, startTransition] = useTransition();
-  const [suggestions, setSuggestions] = useState<AISuggestions | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<{
     title: string;
     items: Product[];
   } | null>(null);
 
-  const { products, business, isLoading } = usePOS();
-  const firestore = useFirestore();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (business?.settings?.aiTroubleshootSuggestions) {
-      setSuggestions(business.settings.aiTroubleshootSuggestions);
-    }
-  }, [business]);
-
+  const { products, isLoading } = usePOS();
+  
   const analysis = useMemo(() => {
     if (!products) return null;
     const productsWithoutPrice = products.filter((p) => !p.price || p.price <= 0);
+    const productsWithoutImage = products.filter((p) => !p.imageUrl);
+    const productsWithoutSku = products.filter((p) => !p.sku);
     const productsWithoutCategory = products.filter((p) => !p.category);
     const productsWithoutDescription = products.filter(
-      (p) => !p.description || p.description.length < 10
-    );
-    const lowStockProducts = products.filter(
-      (p) => (p.stock || 0) <= (p.lowStockThreshold || 5)
+      (p) => !p.description || p.description.length < 20
     );
 
-    const totalPoints = products.length * 4;
+    const totalPoints = products.length * 5;
     const issuePoints =
       productsWithoutPrice.length +
+      productsWithoutImage.length +
+      productsWithoutSku.length +
       productsWithoutCategory.length +
-      productsWithoutDescription.length +
-      lowStockProducts.length;
+      productsWithoutDescription.length;
+      
     const dataQualityScore =
       totalPoints > 0
         ? Math.round(((totalPoints - issuePoints) / totalPoints) * 100)
@@ -201,9 +181,10 @@ export default function ProductDataQualityTab() {
 
     return {
       productsWithoutPrice,
+      productsWithoutImage,
+      productsWithoutSku,
       productsWithoutCategory,
       productsWithoutDescription,
-      lowStockProducts,
       dataQualityScore,
       totalProducts: products.length,
     };
@@ -214,51 +195,19 @@ export default function ProductDataQualityTab() {
     setIsModalOpen(true);
   };
 
-  const handleGetSuggestions = () => {
-    if (!products || products.length === 0 || !business?.id || !firestore) {
-      toast({
-        variant: "destructive",
-        title: "Cannot Run AI Analysis",
-        description: "Product or business data is not available.",
-      });
-      return;
-    }
-    startTransition(async () => {
-      const sanitizedProducts = products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        category: p.category,
-        sku: p.sku,
-      }));
-
-      const result = await productTroubleshoot({ products: sanitizedProducts });
-
-      const dataToSave: AISuggestions = { ...result, createdAt: new Date() };
-
-      try {
-        const businessDocRef = doc(firestore, "businessInstances", business.id);
-        await updateDoc(businessDocRef, {
-          "settings.aiTroubleshootSuggestions": { ...result, createdAt: serverTimestamp() },
-        });
-        setSuggestions(dataToSave);
-        toast({
-          variant: "success",
-          title: "Suggestions Saved",
-          description: "Your AI suggestions have been generated and saved.",
-        });
-      } catch (error) {
-        console.error("Failed to save AI suggestions:", error);
-        toast({
-          variant: "destructive",
-          title: "Save Failed",
-          description: "Could not save the AI suggestions.",
-        });
-        setSuggestions(dataToSave);
-      }
-    });
-  };
+  if (isLoading) {
+      return (
+          <Card className="mt-6">
+              <CardHeader>
+                  <CardTitle className="font-headline">Inventory Health Check</CardTitle>
+                  <CardDescription>Analyzing your product data...</CardDescription>
+              </CardHeader>
+              <CardContent>
+                   <div className="flex items-center justify-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+              </CardContent>
+          </Card>
+      );
+  }
 
   if (!analysis || analysis.totalProducts === 0) {
     return (
@@ -281,24 +230,35 @@ export default function ProductDataQualityTab() {
     {
       icon: DollarSign,
       title: "Missing Price",
+      description: "Products without a price can't be sold and hurt your store's professionalism.",
       count: analysis.productsWithoutPrice.length,
       items: analysis.productsWithoutPrice,
     },
     {
-      icon: BarChart,
-      title: "Low Stock",
-      count: analysis.lowStockProducts.length,
-      items: analysis.lowStockProducts,
+      icon: ImageIcon,
+      title: "Missing Image",
+      description: "Images are crucial for online sales and make your POS easier to use.",
+      count: analysis.productsWithoutImage.length,
+      items: analysis.productsWithoutImage,
     },
     {
       icon: FileText,
-      title: "Short Description",
+      title: "Weak Description",
+      description: "Good descriptions improve SEO and help customers make buying decisions.",
       count: analysis.productsWithoutDescription.length,
       items: analysis.productsWithoutDescription,
     },
     {
+      icon: Barcode,
+      title: "Missing SKU",
+      description: "SKUs are essential for accurate tracking and preventing inventory errors.",
+      count: analysis.productsWithoutSku.length,
+      items: analysis.productsWithoutSku,
+    },
+    {
       icon: Package,
       title: "Missing Category",
+      description: "Categories help organize your store and provide better sales analytics.",
       count: analysis.productsWithoutCategory.length,
       items: analysis.productsWithoutCategory,
     },
@@ -310,10 +270,10 @@ export default function ProductDataQualityTab() {
     <div className="grid gap-6 mt-6">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Inventory Health Check</CardTitle>
+          <CardTitle className="font-headline">Inventory Data Health</CardTitle>
           <CardDescription>
             Automated analysis of your {analysis.totalProducts} products to identify
-            potential data quality issues.
+            potential data quality issues that could affect sales.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -329,12 +289,12 @@ export default function ProductDataQualityTab() {
               aria-label={`${analysis.dataQualityScore}% data quality`}
             />
             <p className="text-xs text-muted-foreground mt-2">
-              A score based on data completeness and stock levels.
+              A score based on data completeness for price, images, SKU, description and category.
             </p>
           </div>
 
           {hasIssues ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {allIssues.map((issue) => (
                 <IssueCard
                   key={issue.title}
@@ -353,98 +313,12 @@ export default function ProductDataQualityTab() {
                 Excellent Data Quality!
               </AlertTitle>
               <AlertDescription>
-                All your products have prices, categories, descriptions, and
-                healthy stock levels.
+                All your products have prices, images, descriptions, categories, and SKUs. Great job!
               </AlertDescription>
             </Alert>
           )}
         </CardContent>
       </Card>
-
-      <FeatureGate
-        requiredPlan="pro"
-        currentPlan={business?.plan}
-        hasLifetimeAccess={business?.accessLevel === "lifetime"}
-        featureName="AI Data Quality Suggestions"
-        featureDescription="Use GenAI to get advanced merchandising and data quality recommendations for your product listings."
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2">
-              <Lightbulb className="text-primary" /> AI-Powered Suggestions
-            </CardTitle>
-            <CardDescription>
-              Get suggestions from Zen AI to improve your product listings, SEO,
-              and merchandising.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isPending ? (
-              <div className="space-y-2 p-8 text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                <p className="text-muted-foreground">
-                  AI is analyzing your product data...
-                </p>
-              </div>
-            ) : suggestions?.suggestions?.length > 0 ? (
-              <Accordion type="multiple" className="w-full space-y-2">
-                {suggestions.suggestions.map((suggestion, index) => (
-                  <AccordionItem
-                    key={index}
-                    value={`item-${index}`}
-                    className="border-b-0 rounded-lg border bg-muted/50 px-4"
-                  >
-                    <AccordionTrigger className="py-3 hover:no-underline">
-                      <div className="flex items-center gap-3">
-                        {severityIcons[suggestion.severity]}
-                        <span className="font-medium text-base">
-                          {suggestion.title}
-                        </span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-4 text-muted-foreground">
-                      {suggestion.description}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
-                <PartyPopper className="mx-auto h-12 w-12" />
-                <p className="mt-4 font-medium">Ready for some AI magic?</p>
-                <p className="text-sm">
-                  Click the button to get merchandising and SEO tips based on
-                  your products.
-                </p>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <Button
-              onClick={handleGetSuggestions}
-              disabled={isPending || analysis.totalProducts === 0}
-            >
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending
-                ? "Analyzing..."
-                : suggestions
-                ? "Regenerate Suggestions"
-                : "Get AI Suggestions"}
-            </Button>
-            {suggestions?.createdAt && (
-              <p className="text-xs text-muted-foreground">
-                Last generated:{" "}
-                {formatDistanceToNow(
-                  suggestions.createdAt.toDate
-                    ? suggestions.createdAt.toDate()
-                    : new Date(suggestions.createdAt),
-                  { addSuffix: true }
-                )}
-              </p>
-            )}
-          </CardFooter>
-        </Card>
-      </FeatureGate>
 
       <IssueDetailsDialog
         isOpen={isModalOpen}

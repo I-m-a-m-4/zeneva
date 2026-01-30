@@ -33,7 +33,7 @@ import { Button } from '@/components/ui/button';
 export default function OurMissionPage() {
   return (
     <div className="min-h-screen overflow-x-hidden selection:bg-primary/20 selection:text-foreground text-foreground font-body bg-neutral-100 relative">
-      <div className="fixed grid-lines w-full h-[100vh] top-0 right-0 left-0 pointer-events-none z-0"></div>
+      
 
       <div className="relative z-10 flex flex-col min-h-screen pt-16 lg:pt-20">
         <main className="flex-1 w-full">

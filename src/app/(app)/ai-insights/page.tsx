@@ -2,7 +2,7 @@
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysis, TopPerformer, Underperformer, RestockSuggestion } from "@/types";
+import type { BusinessAnalysis, SalesAtRiskItem, MoneyLockedInStockItem, ActionableInsight } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,17 +14,15 @@ import {
 } from "@/components/ui/card";
 import { usePOS } from "@/context/pos-context";
 import {
-  Loader2,
-  TrendingUp,
   Lightbulb,
   ArrowRight,
+  Loader2,
+  HeartPulse,
+  TrendingUp,
   TrendingDown,
-  Warehouse,
-  Flame,
-  ShieldAlert,
-  Info,
+  CircleDollarSign,
   Package,
-  Zap,
+  CheckCircle,
 } from "lucide-react";
 import React, { useState, useTransition, useEffect } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -40,133 +38,97 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductDataQualityTab from "@/components/ai-insights/product-data-quality";
-
-// --- Skeleton Components ---
-const HealthScoreSkeleton = () => (
-    <Card>
-        <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6">
-            <Skeleton className="h-28 w-28 rounded-full flex-shrink-0" />
-            <div className="space-y-3 flex-1 w-full">
-                <Skeleton className="h-7 w-24" />
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-5 w-1/2" />
-            </div>
-        </CardContent>
-    </Card>
-);
-
-const InsightCardSkeleton = () => (
-    <Card className="flex flex-col">
-        <CardHeader><Skeleton className="h-12 w-12 rounded-lg mb-2" /><Skeleton className="h-6 w-3/4" /></CardHeader>
-        <CardContent className="flex-grow space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></CardContent>
-        <CardFooter><Skeleton className="h-5 w-28" /></CardFooter>
-    </Card>
-);
-
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AppConfig } from "@/lib/config";
 
 const GenerationProgress = ({ progress, statusText }: { progress: number; statusText: string }) => (
     <div className="relative">
-         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg text-center">
-                 <h3 className="text-xl font-semibold mb-4">Zen AI is Analyzing Your Business...</h3>
-                 <Progress value={progress} className="w-full h-2 mb-2" />
-                 <p className="text-sm text-muted-foreground">{statusText}</p>
+         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center p-4 rounded-lg">
+            <div className="w-full max-w-lg text-center flex flex-col items-center">
+                 <img src={AppConfig.logoIconUrl} alt="Zeneva Logo" className="h-20 w-20 mb-6 animate-pulse" />
+                 <h3 className="text-xl font-semibold mb-4 text-gray-800">Zen AI is Analyzing Your Business...</h3>
+                 <Progress value={progress} className="w-full h-1.5 mb-2 shadow-inner bg-gray-200" />
+                 <p className="text-sm text-gray-500">{statusText}</p>
             </div>
         </div>
-        <div className="grid gap-8 opacity-40 blur-sm pointer-events-none">
-             <HealthScoreSkeleton />
-             <div>
-                <Skeleton className="h-8 w-64 mb-4" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <InsightCardSkeleton /><InsightCardSkeleton /><InsightCardSkeleton />
-                </div>
-            </div>
-             <div>
-                <Skeleton className="h-8 w-64 mb-4" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <InsightCardSkeleton /><InsightCardSkeleton /><InsightCardSkeleton />
-                </div>
-            </div>
+        <div className="grid gap-8 opacity-20 blur-sm pointer-events-none">
+            <BusinessHealthCard analysis={null} isLoading={true} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="h-48"><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6 mt-2" /></CardContent></Card>
+                <Card className="h-48"><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6 mt-2" /></CardContent></Card>
+             </div>
         </div>
     </div>
 );
 
-
-// --- Business Performance Tab Components ---
-
-const HealthScoreHero = ({ score, status, summary }: { score: number, status: string, summary: string }) => {
-    const getStatusColor = () => {
-        if (status === 'At Risk') return 'text-destructive';
-        if (status === 'Needs Attention') return 'text-amber-500';
-        return 'text-green-600';
+const InsightCard = ({ icon: Icon, title, value, description, variant }: { icon: React.ElementType, title: string, value: string, description: string, variant: 'warning' | 'destructive' }) => {
+    const variantClasses = {
+        warning: 'border-amber-400 bg-amber-50 text-amber-900',
+        destructive: 'border-red-400 bg-red-50 text-red-900',
     }
-
     return (
-        <Card>
-            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6">
-                <div
-                    className="relative h-28 w-28 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: `conic-gradient(hsl(var(--primary)) ${score * 3.6}deg, hsl(var(--muted)) 0deg)` }}
-                >
-                    <div className="absolute h-24 w-24 rounded-full bg-card"></div>
-                    <div className="z-10">
-                        <span className="text-4xl font-bold text-primary">{score}</span>
-                        <span className="text-lg text-muted-foreground">%</span>
-                    </div>
-                </div>
-                <div className="text-center sm:text-left">
-                     <Badge variant="outline" className={cn("text-base font-semibold", getStatusColor(), `border-current`)}>{status}</Badge>
-                     <p className="text-base text-muted-foreground mt-2">{summary}</p>
-                </div>
-            </CardContent>
+        <Card className={cn("text-center p-6 flex flex-col items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 border-t-2", variantClasses[variant])}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white border border-gray-200 mb-4">
+                <Icon className={cn("h-8 w-8", variant === 'warning' ? 'text-amber-500' : 'text-red-500')} />
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">{title}</p>
+            <p className="text-4xl font-bold my-1 text-gray-900">{value}</p>
+            <p className="text-xs text-gray-600 max-w-xs">{description}</p>
         </Card>
     );
 };
 
-
-const InsightCard = ({ icon: Icon, title, description, link, actionText }: { icon: React.ElementType, title: string, description: string, link: string, actionText: string }) => {
-  return (
-    <Card className="flex flex-col h-full">
-        <CardHeader>
-             <div className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-muted mb-4">
-                <div className="absolute inset-0 bg-primary/10 rounded-lg animate-[aura-pulse_4s_cubic-bezier(0.4,0,0.6,1)_infinite]"></div>
-                <Icon className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle className="text-lg leading-tight">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow">
-            <p className="text-sm text-muted-foreground">{description}</p>
-        </CardContent>
-        <CardFooter>
-            <Button variant="link" asChild className="p-0 h-auto text-primary font-semibold">
-                <Link href={link}>{actionText} <ArrowRight className="ml-1 h-4 w-4"/></Link>
-            </Button>
-        </CardFooter>
-    </Card>
-  );
-}
-
-const SuggestionCard = ({ priority, title, description, link, actionText }: { priority: number, title: string, description: string, link: string, actionText: string }) => {
+const ActionableInsightCard = ({ title, description, link, linkText }: ActionableInsight) => {
     return (
-        <Card className="flex flex-col h-full border-primary/20 bg-primary/5 hover:border-primary/40 transition-colors">
+        <Card className="flex flex-col h-full bg-white border hover:border-primary hover:bg-primary/5 transition-colors group">
             <CardHeader>
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg">{priority}</div>
-                    <CardTitle className="text-lg leading-tight">{title}</CardTitle>
-                </div>
+                <CardTitle className="text-lg leading-tight flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary/20 transition-colors">
+                        <Lightbulb className="h-5 w-5" />
+                    </div>
+                    <span className="text-gray-900">{title}</span>
+                </CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <p className="text-sm text-gray-600">{description}</p>
             </CardContent>
             <CardFooter>
-                <Button asChild className="w-full">
-                    <Link href={link}>{actionText}</Link>
+                <Button asChild variant="secondary" className="w-full">
+                    <Link href={link}>{linkText} <ArrowRight className="ml-2 h-4 w-4"/></Link>
                 </Button>
             </CardFooter>
         </Card>
     );
 };
 
+const ItemListCard = ({ title, items, currencySymbol, itemKey, valueKey, timeKey }: { title: string, items: (MoneyLockedInStockItem | SalesAtRiskItem)[], currencySymbol: string, itemKey: 'valueLocked' | 'potentialLostRevenue', valueKey: string, timeKey?: 'daysSinceLastSale' | 'estimatedStockoutDays' }) => (
+    <Card className="h-full bg-white border">
+        <CardHeader>
+            <CardTitle className="text-lg text-gray-900">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            {items && items.length > 0 ? (
+                <ScrollArea className="h-64">
+                    <div className="space-y-3 pr-4">
+                        {items.map(item => (
+                            <Link href={`/inventory/${item.productId}`} key={item.productId} className="block p-3 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-semibold truncate pr-2 text-gray-800">{item.name}</h4>
+                                    <p className="font-bold text-sm text-primary flex-shrink-0">{currencySymbol}{(item as any)[itemKey].toLocaleString()}</p>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                    {timeKey && `${valueKey}: ${(item as any)[timeKey]} days`}
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </ScrollArea>
+            ) : (
+                <div className="text-center text-gray-500 py-16">No items to show.</div>
+            )}
+        </CardContent>
+    </Card>
+);
 
 const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { analysis: BusinessAnalysis | null, handleGenerateAnalysis: () => void, isPending: boolean }) => (
     <div className="flex items-center justify-end gap-4 mt-4">
@@ -183,31 +145,58 @@ const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { 
     </div>
 );
 
-type DetailItem = TopPerformer | Underperformer | RestockSuggestion;
+function BusinessHealthCard({ analysis, isLoading }: { analysis: BusinessAnalysis | null, isLoading: boolean }) {
+    if (isLoading || !analysis || !analysis.health) {
+        return (
+            <Card className="relative overflow-hidden bg-slate-900 border-slate-800 p-8 min-h-[250px] flex items-center justify-center">
+                <Skeleton className="h-full w-full bg-gray-200" />
+            </Card>
+        );
+    }
 
-const DetailedAnalysisCard = ({ title, icon: Icon, items, emptyText }: { title: string; icon: React.ElementType; items: DetailItem[] | undefined; emptyText: string }) => (
-    <Card className="h-full">
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg"><Icon className="text-primary" />{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-            {items && items.length > 0 ? (
-                <div className="space-y-3">
-                    {items.map(item => (
-                        <div key={item.productId} className="p-3 border rounded-md hover:bg-muted/50">
-                            <Link href={`/inventory/${item.productId}`}>
-                                <h4 className="font-semibold hover:underline">{item.name}</h4>
-                                <p className="text-sm text-muted-foreground">{item.reason}</p>
-                            </Link>
+    const { score, status, summary } = analysis.health;
+    const scoreColorClass = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
+
+    return (
+        <Card className="relative overflow-hidden bg-slate-900 border-slate-800 p-8 text-white">
+             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+             <div className="absolute -top-1/2 -right-1/4 w-3/4 h-3/4 bg-primary/10 rounded-full blur-[100px] opacity-50"></div>
+
+            <div className="relative z-10 grid md:grid-cols-3 gap-8 items-center">
+                <div className="flex flex-col items-center justify-center">
+                    <div className="relative w-40 h-40">
+                        {/* Orbital Rings */}
+                        <div className="absolute inset-0 border border-dashed border-white/10 rounded-full animate-spin [animation-duration:20s]"></div>
+                        <div className="absolute inset-4 border border-white/5 rounded-full animate-spin [animation-duration:15s] [animation-direction:reverse]"></div>
+                         
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className={`text-5xl font-bold ${scoreColorClass}`}>{score}</span>
+                            <span className="text-sm text-slate-400">Health Score</span>
                         </div>
-                    ))}
+                    </div>
                 </div>
-            ) : (
-                <div className="text-center text-muted-foreground py-4">{emptyText}</div>
-            )}
-        </CardContent>
-    </Card>
-);
+                <div className="md:col-span-2">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                            <HeartPulse className="h-5 w-5" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-100">Business Vitals</h3>
+                    </div>
+                    <ul className="space-y-2 text-slate-300 text-sm">
+                        <li className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-500 mt-1 shrink-0" />
+                            <span><strong className="text-white">Summary:</strong> {summary}</span>
+                        </li>
+                         <li className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-500 mt-1 shrink-0" />
+                            <span><strong className="text-white">Status:</strong> {status}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </Card>
+    );
+}
 
 function BusinessPerformanceTab() {
   const [isPending, startTransition] = useTransition();
@@ -227,12 +216,13 @@ function BusinessPerformanceTab() {
   React.useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     let statusTimer: NodeJS.Timeout | undefined;
-    const statuses = ["Analyzing sales data...", "Identifying key trends...", "Checking inventory health...", "Generating actionable suggestions..."];
+    const statuses = ["Analyzing sales data...", "Identifying capital at risk...", "Forecasting potential losses...", "Generating actionable insights..."];
+    let statusIndex = 0;
 
     if (isPending) {
         setProgress(10);
-        let statusIndex = 0;
         setStatusText(statuses[statusIndex]);
+        let currentStatusIndex = 0;
 
         timer = setInterval(() => {
             setProgress(prev => {
@@ -247,8 +237,12 @@ function BusinessPerformanceTab() {
         }, 300);
 
         statusTimer = setInterval(() => {
-            statusIndex = (statusIndex + 1) % statuses.length;
-            setStatusText(statuses[statusIndex]);
+            currentStatusIndex = (currentStatusIndex + 1);
+            if(currentStatusIndex < statuses.length) {
+                setStatusText(statuses[currentStatusIndex]);
+            } else {
+                clearInterval(statusTimer);
+            }
         }, 1200);
     }
     return () => {
@@ -334,17 +328,6 @@ function BusinessPerformanceTab() {
   
   const displayData = analysis;
 
-  const getInsightIcon = (title: string) => {
-    const lowerTitle = title.toLowerCase();
-    if (lowerTitle.includes('inactivity') || lowerTitle.includes('stagnant') || lowerTitle.includes('risk')) {
-      return TrendingDown;
-    }
-    if (lowerTitle.includes('integrity') || lowerTitle.includes('issues') || lowerTitle.includes('concerns')) {
-      return ShieldAlert;
-    }
-    return TrendingUp;
-  };
-
   return (
     <FeatureGate
       requiredPlan="business"
@@ -353,65 +336,76 @@ function BusinessPerformanceTab() {
       featureName="AI Executive Briefing"
       featureDescription="Unlock a comprehensive AI-powered analysis of your sales, inventory, and customer trends."
     >
-      <div className="grid gap-6 mt-6">
+      <div className="grid gap-6">
         {isPending ? (
             <GenerationProgress progress={progress} statusText={statusText} />
-        ) : !displayData || !displayData.health ? (
-            <Card className="text-center p-8">
-              <CardTitle className="text-xl">Awaiting Analysis</CardTitle>
-              <CardDescription className="mt-2 mb-4 max-w-md mx-auto">Click "Generate Briefing" to get your first AI-powered executive summary.</CardDescription>
+        ) : !displayData || (!displayData.moneyLockedInStock && !displayData.salesAtRisk && !displayData.actionableInsights) ? (
+            <Card className="text-center p-8 bg-white border">
+              <CardTitle className="text-xl text-gray-900">Awaiting Analysis</CardTitle>
+              <CardDescription className="mt-2 mb-4 max-w-md mx-auto text-gray-600">Click "Generate Briefing" to get your first AI-powered executive summary.</CardDescription>
               <Button onClick={handleGenerateAnalysis}>Generate Your First Briefing</Button>
             </Card>
         ) : (
-            <div className="grid gap-8">
-             <HealthScoreHero score={displayData.health.score} status={displayData.health.status} summary={displayData.health.summary} />
+            <div className="space-y-8">
+                <BusinessHealthCard analysis={analysis} isLoading={isPending} />
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 {displayData.moneyLockedInStock && (
+                    <InsightCard 
+                        icon={CircleDollarSign}
+                        title="Money Locked in Stock"
+                        value={`${currencySymbol}${displayData.moneyLockedInStock.totalValueLocked.toLocaleString()}`}
+                        description="This is cash tied up in products that are not selling. Consider a clearance sale to free up capital."
+                        variant="destructive"
+                    />
+                 )}
+                 {displayData.salesAtRisk && (
+                    <InsightCard 
+                        icon={TrendingDown}
+                        title="Potential Monthly Revenue at Risk"
+                        value={`${currencySymbol}${displayData.salesAtRisk.potentialMonthlyRevenueLoss.toLocaleString()}`}
+                        description="This is estimated revenue you'll miss if your bestsellers stock out. Reorder these items now."
+                        variant="warning"
+                    />
+                 )}
+                </div>
              
-             <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Lightbulb className="text-primary"/> What Zen AI Notices
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {displayData.keyInsights.map((insight, i) => (
-                    <InsightCard key={i} {...insight} icon={getInsightIcon(insight.title)} />
-                    ))}
-                </div>
-            </div>
+                {displayData.actionableInsights && displayData.actionableInsights.length > 0 && (
+                    <div>
+                        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900">
+                            What Zen AI Recommends
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {displayData.actionableInsights.map((insight, i) => (
+                                <ActionableInsightCard key={i} {...insight} />
+                            ))}
+                        </div>
+                    </div>
+                )}
 
-             <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Zap className="text-primary"/> What You Should Do Next
-                </h3>
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {displayData.actionableSuggestions.sort((a, b) => a.priority - b.priority).map((suggestion, i) => (
-                        <SuggestionCard key={i} {...suggestion} />
-                    ))}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {displayData.moneyLockedInStock && (
+                        <ItemListCard 
+                            title="Top Products Locking Up Cash"
+                            items={displayData.moneyLockedInStock.items}
+                            currencySymbol={currencySymbol}
+                            itemKey="valueLocked"
+                            valueKey="Days since last sale"
+                            timeKey="daysSinceLastSale"
+                        />
+                    )}
+                    {displayData.salesAtRisk && (
+                        <ItemListCard 
+                            title="Top Products at Risk of Stockout"
+                            items={displayData.salesAtRisk.items}
+                            currencySymbol={currencySymbol}
+                            itemKey="potentialLostRevenue"
+                            valueKey="Est. days to stockout"
+                            timeKey="estimatedStockoutDays"
+                        />
+                    )}
                 </div>
-            </div>
 
-             <Card>
-                <CardHeader>
-                    <CardTitle>Detailed Breakdown</CardTitle>
-                    <CardDescription>A deeper look into specific areas of your business performance.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Tabs defaultValue="working" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="working">What's Working</TabsTrigger>
-                            <TabsTrigger value="wasting">Capital at Risk</TabsTrigger>
-                            <TabsTrigger value="restock">Restock Watchlist</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="working" className="mt-4">
-                            <DetailedAnalysisCard icon={TrendingUp} title="Top Performers" items={displayData.whatIsWorking} emptyText="No top performing products identified in this period."/>
-                        </TabsContent>
-                        <TabsContent value="wasting" className="mt-4">
-                             <DetailedAnalysisCard icon={TrendingDown} title="Capital at Risk" items={displayData.whatIsWastingMoney} emptyText="No significant underperforming products found."/>
-                        </TabsContent>
-                        <TabsContent value="restock" className="mt-4">
-                            <DetailedAnalysisCard icon={Warehouse} title="Restock Watchlist" items={displayData.whatToRestock} emptyText="No products currently require immediate restocking."/>
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
             </div>
         )}
       
@@ -422,22 +416,30 @@ function BusinessPerformanceTab() {
 }
 
 export default function AiInsightsPage() {
-  const { isLoading, business } = usePOS();
+  const { isLoading: isPosLoading } = usePOS();
   return (
     <div className="space-y-6">
       <PageTitle
-        title="Zen AI Insights Center"
+        title="Zen AI"
         subtitle="Your AI-powered command center for business intelligence."
       />
-       {isLoading ? (
-            <div className="flex items-center justify-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+       {isPosLoading ? (
+            <div className="mt-6 space-y-6">
+                <Skeleton className="h-10 w-full" />
+                <Card>
+                    <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+                    </CardContent>
+                </Card>
+            </div>
         ) : (
             <Tabs defaultValue="business-performance" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 gap-2">
                     <TabsTrigger value="business-performance">Executive Briefing</TabsTrigger>
                     <TabsTrigger value="product-quality">Product Data Quality</TabsTrigger>
                 </TabsList>
-                <TabsContent value="business-performance">
+                <TabsContent value="business-performance" className="pt-6">
                     <BusinessPerformanceTab />
                 </TabsContent>
                  <TabsContent value="product-quality">

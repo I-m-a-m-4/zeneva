@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     siteName: 'Zeneva',
     images: [
       {
-        url: '/zeneva.png',
+        url: 'https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?w=1200&h=630&fit=crop',
         width: 1200,
         height: 630,
       },

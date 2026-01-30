@@ -34,7 +34,12 @@ service cloud.firestore {
     }
 
     function isRequestingUserMemberOf(businessId) {
-      return isUserAuthenticatedAndExists() && getRequestingUserData().businessId == businessId;
+      if (!isUserAuthenticatedAndExists()) {
+        return false;
+      }
+      let userData = getRequestingUserData();
+      // Safely check for the existence of businessId before accessing it.
+      return 'businessId' in userData && userData.businessId == businessId;
     }
     
     function isBusinessOwner(businessId) {
@@ -111,9 +116,9 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isSuperAdmin() || 
-                    (isUserAuthenticated() && request.auth.uid == userId) || 
-                    (isUserAuthenticated() && exists(/databases/$(database)/documents/users/$(userId)) && getRequestingUserData().businessId == resource.data.businessId);
+      allow get: if isSuperAdmin() ||
+                    (isUserAuthenticated() && request.auth.uid == userId);
+                    
 
       allow list: if isRequestingUserAdmin() || isSuperAdmin();
       

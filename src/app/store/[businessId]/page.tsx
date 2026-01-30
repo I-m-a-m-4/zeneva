@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -118,7 +119,7 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
     
     // Server-side verification
     toast({ title: "Processing...", description: "Verifying your payment securely." });
-    const verifyResponse = await fetch('/api/paystack/verify', {
+    const verifyResponse = await fetch('/api/paystack/verify-transaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reference: transaction.reference }),
@@ -184,36 +185,68 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
       toast({ variant: 'destructive', title: 'Missing Information', description: 'Please fill out all required fields.' });
       return;
     }
-    
-    if (!isScriptLoaded) {
-        toast({ variant: "destructive", title: "Payment Gateway Not Ready", description: "Please wait a moment." });
-        return;
-    }
-    
-    setIsSubmitting(true);
-    
-    if (!business.settings?.paystackSubaccount) {
+
+    const hasPaystack = business.settings?.paystackSubaccount;
+    const hasBankDetails = business.settings?.paymentBankName && business.settings?.paymentBankAccountId;
+
+    if (!hasPaystack && !hasBankDetails) {
         toast({
             variant: 'destructive',
             title: 'Payment Not Configured',
-            description: 'The store owner has not configured online payments for this store.',
+            description: 'The store owner has not configured any payment methods.',
         });
-        setIsSubmitting(false);
         return;
     }
+
+    setIsSubmitting(true);
     
-    initializePayment({
-        key: PAYSTACK_PUBLIC_KEY,
-        email: email,
-        amount: total * 100, // Paystack expects amount in kobo
-        currency: 'NGN',
-        reference: `z-${business.id.substring(0, 6)}-${Date.now()}`,
-        subaccount: business.settings.paystackSubaccount,
-        onSuccess: handleSuccessfulPayment,
-        onClose: () => {
-          setIsSubmitting(false); // Re-enable button if user closes modal
-        },
-    });
+    // Prioritize Paystack if available
+    if (hasPaystack) {
+        if (!isScriptLoaded) {
+            toast({ variant: "destructive", title: "Payment Gateway Not Ready", description: "Please wait a moment." });
+            setIsSubmitting(false);
+            return;
+        }
+        
+        initializePayment({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: email,
+            amount: total * 100, // Paystack expects amount in kobo
+            currency: 'NGN',
+            reference: `z-${business.id.substring(0, 6)}-${Date.now()}`,
+            subaccount: business.settings.paystackSubaccount,
+            onSuccess: handleSuccessfulPayment,
+            onClose: () => {
+              setIsSubmitting(false); // Re-enable button if user closes modal
+            },
+        });
+    } else { // Fallback to Bank Transfer
+        try {
+            const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
+            await addDoc(ordersRef, {
+              customerName: name,
+              customerEmail: email,
+              customerPhone: phone,
+              customerAddress: address,
+              items: cart.map(item => ({
+                productId: item.product.id,
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price,
+              })),
+              total,
+              status: 'pending', // Mark as pending
+              paymentMethod: 'Bank Transfer',
+              createdAt: serverTimestamp(),
+            });
+            toast({ variant: 'success', title: 'Order Placed!', description: `Your order has been placed. Please complete payment via bank transfer.` });
+            onOrderPlaced();
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Order Failed', description: e.message || 'Could not place your order.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
   };
 
   return (
@@ -233,24 +266,26 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
         </div>
         <div className="mt-4 p-4 bg-muted/50 rounded-lg">
             <h4 className="font-semibold mb-2">Payment Instructions</h4>
-             <p className="text-sm text-muted-foreground mb-2">You can pay securely with your card via Paystack, or use the bank details below for a direct transfer.</p>
+            {business.settings?.paystackSubaccount ? (
+                 <p className="text-sm text-muted-foreground mb-2">You can pay securely with your card via Paystack.</p>
+            ) : null}
             {business.settings?.paymentBankName && (
-                 <p className="text-sm text-muted-foreground mt-2"><strong>Bank:</strong> {business.settings.paymentBankName}</p>
-            )}
-            {business.settings?.paymentBankAccountId && (
-                 <p className="text-sm text-muted-foreground"><strong>Account:</strong> {business.settings.paymentBankAccountId}</p>
+                 <>
+                    <p className="text-sm text-muted-foreground mb-2">
+                        {business.settings?.paystackSubaccount ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."} Your order will be processed upon confirmation.
+                    </p>
+                    <p className="text-sm"><strong>Bank:</strong> {business.settings.paymentBankName}</p>
+                    <p className="text-sm"><strong>Account:</strong> {business.settings.paymentBankAccountId}</p>
+                    {business.settings.paymentInstructions && <p className="text-xs text-muted-foreground mt-2">{business.settings.paymentInstructions}</p>}
+                </>
             )}
         </div>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          {business.settings?.paystackSubaccount ? (
             <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Pay ₦{total.toLocaleString()} with Paystack
+                {business.settings?.paystackSubaccount ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
             </Button>
-           ) : (
-            <Button disabled>Paystack Not Configured</Button>
-           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -285,7 +320,7 @@ export default function PublicStorePage() {
                 link.rel = 'icon';
                 document.head.appendChild(link);
             }
-            link.href = business.settings?.logoUrl || AppConfig.logoUrl;
+            link.href = business.settings?.logoUrl || AppConfig.logoIconUrl;
 
              const setMeta = (property: string, content: string) => {
                 let element = document.querySelector(`meta[property='${property}']`) as HTMLMetaElement;
@@ -674,3 +709,5 @@ export default function PublicStorePage() {
         </div>
     );
 }
+
+    

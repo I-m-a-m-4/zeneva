@@ -1,19 +1,20 @@
+
 'use client';
 
 import { useUser } from '@/firebase';
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from 'react';
 import { Menu, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '../ui/button';
 import { AppConfig } from '@/lib/config';
 
 export default function MarketingHeader() {
   const { user } = useUser();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -38,21 +39,32 @@ export default function MarketingHeader() {
 
   return (
     <>
-      <header className="fixed top-0 z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg">
-        <nav className="flex max-w-7xl mr-auto ml-auto py-3 sm:py-5 px-6 items-center justify-between">
+      <header className="fixed top-0 z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg h-20">
+        <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center justify-center gap-2" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
-              <Image src={AppConfig.logoUrl} alt="Zeneva Logo" width={32} height={32} />
-              <span className="text-4xl font-bold text-black font-bricolage">Zeneva</span>
+            <Link href="/" className="flex items-center justify-center" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
+              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
           </div>
 
           {/* Nav Links */}
           <div className="hidden md:flex gap-8 items-center">
-            {navLinks.map((link) => (
-              <a key={link.href} href={link.href} className="transition-colors text-base font-medium text-slate-700 tracking-tight font-dm-sans hover:text-black">{link.label}</a>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = (pathname === link.href) || (link.href === '/blog' && pathname.startsWith('/blog')) || (link.href === '/about/our-mission' && pathname.startsWith('/about'));
+              return (
+                <a 
+                    key={link.href} 
+                    href={link.href} 
+                    className={cn(
+                        "transition-colors text-base font-medium tracking-tight font-dm-sans hover:text-black",
+                        isActive ? "text-black font-semibold" : "text-slate-700"
+                    )}
+                >
+                    {link.label}
+                </a>
+              )
+            })}
           </div>
 
           {/* Actions & Mobile Toggle */}
@@ -81,21 +93,7 @@ export default function MarketingHeader() {
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6 transition-transform duration-300 ease-in-out hover:rotate-90" />
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-6 w-6"
-                >
-                  <line x1="3" y1="8" x2="21" y2="8"></line>
-                  <line x1="3" y1="16" x2="21" y2="16"></line>
-                </svg>
+                <Menu className="h-6 w-6" />
               )}
             </button>
           </div>
@@ -104,7 +102,7 @@ export default function MarketingHeader() {
 
       {/* Mobile Menu Panel */}
       <div className={cn(
-        "md:hidden fixed top-[65px] left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-transform duration-300 ease-in-out",
+        "md:hidden fixed top-[80px] left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-transform duration-300 ease-in-out",
         isMobileMenuOpen ? "translate-y-0" : "-translate-y-full"
       )}>
          <div className="container mx-auto px-6 py-8">

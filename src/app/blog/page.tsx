@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowUpRight, ChevronDown, Loader2 } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Loader2, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useMemo } from "react";
@@ -13,8 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { BlogPost } from "@/types";
-import { blogPosts as staticPosts, pressArticles } from '@/lib/blog-data';
+import { blogPosts as staticPosts } from '@/lib/blog-data';
 
 export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -40,105 +39,43 @@ export default function BlogPage() {
     return allPosts.filter(post => post.category === selectedCategory);
   }, [selectedCategory, allPosts]);
 
-  const featuredPosts = allPosts.slice(0, 3);
-
   return (
     <div className="bg-white text-foreground">
       {/* Hero Section */}
-      <div className="bg-[#F9F8F6] relative pb-5">
-        <div className="container mx-auto px-6">
-          <div className="grid lg:grid-cols-5 gap-10 items-center min-h-[50vh] pt-32 lg:pt-40">
-            <div className="lg:col-span-3">
-              <div className="max-w-2xl">
-                <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter leading-tight font-instrument-serif">
-                  Blog & Stories
-                </h1>
-                <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-2xl">
-                  The good stuff. Follow our social media for the latest updates,
-                  features and even sneak peeks 👀
-                </p>
-              </div>
-            </div>
-            <div className="lg:col-span-2 hidden lg:block h-[70vh] overflow-y-auto space-y-8 pr-4 [scrollbar-width:none] [-ms-overflow-style:none]">
-              {isLoading && featuredPosts.length === 0 ? (
-                 <>
-                    <Card className="group overflow-hidden border-4 border-black rounded-2xl shadow-lg w-full max-w-sm mx-auto animate-pulse">
-                        <div className="aspect-[4/3] bg-muted border-b-4 border-black"></div>
-                        <CardContent className="p-4 bg-white space-y-3">
-                           <div className="h-3 w-1/4 bg-muted rounded"></div>
-                           <div className="h-5 w-3/4 bg-muted rounded"></div>
-                           <div className="h-4 w-full bg-muted rounded"></div>
-                           <div className="h-4 w-1/2 bg-muted rounded"></div>
-                           <div className="h-10 w-full bg-muted rounded mt-2"></div>
-                        </CardContent>
-                    </Card>
-                 </>
-              ) : featuredPosts.map((post) => (
-                <Card
-                  key={post.id || post.slug}
-                  className="group overflow-hidden border-4 border-black rounded-2xl shadow-lg w-full max-w-sm mx-auto"
-                >
-                  <Link href={`/blog/${post.slug}`} className="flex flex-col h-full">
-                    <div className="aspect-[4/3] overflow-hidden border-b-4 border-black">
-                      <Image
-                        src={post.imageUrl || `https://picsum.photos/seed/${post.slug}/800/600`}
-                        alt={post.title}
-                        width={400}
-                        height={300}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    </div>
-                    <CardContent className="p-4 bg-white flex flex-col flex-grow">
-                      <p className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">
-                        {post.category}
-                      </p>
-                      <h3 className="text-lg font-bold uppercase mb-3 font-instrument-serif line-clamp-2">
-                        {post.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2 flex-grow">{post.excerpt}</p>
-                      <Button variant="secondary" className="w-full mt-auto font-semibold">
-                        Read More
-                      </Button>
-                    </CardContent>
-                  </Link>
-                </Card>
-              ))}
-            </div>
+      <div className="bg-[#F9F8F6] relative">
+         <div className="container mx-auto px-6 py-24 md:py-32">
+          <div className="max-w-3xl text-center mx-auto">
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight font-bricolage">
+              The Zeneva Ledger
+            </h1>
+            <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              Actionable insights and proven strategies to help you build a more profitable and efficient retail business.
+            </p>
           </div>
         </div>
-        <div
-          className="w-full h-5 absolute bottom-0 left-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20'%3E%3Cpath d='M0 10 V20 H40 V10 H30 V0 H10 V10 Z' fill='black'/%3E%3C/svg%3E")`,
-            backgroundSize: '20px 20px',
-            backgroundRepeat: 'repeat-x',
-            backgroundPosition: 'bottom',
-          }}
-        />
       </div>
 
       {/* Main Content Grid */}
       <div className="container mx-auto px-6 py-16 md:py-24">
         
-        <div className="w-full md:w-[480px] mx-auto mb-20">
+        <div className="w-full md:w-[480px] mx-auto mb-16">
           <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                  <button className="w-full bg-black text-white rounded-lg h-14 px-4 flex items-center justify-between border border-gray-800">
+                  <button className="w-full bg-slate-100 text-slate-800 rounded-lg h-14 px-4 flex items-center justify-between border border-slate-200 hover:bg-slate-200 transition-colors">
                       <div className="flex items-center">
-                          <span className="h-2 w-2 bg-yellow-400 rounded-full mr-3"></span>
-                          <span>Categories: {selectedCategory}</span>
+                          <span className="h-2 w-2 bg-primary rounded-full mr-3"></span>
+                          <span className="font-medium">Filter by: {selectedCategory}</span>
                       </div>
                       <div className="flex items-center">
-                          <span className="text-sm tracking-[3px] font-bold uppercase">SELECT</span>
-                          <ChevronDown className="ml-2 h-4 w-4" />
+                          <ChevronDown className="ml-2 h-5 w-5 text-muted-foreground" />
                       </div>
                   </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] bg-black text-white border-gray-700">
+              <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
                   {categories.map(category => (
-                      <DropdownMenuItem key={category} onSelect={() => setSelectedCategory(category)} className="focus:bg-gray-800 focus:text-white cursor-pointer">
+                      <DropdownMenuItem key={category} onSelect={() => setSelectedCategory(category)} className="focus:bg-slate-100 focus:text-slate-900 cursor-pointer">
                           <div className="flex items-center">
-                               <span className="h-2 w-2 bg-yellow-400 rounded-full mr-3"></span>
+                               <span className="h-2 w-2 bg-primary rounded-full mr-3"></span>
                               {category}
                           </div>
                       </DropdownMenuItem>
@@ -153,66 +90,39 @@ export default function BlogPage() {
                 <p className="mt-4 text-muted-foreground">Loading posts...</p>
             </div>
         ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredPosts.map((post) => (
                 <Card
                   key={post.id || post.slug}
-                  className="group overflow-hidden border-4 border-black rounded-2xl shadow-lg transition-transform duration-300 hover:-translate-y-2 flex flex-col"
+                  className="group overflow-hidden rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col border-border"
                 >
                   <Link href={`/blog/${post.slug}`} className="flex flex-col h-full">
-                    <div className="aspect-[4/3] overflow-hidden border-b-4 border-black">
+                    <div className="aspect-[16/9] overflow-hidden relative">
                       <Image
                         src={post.imageUrl || `https://picsum.photos/seed/${post.slug}/800/600`}
                         alt={post.title}
-                        width={800}
-                        height={600}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        data-ai-hint={post.slug.split('-').slice(0, 2).join(' ')}
                       />
                     </div>
-                    <CardContent className="p-4 bg-white flex-grow flex flex-col">
-                      <p className="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">
+                    <CardContent className="p-6 flex flex-col flex-grow">
+                      <p className="text-sm font-semibold uppercase text-primary mb-2 tracking-wider">
                         {post.category}
                       </p>
-                      <h2 className="text-lg font-bold uppercase mb-3 font-instrument-serif line-clamp-2">
+                      <h2 className="text-2xl font-bold font-bricolage mb-3 line-clamp-2 leading-tight">
                         {post.title}
                       </h2>
-                      <p className="text-sm text-muted-foreground mb-4 flex-grow line-clamp-3">{post.excerpt}</p>
-                      <Button variant="secondary" className="mt-auto w-full font-semibold">
-                        Read More
-                      </Button>
+                      <p className="text-muted-foreground mb-4 flex-grow line-clamp-3 text-sm">{post.excerpt}</p>
+                      <div className="mt-auto flex items-center font-semibold text-primary group-hover:gap-3 transition-all duration-300">
+                        Read More <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </div>
                     </CardContent>
                   </Link>
                 </Card>
               ))}
             </div>
         )}
-
-        {/* Press Section */}
-        <div className="mt-32">
-          <h2 className="text-4xl font-bold border-b border-black pb-5 mb-8 font-instrument-serif">
-            Press
-          </h2>
-          <div className="grid divide-y divide-black">
-            {pressArticles.map((article) => (
-              <Link
-                key={article.title}
-                href={article.url}
-                className="py-8 grid grid-cols-1 md:grid-cols-5 gap-y-4 md:gap-x-10 items-center group"
-              >
-                <p className="md:col-span-3 font-medium text-xl lg:text-2xl group-hover:text-primary transition-colors">
-                  {article.title}
-                </p>
-                <div className="flex md:justify-center">
-                  <p className="font-bold text-gray-400">{article.publication}</p>
-                </div>
-                <div className="flex items-center justify-start md:justify-end text-sm font-bold uppercase group-hover:text-primary text-foreground transition-colors">
-                  <span>View Article</span>
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

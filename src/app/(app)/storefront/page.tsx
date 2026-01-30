@@ -191,12 +191,6 @@ function StorefrontCustomizationPage() {
     googleMapsLink: '',
   });
 
-  const [paymentSettings, setPaymentSettings] = React.useState({
-    bankName: '',
-    bankAccountNumber: '',
-    paystackSubaccount: '',
-  });
-
   const [color, setColor] = React.useState({ h: 22, s: 90, l: 55 });
   const [isSaving, setIsSaving] = React.useState(false);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
@@ -207,11 +201,6 @@ function StorefrontCustomizationPage() {
   React.useEffect(() => {
     if (business?.settings) {
         setStoreSettings(prev => ({...prev, ...(business.settings?.publicStore || {})}));
-        setPaymentSettings({
-            bankName: business.settings.paymentBankName || '',
-            bankAccountNumber: business.settings.paymentBankAccountId || '',
-            paystackSubaccount: business.settings.paystackSubaccount || '',
-        });
 
         if (business.settings.primaryColor) {
             const parts = business.settings.primaryColor.match(/(\d+)\s+(\d+)%\s+(\d+)%/);
@@ -228,13 +217,13 @@ function StorefrontCustomizationPage() {
     }
 
     if (field === 'enabled' && value === true) {
-        const hasBankDetails = paymentSettings.bankAccountNumber && paymentSettings.bankName;
-        const hasPaystack = !!paymentSettings.paystackSubaccount;
+        const hasBankDetails = business?.settings?.paymentBankName && business?.settings?.paymentBankAccountId;
+        const hasPaystack = business?.settings?.paystackSubaccount;
         if (!hasBankDetails && !hasPaystack) {
             toast({
                 variant: 'destructive',
                 title: 'Payment Details Missing',
-                description: 'Please configure bank transfer details or a Paystack subaccount before enabling your store.',
+                description: 'Please configure bank transfer details or a Paystack subaccount in Settings before enabling your store.',
                 duration: 6000
             });
             return;
@@ -242,10 +231,6 @@ function StorefrontCustomizationPage() {
     }
     setStoreSettings(prev => ({ ...prev, [field]: value }));
   };
-
-  const handlePaymentSettingsChange = (field: keyof typeof paymentSettings, value: any) => {
-    setPaymentSettings(prev => ({ ...prev, [field]: value }));
-  }
 
   const handleColorChange = (part: 'h' | 's' | 'l', value: number[]) => {
     setColor(prev => ({ ...prev, [part]: value[0] }));
@@ -334,13 +319,13 @@ function StorefrontCustomizationPage() {
 
     try {
         if (finalSettings.enabled) {
-            const hasBankDetails = paymentSettings.bankName && paymentSettings.bankAccountNumber;
-            const hasPaystack = paymentSettings.paystackSubaccount;
+            const hasBankDetails = business?.settings?.paymentBankName && business?.settings?.paymentBankAccountId;
+            const hasPaystack = business?.settings?.paystackSubaccount;
             if (!hasBankDetails && !hasPaystack) {
                 toast({
                     variant: 'destructive',
                     title: 'Payment Method Required',
-                    description: 'To enable your public store, you must provide either Bank Transfer details or a Paystack Subaccount Code.',
+                    description: 'To enable your public store, you must provide either Bank Transfer details or a Paystack Subaccount Code in your main Settings.',
                     duration: 7000,
                 });
                 setIsSaving(false);
@@ -377,9 +362,6 @@ function StorefrontCustomizationPage() {
       await updateDoc(businessDocRef, {
         'settings.publicStore': finalSettings,
         'settings.primaryColor': primaryColor,
-        'settings.paymentBankName': paymentSettings.bankName,
-        'settings.paymentBankAccountId': paymentSettings.bankAccountNumber,
-        'settings.paystackSubaccount': paymentSettings.paystackSubaccount,
       });
       toast({ variant: 'success', title: 'Storefront Updated', description: 'Your public store settings have been saved.' });
       if (!hasSavedOnce) {
@@ -461,29 +443,6 @@ function StorefrontCustomizationPage() {
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            </AccordionContent>
-                        </Card>
-                    </AccordionItem>
-                     <AccordionItem value="payment" className="border-none">
-                        <Card>
-                            <AccordionTrigger className="p-6 w-full text-left [&[data-state=open]>div]:pb-4">
-                                <div className="space-y-1.5">
-                                    <CardTitle>Payment Methods</CardTitle>
-                                    <CardDescription>Configure how you get paid.</CardDescription>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="p-6 pt-0">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2"><Banknote/> Bank Transfer</Label>
-                                        <Input value={paymentSettings.bankName} onChange={e => handlePaymentSettingsChange('bankName', e.target.value)} placeholder="Bank Name"/>
-                                        <Input value={paymentSettings.bankAccountNumber} onChange={e => handlePaymentSettingsChange('bankAccountNumber', e.target.value)} placeholder="Account Number"/>
-                                    </div>
-                                     <div className="space-y-2">
-                                        <Label className="flex items-center gap-2"><CreditCard/> Paystack</Label>
-                                        <Input value={paymentSettings.paystackSubaccount} onChange={e => handlePaymentSettingsChange('paystackSubaccount', e.target.value)} placeholder="Paystack Subaccount Code (e.g., ACCT_...)"/>
-                                    </div>
                                 </div>
                             </AccordionContent>
                         </Card>
