@@ -78,6 +78,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      { // For Paystack assets
+        protocol: 'https',
+        hostname: 'assets.paystack.com',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
   async headers() {

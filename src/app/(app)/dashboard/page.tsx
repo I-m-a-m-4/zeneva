@@ -4,7 +4,27 @@ import *as React from 'react';
 import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
-import { DollarSign, Package, AlertCircle, ShoppingCart, TrendingUp, Activity, PackageCheck, PackageSearch, FileDigit, Layers, Archive, Award, PlusCircle, Download, Globe, Bot, ArrowRight } from 'lucide-react';
+import { 
+    DollarSign, 
+    Package, 
+    AlertCircle, 
+    ShoppingCart, 
+    TrendingUp, 
+    Activity, 
+    PackageCheck, 
+    PackageSearch, 
+    FileDigit, 
+    Layers, 
+    Archive, 
+    Award, 
+    PlusCircle, 
+    Download, 
+    Globe, 
+    Bot, 
+    ArrowRight,
+    Users, // for new customers
+    ShoppingBag // for units sold
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import type { TopSellingItem, BusinessAnalysis } from '@/types';
 import Link from 'next/link';
@@ -19,7 +39,10 @@ import RefreshButton from '@/components/shared/refresh-button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-
+// New imports for date filtering
+import { DateRangePicker } from '@/components/reports/date-range-picker';
+import type { DateRange } from 'react-day-picker';
+import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -67,30 +90,58 @@ export default function DashboardPage() {
 
   const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders } = usePOS();
   
+  // Date range state, defaults to today
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
+  });
+
   const isLoading = isPosLoading;
 
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];
-    const safeReceipts = receipts || [];
-    const safeCustomers = customers || [];
-    const safeOnlineOrders = onlineOrders || [];
+    const allReceipts = receipts || [];
+    const allCustomers = customers || [];
+    const allOnlineOrders = onlineOrders || [];
+    
+    // Filter data based on selected date range
+    const fromDate = date?.from;
+    const toDate = date?.to;
+
+    const filterByDate = (item: { createdAt: any }) => {
+        if (!item.createdAt?.toDate) return false;
+        const itemDate = item.createdAt.toDate();
+        if (fromDate && !toDate) { // single day selection
+            return isWithinInterval(itemDate, { start: startOfDay(fromDate), end: endOfDay(fromDate) });
+        }
+        if (fromDate && toDate) {
+            return isWithinInterval(itemDate, { start: startOfDay(fromDate), end: endOfDay(toDate) });
+        }
+        return true; // No date filter applied
+    };
+    
+    const filteredReceipts = allReceipts.filter(filterByDate);
+    const filteredOnlineOrders = allOnlineOrders.filter(filterByDate);
+    const newCustomers = allCustomers.filter(filterByDate);
 
     const totalStock = inventoryItems.reduce((sum, item) => sum + (item.stock || 0), 0);
     const uniqueSkus = inventoryItems.length;
     const lowStockItems = inventoryItems.filter(item => (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
 
-    const totalSalesValue = safeReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
-    const totalReceiptsCount = safeReceipts.length;
+    const totalSalesValue = filteredReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
+    const totalReceiptsCount = filteredReceipts.length;
 
-    const totalOnlineSalesValue = safeOnlineOrders.reduce((sum, order) => sum + order.total, 0);
-    const totalOnlineOrdersCount = safeOnlineOrders.length;
+    const totalOnlineSalesValue = filteredOnlineOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalOnlineOrdersCount = filteredOnlineOrders.length;
     
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentOrdersLast7Days = safeReceipts.filter(r => new Date(r.createdAt.toDate()) > sevenDaysAgo).length;
+    const totalRevenue = totalSalesValue + totalOnlineSalesValue;
+    
+    const posUnitsSold = filteredReceipts.reduce((sum, r) => sum + r.items.reduce((q, i) => q + i.quantity, 0), 0);
+    const onlineUnitsSold = filteredOnlineOrders.reduce((sum, o) => sum + o.items.reduce((q, i) => q + i.quantity, 0), 0);
+    const totalUnitsSold = posUnitsSold + onlineUnitsSold;
 
     const itemSalesCount: Record<string, number> = {};
-    safeReceipts.forEach(receipt => {
+    filteredReceipts.forEach(receipt => {
       receipt.items.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
         if (product) {
@@ -110,7 +161,7 @@ export default function DashboardPage() {
         } as TopSellingItem;
       });
 
-    const sortedCustomers = [...safeCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
+    const sortedCustomers = [...allCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
     const topLoyaltyCustomers = sortedCustomers.slice(0, 3);
     
     return {
@@ -121,11 +172,13 @@ export default function DashboardPage() {
       totalReceipts: totalReceiptsCount,
       totalOnlineSalesValue,
       totalOnlineOrdersCount,
-      recentOrdersLast7Days,
+      totalRevenue,
+      newCustomersCount: newCustomers.length,
+      totalUnitsSold,
       topSellingItems,
       topLoyaltyCustomers,
     };
-  }, [products, receipts, customers, onlineOrders]);
+  }, [products, receipts, customers, onlineOrders, date]);
   
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;
@@ -152,29 +205,48 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, recentOrdersLast7Days, topSellingItems, topLoyaltyCustomers } = dashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers } = dashboardData;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
         <div className="no-capture flex flex-wrap items-center justify-start sm:justify-end gap-2">
           <RefreshButton />
-          <Button onClick={() => setIsAddCustomerOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-          </Button>
+          <DateRangePicker date={date} onDateChange={setDate} />
           <Button onClick={handleDownloadImage} variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Download as Image
+            <Download className="mr-2 h-4 w-4" /> Download
           </Button>
         </div>
       </PageTitle>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 auto-rows-fr">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
         <SummaryCard
-          title="Total Sales (POS)"
-          value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+          title="Total Revenue"
+          value={`${currencySymbol}${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
           icon={DollarSign}
-          description={`${totalReceipts} transactions`}
+          description={`${totalReceipts + totalOnlineOrdersCount} total transactions`}
           href="/reports"
+        />
+        <SummaryCard
+          title="Units Sold"
+          value={totalUnitsSold.toLocaleString()}
+          icon={ShoppingBag}
+          description="Across all sales channels"
+          href="/reports"
+        />
+        <SummaryCard
+          title="New Customers"
+          value={newCustomersCount.toLocaleString()}
+          icon={Users}
+          description="Signed up in this period"
+          href="/customers"
+        />
+        <SummaryCard
+          title="POS Sales"
+          value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+          icon={ShoppingCart}
+          description={`${totalReceipts} transactions`}
+          href="/receipts"
         />
         <SummaryCard
           title="Online Sales"
@@ -182,13 +254,6 @@ export default function DashboardPage() {
           icon={Globe}
           description={`${totalOnlineOrdersCount} online orders`}
           href="/online-orders"
-        />
-        <SummaryCard
-          title="Total Inventory Units"
-          value={totalStock.toLocaleString()}
-          icon={Archive}
-          description={`${uniqueSkus} unique SKUs`}
-          href="/inventory"
         />
         <SummaryCard
           title="Low Stock Alerts"
@@ -213,13 +278,13 @@ export default function DashboardPage() {
               <Activity className="h-5 w-5 text-primary" />
               Sales Activity
             </CardTitle>
-            <CardDescription>Overview of your current sales pipeline stages.</CardDescription>
+            <CardDescription>Overview of your sales pipeline stages for the selected period.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <PackageCheck className="h-8 w-8 text-primary mb-2" />
-                <p className="text-2xl font-bold">{totalReceipts}</p>
+                <p className="text-2xl font-bold">{totalReceipts + totalOnlineOrdersCount}</p>
                 <p className="text-xs text-muted-foreground">Completed Sales</p>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">

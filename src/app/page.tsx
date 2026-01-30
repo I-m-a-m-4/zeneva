@@ -71,6 +71,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { sendContactFormEmail } from '@/lib/email';
 import { AppConfig } from '@/lib/config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { MarqueeSection } from '@/components/marquee-section';
+import { FeaturesFloatingSection } from '@/components/features-floating-section';
 
 
 const faqItems = [
@@ -272,23 +274,23 @@ export default function Home() {
                         <div className="max-w-xl z-10">
                             <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
                             <h1 className="leading-[0.95] lg:text-5xl xl:text-6xl text-4xl font-medium text-foreground tracking-tighter font-display mb-8">
-                                The AI-Powered Commerce<br/>
+                                The AI-Powered Commerce<br />
                                 Platform for <span className="text-muted-foreground/80 relative inline-block">Growth.
-                                <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
+                                    <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
                                 </span>
                             </h1>
-                            
+
                             <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-10 text-slate-900">
                                 Zeneva is the AI-powered operating system for modern commerce. Go beyond simple tracking with predictive insights, guided workflows, and a customizable storefront to maximize profit and eliminate stockouts.
                             </p>
 
                             <div className="flex sm:flex-row w-full gap-x-2 gap-y-4">
-                           <Input
-      type="email"
-      placeholder="Enter your work email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-      className="
+                                <Input
+                                    type="email"
+                                    placeholder="Enter your work email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="
         !h-18
         !min-h-[4.7rem]
         !py-3
@@ -309,7 +311,7 @@ export default function Home() {
         shadow-sm
         w-full
       "
-    />
+                                />
 
 
 
@@ -335,6 +337,8 @@ export default function Home() {
                         </div>
                     </div>
                 </main>
+
+                <MarqueeSection />
 
                 {/* Social Proof Section */}
                 <section className="bg-black">
@@ -373,7 +377,7 @@ export default function Home() {
                 </section>
 
                 <section id="features" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden">
-                     <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
+                    <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                     <div className="max-w-7xl mx-auto relative z-10">
                         <div className="text-center max-w-2xl mx-auto mb-16">
                             <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
@@ -384,22 +388,22 @@ export default function Home() {
                             </p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                           {features.map((feature, index) => (
+                            {features.map((feature, index) => (
                                 <div key={index} className="p-8 bg-slate-50/50 backdrop-blur-sm border border-slate-100 rounded-2xl hover:bg-slate-100/70 transition-colors cursor-pointer relative group">
                                     <div className={`w-12 h-12 ${feature.bgColor} ${feature.iconColor} rounded-xl flex items-center justify-center mb-6`}>
                                         <feature.icon width="24" height="24" />
                                     </div>
                                     <h3 className="text-xl font-semibold text-slate-900 mb-2">{feature.title}</h3>
                                     <p className="text-slate-500 text-sm leading-relaxed">{feature.description}</p>
-                                    <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                    <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300 transition-opacity duration-300"></div>
+                                    <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300 transition-opacity duration-300"></div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </section>
-                
-                <section id="how-it-works" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden">
+
+                <section id="how-it-works" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden bg-noise">
                     <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                     <div className="aura-background"></div>
                     <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
@@ -473,23 +477,23 @@ export default function Home() {
                                 </svg>
 
                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-                                     <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-background/80 ring-1 ring-slate-200 backdrop-blur-lg shadow-[0_0_50px_rgba(var(--primary-rgb),0.15)] relative z-20">
-                                         <svg width="40" height="40" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                    <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-background/80 ring-1 ring-slate-200 backdrop-blur-lg shadow-[0_0_50px_rgba(var(--primary-rgb),0.15)] relative z-20">
+                                        <svg width="40" height="40" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                                             <defs>
                                                 <linearGradient id="thickBlueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                                <stop offset="0%" style={{stopColor:'#1e293b;stop-opacity:1'}} />
-                                                <stop offset="100%" style={{stopColor:'#0f172a;stop-opacity:1'}} /> </linearGradient>
+                                                    <stop offset="0%" style={{ stopColor: '#1e293b;stop-opacity:1' }} />
+                                                    <stop offset="100%" style={{ stopColor: '#0f172a;stop-opacity:1' }} /> </linearGradient>
 
                                                 <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                                <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/> 
-                                                <feOffset dx="0" dy="2" result="offsetblur"/> 
-                                                <feComponentTransfer>
-                                                    <feFuncA type="linear" slope="0.3"/> 
-                                                </feComponentTransfer>
-                                                <feMerge> 
-                                                    <feMergeNode/> 
-                                                    <feMergeNode in="SourceGraphic"/> 
-                                                </feMerge>
+                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" />
+                                                    <feOffset dx="0" dy="2" result="offsetblur" />
+                                                    <feComponentTransfer>
+                                                        <feFuncA type="linear" slope="0.3" />
+                                                    </feComponentTransfer>
+                                                    <feMerge>
+                                                        <feMergeNode />
+                                                        <feMergeNode in="SourceGraphic" />
+                                                    </feMerge>
                                                 </filter>
                                             </defs>
 
@@ -501,20 +505,20 @@ export default function Home() {
                                                         M 100 63 
                                                         A 27 27 0 1 1 100 117 
                                                         A 27 27 0 1 1 100 63 
-                                                        Z" 
-                                                    fill="url(#thickBlueGradient)" 
-                                                    stroke="#1e293b" 
+                                                        Z"
+                                                    fill="url(#thickBlueGradient)"
+                                                    stroke="#1e293b"
                                                     strokeWidth="0.5" />
 
                                                 <path d="M 60 127 
                                                         Q 100 154 140 127 
                                                         Q 100 142 60 127 
-                                                        Z" 
-                                                    fill="url(#thickBlueGradient)" 
-                                                    stroke="#1e293b" 
+                                                        Z"
+                                                    fill="url(#thickBlueGradient)"
+                                                    stroke="#1e293b"
                                                     strokeWidth="0.5" />
                                             </g>
-                                            </svg>
+                                        </svg>
                                         <span className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl animate-pulse"></span>
                                     </span>
                                 </div>
@@ -541,41 +545,43 @@ export default function Home() {
                         </div>
                     </div>
                 </section>
-                
-               <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
-                Perfect for Your Business
-              </h2>
-              <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
-                Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {businessTypes.map((type) => {
-                  const image = PlaceHolderImages.find(p => p.id === type.imageId);
-                  if (!image) return null;
-                  return (
-                    <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
-                      <Image
-                        src={image.imageUrl}
-                        alt={type.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                        data-ai-hint={image.imageHint}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-                      <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
-                        <h3 className="text-2xl font-light tracking-tight font-bricolage">{type.name}</h3>
-                        <p className="mt-1 text-sm text-white/90">{type.description}</p>
-                      </div>
+
+                <FeaturesFloatingSection />
+
+                <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="text-center max-w-2xl mx-auto mb-16">
+                            <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
+                                Perfect for Your Business
+                            </h2>
+                            <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
+                                Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+                            {businessTypes.map((type) => {
+                                const image = PlaceHolderImages.find(p => p.id === type.imageId);
+                                if (!image) return null;
+                                return (
+                                    <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
+                                        <Image
+                                            src={image.imageUrl}
+                                            alt={type.name}
+                                            fill
+                                            className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                            data-ai-hint={image.imageHint}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+                                        <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
+                                            <h3 className="text-2xl font-light tracking-tight font-bricolage">{type.name}</h3>
+                                            <p className="mt-1 text-sm text-white/90">{type.description}</p>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
-                  )
-                })}
-            </div>
-          </div>
-        </section>
+                </section>
 
                 <section className="z-10 animate-[fadeInUp_1s_ease-out_1.2s_forwards] relative" style={{ transform: "translateY(0px)" }}>
                     <div className="max-w-7xl mx-auto pt-16 pb-16 px-6">
@@ -605,7 +611,7 @@ export default function Home() {
                                                 <div className="p-2">
                                                     <svg viewBox="0 0 300 90" className="w-full h-20 sm:h-24 text-neutral-300">
                                                         <defs><pattern id="dots1" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.5" fill="currentColor" opacity="0.3"></circle></pattern></defs>
-                                                    <rect width="100%" height="100%" fill="url(#dots1)"></rect>
+                                                        <rect width="100%" height="100%" fill="url(#dots1)"></rect>
                                                         <rect x="20" y="45" width="3" height="20" fill="#F87171"></rect>
                                                         <rect x="40" y="35" width="3" height="25" fill="#4ADE80"></rect>
                                                         <rect x="60" y="50" width="3" height="15" fill="#F87171"></rect>
@@ -667,7 +673,7 @@ export default function Home() {
                             <div className="px-6">
                                 <div className="tech-content" id="technology">
                                     <h3 className="sm:text-5xl transition-colors duration-500 text-4xl font-light text-slate-900 tracking-tight font-bricolage">
-                                       Built for Scale, Designed for Humans
+                                        Built for Scale, Designed for Humans
                                     </h3>
                                     <div className="mt-8">
                                         <div className="pt-6">
@@ -752,4 +758,3 @@ export default function Home() {
         </div>
     );
 }
-    

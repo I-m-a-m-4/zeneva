@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -32,16 +33,27 @@ export async function POST(request: Request) {
     if (!response.ok || !data.status) {
         console.error('Paystack subaccount creation error:', data);
         // Paystack's API for idempotent subaccount creation returns a 409 Conflict.
-        // We can treat this as a success for our use case.
-        if (response.status === 409 && data.message.includes('already exists')) {
-             const existingSubaccountResponse = await fetch(`https://api.paystack.co/subaccount?bank_code=${bank_code}&account_number=${account_number}`, {
-                headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
-             });
-             const existingData = await existingSubaccountResponse.json();
-             if (existingData.status && existingData.data.length > 0) {
-                 return NextResponse.json({ subaccount_code: existingData.data[0].subaccount_code }, { status: 200 });
+        // We can treat this as a success for our use case by fetching the existing subaccount.
+        if (response.status === 409 && data.message.includes('already exist')) {
+             try {
+                const listSubaccountsUrl = new URL('https://api.paystack.co/subaccount');
+                listSubaccountsUrl.searchParams.append('bank_code', bank_code);
+                listSubaccountsUrl.searchParams.append('account_number', account_number);
+                
+                const existingSubaccountResponse = await fetch(listSubaccountsUrl.toString(), {
+                    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+                });
+                const existingData = await existingSubaccountResponse.json();
+                
+                if (existingData.status && existingData.data.length > 0) {
+                    return NextResponse.json({ subaccount_code: existingData.data[0].subaccount_code }, { status: 200 });
+                }
+             } catch (fetchError) {
+                 console.error("Error fetching existing subaccount:", fetchError);
+                 return NextResponse.json({ message: 'A subaccount with these details exists, but we could not retrieve it. Please contact support.'}, { status: 500 });
              }
         }
+        // If it's not a 409 error or we failed to retrieve the existing one, return the original error.
         return NextResponse.json({ message: data.message || 'Failed to create Paystack subaccount.' }, { status: response.status });
     }
     

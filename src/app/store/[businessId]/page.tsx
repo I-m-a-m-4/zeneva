@@ -186,7 +186,7 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
       return;
     }
 
-    const hasPaystack = business.settings?.paystackSubaccount;
+    const hasPaystack = business.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5;
     const hasBankDetails = business.settings?.paymentBankName && business.settings?.paymentBankAccountId;
 
     if (!hasPaystack && !hasBankDetails) {
@@ -266,13 +266,13 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
         </div>
         <div className="mt-4 p-4 bg-muted/50 rounded-lg">
             <h4 className="font-semibold mb-2">Payment Instructions</h4>
-            {business.settings?.paystackSubaccount ? (
+            {business.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5 ? (
                  <p className="text-sm text-muted-foreground mb-2">You can pay securely with your card via Paystack.</p>
             ) : null}
             {business.settings?.paymentBankName && (
                  <>
                     <p className="text-sm text-muted-foreground mb-2">
-                        {business.settings?.paystackSubaccount ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."} Your order will be processed upon confirmation.
+                        {business.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5 ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."} Your order will be processed upon confirmation.
                     </p>
                     <p className="text-sm"><strong>Bank:</strong> {business.settings.paymentBankName}</p>
                     <p className="text-sm"><strong>Account:</strong> {business.settings.paymentBankAccountId}</p>
@@ -284,7 +284,7 @@ function CheckoutDialog({ isOpen, onOpenChange, cart, total, business, onOrderPl
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                {business.settings?.paystackSubaccount ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
+                {business.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5 ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
             </Button>
         </DialogFooter>
       </DialogContent>

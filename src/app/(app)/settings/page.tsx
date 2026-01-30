@@ -141,6 +141,7 @@ function SettingsPageContent() {
     const [paymentBankCode, setPaymentBankCode] = React.useState('');
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
     const [verifiedAccountName, setVerifiedAccountName] = React.useState('');
+    const [paystackSubaccount, setPaystackSubaccount] = React.useState('');
 
     const [industry, setIndustry] = React.useState('');
     const [country, setCountry] = React.useState('Nigeria');
@@ -161,6 +162,7 @@ function SettingsPageContent() {
             setDefaultTaxRate(String(business.settings?.defaultTaxRate || 0));
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');
+            setPaystackSubaccount(business.settings?.paystackSubaccount || '');
             setVerifiedAccountName(''); // Reset on load
 
             setIndustry(business.settings?.industry || '');
@@ -212,7 +214,7 @@ function SettingsPageContent() {
             setVerifiedAccountName(result.data.account_name);
             toast({
                 variant: 'success',
-                title: 'Account Verified (Demo)',
+                title: 'Account Verified',
                 description: `Account Name: ${result.data.account_name}`
             });
 
@@ -263,11 +265,12 @@ function SettingsPageContent() {
 
                     const subaccountData = await subaccountResponse.json();
 
-                    if (!subaccountResponse.ok) {
-                        throw new Error(subaccountData.message || 'Failed to link account with Paystack.');
+                    if (!subaccountResponse.ok || !subaccountData.subaccount_code) {
+                        throw new Error(subaccountData.message || 'Failed to link account with Paystack and retrieve subaccount code.');
                     }
                     
                     finalData['settings.paystackSubaccount'] = subaccountData.subaccount_code;
+                    setPaystackSubaccount(subaccountData.subaccount_code); // Update local state
                     toast({
                         variant: "success",
                         title: "Paystack Account Linked",
@@ -275,12 +278,13 @@ function SettingsPageContent() {
                     });
 
                 } catch (error: any) {
-                    toast({ variant: "destructive", title: "Paystack Link Failed", description: error.message });
+                    toast({ variant: "destructive", title: "Paystack Link Failed", description: error.message, duration: 7000 });
                     setIsSaving(prev => ({ ...prev, [formName]: false }));
                     return; // Stop the save process if linking fails
                 }
             } else {
                 finalData['settings.paystackSubaccount'] = '';
+                setPaystackSubaccount(''); // Clear local state
             }
         }
 
@@ -366,7 +370,7 @@ function SettingsPageContent() {
                         <Separator />
                          <div>
                             <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground"/>Bank Transfer Details</h4>
-                            <p className="text-sm text-muted-foreground mb-4">Provide your bank details for manual payments from your storefront.</p>
+                            <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout.</p>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -384,9 +388,19 @@ function SettingsPageContent() {
                                 {verifiedAccountName && <div><Label>Account Name</Label><Input value={verifiedAccountName} readOnly className="bg-muted"/></div>}
                             </div>
                          </div>
+                         <Separator />
+                         <div>
+                            <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><CreditCard className="h-5 w-5 text-muted-foreground"/>Card Payments (via Paystack)</h4>
+                            <p className="text-sm text-muted-foreground mb-4">To accept card payments on your storefront, your bank account must be linked with Paystack. Saving your financials will attempt to do this automatically.</p>
+                            <div className="space-y-2">
+                                <Label>Paystack Subaccount Code</Label>
+                                <Input value={paystackSubaccount} readOnly placeholder="Generated automatically upon saving financials" className="bg-muted"/>
+                                 <p className="text-xs text-muted-foreground">This code is created when you save valid bank details and is used to route card payments to you.</p>
+                            </div>
+                         </div>
                     </CardContent>
                     <CardFooter>
-                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
+                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paystackSubaccount": paystackSubaccount })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
                         </Button>
                     </CardFooter>

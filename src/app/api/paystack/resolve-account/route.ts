@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     
     const data = await response.json();
 
-    if (!response.ok) {
+    if (!response.ok || !data.status) {
         console.error('Paystack API resolution error:', data);
         return NextResponse.json({ status: false, message: data.message || 'Failed to resolve account with Paystack.' }, { status: response.status });
     }
