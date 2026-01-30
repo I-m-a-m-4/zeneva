@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -89,7 +90,7 @@ const PaystackSubscriptionButton = ({
         try {
             // Step 1: Verify payment on our backend
             toast({ title: "Processing...", description: "Verifying your payment securely." });
-            const verifyResponse = await fetch('/api/paystack/verify', {
+            const verifyResponse = await fetch('/api/paystack/verify-transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reference: transaction.reference }),

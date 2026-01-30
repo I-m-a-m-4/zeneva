@@ -246,6 +246,43 @@ function SettingsPageContent() {
                 return;
             }
         }
+        
+        if (formName === "financials") {
+            const hasBankDetails = dataToSave['settings.paymentBankCode'] && dataToSave['settings.paymentBankAccountId'];
+            if (hasBankDetails) {
+                 try {
+                    const subaccountResponse = await fetch('/api/paystack/create-subaccount', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            business_name: businessName,
+                            bank_code: dataToSave['settings.paymentBankCode'],
+                            account_number: dataToSave['settings.paymentBankAccountId'],
+                        }),
+                    });
+
+                    const subaccountData = await subaccountResponse.json();
+
+                    if (!subaccountResponse.ok) {
+                        throw new Error(subaccountData.message || 'Failed to link account with Paystack.');
+                    }
+                    
+                    finalData['settings.paystackSubaccount'] = subaccountData.subaccount_code;
+                    toast({
+                        variant: "success",
+                        title: "Paystack Account Linked",
+                        description: "Your bank account can now receive card payments via Paystack.",
+                    });
+
+                } catch (error: any) {
+                    toast({ variant: "destructive", title: "Paystack Link Failed", description: error.message });
+                    setIsSaving(prev => ({ ...prev, [formName]: false }));
+                    return; // Stop the save process if linking fails
+                }
+            } else {
+                finalData['settings.paystackSubaccount'] = '';
+            }
+        }
 
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
@@ -309,7 +346,7 @@ function SettingsPageContent() {
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button onClick={() => handleSettingsSubmit('profile', { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail })} disabled={isSaving["profile"]}>
+                        <Button type="button" onClick={() => handleSettingsSubmit('profile', { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail })} disabled={isSaving["profile"]}>
                             {isSaving["profile"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Profile
                         </Button>
                     </CardFooter>
@@ -349,7 +386,7 @@ function SettingsPageContent() {
                          </div>
                     </CardContent>
                     <CardFooter>
-                         <Button onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
+                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
                         </Button>
                     </CardFooter>
@@ -369,7 +406,7 @@ function SettingsPageContent() {
                         </div>
                     </CardContent>
                     <CardFooter>
-                         <Button onClick={() => handleSettingsSubmit('organization', { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart })} disabled={isSaving["organization"]}>
+                         <Button type="button" onClick={() => handleSettingsSubmit('organization', { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart })} disabled={isSaving["organization"]}>
                             {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Organization
                         </Button>
                     </CardFooter>
