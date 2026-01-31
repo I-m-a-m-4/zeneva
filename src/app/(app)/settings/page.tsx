@@ -225,7 +225,7 @@ function SettingsPageContent() {
     };
 
     const handleSettingsSubmit = async (formName: string, dataToSave: Record<string, any>) => {
-        if (!business?.id) return;
+        if (!business?.id || !businessName) return;
         setIsSaving(prev => ({ ...prev, [formName]: true }));
 
         let finalData = { ...dataToSave };
@@ -247,12 +247,36 @@ function SettingsPageContent() {
                 return;
             }
         }
+        
+        if (formName === "financials") {
+            try {
+                if (paymentBankAccountId && paymentBankCode && businessName) {
+                    const subaccountResponse = await fetch('/api/paystack/create-subaccount', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            business_name: businessName,
+                            bank_code: paymentBankCode,
+                            account_number: paymentBankAccountId,
+                        })
+                    });
+                    const subaccountResult = await subaccountResponse.json();
+                    if (!subaccountResponse.ok) {
+                        throw new Error(subaccountResult.message || 'Failed to create Paystack subaccount.');
+                    }
+                    finalData['settings.paystackSubaccount'] = subaccountResult.subaccount_code;
+                }
+            } catch (error: any) {
+                 toast({ variant: "destructive", title: "Paystack Setup Failed", description: error.message });
+                // We don't stop the save process, just notify the user. The other settings can still save.
+            }
+        }
 
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, finalData);
             triggerRefresh();
-            toast({ variant: "success", title: `${formName} Settings Saved`, description: `Your settings have been updated.` });
+            toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
         } finally {
@@ -330,7 +354,7 @@ function SettingsPageContent() {
                         <Separator />
                          <div>
                             <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground"/>Bank Transfer Details</h4>
-                            <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout.</p>
+                            <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.</p>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
