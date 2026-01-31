@@ -44,10 +44,23 @@ const MARQUEE_ITEMS = [
             </svg>
         )
     },
-    {
-        label: "Invoice/Receipt",
-        icon: <img src="/images/receipt.png" alt="Invoice/Receipt" className="w-[26px] h-[26px] object-contain" />
-    },
+{
+    label: "Invoice/Receipt",
+    icon: (
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="sc-bczRLJ kkAHbc">
+            <circle cx="13" cy="13" r="12.6693" fill="#E8F4F8"></circle>
+            <g clipPath="url(#clip0_receipt)">
+                <path d="M8.5 7.5H17.5C17.7761 7.5 18 7.72386 18 8V18.5L16.25 17.375L14.5 18.5L12.75 17.375L11 18.5L9.25 17.375L7.5 18.5V8C7.5 7.72386 7.72386 7.5 8 7.5Z" stroke="#202021" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10.5 10.5H15.5M10.5 13H15.5M10.5 15.5H13.5" stroke="#202021" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
+            <defs>
+                <clipPath id="clip0_receipt">
+                    <rect width="12.67" height="12.67" fill="white" transform="translate(6.5 6.5)"/>
+                </clipPath>
+            </defs>
+        </svg>
+    )
+},
     {
         label: "Run Discounts",
         icon: (

@@ -340,7 +340,22 @@ export default function Home() {
                         </div>
                     </main>
 
-                    <MarqueeSection />
+                    
+                <MarqueeSection />
+
+                    {/* Dashboard Preview Section */}
+                    <section className="relative w-full max-w-7xl mx-auto px-6 pb-24 mt-12 z-20">
+                        <div className="relative rounded-xl overflow-hidden ">
+                            <Image
+                                src="/herolytics.svg"
+                                alt="Zeneva Dashboard View"
+                                width={1400}
+                                height={900}
+                                className="w-full h-auto block"
+                                priority
+                            />
+                        </div>
+                    </section>
 
                     {/* Social Proof Section */}
                     <section className="bg-black">
