@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -268,6 +267,9 @@ export default function AddProductPage() {
                         <FormControl>
                             <Input placeholder="QHDM-001" {...field} />
                         </FormControl>
+                        <FormDescription>
+                            This unique code generates the barcode. <Link href="/support#how-barcodes-work" className="text-primary underline">Learn more</Link>.
+                        </FormDescription>
                         <FormMessage />
                         </FormItem>
                     )}
@@ -377,14 +379,14 @@ export default function AddProductPage() {
                         </FormControl>
                         <SelectContent>
                           {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
-                            business.settings.productCategories.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            business.settings.productCategories.map((cat: string) => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                             ))
                           ) : (
                              <div className="p-4 text-center text-sm text-muted-foreground">
                                 No categories defined.
                                 <Button variant="link" asChild className="p-0 h-auto ml-1">
-                                    <Link href="/settings#product-categories">Create one now</Link>
+                                    <Link href="/settings">Create one now</Link>
                                 </Button>
                             </div>
                           )}

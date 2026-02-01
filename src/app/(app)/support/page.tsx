@@ -29,6 +29,32 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
     )
   },
   {
+    id: "how-barcodes-work",
+    question: "How do barcodes work for POS and stock-taking?",
+    answer: (
+      <>
+        <p>Using a barcode scanner with Zeneva is incredibly simple and dramatically speeds up your workflow. Here’s everything you need to know:</p>
+        
+        <h4 className="font-semibold mt-4 mb-2">What is an SKU?</h4>
+        <p>An SKU (Stock Keeping Unit) is a unique code you assign to each product (e.g., `TSHIRT-RED-L`). The barcode label you print is just a machine-readable version of this SKU.</p>
+        
+        <h4 className="font-semibold mt-4 mb-2">How Does the Scanner Connect?</h4>
+        <p>A standard USB barcode scanner acts just like a keyboard. You don't need any special software or drivers. Simply plug the scanner into your computer's USB port, and it's ready to go.</p>
+
+        <h4 className="font-semibold mt-4 mb-2">How to Use it for Sales (POS):</h4>
+        <ol className="list-decimal list-inside space-y-2 mt-2">
+            <li>Navigate to the <strong>POS</strong> page.</li>
+            <li>Click your mouse into the <strong>"Search by name or SKU..."</strong> input field.</li>
+            <li>Scan the product's barcode.</li>
+        </ol>
+        <p className="mt-2">The scanner will instantly "type" the product's SKU into the search bar and filter the list to show only that item. You can then add it to the cart. This reduces checkout time from minutes to seconds.</p>
+        
+        <h4 className="font-semibold mt-4 mb-2">How to Use it for Stock-Taking:</h4>
+        <p>The process is similar. On the <strong>Inventory</strong> page, click into the search bar, scan an item, and its details will appear, ready for you to update the stock count.</p>
+      </>
+    )
+  },
+  {
     id: "csv-formatting",
     question: "How should I format my CSV files for import?",
     answer: (
@@ -346,7 +372,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                              <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${msg.senderId === userProfile.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                                 <p className="text-sm">{msg.text}</p>
                                 <p className="text-xs opacity-70 mt-1 text-right">{msg.createdAt ? formatDistanceToNow(msg.createdAt.toDate(), { addSuffix: true }) : ''}</p>
-                            </div>
+                             </div>
                         </div>
                     ))}
                  </div>

@@ -9,7 +9,7 @@ import type { OnlineOrder } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Globe, MoreHorizontal, CheckCircle, Clock, Info, XCircle } from 'lucide-react';
+import { Loader2, Globe, MoreHorizontal, CheckCircle, Clock, Info, XCircle, DollarSign, ShoppingCart } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import RefreshButton from '@/components/shared/refresh-button';
@@ -32,6 +32,21 @@ function OrderRowSkeleton() {
     )
 }
 
+function StatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+                {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            </CardContent>
+        </Card>
+    );
+}
+
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
     pending: 'secondary',
     paid: 'default',
@@ -51,6 +66,14 @@ export default function OnlineOrdersPage() {
 
     const { data: onlineOrders, isLoading: isLoadingOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
     const isLoading = isPosLoading || isLoadingOrders;
+
+    const analytics = React.useMemo(() => {
+        if (!onlineOrders) return { totalRevenue: 0, totalOrders: 0, averageOrderValue: 0 };
+        const totalRevenue = onlineOrders.reduce((sum, order) => sum + order.total, 0);
+        const totalOrders = onlineOrders.length;
+        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+        return { totalRevenue, totalOrders, averageOrderValue };
+    }, [onlineOrders]);
     
     const handleStatusChange = async (orderId: string, status: OnlineOrder['status']) => {
         if (!business?.id) return;
@@ -74,6 +97,13 @@ export default function OnlineOrdersPage() {
     return (
         <div className="space-y-6">
             <PageTitle title="Online Orders" subtitle="Manage incoming orders from your public storefront." />
+            
+            <div className="grid gap-4 md:grid-cols-3">
+                <StatCard title="Total Revenue" value={`${currencySymbol}${analytics.totalRevenue.toLocaleString()}`} icon={DollarSign} />
+                <StatCard title="Total Orders" value={analytics.totalOrders.toLocaleString()} icon={ShoppingCart} />
+                <StatCard title="Average Order Value" value={`${currencySymbol}${analytics.averageOrderValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={DollarSign} />
+            </div>
+
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
@@ -128,6 +158,11 @@ export default function OnlineOrdersPage() {
                                             <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
                                             <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
                                             <div className="text-xs text-muted-foreground mt-1 truncate max-w-xs">{order.customerAddress}</div>
+                                             {order.shippingDetails && (
+                                                <div className="text-xs text-muted-foreground mt-1 font-semibold">
+                                                   Shipping: {order.shippingDetails.name} (+{currencySymbol}{order.shippingDetails.price})
+                                                </div>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={statusVariant[order.status]} className="capitalize">{order.status}</Badge>
@@ -158,6 +193,7 @@ export default function OnlineOrdersPage() {
                                                 <DropdownMenuContent>
                                                     <DropdownMenuLabel>Change Status</DropdownMenuLabel>
                                                     <DropdownMenuItem onSelect={() => handleStatusChange(order.id, 'paid')}><CheckCircle className="mr-2 h-4 w-4 text-green-500"/> Mark as Paid</DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => handleStatusChange(order.id, 'shipped')}><CheckCircle className="mr-2 h-4 w-4 text-blue-500"/> Mark as Shipped</DropdownMenuItem>
                                                     <DropdownMenuItem onSelect={() => handleStatusChange(order.id, 'pending')}><Clock className="mr-2 h-4 w-4 text-amber-500"/> Mark as Pending</DropdownMenuItem>
                                                     <DropdownMenuItem onSelect={() => handleStatusChange(order.id, 'cancelled')} className="text-destructive"><XCircle className="mr-2 h-4 w-4"/> Cancel Order</DropdownMenuItem>
                                                 </DropdownMenuContent>

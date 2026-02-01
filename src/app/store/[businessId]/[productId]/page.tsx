@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import * as React from 'react';
@@ -13,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Package, ShoppingCart, AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { usePOS } from '@/context/pos-context';
+import { useStore } from '@/context/store-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { AppConfig } from '@/lib/config';
 
@@ -48,7 +46,7 @@ export default function ProductDetailPage() {
     const { businessId, productId } = params as { businessId: string; productId: string; };
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { addToCart, business } = usePOS();
+    const { addToCart, business } = useStore();
 
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
     const { data: product, isLoading, error } = useDoc<Product>(productDocRef);
@@ -80,12 +78,7 @@ export default function ProductDetailPage() {
 
         }
     }, [product, business]);
-
-    const storeStyle = {
-        '--primary': business?.settings?.primaryColor || '22 90% 55%',
-        '--accent': business?.settings?.primaryColor || '22 90% 55%',
-    } as React.CSSProperties;
-
+    
     if (isLoading) {
         return <ProductDetailSkeleton />;
     }
@@ -104,7 +97,7 @@ export default function ProductDetailPage() {
     const isOutOfStock = !product.stock || product.stock <= 0;
 
     return (
-        <div style={storeStyle}>
+        <div>
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <Button variant="ghost" onClick={() => router.back()} className="mb-6">
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -170,3 +163,4 @@ export default function ProductDetailPage() {
         </div>
     );
 }
+    

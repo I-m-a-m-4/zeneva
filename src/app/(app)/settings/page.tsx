@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -116,7 +116,7 @@ function SettingsPageSkeleton() {
 }
 
 function SettingsPageContent() {
-    const { business, currentUserProfile, triggerRefresh } = usePOS();
+    const { business, currentUserProfile } = usePOS();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
@@ -147,6 +147,12 @@ function SettingsPageContent() {
     const [country, setCountry] = React.useState('Nigeria');
     const [state, setState] = React.useState('');
     const [fiscalYearStart, setFiscalYearStart] = React.useState('January');
+    
+    const [shippingOptions, setShippingOptions] = React.useState<{name: string, price: number}[]>([]);
+    const [newShippingOption, setNewShippingOption] = React.useState({ name: '', price: '' });
+
+    const [productCategories, setProductCategories] = React.useState<string[]>([]);
+    const [newCategory, setNewCategory] = React.useState('');
 
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
@@ -168,6 +174,8 @@ function SettingsPageContent() {
             setCountry(business.settings?.country || 'Nigeria');
             setState(business.settings?.state || '');
             setFiscalYearStart(business.settings?.fiscalYearStart || 'January');
+            setShippingOptions(business.settings?.publicStore?.shippingOptions || []);
+            setProductCategories(business.settings?.productCategories || []);
         }
     }, [business]);
 
@@ -268,14 +276,12 @@ function SettingsPageContent() {
                 }
             } catch (error: any) {
                  toast({ variant: "destructive", title: "Paystack Setup Failed", description: error.message });
-                // We don't stop the save process, just notify the user. The other settings can still save.
             }
         }
 
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, finalData);
-            triggerRefresh();
             toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
@@ -284,6 +290,33 @@ function SettingsPageContent() {
         }
     };
     
+    const handleAddShippingOption = () => {
+        const name = newShippingOption.name.trim();
+        const price = parseFloat(newShippingOption.price);
+        if (name && !isNaN(price) && price >= 0) {
+            setShippingOptions([...shippingOptions, { name, price }]);
+            setNewShippingOption({ name: '', price: '' });
+        } else {
+            toast({ variant: 'destructive', title: 'Invalid Option', description: 'Please provide a valid name and price for the shipping option.' });
+        }
+    };
+
+    const handleDeleteShippingOption = (index: number) => {
+        setShippingOptions(shippingOptions.filter((_, i) => i !== index));
+    };
+
+    const handleAddCategory = () => {
+        const cat = newCategory.trim();
+        if (cat && !productCategories.includes(cat)) {
+            setProductCategories([...productCategories, cat]);
+            setNewCategory('');
+        }
+    }
+
+    const handleDeleteCategory = (catToDelete: string) => {
+        setProductCategories(productCategories.filter(c => c !== catToDelete));
+    }
+
     const handleDeleteAccount = async () => {
         if (!firestore || !currentUserProfile || !business) return;
         setIsDeleting(true);
@@ -340,6 +373,34 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Product Categories</CardTitle>
+                        <CardDescription>Manage the categories for your products. This helps in organizing and filtering your inventory.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {productCategories.map((cat, index) => (
+                                <div key={index} className="flex items-center justify-between gap-2 p-3 border rounded-md bg-muted/50">
+                                    <p className="font-medium">{cat}</p>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
+                            ))}
+                            <div className="flex items-end gap-2 pt-4 border-t">
+                                <div className="flex-1"><Label>New Category</Label><Input placeholder="e.g., Electronics" value={newCategory} onChange={e => setNewCategory(e.target.value)} /></div>
+                                <Button type="button" onClick={handleAddCategory}><Plus className="h-4 w-4 mr-2"/>Add Category</Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                     <CardFooter>
+                        <Button type="button" onClick={() => handleSettingsSubmit('categories', { 'settings.productCategories': productCategories })} disabled={isSaving["categories"]}>
+                            {isSaving["categories"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Categories
+                        </Button>
+                    </CardFooter>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" />Payment & Financials</CardTitle>
@@ -376,6 +437,38 @@ function SettingsPageContent() {
                     <CardFooter>
                          <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
+                        </Button>
+                    </CardFooter>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5 text-primary" />Shipping & Delivery</CardTitle>
+                        <CardDescription>Set up the shipping options available for your online store customers.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {shippingOptions.map((option, index) => (
+                                <div key={index} className="flex items-center justify-between gap-2 p-3 border rounded-md bg-muted/50">
+                                    <div>
+                                        <p className="font-medium">{option.name}</p>
+                                        <p className="text-sm text-muted-foreground">₦{option.price.toLocaleString()}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteShippingOption(index)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
+                            ))}
+                            <div className="flex items-end gap-2 pt-4 border-t">
+                                <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({...newShippingOption, name: e.target.value})} /></div>
+                                <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({...newShippingOption, price: e.target.value})}/></div>
+                                <Button type="button" onClick={handleAddShippingOption}>Add</Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                     <CardFooter>
+                        <Button type="button" onClick={() => handleSettingsSubmit('shipping', { 'settings.publicStore.shippingOptions': shippingOptions })} disabled={isSaving["shipping"]}>
+                            {isSaving["shipping"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Shipping Options
                         </Button>
                     </CardFooter>
                 </Card>

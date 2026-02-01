@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -21,6 +20,7 @@ import {
   ChevronRight,
   Loader2,
   Download,
+  Barcode as BarcodeIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,13 +36,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import {
   Table,
@@ -70,6 +70,7 @@ import Papa from 'papaparse';
 import RefreshButton from '@/components/shared/refresh-button';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
+import BarcodeDialog from '@/components/inventory/barcode-dialog';
 
 function ProductRowSkeleton() {
     return (
@@ -115,6 +116,7 @@ export default function InventoryPage() {
   const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
+  const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [stockFilter, setStockFilter] = React.useState('all');
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   
@@ -326,7 +328,7 @@ export default function InventoryPage() {
                         <DropdownMenuSubContent>
                              <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
                                 <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
-                                {business?.settings?.productCategories?.map(cat => (
+                                {business?.settings?.productCategories?.map((cat: string) => (
                                     <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>
@@ -477,6 +479,9 @@ export default function InventoryPage() {
                         <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setQuickEditProduct(product)}} disabled={!canManageStock}>
                             <Edit className="mr-2 h-4 w-4"/> Quick Edit
                         </DropdownMenuItem>
+                         <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setBarcodeProduct(product); }} disabled={!product.sku}>
+                            <BarcodeIcon className="mr-2 h-4 w-4"/> Print Barcode
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setIsDeleteDialogOpen(true); setSelectedProductIds([product.id]); }} disabled={!canManageStock}>
                             <Trash2 className="mr-2 h-4 w-4"/> Delete
@@ -581,6 +586,15 @@ export default function InventoryPage() {
             onSuccess={handleBulkEditSuccess}
         />
       )}
+       <BarcodeDialog
+            product={barcodeProduct}
+            isOpen={!!barcodeProduct}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setBarcodeProduct(null);
+                }
+            }}
+        />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -10,8 +9,9 @@ import {
   ChevronLeft,
   Upload,
   Loader2,
-  Barcode
+  Barcode as BarcodeIcon
 } from "lucide-react";
+import BarcodeDisplay from 'react-barcode';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { UserProfile, Product } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBusiness } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
 
 const productSchema = z.object({
@@ -95,8 +95,8 @@ export default function EditProductPage() {
     const productId = params.id as string;
 
     const { toast } = useToast();
-    const { profile: userProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
-    const business = useBusiness();
+    const { currentUserProfile } = usePOS();
+    const { business } = usePOS();
     const firestore = useFirestore();
     
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
@@ -144,7 +144,7 @@ export default function EditProductPage() {
     };
     
     const onSubmit = async (values: ProductFormValues) => {
-        if (!productDocRef || !product || !userProfile || !firestore || !business) return;
+        if (!productDocRef || !product || !currentUserProfile || !firestore || !business) return;
 
         setIsSaving(true);
         let imageUrl = product?.imageUrl || '';
@@ -168,7 +168,7 @@ export default function EditProductPage() {
             });
 
             // Log audit event
-            logAuditEvent(firestore, business.id, userProfile, {
+            logAuditEvent(firestore, business.id, currentUserProfile, {
                 action: 'product.update',
                 entity: { type: 'Product', id: product.id, name: product.name },
                 details: { changes: Object.keys(values).filter(key => values[key as keyof typeof values] !== product[key as keyof typeof product])}
@@ -186,8 +186,8 @@ export default function EditProductPage() {
         }
     };
     
-    const isLoading = isProfileLoading || isProductLoading;
-    const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
+    const isLoading = isProductLoading;
+    const canManageProduct = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
         return <EditProductSkeleton />;
@@ -346,14 +346,14 @@ export default function EditProductPage() {
                             </FormControl>
                             <SelectContent>
                                 {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
-                                    business.settings.productCategories.map(cat => (
+                                    business.settings.productCategories.map((cat: string) => (
                                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                                     ))
                                 ) : (
                                     <div className="p-4 text-center text-sm text-muted-foreground">
                                         No categories defined.
                                         <Button variant="link" asChild className="p-0 h-auto ml-1">
-                                            <Link href="/settings#product-categories">Create one now</Link>
+                                            <Link href="/settings">Create one now</Link>
                                         </Button>
                                     </div>
                                 )}
@@ -393,6 +393,25 @@ export default function EditProductPage() {
                             />
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Barcode</CardTitle>
+                    <CardDescription>
+                        This barcode is generated from the product's SKU.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {product.sku ? (
+                        <div className="flex justify-center bg-white p-2 rounded-md">
+                            <BarcodeDisplay value={product.sku} />
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center">
+                            Add an SKU to generate a barcode for this product.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
             </div>

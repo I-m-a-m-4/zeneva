@@ -1,8 +1,3 @@
-
-
-
-
-
 export interface Product {
     id: string;
     businessId: string;
@@ -92,6 +87,10 @@ export interface OnlineOrder {
         price: number;
     }[];
     total: number;
+    shippingDetails?: {
+      name: string;
+      price: number;
+    };
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
     paymentMethod?: 'Paystack' | 'Bank Transfer';
     paymentReference?: string;
@@ -148,7 +147,6 @@ export interface BusinessAnalysis {
     createdAt: any; // Can be Date or Firestore Timestamp
 }
 
-
 export interface BusinessInstance {
     id: string;
     name: string;
@@ -200,6 +198,7 @@ export interface BusinessInstance {
             contactEmail?: string;
             businessHours?: string;
             googleMapsLink?: string;
+            shippingOptions?: { name: string; price: number; }[];
         },
         industry?: string;
         language?: string;
@@ -302,7 +301,3 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
-    
-
-    
-

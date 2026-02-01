@@ -1,0 +1,243 @@
+'use client';
+
+import * as React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useFirestore } from '@/firebase';
+import { collection, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
+import type { BusinessInstance, CartItem, OnlineOrder } from '@/types';
+import usePaystack from '@/hooks/use-paystack';
+import { sendReceiptEmail } from '@/lib/email';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Separator } from '../ui/separator';
+import { useStore } from '@/context/store-context';
+
+
+const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
+
+interface CheckoutDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogProps) {
+  const { cart, business, onOrderPlaced, subtotal } = useStore();
+  const { toast } = useToast();
+  const firestore = useFirestore();
+  const { initializePayment, isScriptLoaded } = usePaystack();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [address, setAddress] = React.useState('');
+  const [selectedShipping, setSelectedShipping] = React.useState<string | undefined>(undefined);
+
+  const shippingOptions = business?.settings?.publicStore?.shippingOptions || [];
+  const chosenShippingOption = shippingOptions.find(opt => opt.name === selectedShipping);
+  const shippingCost = chosenShippingOption?.price || 0;
+  
+  const total = subtotal + shippingCost;
+  
+  const resetForm = () => {
+    setName('');
+    setEmail('');
+    setPhone('');
+    setAddress('');
+    setSelectedShipping(undefined);
+  }
+
+  const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
+    if (!firestore || !business) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please refresh.' });
+        setIsSubmitting(false);
+        return;
+    }
+    
+    toast({ title: "Processing...", description: "Verifying your payment securely." });
+    const verifyResponse = await fetch('/api/paystack/verify-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: transaction.reference }),
+    });
+
+    if (!verifyResponse.ok) {
+        throw new Error('Payment verification failed.');
+    }
+    const verifyResult = await verifyResponse.json();
+    if (verifyResult.data.amount !== total * 100) {
+        throw new Error('Paid amount does not match order total.');
+    }
+     if (verifyResult.status !== 'success') {
+        throw new Error(verifyResult.message || 'Payment not successful.');
+    }
+
+    const orderData: Omit<OnlineOrder, 'id'> = {
+        businessId: business.id,
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
+        customerAddress: address,
+        items: cart.map(item => ({
+            productId: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+        })),
+        total,
+        shippingDetails: chosenShippingOption,
+        status: 'paid',
+        paymentMethod: 'Paystack',
+        paymentReference: transaction.reference,
+        createdAt: serverTimestamp(),
+    };
+    
+    const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
+    const newOrderRef = await addDoc(ordersRef, orderData);
+    
+    toast({ variant: 'success', title: 'Order Placed!', description: `Thank you, ${name}! Your order has been sent.` });
+    
+    const canSendEmail = business.plan === 'pro' || business.plan === 'business' || business.accessLevel === 'lifetime';
+    if(canSendEmail) {
+        sendReceiptEmail({
+            to_email: email, to_name: name, business_name: business.name,
+            receipt_id: newOrderRef.id.substring(0, 8),
+            items_html: cart.map(item => `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.quantity} x ${item.product.name}</td><td style="padding: 8px; text-align:right; border-bottom: 1px solid #ddd;">₦${(item.quantity * item.product.price).toLocaleString()}</td></tr>`).join(''),
+            currency_symbol: '₦', subtotal: subtotal.toLocaleString(), tax: '0.00', discount: '0.00', total: total.toLocaleString(),
+        }).catch(err => console.error("Receipt email failed to send:", err));
+    }
+    onOrderPlaced();
+    resetForm();
+
+  }, [firestore, business, cart, total, name, email, phone, address, chosenShippingOption, subtotal, onOrderPlaced, toast]);
+
+
+  const handlePlaceOrder = async () => {
+    if (!business) return;
+
+    if (!name || !email || !address || !phone || (shippingOptions.length > 0 && !selectedShipping)) {
+      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please fill out all required fields, including shipping.' });
+      return;
+    }
+
+    const hasPaystack = business.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5;
+    const hasBankDetails = business.settings?.paymentBankName && business.settings?.paymentBankAccountId;
+
+    if (!hasPaystack && !hasBankDetails) {
+        toast({ variant: 'destructive', title: 'Payment Not Configured', description: 'The store owner has not configured any payment methods.' });
+        return;
+    }
+
+    setIsSubmitting(true);
+    
+    if (hasPaystack) {
+        if (!isScriptLoaded) {
+            toast({ variant: "destructive", title: "Payment Gateway Not Ready", description: "Please wait a moment." });
+            setIsSubmitting(false);
+            return;
+        }
+        
+        initializePayment({
+            key: PAYSTACK_PUBLIC_KEY, email, amount: total * 100, currency: 'NGN',
+            reference: `z-${business.id.substring(0, 6)}-${Date.now()}`,
+            subaccount: business.settings.paystackSubaccount,
+            onSuccess: handleSuccessfulPayment,
+            onClose: () => setIsSubmitting(false),
+        });
+    } else {
+        try {
+            const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
+            await addDoc(ordersRef, {
+                businessId: business.id, customerName: name, customerEmail: email, customerPhone: phone, customerAddress: address,
+                items: cart.map(item => ({ productId: item.product.id, name: item.product.name, quantity: item.quantity, price: item.product.price })),
+                total, shippingDetails: chosenShippingOption, status: 'pending', paymentMethod: 'Bank Transfer', createdAt: serverTimestamp(),
+            });
+            toast({ variant: 'success', title: 'Order Placed!', description: `Your order has been placed. Please complete payment via bank transfer.` });
+            onOrderPlaced();
+            resetForm();
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Order Failed', description: e.message || 'Could not place your order.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+  };
+
+  const handleDialogChange = (open: boolean) => {
+      if (!open) {
+          resetForm();
+      }
+      onOpenChange(open);
+  }
+  
+  const hasPaystack = business?.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5;
+  const hasBankDetails = business?.settings?.paymentBankName && business.settings?.paymentBankAccountId;
+
+  if (!business) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Complete Your Order</DialogTitle>
+          <DialogDescription>Provide your details for fulfillment and payment.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} required /></div>
+                <div><Label htmlFor="email">Email Address</Label><Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
+            </div>
+             <div><Label htmlFor="phone">Phone Number</Label><Input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
+             <div><Label htmlFor="address">Delivery Address</Label><Textarea id="address" value={address} onChange={e => setAddress(e.target.value)} required /></div>
+             {shippingOptions.length > 0 && (
+                <div>
+                    <Label>Shipping Method</Label>
+                    <Select onValueChange={setSelectedShipping} value={selectedShipping}>
+                        <SelectTrigger><SelectValue placeholder="Select a shipping option..." /></SelectTrigger>
+                        <SelectContent>
+                            {shippingOptions.map(opt => (
+                                <SelectItem key={opt.name} value={opt.name}>
+                                    {opt.name} - ₦{opt.price.toLocaleString()}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+             )}
+        </div>
+        <Separator />
+        <div className="text-sm space-y-2">
+            <div className="flex justify-between"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>Shipping</span><span>₦{shippingCost.toLocaleString()}</span></div>
+            <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
+        </div>
+        
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+            <h4 className="font-semibold mb-2">Payment Instructions</h4>
+            {hasPaystack && <p className="text-sm text-muted-foreground">You can pay securely with your card.</p>}
+            {hasBankDetails && (
+                 <>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        {hasPaystack ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."}
+                    </p>
+                    <p className="text-sm font-medium mt-1">Bank: {business.settings.paymentBankName}</p>
+                    <p className="text-sm font-medium">Account: {business.settings.paymentBankAccountId}</p>
+                </>
+            )}
+        </div>
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                {hasPaystack ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
+            </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

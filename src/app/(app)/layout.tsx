@@ -1,4 +1,3 @@
-
 'use client';
 
 import *as React from 'react';
@@ -41,7 +40,6 @@ import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
-import { POSProvider } from '@/context/pos-context';
 import { ThemeProvider } from '@/components/theme-provider';
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -96,7 +94,7 @@ function FullScreenLoader({ text }: { text: string }) {
   );
 }
 
-function AuthenticatedLayoutContent({
+export default function AuthenticatedLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -108,6 +106,7 @@ function AuthenticatedLayoutContent({
   
   const {
     isLoading,
+    isUserLoading,
     currentUserProfile,
     user,
     business: businessInstance,
@@ -117,8 +116,6 @@ function AuthenticatedLayoutContent({
   } = usePOS();
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
-
-  // All hooks must be called before any conditional returns.
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
 
   const userNotificationsQuery = useMemoFirebase(
@@ -210,8 +207,8 @@ function AuthenticatedLayoutContent({
     return <FullScreenLoader text="Logging out..." />;
   }
 
-  // Show full-screen loader ONLY on initial load OR if core data is missing after load.
-  if (isLoading || !currentUserProfile || !user) {
+  // Show full-screen loader ONLY on initial auth load or if profile is missing
+  if (isUserLoading || !user || (user && !currentUserProfile)) {
     return <FullScreenLoader text="Loading your workspace..." />;
   }
 
@@ -528,17 +525,4 @@ function AuthenticatedLayoutContent({
       </TooltipProvider>
     </ThemeProvider>
   );
-}
-
-
-export default function AuthenticatedLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <POSProvider>
-      <AuthenticatedLayoutContent>{children}</AuthenticatedLayoutContent>
-    </POSProvider>
-  )
 }

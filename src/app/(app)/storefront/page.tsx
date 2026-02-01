@@ -83,16 +83,10 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
 
         prods.sort((a,b) => a.name.localeCompare(b.name));
         
-        // Ensure at least 5 rows worth of products for preview, or duplicate if not enough
+        // Limit the number of products shown in the preview without duplicating them
         const desiredCount = (settings.desktopColumns || 4) * 5;
-        if (prods.length > 0 && prods.length < desiredCount) {
-          const originalLength = prods.length;
-          while (prods.length < desiredCount) {
-            prods.push(prods[prods.length % originalLength]);
-          }
-        }
+        return prods.slice(0, desiredCount);
 
-        return prods;
     }, [products, settings.hideOutOfStock, settings.desktopColumns]);
     
     const hasProducts = previewProducts.length > 0;
@@ -141,7 +135,7 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
                 <h2 className="text-2xl font-bold mb-4">Our Products</h2>
                 {hasProducts ? (
                      <div className={cn("grid grid-cols-2 md:grid-cols-3 gap-4", gridClass)}>
-                        {previewProducts.slice(0, (settings.desktopColumns || 4) * 5).map((p, i) => (
+                        {previewProducts.map((p, i) => (
                             <div key={`${p.id}-${i}`} className="border rounded-md overflow-hidden">
                                 <div className="w-full h-24 bg-muted relative">
                                     {p.imageUrl && <Image src={p.imageUrl} alt={p.name} fill className="object-cover" />}
@@ -215,8 +209,13 @@ function StorefrontCustomizationPage() {
     if (field === 'slug') {
         value = value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/\s+/g, '-');
     }
+    setStoreSettings(prev => ({ ...prev, [field]: value }));
+  };
 
-    if (field === 'enabled' && value === true) {
+  const handleToggleStore = async (checked: boolean) => {
+    if (!business?.id || !firestore) return;
+
+    if (checked) { // Only check when enabling
         const hasBankDetails = business?.settings?.paymentBankName && business?.settings?.paymentBankAccountId;
         const hasPaystack = business?.settings?.paystackSubaccount;
         if (!hasBankDetails && !hasPaystack) {
@@ -226,10 +225,36 @@ function StorefrontCustomizationPage() {
                 description: 'Please configure bank transfer details or a Paystack subaccount in Settings before enabling your store.',
                 duration: 6000
             });
-            return;
+            return; // Prevent toggle
         }
     }
-    setStoreSettings(prev => ({ ...prev, [field]: value }));
+
+    // Update local state immediately for responsiveness
+    setStoreSettings(prev => ({ ...prev, enabled: checked }));
+
+    try {
+        const businessDocRef = doc(firestore, 'businessInstances', business.id);
+        await updateDoc(businessDocRef, {
+            'settings.publicStore.enabled': checked
+        });
+        toast({
+            variant: 'success',
+            title: `Store ${checked ? 'Enabled' : 'Disabled'}`,
+            description: `Your public store is now ${checked ? 'live' : 'offline'}.`,
+        });
+        if (checked && !hasSavedOnce) {
+            triggerConfetti();
+            setHasSavedOnce(true);
+        }
+    } catch (e: any) {
+        // Revert UI on failure
+        setStoreSettings(prev => ({ ...prev, enabled: !checked }));
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: 'Could not update your store status.',
+        });
+    }
   };
 
   const handleColorChange = (part: 'h' | 's' | 'l', value: number[]) => {
@@ -318,21 +343,6 @@ function StorefrontCustomizationPage() {
     let finalSettings = { ...storeSettings };
 
     try {
-        if (finalSettings.enabled) {
-            const hasBankDetails = business?.settings?.paymentBankName && business?.settings?.paymentBankAccountId;
-            const hasPaystack = business?.settings?.paystackSubaccount;
-            if (!hasBankDetails && !hasPaystack) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Payment Method Required',
-                    description: 'To enable your public store, you must provide either Bank Transfer details or a Paystack Subaccount Code in your main Settings.',
-                    duration: 7000,
-                });
-                setIsSaving(false);
-                return; // Stop the save process
-            }
-        }
-
         if (storeSettings.slug && storeSettings.slug !== business.settings?.publicStore?.slug) {
             const q = query(collection(firestore, 'businessInstances'), where('settings.publicStore.slug', '==', storeSettings.slug), limit(1));
             const snapshot = await getDocs(q);
@@ -364,10 +374,7 @@ function StorefrontCustomizationPage() {
         'settings.primaryColor': primaryColor,
       });
       toast({ variant: 'success', title: 'Storefront Updated', description: 'Your public store settings have been saved.' });
-      if (!hasSavedOnce) {
-        triggerConfetti();
-        setHasSavedOnce(true);
-      }
+
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Save Failed', description: e.message || 'Could not update your settings.' });
     } finally {
@@ -392,7 +399,7 @@ function StorefrontCustomizationPage() {
                             </AccordionTrigger>
                             <AccordionContent className="p-6 pt-0">
                                 <div className="space-y-4">
-                                    <div className="flex items-center space-x-2"><Switch id="enableStore" checked={storeSettings.enabled} onCheckedChange={(checked) => handleSettingsChange('enabled', checked)}/><Label htmlFor="enableStore" className="text-base">Enable Public Store</Label></div>
+                                    <div className="flex items-center space-x-2"><Switch id="enableStore" checked={storeSettings.enabled} onCheckedChange={handleToggleStore}/><Label htmlFor="enableStore" className="text-base">Enable Public Store</Label></div>
                                     {storeSettings.enabled && (
                                         <div className="space-y-4 pt-4 border-t">
                                             <div><Label htmlFor="storeSlug">Store Slug</Label><Input id="storeSlug" value={storeSettings.slug} onChange={e => handleSettingsChange('slug', e.target.value)} className="mt-1" placeholder="e.g., my-zeneva-shop"/></div>
