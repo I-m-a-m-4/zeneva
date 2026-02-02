@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import *as React from 'react';
@@ -123,9 +121,6 @@ function SettingsPageContent() {
 
     // General state
     const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
-    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
-    const [isDeleting, setIsDeleting] = React.useState(false);
-    const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
     const [isVerifying, setIsVerifying] = React.useState(false);
 
     // Form fields state
@@ -226,7 +221,7 @@ function SettingsPageContent() {
             });
 
         } catch (error: any) {
-             toast({ variant: 'destructive', title: 'Verification Failed', description: error.message });
+             toast({ variant: "destructive", title: 'Verification Failed', description: error.message });
         } finally {
             setIsVerifying(false);
         }
@@ -316,26 +311,6 @@ function SettingsPageContent() {
     const handleDeleteCategory = (catToDelete: string) => {
         setProductCategories(productCategories.filter(c => c !== catToDelete));
     }
-
-    const handleDeleteAccount = async () => {
-        if (!firestore || !currentUserProfile || !business) return;
-        setIsDeleting(true);
-        try {
-            const batch = writeBatch(firestore);
-            const businessDocRef = doc(firestore, 'businessInstances', business.id);
-            batch.update(businessDocRef, { status: 'deleted', deletedAt: serverTimestamp() });
-            const userDocRef = doc(firestore, 'users', currentUserProfile.id);
-            batch.update(userDocRef, { status: 'inactive' });
-            await batch.commit();
-            
-            toast({ title: "Business Deletion Initiated", description: "You will be logged out shortly." });
-            setTimeout(() => signOut(getAuth()), 2000);
-        } catch (e) {
-            toast({ variant: "destructive", title: "Deletion Failed" });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -502,42 +477,7 @@ function SettingsPageContent() {
                         <ThemeSwitcher />
                     </CardContent>
                 </Card>
-
-                <Card id="danger-zone" className="border-destructive/50 bg-destructive/5">
-                    <CardHeader>
-                        <CardTitle className="text-destructive flex items-center gap-2"><ShieldQuestion/> Danger Zone</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="font-semibold mb-2">Delete This Business</p>
-                        <p className="text-sm text-muted-foreground mb-4">This action is permanent and cannot be undone. Deleting your business will make its data inaccessible and disable your user account.</p>
-                        <Button variant="destructive" onClick={() => setIsDeleteAlertOpen(true)} disabled={currentUserProfile?.role !== 'admin'}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete My Business
-                        </Button>
-                    </CardContent>
-                </Card>
             </div>
-
-            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action is irreversible. To confirm, please type{" "}
-                            <strong className="text-destructive">delete my business</strong>{" "}
-                            in the box below.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="py-2">
-                        <Input value={deleteConfirmation} onChange={(e) => setDeleteConfirmation(e.target.value)} placeholder="delete my business" />
-                    </div>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAccount} disabled={deleteConfirmation !== 'delete my business' || isDeleting}>
-                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} I understand, delete my business
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
@@ -550,6 +490,3 @@ export default function SettingsPage() {
     }
     return <SettingsPageContent />;
 }
-    
-
-    

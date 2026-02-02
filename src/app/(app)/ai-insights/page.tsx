@@ -1,8 +1,7 @@
-
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysis, SalesAtRiskItem, MoneyLockedInStockItem, ActionableInsight } from "@/types";
+import type { BusinessAnalysis, SalesAtRiskItem, MoneyLockedInStockItem, StrategicInsight } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,14 +14,13 @@ import {
 import { usePOS } from "@/context/pos-context";
 import {
   Lightbulb,
-  ArrowRight,
   Loader2,
   HeartPulse,
-  TrendingUp,
   TrendingDown,
   CircleDollarSign,
-  Package,
   CheckCircle,
+  BrainCircuit,
+  ArrowRight,
 } from "lucide-react";
 import React, { useState, useTransition, useEffect } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -34,12 +32,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import FeatureGate from "@/components/shared/feature-gate";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductDataQualityTab from "@/components/ai-insights/product-data-quality";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AppConfig } from "@/lib/config";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const GenerationProgress = ({ progress, statusText }: { progress: number; statusText: string }) => (
     <div className="relative">
@@ -61,42 +59,48 @@ const GenerationProgress = ({ progress, statusText }: { progress: number; status
     </div>
 );
 
-const InsightCard = ({ icon: Icon, title, value, description, variant }: { icon: React.ElementType, title: string, value: string, description: string, variant: 'warning' | 'destructive' }) => {
+const InsightCard = ({ icon: Icon, title, value, description, narrative, variant }: { icon: React.ElementType, title: string, value: string, description: string, narrative: string, variant: 'warning' | 'destructive' }) => {
     const variantClasses = {
         warning: 'border-amber-400 bg-amber-50 text-amber-900',
         destructive: 'border-red-400 bg-red-50 text-red-900',
     }
     return (
-        <Card className={cn("text-center p-6 flex flex-col items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 border-t-2", variantClasses[variant])}>
+        <Card className={cn("text-center p-6 flex flex-col items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 border-t-4", variantClasses[variant])}>
             <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white border border-gray-200 mb-4">
                 <Icon className={cn("h-8 w-8", variant === 'warning' ? 'text-amber-500' : 'text-red-500')} />
             </div>
             <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">{title}</p>
             <p className="text-4xl font-bold my-1 text-gray-900">{value}</p>
-            <p className="text-xs text-gray-600 max-w-xs">{description}</p>
+            <p className="text-xs text-gray-600 max-w-xs font-medium italic">"{narrative}"</p>
         </Card>
     );
 };
 
-const ActionableInsightCard = ({ title, description, link, linkText }: ActionableInsight) => {
+const StrategicInsightCard = ({ title, description, recommendation, link }: StrategicInsight) => {
     return (
         <Card className="flex flex-col h-full bg-white border hover:border-primary hover:bg-primary/5 transition-colors group">
             <CardHeader>
                 <CardTitle className="text-lg leading-tight flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary/20 transition-colors">
-                        <Lightbulb className="h-5 w-5" />
+                        <BrainCircuit className="h-5 w-5" />
                     </div>
                     <span className="text-gray-900">{title}</span>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="flex-grow space-y-4">
                 <p className="text-sm text-gray-600">{description}</p>
+                <div className="p-3 rounded-md bg-muted/50 border">
+                    <p className="text-xs font-semibold text-primary mb-1">Recommendation</p>
+                    <p className="text-sm text-foreground">{recommendation}</p>
+                </div>
             </CardContent>
-            <CardFooter>
-                <Button asChild variant="secondary" className="w-full">
-                    <Link href={link}>{linkText} <ArrowRight className="ml-2 h-4 w-4"/></Link>
-                </Button>
-            </CardFooter>
+            {link && (
+                <CardFooter>
+                    <Button asChild variant="secondary" className="w-full">
+                        <Link href={link}>Take Action <ArrowRight className="ml-2 h-4 w-4"/></Link>
+                    </Button>
+                </CardFooter>
+            )}
         </Card>
     );
 };
@@ -165,7 +169,6 @@ function BusinessHealthCard({ analysis, isLoading }: { analysis: BusinessAnalysi
             <div className="relative z-10 grid md:grid-cols-3 gap-8 items-center">
                 <div className="flex flex-col items-center justify-center">
                     <div className="relative w-40 h-40">
-                        {/* Orbital Rings */}
                         <div className="absolute inset-0 border border-dashed border-white/10 rounded-full animate-spin [animation-duration:20s]"></div>
                         <div className="absolute inset-4 border border-white/5 rounded-full animate-spin [animation-duration:15s] [animation-direction:reverse]"></div>
                          
@@ -198,7 +201,7 @@ function BusinessHealthCard({ analysis, isLoading }: { analysis: BusinessAnalysi
     );
 }
 
-function BusinessPerformanceTab() {
+function ExecutiveBriefingTab() {
   const [isPending, startTransition] = useTransition();
   const { products, receipts, business, currencySymbol, triggerRefresh } = usePOS();
   const [analysis, setAnalysis] = useState<BusinessAnalysis | null>(business?.settings?.businessAnalysis || null);
@@ -216,7 +219,7 @@ function BusinessPerformanceTab() {
   React.useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     let statusTimer: NodeJS.Timeout | undefined;
-    const statuses = ["Analyzing sales data...", "Identifying capital at risk...", "Forecasting potential losses...", "Generating actionable insights..."];
+    const statuses = ["Analyzing sales data...", "Identifying capital at risk...", "Forecasting potential losses...", "Generating strategic insights..."];
     let statusIndex = 0;
 
     if (isPending) {
@@ -314,7 +317,7 @@ function BusinessPerformanceTab() {
             
             setProgress(100);
             setAnalysis(dataToSave);
-            triggerRefresh(); // This will trigger a refresh of the context
+            triggerRefresh();
             toast({ variant: 'success', title: 'Analysis Complete!', description: 'Your new business insights are ready.' });
             setTimeout(() => setProgress(0), 1000);
 
@@ -339,7 +342,7 @@ function BusinessPerformanceTab() {
       <div className="grid gap-6">
         {isPending ? (
             <GenerationProgress progress={progress} statusText={statusText} />
-        ) : !displayData || (!displayData.moneyLockedInStock && !displayData.salesAtRisk && !displayData.actionableInsights) ? (
+        ) : !displayData || (!displayData.moneyLockedInStock && !displayData.salesAtRisk && !displayData.strategicInsights) ? (
             <Card className="text-center p-8 bg-white border">
               <CardTitle className="text-xl text-gray-900">Awaiting Analysis</CardTitle>
               <CardDescription className="mt-2 mb-4 max-w-md mx-auto text-gray-600">Click "Generate Briefing" to get your first AI-powered executive summary.</CardDescription>
@@ -355,7 +358,8 @@ function BusinessPerformanceTab() {
                         icon={CircleDollarSign}
                         title="Money Locked in Stock"
                         value={`${currencySymbol}${displayData.moneyLockedInStock.totalValueLocked.toLocaleString()}`}
-                        description="This is cash tied up in products that are not selling. Consider a clearance sale to free up capital."
+                        description="This is cash tied up in products that are not selling."
+                        narrative={displayData.moneyLockedInStock.narrative}
                         variant="destructive"
                     />
                  )}
@@ -364,22 +368,44 @@ function BusinessPerformanceTab() {
                         icon={TrendingDown}
                         title="Potential Monthly Revenue at Risk"
                         value={`${currencySymbol}${displayData.salesAtRisk.potentialMonthlyRevenueLoss.toLocaleString()}`}
-                        description="This is estimated revenue you'll miss if your bestsellers stock out. Reorder these items now."
+                        description="This is estimated revenue you'll miss if your bestsellers stock out."
+                        narrative={displayData.salesAtRisk.narrative}
                         variant="warning"
                     />
                  )}
                 </div>
              
-                {displayData.actionableInsights && displayData.actionableInsights.length > 0 && (
+                {displayData.strategicInsights && displayData.strategicInsights.length > 0 && (
                     <div>
                         <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900">
-                            What Zen AI Recommends
+                           Strategic Recommendations
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {displayData.actionableInsights.map((insight, i) => (
-                                <ActionableInsightCard key={i} {...insight} />
+                        <Accordion type="single" collapsible defaultValue="item-0" className="space-y-4">
+                            {displayData.strategicInsights.map((insight, i) => (
+                                <AccordionItem key={i} value={`item-${i}`} className="border-none">
+                                    <Card className="border-primary/20 bg-primary/5">
+                                        <AccordionTrigger className="p-6 text-left hover:no-underline [&>svg]:text-primary">
+                                             <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary border border-primary/20">
+                                                    <Lightbulb className="h-5 w-5" />
+                                                </div>
+                                                <h4 className="text-lg font-semibold text-gray-900">{insight.title}</h4>
+                                             </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="px-6 pb-6">
+                                            <div className="prose prose-sm max-w-none text-gray-600 space-y-4">
+                                                <p>{insight.description}</p>
+                                                <div className="p-3 rounded-md bg-background/60 border">
+                                                    <p className="text-xs font-semibold text-primary mb-1">Recommendation</p>
+                                                    <p className="text-foreground">{insight.recommendation}</p>
+                                                </div>
+                                                {insight.link && <Button asChild variant="secondary" size="sm"><Link href={insight.link}>Take Action</Link></Button>}
+                                            </div>
+                                        </AccordionContent>
+                                    </Card>
+                                </AccordionItem>
                             ))}
-                        </div>
+                        </Accordion>
                     </div>
                 )}
 
@@ -440,7 +466,7 @@ export default function AiInsightsPage() {
                     <TabsTrigger value="product-quality">Product Data Quality</TabsTrigger>
                 </TabsList>
                 <TabsContent value="business-performance" className="pt-6">
-                    <BusinessPerformanceTab />
+                    <ExecutiveBriefingTab />
                 </TabsContent>
                  <TabsContent value="product-quality">
                     <ProductDataQualityTab />
@@ -450,5 +476,3 @@ export default function AiInsightsPage() {
     </div>
   );
 }
-
-    

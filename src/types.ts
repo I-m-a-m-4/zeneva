@@ -1,3 +1,5 @@
+
+
 export interface Product {
     id: string;
     businessId: string;
@@ -122,30 +124,33 @@ export interface SalesAtRiskItem {
   potentialLostRevenue: number;
 }
 
-export interface ActionableInsight {
+export interface StrategicInsight {
   title: string;
   description: string;
-  link: string;
-  linkText: string;
+  recommendation: string;
+  link?: string;
 }
 
 export interface BusinessAnalysis {
-    health?: {
+    health: {
         score: number;
         status: 'Healthy' | 'Needs Attention' | 'At Risk';
         summary: string;
     };
     moneyLockedInStock?: {
         totalValueLocked: number;
+        narrative: string;
         items: MoneyLockedInStockItem[];
     };
     salesAtRisk?: {
         potentialMonthlyRevenueLoss: number;
+        narrative: string;
         items: SalesAtRiskItem[];
     };
-    actionableInsights?: ActionableInsight[];
+    strategicInsights?: StrategicInsight[];
     createdAt: any; // Can be Date or Firestore Timestamp
 }
+
 
 export interface BusinessInstance {
     id: string;
@@ -301,3 +306,4 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
+    

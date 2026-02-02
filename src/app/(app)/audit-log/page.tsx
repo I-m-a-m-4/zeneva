@@ -1,7 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link'; // Import Link
 import { usePOS } from '@/context/pos-context';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 
 type SuspiciousActivity = {
@@ -157,6 +157,37 @@ function AnalysisResults({ analysis }: { analysis: { summary: string, suspicious
     )
 }
 
+function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Bot className="text-primary"/> Upgrade to Business Plan
+                    </DialogTitle>
+                    <DialogDescription>
+                        The Automated Audit Assistant is a Business Plan feature. It scans your logs for suspicious patterns to help you detect issues like internal theft or operational mistakes.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <h4 className="font-semibold mb-2">Unlock powerful security features:</h4>
+                    <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                        <li>Automated scan for suspicious activities.</li>
+                        <li>Detailed analysis of user actions.</li>
+                        <li>Proactive alerts for potential security risks.</li>
+                    </ul>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Maybe Later</Button>
+                    <Button asChild>
+                        <Link href="/billing">Upgrade Now</Link>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function AuditLogPageContent() {
     const { business, isLoading: isPosLoading } = usePOS();
     const firestore = useFirestore();
@@ -164,6 +195,8 @@ function AuditLogPageContent() {
     const [isAnalyzing, startTransition] = React.useTransition();
     const [analysis, setAnalysis] = React.useState<{ summary: string; suspiciousActivities: SuspiciousActivity[] } | null>(null);
     const [selectedLog, setSelectedLog] = React.useState<AuditLog | null>(null);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
+
 
     const auditLogQuery = useMemoFirebase(
         () => business?.id ? query(collection(firestore, 'businessInstances', business.id, 'auditLogs'), orderBy('createdAt', 'desc')) : null,
@@ -174,6 +207,12 @@ function AuditLogPageContent() {
     const isLoading = isPosLoading || isLoadingLogs;
 
     const handleAnalyze = () => {
+        const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
+        if (!isBusinessPlan) {
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
         if (!auditLogs || auditLogs.length === 0) {
             toast({ variant: 'destructive', title: 'No Data', description: 'There are no audit logs to analyze.' });
             return;
@@ -200,19 +239,10 @@ function AuditLogPageContent() {
                         <CardTitle className="flex items-center gap-2"><History /> Audit Log</CardTitle>
                         <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
                     </div>
-                     <FeatureGate
-                        requiredPlan="business"
-                        currentPlan={business?.plan}
-                        hasLifetimeAccess={business?.accessLevel === 'lifetime'}
-                        featureName="Automated Audit Assistant"
-                        featureDescription=""
-                        className="w-full sm:w-auto"
-                     >
-                         <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto">
-                            {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
-                            {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
-                        </Button>
-                    </FeatureGate>
+                     <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto">
+                        {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
+                        {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
+                    </Button>
                 </div>
             </CardHeader>
             <CardContent>
@@ -329,6 +359,7 @@ function AuditLogPageContent() {
                 )}
             </DialogContent>
         </Dialog>
+        <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} />
         </>
     );
 }
