@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,11 +23,10 @@ import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
-import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
-import RefreshButton from '@/components/shared/refresh-button';
 import { useRouter } from 'next/navigation';
 import NProgress from 'nprogress';
 import { logAuditEvent } from '@/lib/audit';
@@ -64,7 +62,7 @@ function CustomerRowSkeleton() {
 }
 
 export default function CustomersPage() {
-  const { customers, receipts, isLoading, business, currentUserProfile: currentUser } = usePOS();
+  const { customers, receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -88,11 +86,6 @@ export default function CustomersPage() {
     }
     return totals;
   }, [receipts]);
-
-  const currencySymbol = React.useMemo(() => {
-    const code = business?.settings?.currency || 'NGN';
-    return CURRENCY_SYMBOLS[code] || '₦';
-  }, [business]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -161,7 +154,6 @@ export default function CustomersPage() {
                         </span>
                     </Button>
                 )}
-                <RefreshButton />
                 <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                     <Upload className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

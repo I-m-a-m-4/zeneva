@@ -97,7 +97,7 @@ export const createUserProfileDocument = async (
 };
 
 /**
- * Polls Firestore until the user's profile document is available.
+ * Polls Firestore until the user's profile document and their associated business document are available.
  * This is used after signup to prevent a race condition where the app
  * tries to read the profile before it has been created.
  */
@@ -110,15 +110,26 @@ export const waitForUserProfile = (firestore: Firestore, userId: string, timeout
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          resolve();
-        } else if (Date.now() - startTime > timeout) {
-          reject(new Error("Timed out waiting for user profile creation."));
+          const userProfile = userDoc.data() as UserProfile;
+          if (userProfile.businessId) {
+            const businessDocRef = doc(firestore, 'businessInstances', userProfile.businessId);
+            const businessDoc = await getDoc(businessDocRef);
+            if (businessDoc.exists()) {
+              // Both user and business docs exist, we can resolve.
+              resolve();
+              return;
+            }
+          }
+        } 
+        
+        if (Date.now() - startTime > timeout) {
+          reject(new Error("Timed out waiting for user and business profile creation."));
         } else {
           setTimeout(check, 300); // Poll every 300ms
         }
+
       } catch (error) {
          console.error("Polling for user profile failed:", error);
-         // Keep polling unless we time out
          if (Date.now() - startTime > timeout) {
            reject(error);
          } else {

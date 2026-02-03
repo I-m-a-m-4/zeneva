@@ -23,6 +23,22 @@ import AIChat from '@/components/support/ai-chat';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
   {
+    question: "What is Zen AI and how does it help my business?",
+    answer: (
+        <>
+            <p>Zen AI is your proactive business strategist. Its primary goal is to **maximize your profit and ensure you never miss a sale.** It moves beyond simple reports to give you actionable, intelligent advice.</p>
+            <h4 className="font-semibold mt-4 mb-2">Key Capabilities:</h4>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+                <li><strong>Optimal Stock Forecasting:</strong> Instead of just a "low stock" alert, Zen AI analyzes your sales velocity to recommend the *optimal* quantity to reorder for your bestsellers, helping you avoid both stockouts and costly overstocking.</li>
+                <li><strong>Capital Optimization:</strong> The AI identifies which slow-moving products are tying up your cash and recommends strategies (like targeted discounts) to liquidate them, freeing up capital for products that actually sell.</li>
+                <li><strong>Market Opportunity Discovery:</strong> By analyzing your top-selling items and categories, Zen AI suggests new, related products your customer demographic is likely to want, turning your sales data into a roadmap for future growth.</li>
+                <li><strong>Data Quality Improvement:</strong> It scans all your product listings for issues like missing prices or weak descriptions and provides a prioritized list of fixes to make your products more appealing to customers.</li>
+            </ul>
+            <p className="mt-4">In short, Zen AI doesn't just give you data; it gives you judgment and a clear path to increasing your revenue.</p>
+        </>
+    )
+  },
+  {
     question: "How do I add a new product to my inventory?",
     answer: (
         <p>Navigate to the 'Inventory' page from the sidebar menu. In the top-right corner, click the 'Add Product' button. This will take you to a form where you can fill in the product's details such as Name, Description, Price, Stock quantity, SKU (Stock Keeping Unit), and assign it to a Category. Once you're done, click 'Save Product'.</p>
@@ -123,12 +139,6 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string }[] = [
     question: "How can I upgrade or manage my subscription?",
     answer: (
         <p>Navigate to the 'Billing' page from the main menu. Here, you can view your current plan, see your payment history, and choose to upgrade to a higher tier to unlock more features like advanced reporting and a public storefront.</p>
-    )
-  },
-    {
-    question: "What is the AI Troubleshoot feature?",
-    answer: (
-      <p>You can find this feature in the 'Zen AI' section under the 'Product Data Quality' tab. Our system analyzes all your product data for issues like missing prices, short descriptions, or missing categories. It provides a prioritized list of actionable suggestions to help you improve your data quality and sell more effectively. This is a Pro and Business plan feature.</p>
     )
   },
   {

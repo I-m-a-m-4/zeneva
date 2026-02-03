@@ -1,4 +1,3 @@
-
 'use client';
 import *as React from 'react';
 import dynamic from 'next/dynamic';
@@ -35,7 +34,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
-import RefreshButton from '@/components/shared/refresh-button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -211,7 +209,6 @@ export default function DashboardPage() {
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
         <div className="no-capture flex flex-wrap items-center justify-start sm:justify-end gap-2">
-          <RefreshButton />
           <DateRangePicker date={date} onDateChange={setDate} />
           <Button onClick={handleDownloadImage} variant="outline">
             <Download className="mr-2 h-4 w-4" /> Download

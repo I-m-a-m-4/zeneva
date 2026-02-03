@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -16,7 +15,6 @@ import TopCustomersList from '@/components/reports/top-customers-list';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
-import RefreshButton from '@/components/shared/refresh-button';
 import Link from 'next/link';
 import ProfitLossChart from '@/components/reports/profit-loss-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
@@ -156,10 +154,9 @@ export default function ReportsDashboard() {
                 featureName="Advanced Reports"
                 featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
                 className="flex-grow flex flex-col"
-                placeholderContent={<ReportsPlaceholder />}
+                 placeholderContent={<ReportsPlaceholder />}
             >
                 <div className="flex flex-wrap items-center gap-2 no-capture mb-6">
-                    <RefreshButton />
                     <DateRangePicker date={date} onDateChange={setDate} />
                     <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4"/>Download</Button>
                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysis, SalesAtRiskItem, MoneyLockedInStockItem, StrategicInsight } from "@/types";
+import type { BusinessAnalysisOutput, RestockOpportunityItem, MoneyLockedInStockItem, StrategicInsight } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,12 +15,9 @@ import { usePOS } from "@/context/pos-context";
 import {
   Lightbulb,
   Loader2,
-  HeartPulse,
   TrendingDown,
   CircleDollarSign,
-  CheckCircle,
-  BrainCircuit,
-  ArrowRight,
+  Package,
 } from "lucide-react";
 import React, { useState, useTransition, useEffect } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -38,6 +35,7 @@ import ProductDataQualityTab from "@/components/ai-insights/product-data-quality
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AppConfig } from "@/lib/config";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 
 const GenerationProgress = ({ progress, statusText }: { progress: number; statusText: string }) => (
     <div className="relative">
@@ -50,7 +48,6 @@ const GenerationProgress = ({ progress, statusText }: { progress: number; status
             </div>
         </div>
         <div className="grid gap-8 opacity-20 blur-sm pointer-events-none">
-            <BusinessHealthCard analysis={null} isLoading={true} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="h-48"><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6 mt-2" /></CardContent></Card>
                 <Card className="h-48"><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6 mt-2" /></CardContent></Card>
@@ -59,7 +56,7 @@ const GenerationProgress = ({ progress, statusText }: { progress: number; status
     </div>
 );
 
-const InsightCard = ({ icon: Icon, title, value, description, narrative, variant }: { icon: React.ElementType, title: string, value: string, description: string, narrative: string, variant: 'warning' | 'destructive' }) => {
+const InsightCard = ({ icon: Icon, title, value, narrative, variant }: { icon: React.ElementType, title: string, value: string, narrative: string, variant: 'warning' | 'destructive' }) => {
     const variantClasses = {
         warning: 'border-amber-400 bg-amber-50 text-amber-900',
         destructive: 'border-red-400 bg-red-50 text-red-900',
@@ -76,36 +73,7 @@ const InsightCard = ({ icon: Icon, title, value, description, narrative, variant
     );
 };
 
-const StrategicInsightCard = ({ title, description, recommendation, link }: StrategicInsight) => {
-    return (
-        <Card className="flex flex-col h-full bg-white border hover:border-primary hover:bg-primary/5 transition-colors group">
-            <CardHeader>
-                <CardTitle className="text-lg leading-tight flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary/20 transition-colors">
-                        <BrainCircuit className="h-5 w-5" />
-                    </div>
-                    <span className="text-gray-900">{title}</span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-4">
-                <p className="text-sm text-gray-600">{description}</p>
-                <div className="p-3 rounded-md bg-muted/50 border">
-                    <p className="text-xs font-semibold text-primary mb-1">Recommendation</p>
-                    <p className="text-sm text-foreground">{recommendation}</p>
-                </div>
-            </CardContent>
-            {link && (
-                <CardFooter>
-                    <Button asChild variant="secondary" className="w-full">
-                        <Link href={link}>Take Action <ArrowRight className="ml-2 h-4 w-4"/></Link>
-                    </Button>
-                </CardFooter>
-            )}
-        </Card>
-    );
-};
-
-const ItemListCard = ({ title, items, currencySymbol, itemKey, valueKey, timeKey }: { title: string, items: (MoneyLockedInStockItem | SalesAtRiskItem)[], currencySymbol: string, itemKey: 'valueLocked' | 'potentialLostRevenue', valueKey: string, timeKey?: 'daysSinceLastSale' | 'estimatedStockoutDays' }) => (
+const ItemListCard = ({ title, items, currencySymbol }: { title: string, items: (MoneyLockedInStockItem | RestockOpportunityItem)[], currencySymbol: string }) => (
     <Card className="h-full bg-white border">
         <CardHeader>
             <CardTitle className="text-lg text-gray-900">{title}</CardTitle>
@@ -118,10 +86,16 @@ const ItemListCard = ({ title, items, currencySymbol, itemKey, valueKey, timeKey
                             <Link href={`/inventory/${item.productId}`} key={item.productId} className="block p-3 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
                                 <div className="flex justify-between items-center">
                                     <h4 className="font-semibold truncate pr-2 text-gray-800">{item.name}</h4>
-                                    <p className="font-bold text-sm text-primary flex-shrink-0">{currencySymbol}{(item as any)[itemKey].toLocaleString()}</p>
+                                    {'valueLocked' in item ? (
+                                        <p className="font-bold text-sm text-primary flex-shrink-0">{currencySymbol}{item.valueLocked.toLocaleString()}</p>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline">Restock: {item.recommendedRestockQuantity}</Badge>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1">
-                                    {timeKey && `${valueKey}: ${(item as any)[timeKey]} days`}
+                                    {'daysSinceLastSale' in item ? `Days since last sale: ${item.daysSinceLastSale}` : `Est. stockout in: ${item.estimatedStockoutDays} days`}
                                 </div>
                             </Link>
                         ))}
@@ -134,7 +108,7 @@ const ItemListCard = ({ title, items, currencySymbol, itemKey, valueKey, timeKey
     </Card>
 );
 
-const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { analysis: BusinessAnalysis | null, handleGenerateAnalysis: () => void, isPending: boolean }) => (
+const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { analysis: BusinessAnalysisOutput | null, handleGenerateAnalysis: () => void, isPending: boolean }) => (
     <div className="flex items-center justify-end gap-4 mt-4">
         {analysis?.createdAt && (
             <p className="text-xs text-muted-foreground">
@@ -149,62 +123,11 @@ const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { 
     </div>
 );
 
-function BusinessHealthCard({ analysis, isLoading }: { analysis: BusinessAnalysis | null, isLoading: boolean }) {
-    if (isLoading || !analysis || !analysis.health) {
-        return (
-            <Card className="relative overflow-hidden bg-slate-900 border-slate-800 p-8 min-h-[250px] flex items-center justify-center">
-                <Skeleton className="h-full w-full bg-gray-200" />
-            </Card>
-        );
-    }
-
-    const { score, status, summary } = analysis.health;
-    const scoreColorClass = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
-
-    return (
-        <Card className="relative overflow-hidden bg-slate-900 border-slate-800 p-8 text-white">
-             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
-             <div className="absolute -top-1/2 -right-1/4 w-3/4 h-3/4 bg-primary/10 rounded-full blur-[100px] opacity-50"></div>
-
-            <div className="relative z-10 grid md:grid-cols-3 gap-8 items-center">
-                <div className="flex flex-col items-center justify-center">
-                    <div className="relative w-40 h-40">
-                        <div className="absolute inset-0 border border-dashed border-white/10 rounded-full animate-spin [animation-duration:20s]"></div>
-                        <div className="absolute inset-4 border border-white/5 rounded-full animate-spin [animation-duration:15s] [animation-direction:reverse]"></div>
-                         
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className={`text-5xl font-bold ${scoreColorClass}`}>{score}</span>
-                            <span className="text-sm text-slate-400">Health Score</span>
-                        </div>
-                    </div>
-                </div>
-                <div className="md:col-span-2">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
-                            <HeartPulse className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-100">Business Vitals</h3>
-                    </div>
-                    <ul className="space-y-2 text-slate-300 text-sm">
-                        <li className="flex items-start gap-2">
-                            <CheckCircle size={16} className="text-green-500 mt-1 shrink-0" />
-                            <span><strong className="text-white">Summary:</strong> {summary}</span>
-                        </li>
-                         <li className="flex items-start gap-2">
-                            <CheckCircle size={16} className="text-green-500 mt-1 shrink-0" />
-                            <span><strong className="text-white">Status:</strong> {status}</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </Card>
-    );
-}
 
 function ExecutiveBriefingTab() {
   const [isPending, startTransition] = useTransition();
   const { products, receipts, business, currencySymbol, triggerRefresh } = usePOS();
-  const [analysis, setAnalysis] = useState<BusinessAnalysis | null>(business?.settings?.businessAnalysis || null);
+  const [analysis, setAnalysis] = useState<BusinessAnalysisOutput | null>(business?.settings?.businessAnalysis || null);
   const firestore = useFirestore();
   const { toast } = useToast();
   const [progress, setProgress] = React.useState(0);
@@ -219,13 +142,12 @@ function ExecutiveBriefingTab() {
   React.useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     let statusTimer: NodeJS.Timeout | undefined;
-    const statuses = ["Analyzing sales data...", "Identifying capital at risk...", "Forecasting potential losses...", "Generating strategic insights..."];
-    let statusIndex = 0;
-
+    const statuses = ["Analyzing sales data...", "Identifying capital at risk...", "Forecasting restock needs...", "Generating strategic insights..."];
+    
     if (isPending) {
         setProgress(10);
-        setStatusText(statuses[statusIndex]);
         let currentStatusIndex = 0;
+        setStatusText(statuses[currentStatusIndex]);
 
         timer = setInterval(() => {
             setProgress(prev => {
@@ -310,7 +232,7 @@ function ExecutiveBriefingTab() {
 
         try {
             const result = await businessAnalysis({ products: productInput, receipts: receiptInput, currencySymbol });
-            const dataToSave: BusinessAnalysis = { ...result, createdAt: new Date() };
+            const dataToSave: BusinessAnalysisOutput = { ...result, createdAt: new Date() };
 
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, { 'settings.businessAnalysis': { ...result, createdAt: serverTimestamp() } });
@@ -342,7 +264,7 @@ function ExecutiveBriefingTab() {
       <div className="grid gap-6">
         {isPending ? (
             <GenerationProgress progress={progress} statusText={statusText} />
-        ) : !displayData || (!displayData.moneyLockedInStock && !displayData.salesAtRisk && !displayData.strategicInsights) ? (
+        ) : !displayData || (!displayData.moneyLockedInStock && !displayData.restockOpportunities && !displayData.strategicInsights) ? (
             <Card className="text-center p-8 bg-white border">
               <CardTitle className="text-xl text-gray-900">Awaiting Analysis</CardTitle>
               <CardDescription className="mt-2 mb-4 max-w-md mx-auto text-gray-600">Click "Generate Briefing" to get your first AI-powered executive summary.</CardDescription>
@@ -350,26 +272,22 @@ function ExecutiveBriefingTab() {
             </Card>
         ) : (
             <div className="space-y-8">
-                <BusinessHealthCard analysis={analysis} isLoading={isPending} />
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  {displayData.moneyLockedInStock && (
                     <InsightCard 
                         icon={CircleDollarSign}
                         title="Money Locked in Stock"
                         value={`${currencySymbol}${displayData.moneyLockedInStock.totalValueLocked.toLocaleString()}`}
-                        description="This is cash tied up in products that are not selling."
                         narrative={displayData.moneyLockedInStock.narrative}
                         variant="destructive"
                     />
                  )}
-                 {displayData.salesAtRisk && (
+                 {displayData.restockOpportunities && (
                     <InsightCard 
                         icon={TrendingDown}
                         title="Potential Monthly Revenue at Risk"
-                        value={`${currencySymbol}${displayData.salesAtRisk.potentialMonthlyRevenueLoss.toLocaleString()}`}
-                        description="This is estimated revenue you'll miss if your bestsellers stock out."
-                        narrative={displayData.salesAtRisk.narrative}
+                        value={`${currencySymbol}${displayData.restockOpportunities.potentialMonthlyRevenueLoss.toLocaleString()}`}
+                        narrative={displayData.restockOpportunities.narrative}
                         variant="warning"
                     />
                  )}
@@ -415,19 +333,13 @@ function ExecutiveBriefingTab() {
                             title="Top Products Locking Up Cash"
                             items={displayData.moneyLockedInStock.items}
                             currencySymbol={currencySymbol}
-                            itemKey="valueLocked"
-                            valueKey="Days since last sale"
-                            timeKey="daysSinceLastSale"
                         />
                     )}
-                    {displayData.salesAtRisk && (
+                    {displayData.restockOpportunities && (
                         <ItemListCard 
-                            title="Top Products at Risk of Stockout"
-                            items={displayData.salesAtRisk.items}
+                            title="Top Restock Opportunities"
+                            items={displayData.restockOpportunities.items}
                             currencySymbol={currencySymbol}
-                            itemKey="potentialLostRevenue"
-                            valueKey="Est. days to stockout"
-                            timeKey="estimatedStockoutDays"
                         />
                     )}
                 </div>

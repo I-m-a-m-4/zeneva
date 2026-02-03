@@ -1,5 +1,8 @@
 
 
+
+
+
 export interface Product {
     id: string;
     businessId: string;
@@ -117,11 +120,12 @@ export interface MoneyLockedInStockItem {
   daysSinceLastSale: number;
 }
 
-export interface SalesAtRiskItem {
+export interface RestockOpportunityItem {
   productId: string;
   name: string;
   estimatedStockoutDays: number;
   potentialLostRevenue: number;
+  recommendedRestockQuantity: number;
 }
 
 export interface StrategicInsight {
@@ -131,24 +135,19 @@ export interface StrategicInsight {
   link?: string;
 }
 
-export interface BusinessAnalysis {
-    health: {
-        score: number;
-        status: 'Healthy' | 'Needs Attention' | 'At Risk';
-        summary: string;
-    };
-    moneyLockedInStock?: {
-        totalValueLocked: number;
-        narrative: string;
-        items: MoneyLockedInStockItem[];
-    };
-    salesAtRisk?: {
-        potentialMonthlyRevenueLoss: number;
-        narrative: string;
-        items: SalesAtRiskItem[];
-    };
-    strategicInsights?: StrategicInsight[];
-    createdAt: any; // Can be Date or Firestore Timestamp
+export interface BusinessAnalysisOutput {
+  moneyLockedInStock?: {
+    totalValueLocked: number;
+    narrative: string;
+    items: MoneyLockedInStockItem[];
+  };
+  restockOpportunities?: {
+    potentialMonthlyRevenueLoss: number;
+    narrative: string;
+    items: RestockOpportunityItem[];
+  };
+  strategicInsights?: StrategicInsight[];
+  createdAt?: any; // Can be Date or Firestore Timestamp
 }
 
 
@@ -184,7 +183,7 @@ export interface BusinessInstance {
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
         aiTroubleshootSuggestions?: AISuggestions;
-        businessAnalysis?: BusinessAnalysis;
+        businessAnalysis?: BusinessAnalysisOutput;
         publicStore?: {
             enabled?: boolean;
             headline?: string;
@@ -265,6 +264,9 @@ export interface AdminNotification {
     createdAt: any;
 }
 
+// This interface is intentionally left empty.
+export interface UserNotification {}
+
 export interface SupportThread {
     id: string;
     userId: string;
@@ -306,4 +308,6 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
+    
+
     

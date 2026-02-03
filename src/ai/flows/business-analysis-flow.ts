@@ -31,43 +31,37 @@ const prompt = ai.definePrompt({
 **Analysis Period:** The data provided is for the last 90 days.
 
 **Your Task:**
-Generate a structured JSON object that strictly follows the output schema.
+Generate a structured JSON object that strictly follows the output schema. DO NOT include a health score or summary.
 
-**PART 1: Business Health Score & Summary (AI as Judge)**
-1.  Analyze all provided data (sales velocity, inventory health, product data quality).
-2.  Calculate a single \`score\` from 0-100 reflecting overall business health.
-3.  Assign a \`status\` based on the score (Healthy: 80-100, Needs Attention: 50-79, At Risk: 0-49).
-4.  Write a concise 2-3 sentence \`summary\` that *explains the score in business terms*. Don't just list metrics. Translate the data into a judgment.
-    *   **Good Example:** "Your score is solid because sales are strong, but it's being held back by a significant amount of cash tied up in products that aren't selling. We need to turn that dead stock back into working capital."
-    *   **Bad Example:** "Your score is 75 due to high sales but low inventory turnover."
+**PART 1: Money Locked in Stock (Capital Optimization)**
+1.  Identify "dead stock" (not sold in 90 days) or "slow-moving" items.
+2.  Calculate the \`totalValueLocked\` (current stock quantity * cost price; if cost is 0, use 0.5 * price).
+3.  Provide the top 3-5 \`items\` trapping the most cash.
+4.  Write a short, impactful \`narrative\`. Example: "This represents cash that could be reinvested into your bestsellers to accelerate growth."
 
-**PART 2: Key Financial Insights (AI as Analyst)**
-Your goal here is not just to calculate, but to *frame* the numbers with a business-focused \`narrative\`.
+**PART 2: Restock Opportunities (Forecasting)**
+1.  Identify fast-selling products with low stock levels.
+2.  For each, calculate its 90-day sales velocity to get an average daily sales rate.
+3.  Estimate the \`estimatedStockoutDays\` based on current stock and daily velocity.
+4.  **Crucially, calculate a \`recommendedRestockQuantity\`. This should be the quantity needed to achieve a 60-day supply based on its sales velocity.**
+5.  Estimate the \`potentialMonthlyRevenueLoss\` if they stock out.
+6.  Provide the top 1-3 most critical \`items\`.
+7.  Write a short, impactful \`narrative\`. Example: "This is your most predictable future revenue, and it's at risk. Action is needed to protect it."
 
-1.  **Money Locked in Stock:**
-    *   Identify "dead stock" (not sold in 90 days) or "slow-moving" items.
-    *   Calculate the \`totalValueLocked\` (current stock quantity * cost price; if cost is 0, use 0.5 * price).
-    *   Provide the top 3-5 \`items\` trapping the most cash.
-    *   Write a short, impactful \`narrative\`. Example: "This represents cash that could be reinvested into your bestsellers to accelerate growth."
-
-2.  **Sales You Are About to Miss (Sales at Risk):**
-    *   Identify fast-selling products with low stock levels.
-    *   Estimate the \`potentialMonthlyRevenueLoss\` if they stock out.
-    *   Provide the top 1-3 most critical \`items\`.
-    *   Write a short, impactful \`narrative\`. Example: "This is your most predictable future revenue, and it's at risk. Action is needed to protect it."
-
-**PART 3: Strategic Insights (AI as Strategist)**
-This is the most important part. Generate 2-3 high-level, non-obvious \`strategicInsights\`.
+**PART 3: Strategic Insights (Growth & Pricing)**
+This is the most important part. Generate 2-3 high-level, non-obvious \`strategicInsights\`. Your goal is to provide genuine business advice, not just data points.
 
 *   **Focus on Explaining 'Why':**
     *   **Title:** "Price Sensitivity Detected"
     *   **Description:** "Sales for 'Product X' dropped sharply right after a price increase on May 15th and never recovered. Meanwhile, similar products in the same category maintained steady sales."
     *   **Recommendation:** "Consider reverting the price change or running a targeted promotion on 'Product X' to test market response and recapture sales velocity."
-*   **Focus on Revenue Opportunities:**
-    *   **Title:** "Untapped Category Potential"
-    *   **Description:** "Your fastest-selling and most profitable items are all in the 'Electronics' category. This indicates strong customer demand in this area."
-    *   **Recommendation:** "Expanding your product offerings within 'Electronics' is a safer growth strategy than adding new, unproven categories right now. Consider adding accessories for your current bestsellers."
-*   **Translate Data into Business Language:**
+
+*   **Identify Growth Opportunities & Suggest New Products:**
+    *   **Title:** "Untapped Category Potential: Electronics"
+    *   **Description:** "Your fastest-selling and most profitable items are all in the 'Electronics' category, which accounts for 60% of your revenue from only 15% of your product count. This indicates strong customer demand."
+    *   **Recommendation:** "Expand your offerings within 'Electronics'. Based on your bestsellers like the 'Quantum Monitor', consider adding related products your customers would want, such as 'Ergonomic Keyboards', 'High-Resolution Webcams', or 'Monitor Screen Protectors'."
+
+*   **Translate Data into Business Judgment:**
     *   **Title:** "You Have a Stocking Problem, Not a Sales Problem"
     *   **Description:** "Your overall revenue is healthy, but a large portion of your capital is tied up in products that are not selling. This 'dead stock' limits your ability to reinvest in proven winners."
     *   **Recommendation:** "Initiate a clearance sale on the top 3 items locking up cash to convert them back into working capital you can use to reorder your bestsellers."

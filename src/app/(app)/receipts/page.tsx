@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -22,12 +21,11 @@ import { useFirestore } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
 import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
 
 function ReceiptRowSkeleton() {
@@ -124,7 +122,6 @@ export default function ReceiptsPage() {
                 <CardTitle>Transaction History</CardTitle>
                 <CardDescription>A log of all completed sales.</CardDescription>
             </div>
-            <RefreshButton />
         </div>
       </CardHeader>
       <CardContent>

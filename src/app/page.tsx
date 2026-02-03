@@ -53,6 +53,10 @@ import {
     Users,
     UserCog,
     WifiOff,
+    Printer,
+    ScanBarcode,
+    Monitor,
+    BarChart3,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -129,7 +133,7 @@ const features = [
         iconColor: "text-pink-600"
     },
     {
-        icon: BarChart2,
+        icon: BarChart3,
         title: "Advanced Reporting",
         description: "Deep-dive into your business performance with detailed reports on sales, profit & loss, top products, and customer behavior, all filterable by date.",
         bgColor: "bg-sky-100",
@@ -171,6 +175,17 @@ export default function Home() {
     const { toast } = useToast();
     const form = useRef<HTMLFormElement>(null);
     const [isSending, setIsSending] = useState(false);
+
+    // Carousel State
+    const [activeSlide, setActiveSlide] = useState(0);
+    const slides = [
+        { src: "/herolytics.svg", alt: "Zeneva Dashboard View", label: "Dashboard" },
+        { src: "/poslytics.svg", alt: "Zeneva POS View", label: "POS Page" },
+        { src: "/inventory.svg", alt: "Zeneva Inventory View", label: "Inventory Page" },
+        { src: "/loglytics.svg", alt: "Audit Log", label: "Audit Log " },
+        { src: "/storelytics.svg", alt: "Storefront Page", label: "Storefront" },
+        { src: "/reportlytics.svg", alt: "Reports Page", label: "Advanced Report " }
+    ];
 
     const handleContactSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -340,20 +355,48 @@ export default function Home() {
                         </div>
                     </main>
 
-                    
-                <MarqueeSection />
 
-                    {/* Dashboard Preview Section */}
+                    <MarqueeSection />
+
+                    {/* Dashboard Preview Section - Carousel */}
                     <section className="relative w-full max-w-7xl mx-auto px-6 pb-24 mt-12 z-20">
-                        <div className="relative rounded-xl overflow-hidden ">
-                            <Image
-                                src="/herolytics.svg"
-                                alt="Zeneva Dashboard View"
-                                width={1400}
-                                height={900}
-                                className="w-full h-auto block"
-                                priority
-                            />
+                        <div className="flex flex-col items-center">
+                            <div className="relative w-full rounded-xl overflow-hidden  ">
+                                <div className="relative aspect-[16/10] w-full bg-slate-50">
+                                    {slides.map((slide, index) => (
+                                        <div
+                                            key={index}
+                                            className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${index === activeSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                                        >
+                                            <Image
+                                                src={slide.src}
+                                                alt={slide.alt}
+                                                width={1400}
+                                                height={900}
+                                                className="w-full h-full object-contain"
+                                                priority={index === 0}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-8 mt-8">
+                                {slides.map((slide, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => setActiveSlide(index)}
+                                        className={`pb-2 text-sm font-medium transition-all duration-300 relative group ${index === activeSlide
+                                                ? 'text-primary'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        {slide.label}
+                                        <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-primary transition-transform duration-300 origin-left ${index === activeSlide ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                                            }`} />
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </section>
 
@@ -477,6 +520,30 @@ export default function Home() {
                                         bgColor: "bg-red-100",
                                         iconColor: "text-red-600",
                                         hoverBg: "bg-[#FAFAF9]" // Light Stone/White
+                                    },
+                                    {
+                                        icon: Package,
+                                        title: "Inventory Management",
+                                        description: "Effortlessly track stock levels, manage variants, and receive low-stock alerts to ensure you never run out of your best-selling products.",
+                                        bgColor: "bg-orange-100",
+                                        iconColor: "text-orange-600",
+                                        hoverBg: "bg-[#FFF7ED]" // Light Orange
+                                    },
+                                    {
+                                        icon: ScanBarcode,
+                                        title: "Barcode Scanning",
+                                        description: "Speed up your checkout process significantly. Zeneva supports all standard barcode scanners for instant product lookup.",
+                                        bgColor: "bg-indigo-100",
+                                        iconColor: "text-indigo-600",
+                                        hoverBg: "bg-[#EEF2FF]" // Light Indigo
+                                    },
+                                    {
+                                        icon: Printer,
+                                        title: "Receipt Printing",
+                                        description: "Provide professional, branded receipts for every transaction. Compatible with most thermal receipt printers.",
+                                        bgColor: "bg-amber-100",
+                                        iconColor: "text-amber-600",
+                                        hoverBg: "bg-[#FFFBEB]" // Light Amber
                                     }
                                 ].map((feature, index) => (
                                     <div key={index} className="group relative p-8 bg-slate-50/50 backdrop-blur-sm border border-slate-100 rounded-2xl overflow-hidden transition-all duration-300 isolate cursor-pointer">
@@ -518,29 +585,34 @@ export default function Home() {
                             <div className="relative mx-auto max-w-4xl">
                                 <div className="flex items-center justify-center gap-6 sm:gap-10 relative z-10">
                                     <div className="group relative cursor-pointer">
-                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
-                                            <BrainCircuit className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                                            <Monitor className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">POS</span>
                                     </div>
                                     <div className="group relative cursor-pointer">
-                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
-                                            <Bot className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                                            <Package className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Inventory</span>
                                     </div>
                                     <div className="group relative cursor-pointer">
-                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
-                                            <Blocks className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                                            <Globe className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Storefront</span>
                                     </div>
                                     <div className="group relative cursor-pointer">
-                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
-                                            <Database className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                                            <Users className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">CRM</span>
                                     </div>
                                     <div className="group relative cursor-pointer">
-                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
-                                            <ShoppingCart className="text-slate-600 group-hover:text-primary transition-colors h-6 w-6" />
+                                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
+                                            <BarChart3 className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Analytics</span>
                                     </div>
                                 </div>
 
@@ -564,6 +636,10 @@ export default function Home() {
                                         <path d="M450 300 C 450 210, 540 130, 630 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
                                             <animate attributeName="stroke-dasharray" values="520" dur="0.1s" fill="freeze" />
                                             <animate attributeName="stroke-dashoffset" values="520;0;520" dur="4s" begin="0.8s" repeatCount="indefinite" />
+                                        </path>
+                                        <path d="M450 300 L 450 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
+                                            <animate attributeName="stroke-dasharray" values="270" dur="0.1s" fill="freeze" />
+                                            <animate attributeName="stroke-dashoffset" values="270;0;270" dur="4s" begin="0.8s" repeatCount="indefinite" />
                                         </path>
                                         <path d="M450 300 C 450 200, 600 120, 750 30" stroke="url(#line-gradient-light)" strokeWidth="1" strokeLinecap="round" fill="none">
                                             <animate attributeName="stroke-dasharray" values="600" dur="0.1s" fill="freeze" />
@@ -616,6 +692,7 @@ export default function Home() {
                                             </svg>
                                             <span className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl animate-pulse"></span>
                                         </span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm font-bold tracking-wide text-slate-900 whitespace-nowrap">Zen AI</span>
                                     </div>
                                 </div>
                             </div>
@@ -751,15 +828,9 @@ export default function Home() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                                <div>
-                                                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-bricolage">Intelligent Analysis</h4>
-                                                    <p className="text-sm text-stone-700 mt-2">Zen AI analyzes your sales, troubleshoots your products, and provides actionable insights. We turn your data into your competitive advantage.</p>
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-2xl font-light text-stone-900 tracking-tight font-bricolage">Actionable Insights</h4>
-                                                    <p className="mt-2 text-sm text-neutral-400">Don't just see a problem. Zen AI suggests concrete next steps, like running a clearance sale on slow-moving stock to free up your capital.</p>
-                                                </div>
+                                            <div className="mb-8">
+                                                <h4 className="text-2xl font-light text-stone-900 tracking-tight font-bricolage">Maximizing Profit, Minimizing Lost Sales</h4>
+                                                <p className="text-sm text-stone-700 mt-2">Zeneva solves the "customer comes and we don't have it" problem that leads to lost sales. We help you maximize profit by ensuring you're always stocked with what sells.</p>
                                             </div>
                                         </div>
                                     </article>
@@ -772,14 +843,14 @@ export default function Home() {
                                         </h3>
                                         <div className="mt-8">
                                             <div className="pt-6">
-                                                <div className="space-y-4">
+                                                <div className="space-y-6">
                                                     <div className="flex items-start gap-3">
                                                         <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-blue-100">
                                                             <Check className="w-4 h-4 text-blue-600" />
                                                         </div>
                                                         <div>
-                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Real-time Processing</h5>
-                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">Sub-second inventory analysis with continuous calibration for consistent results.</p>
+                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Predictive Restocking & Forecasting</h5>
+                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">Instead of a simple "low stock" alert, Zen AI becomes a forecasting engine. It analyzes sales velocity for best-selling items and calculates a Recommended Restock Quantity to meet demand without tying up cash in overstock.</p>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-start gap-3">
@@ -787,30 +858,39 @@ export default function Home() {
                                                             <Check className="w-4 h-4 text-blue-600" />
                                                         </div>
                                                         <div>
-                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Intelligent Analysis</h5>
-                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">AI-enhanced sales forecasting and inventory analysis provide clear, actionable insights to guide your business decisions.</p>
+                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Capital Optimization</h5>
+                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">The AI identifies "dead stock"—products that aren't selling and are just locking up your cash. It shows exactly how much money is trapped, empowering you to make smart decisions about clearance sales to free up capital.</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-blue-100">
+                                                            <Check className="w-4 h-4 text-blue-600" />
+                                                        </div>
+                                                        <div>
+                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Uncovering Hidden Growth Opportunities</h5>
+                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">Zen AI acts as a partner, analyzing sales patterns to suggest new product lines and pricing strategies. From adding accessories to testing promotional prices, it turns data into growth.</p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="border-t mt-8 pt-6 border-neutral-200">
-                                        <div className="grid gap-6 sm:grid-cols-2">
-                                            <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
-                                                <div>
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">5M+</span>
+                                            <div className="border-t mt-8 pt-6 border-neutral-200">
+                                                <div className="grid gap-6 sm:grid-cols-2">
+                                                    <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
+                                                        <div>
+                                                            <div className="flex items-baseline gap-2">
+                                                                <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">5M+</span>
+                                                            </div>
+                                                            <p className="text-base tracking-tight text-slate-600">Data Points Analyzed Daily</p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-base tracking-tight text-slate-600">Data Points Analyzed Daily</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
-                                                <div>
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">1,200+</span>
+                                                    <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
+                                                        <div>
+                                                            <div className="flex items-baseline gap-2">
+                                                                <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">1,200+</span>
+                                                            </div>
+                                                            <p className="text-base tracking-tight font-dm-sans text-slate-600">Businesses Powered</p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-base tracking-tight font-dm-sans text-slate-600">Businesses Powered</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -849,8 +929,8 @@ export default function Home() {
                     </a>
 
                     <MarketingFooter />
-                </div>
-            </div>
-        </ThemeProvider>
+                </div >
+            </div >
+        </ThemeProvider >
     );
 }
