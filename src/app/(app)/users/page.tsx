@@ -134,15 +134,21 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
 
-  const { users, business: businessInstance, isLoading: areUsersLoading } = usePOS();
+  const { business: businessInstance, isLoading: isPosLoading } = usePOS();
   
+  const usersQuery = useMemoFirebase(() => {
+    if (!businessId || !firestore) return null;
+    return query(collection(firestore, "users"), where("businessId", "==", businessId));
+  }, [businessId, firestore]);
+  const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
+
   const invitationsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return query(collection(firestore, 'invitations'), where('businessId', '==', businessId));
   }, [businessId, firestore]);
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
   
-  const isLoading = areUsersLoading || areInvitationsLoading;
+  const isLoading = isPosLoading || areUsersLoading || areInvitationsLoading;
 
   const staffUsers = React.useMemo(() => {
       if (!users) return [];

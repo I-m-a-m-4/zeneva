@@ -24,7 +24,6 @@ interface POSContextType {
   customers: Customer[] | null;
   onlineOrders: OnlineOrder[] | null;
   currentUserProfile: UserProfile | null;
-  users: UserProfile[] | null;
   isLoading: boolean;
   isUserLoading: boolean; 
   user: any; 
@@ -98,11 +97,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
   
-  const isAdmin = currentUserProfile?.role === 'admin';
-  const usersQuery = useMemoFirebase(() => (businessId && isAdmin ? query(collection(firestore, "users"), where("businessId", "==", businessId)) : null), [businessId, isAdmin, firestore, refreshKey]);
-  const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
-
-  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || (isAdmin && isLoadingUsers);
+  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders;
   
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -387,7 +382,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile, users, isLoading, isUserLoading, user,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, users: null, isLoading, isUserLoading, user,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
@@ -396,7 +391,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions,
   }), [
-    business, products, receipts, customers, onlineOrders, currentUserProfile, users, isLoading, isUserLoading, user,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions,
