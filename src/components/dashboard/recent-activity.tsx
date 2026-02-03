@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -6,39 +7,46 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShoppingCart, ListChecks, UserPlus, Loader2 } from "lucide-react";
-import type { Customer, Receipt } from "@/types";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc } from 'firebase/firestore';
+import type { Customer, Receipt, UserProfile } from "@/types";
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { collection, query, where, getDocs, doc, orderBy, limit } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 
 type ActivityItem = 
   | { type: 'sale', data: Receipt, timestamp: Date }
   | { type: 'new_customer', data: Customer, timestamp: Date };
 
+// This hook now returns the loading state along with the business ID.
 function useCurrentBusinessId() {
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser(); // <-- Get the user loading state
     const firestore = useFirestore();
     const userDocRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return doc(firestore, 'users', user.uid);
     }, [user, firestore]);
-    const { data: userProfile } = useDoc<any>(userDocRef);
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-    if (userProfile) {
-        return userProfile.businessId;
-    }
-    return null;
+    return {
+        businessId: userProfile?.businessId ?? null,
+        isLoading: isUserLoading || isProfileLoading, // Combine loading states
+    };
 }
 
 export default function RecentActivity() {
-  const currentBusinessId = useCurrentBusinessId();
+  const { businessId: currentBusinessId, isLoading: isBusinessIdLoading } = useCurrentBusinessId();
   const firestore = useFirestore();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentBusinessId || !firestore) {
-      setIsLoading(false);
+    // Abort if the business ID is loading or not available.
+    if (isBusinessIdLoading || !currentBusinessId || !firestore) {
+      // If we're not loading the business ID anymore (e.g., user logged out),
+      // ensure the local loading state is also false.
+      if (!isBusinessIdLoading) {
+        setIsLoading(false);
+        setActivities([]); // Clear activities on logout
+      }
       return;
     }
 
@@ -47,12 +55,16 @@ export default function RecentActivity() {
       try {
         const salesQuery = query(
           collection(firestore, "receipts"),
-          where("businessId", "==", currentBusinessId)
+          where("businessId", "==", currentBusinessId),
+          orderBy("createdAt", "desc"),
+          limit(10)
         );
         
         const customersQuery = query(
           collection(firestore, "customers"),
-          where("businessId", "==", currentBusinessId)
+          where("businessId", "==", currentBusinessId),
+          orderBy("createdAt", "desc"),
+          limit(10)
         );
 
         const [salesSnapshot, customersSnapshot] = await Promise.all([
@@ -85,7 +97,7 @@ export default function RecentActivity() {
     };
 
     fetchActivities();
-  }, [currentBusinessId, firestore]);
+  }, [currentBusinessId, firestore, isBusinessIdLoading]);
 
 
   return (
