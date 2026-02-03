@@ -1,8 +1,6 @@
 
 
 
-
-
 export interface Product {
     id: string;
     businessId: string;
@@ -17,6 +15,7 @@ export interface Product {
     description?: string;
     lowStockThreshold?: number;
     createdAt?: any;
+    updatedAt?: any;
     expiryDate?: any;
 }
 export type InventoryItem = Product;
@@ -53,6 +52,7 @@ export interface Customer {
     phone?: string;
     loyaltyPoints?: number;
     createdAt?: any;
+    updatedAt?: any;
 }
 
 export interface Receipt {
@@ -81,6 +81,7 @@ export interface Receipt {
 export interface OnlineOrder {
     id: string;
     businessId: string;
+    customerId?: string;
     customerName: string;
     customerEmail: string;
     customerPhone: string;
@@ -95,11 +96,23 @@ export interface OnlineOrder {
     shippingDetails?: {
       name: string;
       price: number;
+      type: 'delivery' | 'pickup';
+      location?: string;
     };
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
     paymentMethod?: 'Paystack' | 'Bank Transfer';
     paymentReference?: string;
     createdAt: any;
+}
+
+export interface QueuedAction {
+  id: string;
+  type: 'complete-sale' | 'update-product' | 'add-customer' | 'bulk-update-products';
+  description: string;
+  payload: any;
+  timestamp: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  errorMessage?: string;
 }
 
 export interface AISuggestion {
@@ -113,41 +126,73 @@ export interface AISuggestions {
     createdAt: any; // Firestore Timestamp
 }
 
-export interface MoneyLockedInStockItem {
-  productId: string;
-  name: string;
-  valueLocked: number;
-  daysSinceLastSale: number;
+// --- New AI Analysis Types ---
+
+export interface SmartStockRecommendation {
+    productId: string;
+    name: string;
+    recommendedStock: number;
+    confidence: number;
+    reason: string;
 }
 
-export interface RestockOpportunityItem {
-  productId: string;
-  name: string;
-  estimatedStockoutDays: number;
-  potentialLostRevenue: number;
-  recommendedRestockQuantity: number;
+export interface DemandHeatmap {
+    title: string;
+    insight: string;
 }
 
-export interface StrategicInsight {
-  title: string;
+export interface RevenueOpportunity {
+    productId: string;
+    name: string;
+    lostRevenue: number;
+    reason: string;
+    suggestion: string;
+}
+
+export interface SmartMerchandising {
+    primaryProductName: string;
+    pairedProductName: string;
+    insight: string;
+    recommendation: string;
+}
+
+export interface SlowMovingInventory {
+    productId: string;
+    name: string;
+    daysUnsold: number;
+    capitalLocked: number;
+    suggestion: 'Bundle' | 'Discount' | 'Promote with fast-seller';
+}
+
+export interface BusinessHealth {
+  score: number; // 0-100
+  status: 'Healthy' | 'Needs Attention' | 'At Risk';
+  summary: string; // A brief sentence about the score.
+}
+
+export interface CustomerSegment {
+  segmentName: string;
   description: string;
-  recommendation: string;
-  link?: string;
+  customers: {
+      name: string;
+      email: string;
+  }[];
+  suggestedCampaign: {
+    title: string;
+    body: string;
+  };
 }
+
 
 export interface BusinessAnalysisOutput {
-  moneyLockedInStock?: {
-    totalValueLocked: number;
-    narrative: string;
-    items: MoneyLockedInStockItem[];
-  };
-  restockOpportunities?: {
-    potentialMonthlyRevenueLoss: number;
-    narrative: string;
-    items: RestockOpportunityItem[];
-  };
-  strategicInsights?: StrategicInsight[];
-  createdAt?: any; // Can be Date or Firestore Timestamp
+  smartStockRecommendations?: SmartStockRecommendation[];
+  demandHeatmap?: DemandHeatmap;
+  revenueOpportunities?: RevenueOpportunity[];
+  smartMerchandising?: SmartMerchandising[];
+  slowMovingInventory?: SlowMovingInventory[];
+  businessHealth?: BusinessHealth;
+  customerSegments?: CustomerSegment[];
+  createdAt?: any;
 }
 
 
@@ -202,7 +247,7 @@ export interface BusinessInstance {
             contactEmail?: string;
             businessHours?: string;
             googleMapsLink?: string;
-            shippingOptions?: { name: string; price: number; }[];
+            shippingOptions?: { name: string; price: number; type: 'delivery' | 'pickup'; location?: string; }[];
         },
         industry?: string;
         language?: string;
@@ -264,8 +309,17 @@ export interface AdminNotification {
     createdAt: any;
 }
 
-// This interface is intentionally left empty.
-export interface UserNotification {}
+export interface UserNotification {
+    id: string;
+    title: string;
+    body: string;
+    read: boolean;
+    createdAt: any;
+    isGlobal?: boolean;
+    queuedActionId?: string;
+}
+
+
 
 export interface SupportThread {
     id: string;
@@ -308,6 +362,3 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
-    
-
-    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,7 +24,7 @@ import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
-import { usePOS } from '@/context/pos-context';
+import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
@@ -62,7 +63,7 @@ function CustomerRowSkeleton() {
 }
 
 export default function CustomersPage() {
-  const { customers, receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol } = usePOS();
+  const { customers, receipts, isLoading, business, currentUserProfile: currentUser } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -86,6 +87,11 @@ export default function CustomersPage() {
     }
     return totals;
   }, [receipts]);
+
+  const currencySymbol = React.useMemo(() => {
+    const code = business?.settings?.currency || 'NGN';
+    return CURRENCY_SYMBOLS[code] || '₦';
+  }, [business]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {

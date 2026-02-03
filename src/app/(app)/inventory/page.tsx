@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -67,7 +68,6 @@ import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
-import RefreshButton from '@/components/shared/refresh-button';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
 import BarcodeDialog from '@/components/inventory/barcode-dialog';
@@ -345,7 +345,6 @@ export default function InventoryPage() {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-          <RefreshButton />
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
             <Download className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

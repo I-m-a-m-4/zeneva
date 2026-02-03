@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Button } from "@/components/ui/button";
@@ -15,28 +16,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Customer, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 
-function useCurrentUserProfile() {
-    const { user } = useUser();
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading } = useDoc<UserProfile>(userDocRef);
-    return { profile: userProfile, isLoading };
-}
-
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: () => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { triggerRefresh } = usePOS();
+    const { triggerRefresh, customers } = usePOS();
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [phone, setPhone] = React.useState('');
@@ -48,6 +38,21 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             toast({ title: 'Missing fields', description: 'Name and email are required.', variant: 'destructive' });
             return;
         }
+
+        const emailExists = customers?.some(c => c.email.toLowerCase() === email.toLowerCase());
+        if (emailExists) {
+            toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
+            return;
+        }
+
+        if (phone) {
+            const phoneExists = customers?.some(c => c.phone === phone);
+            if (phoneExists) {
+                toast({ title: 'Duplicate Phone Number', description: 'A customer with this phone number already exists.', variant: 'destructive' });
+                return;
+            }
+        }
+
         setIsSaving(true);
         try {
             await addDoc(collection(firestore, 'customers'), {
@@ -95,8 +100,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 }
 
 export default function CustomerPage() {
-    const { selectedCustomer, selectCustomer, customers, isLoading: areCustomersLoading } = usePOS();
-    const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
+    const { selectedCustomer, selectCustomer, customers, isLoading: areCustomersLoading, currentUserProfile: currentUser } = usePOS();
     const router = useRouter();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
@@ -110,7 +114,7 @@ export default function CustomerPage() {
         );
     }, [customers, searchTerm]);
 
-    const isLoading = isProfileLoading || areCustomersLoading;
+    const isLoading = areCustomersLoading;
 
     const handleNext = () => {
         setIsNavigating(true);

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, serverTimestamp, writeBatch, query, where, getDocs, limit } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import type { BusinessInstance, CartItem, OnlineOrder } from '@/types';
 import usePaystack from '@/hooks/use-paystack';
@@ -22,7 +22,7 @@ const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
 interface CheckoutDialogProps {
   isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (isOpen: boolean) => void;
 }
 
 export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogProps) {
@@ -52,34 +52,40 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
     setSelectedShipping(undefined);
   }
 
-  const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
-    if (!firestore || !business) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please refresh.' });
-        setIsSubmitting(false);
-        return;
-    }
-    
-    toast({ title: "Processing...", description: "Verifying your payment securely." });
-    const verifyResponse = await fetch('/api/paystack/verify-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: transaction.reference }),
-    });
+  const createOrderInFirestore = async (paymentDetails: {method: 'Paystack' | 'Bank Transfer', reference?: string, status: 'paid' | 'pending'}) => {
+    if (!firestore || !business) throw new Error("Firestore or Business not available");
 
-    if (!verifyResponse.ok) {
-        throw new Error('Payment verification failed.');
-    }
-    const verifyResult = await verifyResponse.json();
-    if (verifyResult.data.amount !== total * 100) {
-        throw new Error('Paid amount does not match order total.');
-    }
-     if (verifyResult.status !== 'success') {
-        throw new Error(verifyResult.message || 'Payment not successful.');
+    const batch = writeBatch(firestore);
+
+    // 1. Find or Create Customer
+    const customersRef = collection(firestore, 'customers');
+    const q = query(customersRef, where("businessId", "==", business.id), where("email", "==", email.toLowerCase().trim()), limit(1));
+    const customerSnapshot = await getDocs(q);
+    let customerId: string;
+    let customerName = name;
+
+    if (!customerSnapshot.empty) {
+        const customerDoc = customerSnapshot.docs[0];
+        customerId = customerDoc.id;
+        customerName = customerDoc.data().name;
+    } else {
+        const newCustomerRef = doc(customersRef);
+        batch.set(newCustomerRef, {
+            name: name,
+            email: email.toLowerCase().trim(),
+            phone: phone,
+            businessId: business.id,
+            createdAt: serverTimestamp(),
+            loyaltyPoints: 0,
+        });
+        customerId = newCustomerRef.id;
     }
 
+    // 2. Create Order
     const orderData: Omit<OnlineOrder, 'id'> = {
         businessId: business.id,
-        customerName: name,
+        customerId: customerId,
+        customerName: customerName,
         customerEmail: email,
         customerPhone: phone,
         customerAddress: address,
@@ -91,30 +97,48 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         })),
         total,
         shippingDetails: chosenShippingOption,
-        status: 'paid',
-        paymentMethod: 'Paystack',
-        paymentReference: transaction.reference,
+        status: paymentDetails.status,
+        paymentMethod: paymentDetails.method,
+        paymentReference: paymentDetails.reference,
         createdAt: serverTimestamp(),
     };
-    
-    const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
-    const newOrderRef = await addDoc(ordersRef, orderData);
-    
-    toast({ variant: 'success', title: 'Order Placed!', description: `Thank you, ${name}! Your order has been sent.` });
-    
-    const canSendEmail = business.plan === 'pro' || business.plan === 'business' || business.accessLevel === 'lifetime';
-    if(canSendEmail) {
-        sendReceiptEmail({
-            to_email: email, to_name: name, business_name: business.name,
-            receipt_id: newOrderRef.id.substring(0, 8),
-            items_html: cart.map(item => `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.quantity} x ${item.product.name}</td><td style="padding: 8px; text-align:right; border-bottom: 1px solid #ddd;">₦${(item.quantity * item.product.price).toLocaleString()}</td></tr>`).join(''),
-            currency_symbol: '₦', subtotal: subtotal.toLocaleString(), tax: '0.00', discount: '0.00', total: total.toLocaleString(),
-        }).catch(err => console.error("Receipt email failed to send:", err));
-    }
-    onOrderPlaced();
-    resetForm();
 
-  }, [firestore, business, cart, total, name, email, phone, address, chosenShippingOption, subtotal, onOrderPlaced, toast]);
+    const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
+    const newOrderRef = doc(ordersRef);
+    batch.set(newOrderRef, orderData);
+    
+    // 3. Commit batch
+    await batch.commit();
+
+    return { orderId: newOrderRef.id, finalCustomerName: customerName };
+  }
+
+  const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
+    toast({ title: "Processing...", description: "Verifying your payment securely." });
+    try {
+        const verifyResponse = await fetch('/api/paystack/verify-transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: transaction.reference }),
+        });
+        const verifyResult = await verifyResponse.json();
+        if (!verifyResponse.ok || verifyResult.status !== 'success' || verifyResult.data.amount !== total * 100) {
+            throw new Error(verifyResult.message || 'Payment verification failed.');
+        }
+
+        const { orderId, finalCustomerName } = await createOrderInFirestore({ method: 'Paystack', reference: transaction.reference, status: 'paid' });
+        
+        toast({ variant: 'success', title: 'Order Placed!', description: `Thank you, ${finalCustomerName}! Your order has been sent.` });
+        
+        onOrderPlaced();
+        resetForm();
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Payment Error', description: error.message || 'There was an issue processing your payment.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }, [total, createOrderInFirestore, toast, onOrderPlaced]);
 
 
   const handlePlaceOrder = async () => {
@@ -151,12 +175,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         });
     } else {
         try {
-            const ordersRef = collection(firestore, 'businessInstances', business.id, 'onlineOrders');
-            await addDoc(ordersRef, {
-                businessId: business.id, customerName: name, customerEmail: email, customerPhone: phone, customerAddress: address,
-                items: cart.map(item => ({ productId: item.product.id, name: item.product.name, quantity: item.quantity, price: item.product.price })),
-                total, shippingDetails: chosenShippingOption, status: 'pending', paymentMethod: 'Bank Transfer', createdAt: serverTimestamp(),
-            });
+            const { orderId, finalCustomerName } = await createOrderInFirestore({ method: 'Bank Transfer', status: 'pending' });
             toast({ variant: 'success', title: 'Order Placed!', description: `Your order has been placed. Please complete payment via bank transfer.` });
             onOrderPlaced();
             resetForm();
@@ -202,7 +221,15 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
                         <SelectContent>
                             {shippingOptions.map(opt => (
                                 <SelectItem key={opt.name} value={opt.name}>
-                                    {opt.name} - ₦{opt.price.toLocaleString()}
+                                    <div className="flex flex-col text-left">
+                                        <div className="flex justify-between w-full">
+                                            <span>{opt.name}{opt.type === 'pickup' ? ' (Pickup)' : ''}</span>
+                                            <span className="font-semibold ml-4">₦{opt.price.toLocaleString()}</span>
+                                        </div>
+                                        {opt.type === 'pickup' && opt.location && (
+                                            <p className="text-xs text-muted-foreground">{opt.location}</p>
+                                        )}
+                                    </div>
                                 </SelectItem>
                             ))}
                         </SelectContent>

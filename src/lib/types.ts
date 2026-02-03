@@ -1,6 +1,5 @@
 
 
-
 export interface Product {
     id: string;
     businessId: string;
@@ -15,6 +14,8 @@ export interface Product {
     description?: string;
     lowStockThreshold?: number;
     createdAt?: any;
+    updatedAt?: any;
+    expiryDate?: any;
 }
 export type InventoryItem = Product;
 export interface CartItem {
@@ -50,6 +51,7 @@ export interface Customer {
     phone?: string;
     loyaltyPoints?: number;
     createdAt?: any;
+    updatedAt?: any;
 }
 
 export interface Receipt {
@@ -78,6 +80,7 @@ export interface Receipt {
 export interface OnlineOrder {
     id: string;
     businessId: string;
+    customerId?: string;
     customerName: string;
     customerEmail: string;
     customerPhone: string;
@@ -89,10 +92,26 @@ export interface OnlineOrder {
         price: number;
     }[];
     total: number;
+    shippingDetails?: {
+      name: string;
+      price: number;
+      type: 'delivery' | 'pickup';
+      location?: string;
+    };
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
     paymentMethod?: 'Paystack' | 'Bank Transfer';
     paymentReference?: string;
     createdAt: any;
+}
+
+export interface QueuedAction {
+  id: string;
+  type: 'complete-sale' | 'update-product' | 'add-customer' | 'bulk-update-products';
+  description: string;
+  payload: any;
+  timestamp: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  errorMessage?: string;
 }
 
 export interface AISuggestion {
@@ -105,6 +124,73 @@ export interface AISuggestions {
     suggestions: AISuggestion[];
     createdAt: any; // Firestore Timestamp
 }
+
+// --- New AI Analysis Types ---
+
+export interface SmartStockRecommendation {
+    productId: string;
+    name: string;
+    recommendedStock: number;
+    confidence: number;
+    reason: string;
+}
+
+export interface DemandHeatmap {
+    title: string;
+    insight: string;
+}
+
+export interface RevenueOpportunity {
+    productId: string;
+    name: string;
+    lostRevenue: number;
+    reason: string;
+    suggestion: string;
+}
+
+export interface SmartMerchandising {
+    primaryProductName: string;
+    pairedProductName: string;
+    insight: string;
+    recommendation: string;
+}
+
+export interface SlowMovingInventory {
+    productId: string;
+    name: string;
+    daysUnsold: number;
+    capitalLocked: number;
+    suggestion: 'Bundle' | 'Discount' | 'Promote with fast-seller';
+}
+
+export interface BusinessHealth {
+  score: number; // 0-100
+  status: 'Healthy' | 'Needs Attention' | 'At Risk';
+  summary: string; // A brief sentence about the score.
+}
+
+export interface CustomerSegment {
+  segmentName: string; // e.g., "High-Value Snack Lovers"
+  description: string;
+  customerCount: number;
+  customerEmails: string[];
+  suggestedCampaign: {
+    title: string;
+    body: string;
+  };
+}
+
+export interface BusinessAnalysisOutput {
+  smartStockRecommendations?: SmartStockRecommendation[];
+  demandHeatmap?: DemandHeatmap;
+  revenueOpportunities?: RevenueOpportunity[];
+  smartMerchandising?: SmartMerchandising[];
+  slowMovingInventory?: SlowMovingInventory[];
+  businessHealth?: BusinessHealth;
+  customerSegments?: CustomerSegment[];
+  createdAt?: any;
+}
+
 
 export interface BusinessInstance {
     id: string;
@@ -124,8 +210,10 @@ export interface BusinessInstance {
         timezone?: string;
         defaultTaxRate?: number;
         primaryColor?: string;
+        logoUrl?: string;
         paymentBankAccountId?: string;
         paymentBankName?: string;
+        paymentBankCode?: string;
         paymentInstructions?: string;
         paystackSubaccount?: string;
         vendorPolicyEnabled?: boolean;
@@ -136,6 +224,7 @@ export interface BusinessInstance {
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
         aiTroubleshootSuggestions?: AISuggestions;
+        businessAnalysis?: BusinessAnalysisOutput;
         publicStore?: {
             enabled?: boolean;
             headline?: string;
@@ -154,6 +243,7 @@ export interface BusinessInstance {
             contactEmail?: string;
             businessHours?: string;
             googleMapsLink?: string;
+            shippingOptions?: { name: string; price: number; type: 'delivery' | 'pickup'; location?: string; }[];
         },
         industry?: string;
         language?: string;
@@ -215,6 +305,9 @@ export interface AdminNotification {
     createdAt: any;
 }
 
+// This interface is intentionally left empty.
+export interface UserNotification {}
+
 export interface SupportThread {
     id: string;
     userId: string;
@@ -256,6 +349,3 @@ export interface AuditLog {
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
 }
-    
-
-    

@@ -423,6 +423,7 @@ export default function AuthenticatedLayout({
                   <BusinessHealthIndicator />
                   <div className="flex-1" />
                   <div className="flex items-center gap-1 md:gap-2 ml-auto">
+                      <NetworkStatusIndicator />
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" aria-label="Calculator" onClick={() => setIsCalculatorOpen(true)}>
@@ -519,7 +520,6 @@ export default function AuthenticatedLayout({
             </div>
           </div>
           <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
-          <NetworkStatusIndicator />
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
         </SidebarProvider>
       </TooltipProvider>

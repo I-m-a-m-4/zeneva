@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 const ProductInputSchema = z.object({
@@ -7,7 +8,6 @@ const ProductInputSchema = z.object({
   costPrice: z.number().optional().default(0),
   stock: z.number().optional().default(0),
   category: z.string().optional(),
-  expiryDate: z.any().optional().describe('The expiry date of the product'),
 });
 
 const ReceiptItemInputSchema = z.object({
@@ -20,59 +20,97 @@ const ReceiptItemInputSchema = z.object({
 
 const ReceiptInputSchema = z.object({
   id: z.string(),
-  createdAt: z.any().describe('Firestore Timestamp or Date object for the sale'),
+  createdAt: z.any().describe('The sale timestamp (Date object or Firestore Timestamp). The AI should use this for time-based analysis.'),
   items: z.array(ReceiptItemInputSchema),
   total: z.number(),
-  discount: z.number().optional().default(0),
 });
 
+const CustomerInputSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().optional(),
+    orderCount: z.number(),
+    totalSpent: z.number(),
+});
+
+
 export const BusinessAnalysisInputSchema = z.object({
-  products: z.array(ProductInputSchema).describe("List of all products with their stock and pricing. DO NOT use creation dates for analysis."),
-  receipts: z.array(ReceiptInputSchema).describe("Sale transactions from the last 90 days."),
-  currencySymbol: z.string().default('₦').describe("The currency symbol for formatting, e.g., ₦, $."),
+  products: z.array(ProductInputSchema).describe("List of all products."),
+  receipts: z.array(ReceiptInputSchema).describe("Sale transactions. The timestamp is crucial for time-based demand analysis."),
+  customers: z.array(CustomerInputSchema).describe("List of all customers with their lifetime order count and spend."),
+  currencySymbol: z.string().default('₦').describe("The currency symbol for formatting."),
 });
 
 export type BusinessAnalysisInput = z.infer<typeof BusinessAnalysisInputSchema>;
 
 
-// --- NEW, FOCUSED OUTPUT SCHEMA ---
+// --- OUTPUT SCHEMAS ---
 
-const MoneyLockedInStockItemSchema = z.object({
-  productId: z.string(),
-  name: z.string(),
-  valueLocked: z.number().describe("The total value of this product's stock that isn't selling."),
-  daysSinceLastSale: z.number().describe("How many days since this product last sold."),
-});
-
-const RestockOpportunityItemSchema = z.object({
+const SmartStockRecommendationSchema = z.object({
     productId: z.string(),
     name: z.string(),
-    estimatedStockoutDays: z.number().describe("Estimated number of days until this product sells out."),
-    potentialLostRevenue: z.number().describe("Estimated monthly revenue that will be lost if it stocks out."),
-    recommendedRestockQuantity: z.number().describe("The suggested quantity to reorder to maintain a healthy stock level (e.g., 60 days of supply)."),
+    recommendedStock: z.number().describe("The suggested quantity to have for the next cycle (e.g., tomorrow, next week)."),
+    confidence: z.number().describe("Confidence score (0-100) for the recommendation."),
+    reason: z.string().describe("A concise explanation for the recommendation, e.g., 'Demand peaks on Wednesdays and Fridays between 4–7pm.'"),
 });
 
-const StrategicInsightSchema = z.object({
-    title: z.string().describe("A direct, impactful headline for the insight. (e.g., 'You have a stocking problem, not a sales problem.')"),
-    description: z.string().describe("A multi-sentence explanation of the 'why' behind the data. This should translate data into business language and provide context."),
-    recommendation: z.string().describe("A concrete, actionable next step for the user to take."),
-    link: z.string().optional().describe("An optional application link for the call-to-action (e.g., /inventory, /reports)."),
+const DemandHeatmapSchema = z.object({
+    title: z.string().default("When Customers Buy Most"),
+    insight: z.string().describe("A summary of time-based demand patterns, e.g., 'Wednesday evenings show the highest conversion rate.'"),
 });
 
+const RevenueOpportunitySchema = z.object({
+    productId: z.string(),
+    name: z.string(),
+    lostRevenue: z.number().describe("Estimated monthly revenue lost due to stockouts."),
+    reason: z.string().describe("The cause of the lost revenue, e.g., 'Underproduction', 'Late restocking'."),
+    suggestion: z.string().describe("A concrete suggestion, e.g., 'Increasing stock by 20% on peak days could recover ₦X monthly.'"),
+});
+
+const SmartMerchandisingSchema = z.object({
+    primaryProductName: z.string(),
+    pairedProductName: z.string(),
+    insight: z.string().describe("The core insight, e.g., 'Customers who buy donuts also buy coffee 64% of the time.'"),
+    recommendation: z.string().describe("A suggestion to boost sales, e.g., 'Place coffee near the donut display.'"),
+});
+
+const SlowMovingInventorySchema = z.object({
+    productId: z.string(),
+    name: z.string(),
+    daysUnsold: z.number(),
+    capitalLocked: z.number(),
+    suggestion: z.enum(['Bundle', 'Discount', 'Promote with fast-seller']).describe("A suggested action to recover capital."),
+});
+
+const BusinessHealthSchema = z.object({
+    score: z.number().min(0).max(100).describe("The overall business health score from 0 to 100."),
+    status: z.enum(['Healthy', 'Needs Attention', 'At Risk']).describe("The one-word status of the business."),
+    summary: z.string().describe("A concise one-sentence summary explaining the current health score."),
+});
+
+const SegmentCustomerSchema = z.object({
+    name: z.string().describe("The customer's full name."),
+    email: z.string().email().describe("The customer's email address."),
+});
+
+const CustomerSegmentSchema = z.object({
+    segmentName: z.string().describe("A descriptive name for a customer group, e.g., 'Weekend High Spenders' or 'Frequent Snack Buyers'."),
+    description: z.string().describe("A brief explanation of why these customers are grouped together."),
+    customers: z.array(SegmentCustomerSchema).describe("A list of the customers (name and email) in this segment."),
+    suggestedCampaign: z.object({
+        title: z.string().describe("A catchy email subject line for a marketing campaign targeting this segment."),
+        body: z.string().describe("The full body content of the suggested email campaign. Use placeholders like {{customerName}} if applicable."),
+    }),
+});
 
 export const BusinessAnalysisOutputSchema = z.object({
-  moneyLockedInStock: z.object({
-    totalValueLocked: z.number().describe("The total sum of money tied up in dead or slow-moving stock."),
-    narrative: z.string().describe("A concise sentence putting the totalValueLocked into business context. (e.g., 'This represents cash that could be reinvested into your bestsellers.')"),
-    items: z.array(MoneyLockedInStockItemSchema).describe("A list of the top 3-5 products trapping the most cash."),
-  }).optional(),
-  restockOpportunities: z.object({
-      potentialMonthlyRevenueLoss: z.number().describe("The total estimated monthly revenue at risk from products about to stock out."),
-      narrative: z.string().describe("A concise sentence framing the revenue at risk as an urgent opportunity. (e.g., 'This is your most predictable future revenue, and it's in jeopardy.')"),
-      items: z.array(RestockOpportunityItemSchema).describe("A list of the top 1-3 most critical items at risk of stocking out, including a recommended restock quantity."),
-  }).optional(),
-  strategicInsights: z.array(StrategicInsightSchema).max(3).describe("The top 2-3 most important, non-obvious strategic recommendations for the business owner.").optional(),
+  smartStockRecommendations: z.array(SmartStockRecommendationSchema).optional().describe("Predictive stock recommendations for key products."),
+  demandHeatmap: DemandHeatmapSchema.optional().describe("An analysis of when customers are most active."),
+  revenueOpportunities: z.array(RevenueOpportunitySchema).optional().describe("Analysis of revenue missed due to stockouts."),
+  smartMerchandising: z.array(SmartMerchandisingSchema).optional().describe("Suggestions for bundling products to increase sales."),
+  slowMovingInventory: z.array(SlowMovingInventorySchema).optional().describe("Products that are not selling and are trapping capital."),
+  businessHealth: BusinessHealthSchema.optional().describe("The overall business health assessment."),
+  customerSegments: z.array(CustomerSegmentSchema).optional().describe("Segments of customers grouped by behavior, with targeted campaign suggestions."),
 });
-
 
 export type BusinessAnalysisOutput = z.infer<typeof BusinessAnalysisOutputSchema>;

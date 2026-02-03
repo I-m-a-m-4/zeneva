@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -37,6 +37,7 @@ import { usePOS } from '@/context/pos-context';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeSwitcher } from '@/components/settings/theme-switcher';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
@@ -114,7 +115,7 @@ function SettingsPageSkeleton() {
 }
 
 function SettingsPageContent() {
-    const { business, currentUserProfile } = usePOS();
+    const { business, currentUserProfile, triggerRefresh } = usePOS();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
@@ -143,8 +144,8 @@ function SettingsPageContent() {
     const [state, setState] = React.useState('');
     const [fiscalYearStart, setFiscalYearStart] = React.useState('January');
     
-    const [shippingOptions, setShippingOptions] = React.useState<{name: string, price: number}[]>([]);
-    const [newShippingOption, setNewShippingOption] = React.useState({ name: '', price: '' });
+    const [shippingOptions, setShippingOptions] = React.useState<{name: string, price: number, type: 'delivery' | 'pickup', location?: string}[]>([]);
+    const [newShippingOption, setNewShippingOption] = React.useState({ name: '', price: '', type: 'delivery' as 'delivery' | 'pickup', location: '' });
 
     const [productCategories, setProductCategories] = React.useState<string[]>([]);
     const [newCategory, setNewCategory] = React.useState('');
@@ -277,6 +278,7 @@ function SettingsPageContent() {
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, finalData);
+            triggerRefresh();
             toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
@@ -288,11 +290,18 @@ function SettingsPageContent() {
     const handleAddShippingOption = () => {
         const name = newShippingOption.name.trim();
         const price = parseFloat(newShippingOption.price);
+        const type = newShippingOption.type;
+        const location = newShippingOption.location.trim();
+
         if (name && !isNaN(price) && price >= 0) {
-            setShippingOptions([...shippingOptions, { name, price }]);
-            setNewShippingOption({ name: '', price: '' });
+            if (type === 'pickup' && !location) {
+                toast({ variant: 'destructive', title: 'Location Required', description: 'Please provide a location for the pickup option.' });
+                return;
+            }
+            setShippingOptions([...shippingOptions, { name, price, type, location: type === 'pickup' ? location : undefined }]);
+            setNewShippingOption({ name: '', price: '', type: 'delivery', location: '' });
         } else {
-            toast({ variant: 'destructive', title: 'Invalid Option', description: 'Please provide a valid name and price for the shipping option.' });
+            toast({ variant: 'destructive', title: 'Invalid Option', description: 'Please provide a valid name and price.' });
         }
     };
 
@@ -427,17 +436,38 @@ function SettingsPageContent() {
                                 <div key={index} className="flex items-center justify-between gap-2 p-3 border rounded-md bg-muted/50">
                                     <div>
                                         <p className="font-medium">{option.name}</p>
-                                        <p className="text-sm text-muted-foreground">₦{option.price.toLocaleString()}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {option.type === 'pickup' ? `Pickup at: ${option.location}` : `Delivery`} - ₦{option.price.toLocaleString()}
+                                        </p>
                                     </div>
                                     <Button variant="ghost" size="icon" onClick={() => handleDeleteShippingOption(index)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 </div>
                             ))}
-                            <div className="flex items-end gap-2 pt-4 border-t">
-                                <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({...newShippingOption, name: e.target.value})} /></div>
-                                <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({...newShippingOption, price: e.target.value})}/></div>
-                                <Button type="button" onClick={handleAddShippingOption}>Add</Button>
+                            <div className="pt-4 border-t space-y-4">
+                                <Label>Add New Option</Label>
+                                <RadioGroup value={newShippingOption.type} onValueChange={(value: 'delivery' | 'pickup') => setNewShippingOption({...newShippingOption, type: value})} className="flex space-x-4">
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="delivery" id="delivery"/>
+                                        <Label htmlFor="delivery">Delivery</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="pickup" id="pickup"/>
+                                        <Label htmlFor="pickup">In-Store Pickup</Label>
+                                    </div>
+                                </RadioGroup>
+                                <div className="flex items-end gap-2">
+                                    <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({...newShippingOption, name: e.target.value})} /></div>
+                                    <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({...newShippingOption, price: e.target.value})}/></div>
+                                </div>
+                                 {newShippingOption.type === 'pickup' && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="pickup-location">Pickup Location</Label>
+                                        <Input id="pickup-location" placeholder="e.g., 123 Main St, Lagos" value={newShippingOption.location} onChange={e => setNewShippingOption({...newShippingOption, location: e.target.value})} />
+                                    </div>
+                                )}
+                                <Button type="button" onClick={handleAddShippingOption} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2"/>Add Option</Button>
                             </div>
                         </div>
                     </CardContent>

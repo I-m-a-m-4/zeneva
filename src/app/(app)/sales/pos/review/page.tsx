@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import ReceiptDetails from "@/components/receipts/receipt-details";
@@ -136,6 +135,17 @@ export default function ReviewPage() {
                 batch.set(newReceiptRef, receiptData);
 
                 await batch.commit();
+
+                if (navigator.onLine) {
+                    toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
+                } else {
+                    toast({
+                        variant: 'default',
+                        title: "Sale Queued",
+                        description: "You're offline. This sale is saved locally and will sync automatically.",
+                        duration: 5000,
+                    });
+                }
                 
                 logAuditEvent(firestore, business.id, currentUserProfile, {
                     action: 'sale.create',
@@ -143,33 +153,15 @@ export default function ReviewPage() {
                     details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
                 });
 
-                toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
-                
-                // Send email (fire-and-forget)
+                // Send email (fire-and-forget) - only if online
                 const canSendEmail = (business.plan === 'business' || business.accessLevel === 'lifetime');
-                if (canSendEmail && shouldSendEmail && selectedCustomer?.email) {
-                    // ... email sending logic
-                    const items_html = `
-                      <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                          <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Item</th>
-                            <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          ${cart.map(item => `
-                            <tr>
-                              <td style="padding: 8px;">
-                                <div style="font-weight: 500;">${item.product.name}</div>
-                                <div style="font-size: 12px; color: #666;">${item.quantity} x ${currencySymbol}${item.product.price.toFixed(2)}</div>
-                              </td>
-                              <td style="padding: 8px; text-align:right;">${currencySymbol}${(item.quantity * item.product.price).toFixed(2)}</td>
-                            </tr>
-                          `).join('')}
-                        </tbody>
-                      </table>
-                    `;
+                if (navigator.onLine && canSendEmail && shouldSendEmail && selectedCustomer?.email) {
+                    const items_html = cart.map(item => 
+                        `<tr>
+                            <td style="padding: 5px;">${item.product.name} (x${item.quantity})</td>
+                            <td style="padding: 5px; text-align: right;">${currencySymbol}${(item.product.price * item.quantity).toFixed(2)}</td>
+                        </tr>`
+                    ).join('');
                     
                     sendReceiptEmail({
                         to_email: selectedCustomer.email,

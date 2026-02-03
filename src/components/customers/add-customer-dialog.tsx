@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -57,6 +58,14 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
     if (emailExists) {
         toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
         return;
+    }
+
+    if (phone) {
+        const phoneExists = customers?.some(customer => customer.phone === phone);
+        if (phoneExists) {
+            toast({ title: 'Duplicate Phone Number', description: 'A customer with this phone number already exists.', variant: 'destructive' });
+            return;
+        }
     }
 
     setIsSaving(true);

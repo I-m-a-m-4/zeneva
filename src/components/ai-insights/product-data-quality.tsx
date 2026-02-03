@@ -197,9 +197,9 @@ export default function ProductDataQualityTab() {
 
   if (isLoading) {
       return (
-          <Card className="mt-6">
+          <Card>
               <CardHeader>
-                  <CardTitle className="font-headline">Inventory Health Check</CardTitle>
+                  <CardTitle>Inventory Health Check</CardTitle>
                   <CardDescription>Analyzing your product data...</CardDescription>
               </CardHeader>
               <CardContent>
@@ -211,9 +211,9 @@ export default function ProductDataQualityTab() {
 
   if (!analysis || analysis.totalProducts === 0) {
     return (
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Inventory Health Check</CardTitle>
+          <CardTitle>Inventory Health Check</CardTitle>
         </CardHeader>
         <CardContent className="text-center py-12">
           <Package className="h-16 w-16 mx-auto text-muted-foreground/50" />
@@ -267,10 +267,10 @@ export default function ProductDataQualityTab() {
   const hasIssues = allIssues.some((issue) => issue.count > 0);
 
   return (
-    <div className="grid gap-6 mt-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Inventory Data Health</CardTitle>
+          <CardTitle>Inventory Data Health</CardTitle>
           <CardDescription>
             Automated analysis of your {analysis.totalProducts} products to identify
             potential data quality issues that could affect sales.
@@ -328,5 +328,3 @@ export default function ProductDataQualityTab() {
     </div>
   );
 }
-
-    

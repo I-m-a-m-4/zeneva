@@ -1,46 +1,48 @@
-
 'use client';
 
-import { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { WifiOff, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { WifiOff } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function NetworkStatusIndicator() {
-  const { toast, dismiss } = useToast();
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    const handleOnline = () => {
-      dismiss(); // Dismiss any offline toast
-      toast({
-        title: 'You are back online',
-        description: 'Your changes will now be synced.',
-        variant: 'success',
-        duration: 3000,
-      });
-    };
+    // Set initial state from navigator, only on client
+    if (typeof navigator !== 'undefined') {
+      setIsOnline(navigator.onLine);
+    }
 
-    const handleOffline = () => {
-      toast({
-        title: 'No Internet Connection',
-        description: 'You are currently offline. Changes will be saved locally and synced when you reconnect.',
-        variant: 'warning',
-        duration: Infinity, // Keep the toast until back online
-      });
-    };
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Initial check in case the component mounts while offline
-    if (!navigator.onLine) {
-        handleOffline();
-    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [toast, dismiss]);
+  }, []); // Empty dependency array means this effect runs once on mount.
 
-  return null; // This component renders nothing itself
+  if (isOnline) {
+    return null; // Render nothing when online.
+  }
+
+  // Render the indicator for the header bar when offline.
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-amber-600 no-print cursor-pointer">
+            <WifiOff className="h-4 w-4" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="end">
+          <p className="font-semibold">You are offline</p>
+          <p className="text-sm text-muted-foreground">Changes are saved locally and will sync when reconnected.</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }

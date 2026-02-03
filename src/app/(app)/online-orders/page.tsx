@@ -9,7 +9,7 @@ import type { OnlineOrder } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Globe, MoreHorizontal, CheckCircle, Clock, Info, XCircle, DollarSign, ShoppingCart } from 'lucide-react';
+import { Loader2, Globe, MoreHorizontal, CheckCircle, Clock, Info, XCircle, DollarSign, ShoppingCart, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import RefreshButton from '@/components/shared/refresh-button';
@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import Link from 'next/link';
 
 function OrderRowSkeleton() {
     return (
@@ -55,7 +56,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | 
 }
 
 export default function OnlineOrdersPage() {
-    const { business, isLoading: isPosLoading, currencySymbol } = usePOS();
+    const { business, isLoading: isPosLoading, currencySymbol, triggerRefresh } = usePOS();
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -80,6 +81,7 @@ export default function OnlineOrdersPage() {
         const orderRef = doc(firestore, 'businessInstances', business.id, 'onlineOrders', orderId);
         try {
             await updateDoc(orderRef, { status });
+            triggerRefresh();
             toast({
                 variant: 'success',
                 title: 'Order Status Updated',
@@ -111,7 +113,6 @@ export default function OnlineOrdersPage() {
                             <CardTitle className="flex items-center gap-2"><Globe /> Incoming Orders</CardTitle>
                             <CardDescription>A log of all orders placed through your public store.</CardDescription>
                          </div>
-                         <RefreshButton />
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -154,13 +155,18 @@ export default function OnlineOrdersPage() {
                                         <TableCell className="font-mono text-xs">{order.id.substring(0,8)}...</TableCell>
                                         <TableCell>{order.createdAt ? format(order.createdAt.toDate(), 'PP') : 'N/A'}</TableCell>
                                         <TableCell>
-                                            <div className="font-medium">{order.customerName}</div>
+                                            {order.customerId ? (
+                                                <Link href={`/customers/${order.customerId}`} className="font-medium hover:underline">{order.customerName}</Link>
+                                            ) : (
+                                                <div className="font-medium">{order.customerName}</div>
+                                            )}
                                             <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
                                             <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
                                             <div className="text-xs text-muted-foreground mt-1 truncate max-w-xs">{order.customerAddress}</div>
                                              {order.shippingDetails && (
-                                                <div className="text-xs text-muted-foreground mt-1 font-semibold">
-                                                   Shipping: {order.shippingDetails.name} (+{currencySymbol}{order.shippingDetails.price})
+                                                <div className="text-xs text-muted-foreground mt-1 font-semibold flex items-center gap-1">
+                                                   <Truck className="h-3 w-3"/>
+                                                   {order.shippingDetails.name} (+{currencySymbol}{order.shippingDetails.price})
                                                 </div>
                                             )}
                                         </TableCell>
