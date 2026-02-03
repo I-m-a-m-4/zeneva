@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
@@ -78,7 +76,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isConfettiActive, setIsConfettiActive] = useState(false);
 
   // --- Centralized Data Fetching ---
-  const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore, refreshKey]);
+  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const isProfileReady = !!(user && currentUserProfile && user.uid === currentUserProfile.id);
@@ -329,22 +327,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencyCode = business?.settings?.currency || 'NGN';
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
-  const addToCart = (product: Product) => {
-    const existingItem = cart.find(item => item.product.id === product.id);
-    if (existingItem) {
-      if (existingItem.quantity >= (product.stock || 0)) {
-        toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
-        return;
+  const addToCart = useCallback((product: Product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product.id === product.id);
+      if (existingItem) {
+        if (existingItem.quantity >= (product.stock || 0)) {
+          toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
+          return prevCart;
+        }
+        return prevCart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      } else {
+        if ((product.stock || 0) <= 0) {
+          toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
+          return prevCart;
+        }
+        return [...prevCart, { product, quantity: 1 }];
       }
-      setCart(prevCart => prevCart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
-    } else {
-      if ((product.stock || 0) <= 0) {
-        toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
-        return;
-      }
-      setCart(prevCart => [...prevCart, { product, quantity: 1 }]);
-    }
-  };
+    });
+  }, [toast]);
 
   const removeFromCart = (productId: string) => setCart(prev => prev.filter(item => item.product.id !== productId));
   
