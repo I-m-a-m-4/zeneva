@@ -383,12 +383,13 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 }
 
 export default function UsersPage() {
-    const { currentUserProfile: currentUser, isLoading: isProfileLoading, user: authUser } = usePOS();
+    const { currentUserProfile: currentUser, isLoading: isPosLoading } = usePOS();
+    const isLoading = isPosLoading || !currentUser?.businessId;
 
-    if (isProfileLoading || !currentUser || !authUser || authUser.uid !== currentUser.id) {
+    if (isLoading) {
         return <UsersPageSkeleton />;
     }
-
+    
     if (currentUser?.role !== 'admin') {
         return (
             <>

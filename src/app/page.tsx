@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -163,7 +164,7 @@ const features = [
     {
         icon: ShieldCheck,
         title: "Security & Audit Log",
-        description: "Enhance security with a detailed, chronological record of all critical events, from voided sales to product updates, complete with automated issue scanning.",
+        description: "Enhance security with a detailed, chronological record of all critical events, complete with automated issue scanning.",
         bgColor: "bg-red-100",
         iconColor: "text-red-600"
     }
@@ -755,150 +756,86 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <section className="z-10 animate-[fadeInUp_1s_ease-out_1.2s_forwards] relative" style={{ transform: "translateY(0px)" }}>
-                        <div className="max-w-7xl mx-auto pt-16 pb-16 px-6">
-                            <div className="grid gap-12 lg:grid-cols-2 gap-x-12 gap-y-12">
-                                <div className="bg-center bg-stone-200 bg-[url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/f7302105-bf99-4736-914e-d8fbdb904af5_1600w.png')] bg-cover border-stone-200 border rounded-md pt-5 pr-5 pb-5 pl-5 relative">
-                                    <article className="group overflow-hidden transition-shadow hover:shadow-md bg-primary/20 border-stone-300 border rounded relative shadow-xl backdrop-blur-xl">
-                                        <div className="sm:p-10 bg-stone-50 rounded pt-6 pr-6 pb-6 pl-6">
-                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                                                <h3 className="text-2xl font-light text-stone-900 tracking-tight font-bricolage">Real-Time Sales Data</h3>
-                                                <span className="inline-flex items-center gap-2 text-[10px] sm:text-xs text-neutral-300 bg-stone-950 border-white/10 border rounded-full px-2.5 py-1">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-400">
-                                                        <path d="M16 7h6v6" className=""></path>
-                                                        <path d="m22 7-8.5 8.5-5-5L2 17" className=""></path>
-                                                    </svg>
-                                                    Live streaming
-                                                </span>
-                                            </div>
-                                            <div className="relative h-56 sm:h-64 rounded-2xl bg-gradient-to-b ring-1 ring-inset mb-8 from-neutral-200 to-neutral-100 ring-black/5">
-                                                <div className="absolute right-3 sm:right-6 top-4 sm:top-6 w-[78%] h-[68%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
-                                                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
-                                                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">SALES</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs text-green-600">+12.5%</span>
-                                                            <span className="h-2 w-12 rounded bg-green-500/20"></span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="p-2">
-                                                        <svg viewBox="0 0 300 90" className="w-full h-20 sm:h-24 text-neutral-300">
-                                                            <defs><pattern id="dots1" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.5" fill="currentColor" opacity="0.3"></circle></pattern></defs>
-                                                            <rect width="100%" height="100%" fill="url(#dots1)"></rect>
-                                                            <rect x="20" y="45" width="3" height="20" fill="#F87171"></rect>
-                                                            <rect x="40" y="35" width="3" height="25" fill="#4ADE80"></rect>
-                                                            <rect x="60" y="50" width="3" height="15" fill="#F87171"></rect>
-                                                            <rect x="80" y="30" width="3" height="30" fill="#4ADE80"></rect>
-                                                            <rect x="100" y="40" width="3" height="20" fill="#4ADE80"></rect>
-                                                            <rect x="120" y="25" width="3" height="35" fill="#4ADE80"></rect>
-                                                            <rect x="140" y="45" width="3" height="18" fill="#F87171"></rect>
-                                                            <rect x="160" y="20" width="3" height="40" fill="#4ADE80"></rect>
-                                                            <rect x="180" y="35" width="3" height="25" fill="#4ADE80"></rect>
-                                                            <rect x="200" y="15" width="3" height="45" fill="#4ADE80"></rect>
-                                                            <polyline points="22,55 42,47 62,57 82,45 102,50 122,42 142,54 162,40 182,47 202,37" fill="none" stroke="#4ADE80" strokeWidth="1.5" strokeLinecap="round"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                <div className="absolute left-6 sm:left-12 bottom-10 sm:bottom-12 w-[62%] h-[52%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
-                                                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
-                                                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">TOP PRODUCTS</span>
-                                                    </div>
-                                                    <div className="p-2 space-y-1">
-                                                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Quantum HD Monitor</span><span className="text-green-600">+8.2%</span></div>
-                                                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Ergo Mouse</span><span className="text-red-600">-1.5%</span></div>
-                                                        <div className="flex items-center justify-between text-xs"><span className="text-neutral-700">Zeneva Hoodie</span><span className="text-green-600">+5.8%</span></div>
-                                                    </div>
-                                                </div>
-                                                <div className="absolute left-3 sm:left-6 bottom-3 sm:bottom-4 w-[38%] h-[44%] rounded-2xl backdrop-blur border shadow-sm bg-white/70 border-neutral-200">
-                                                    <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200/70">
-                                                        <span className="text-[10px] sm:text-xs tracking-widest text-neutral-500">POS</span>
-                                                    </div>
-                                                    <div className="p-2">
-                                                        <svg viewBox="0 0 180 70" className="w-full h-14 sm:h-16 text-neutral-300">
-                                                            <rect x="10" y="35" width="2" height="12" fill="#4ADE80"></rect>
-                                                            <rect x="25" y="30" width="2" height="17" fill="#4ADE80"></rect>
-                                                            <rect x="40" y="40" width="2" height="10" fill="#F87171"></rect>
-                                                            <rect x="55" y="25" width="2" height="22" fill="#4ADE80"></rect>
-                                                            <rect x="70" y="20" width="2" height="27" fill="#4ADE80"></rect>
-                                                            <rect x="85" y="35" width="2" height="12" fill="#F87171"></rect>
-                                                            <rect x="100" y="15" width="2" height="32" fill="#4ADE80"></rect>
-                                                            <rect x="115" y="28" width="2" height="19" fill="#4ADE80"></rect>
-                                                            <rect x="130" y="12" width="2" height="35" fill="#4ADE80"></rect>
-                                                            <polyline points="11,41 26,38 41,45 56,36 71,33 86,41 101,31 116,36 131,29" fill="none" stroke="#4ADE80" strokeWidth="1" strokeLinecap="round"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="mb-8">
-                                                <h4 className="text-2xl font-light text-stone-900 tracking-tight font-bricolage">Maximizing Profit, Minimizing Lost Sales</h4>
-                                                <p className="text-sm text-stone-700 mt-2">Zeneva solves the "customer comes and we don't have it" problem that leads to lost sales. We help you maximize profit by ensuring you're always stocked with what sells.</p>
-                                            </div>
-                                        </div>
-                                    </article>
-                                </div>
+                    {/* Pricing Section */}
+                    <section id="pricing" className="py-24 px-6 bg-[#F9F8F6] border-t border-slate-100">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="text-center max-w-2xl mx-auto mb-16">
+                                <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
+                                    Choose the Perfect Plan for Your Business
+                                </h2>
+                                <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
+                                    Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
+                                </p>
+                            </div>
 
-                                <div className="px-6">
-                                    <div className="tech-content" id="technology">
-                                        <h3 className="sm:text-5xl transition-colors duration-500 text-4xl font-light text-slate-900 tracking-tight font-bricolage">
-                                            Built for Scale, Designed for Humans
-                                        </h3>
-                                        <div className="mt-8">
-                                            <div className="pt-6">
-                                                <div className="space-y-6">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-blue-100">
-                                                            <Check className="w-4 h-4 text-blue-600" />
-                                                        </div>
-                                                        <div>
-                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Predictive Restocking & Forecasting</h5>
-                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">Instead of a simple "low stock" alert, Zen AI becomes a forecasting engine. It analyzes sales velocity for best-selling items and calculates a Recommended Restock Quantity to meet demand without tying up cash in overstock.</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-blue-100">
-                                                            <Check className="w-4 h-4 text-blue-600" />
-                                                        </div>
-                                                        <div>
-                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Capital Optimization</h5>
-                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">The AI identifies "dead stock"—products that aren't selling and are just locking up your cash. It shows exactly how much money is trapped, empowering you to make smart decisions about clearance sales to free up capital.</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-blue-100">
-                                                            <Check className="w-4 h-4 text-blue-600" />
-                                                        </div>
-                                                        <div>
-                                                            <h5 className="text-base font-medium tracking-tight font-dm-sans text-slate-900">Uncovering Hidden Growth Opportunities</h5>
-                                                            <p className="text-base tracking-tight font-dm-sans mt-1 text-slate-600">Zen AI acts as a partner, analyzing sales patterns to suggest new product lines and pricing strategies. From adding accessories to testing promotional prices, it turns data into growth.</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="border-t mt-8 pt-6 border-neutral-200">
-                                                <div className="grid gap-6 sm:grid-cols-2">
-                                                    <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
-                                                        <div>
-                                                            <div className="flex items-baseline gap-2">
-                                                                <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">5M+</span>
-                                                            </div>
-                                                            <p className="text-base tracking-tight text-slate-600">Data Points Analyzed Daily</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 hover:scale-105 transition-transform duration-200 cursor-pointer">
-                                                        <div>
-                                                            <div className="flex items-baseline gap-2">
-                                                                <span className="rating-number text-2xl tracking-tight font-bricolage font-light text-slate-900">1,200+</span>
-                                                            </div>
-                                                            <p className="text-base tracking-tight font-dm-sans text-slate-600">Businesses Powered</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                {/* Starter Plan */}
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                    <h3 className="text-lg font-semibold leading-5">Starter</h3>
+                                    <p className="mt-4 text-slate-500 text-sm">For new businesses getting started with inventory management.</p>
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-bold tracking-tight">Free</span>
+                                    </div>
+                                    <ul className="mt-6 space-y-4 text-sm">
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 500 products</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 2 Staff Accounts</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
+                                    </ul>
+                                    <div className="mt-auto pt-6">
+                                        <Button asChild size="lg" className="w-full">
+                                            <Link href="/signup">Get Started for Free</Link>
+                                        </Button>
+                                    </div>
+                                </div>
+                                {/* Pro Plan */}
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-2xl shadow-2xl shadow-primary/10">
+                                    <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
+                                    <h3 className="text-lg font-semibold leading-5">Pro</h3>
+                                    <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-bold tracking-tight">₦10,000</span>
+                                        <span className="text-base font-medium text-slate-500">/mo</span>
+                                    </div>
+                                    <ul className="mt-6 space-y-4 text-sm">
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 10 Staff Accounts</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Audit Log</li>
+                                    </ul>
+                                    <div className="mt-auto pt-6">
+                                        <Button asChild size="lg" className="w-full">
+                                            <Link href="/signup">Start Your Pro Trial</Link>
+                                        </Button>
+                                    </div>
+                                </div>
+                                {/* Business Plan */}
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                    <h3 className="text-lg font-semibold leading-5">Business</h3>
+                                    <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-bold tracking-tight">₦30,000</span>
+                                        <span className="text-base font-medium text-slate-500">/mo</span>
+                                    </div>
+                                    <ul className="mt-6 space-y-4 text-sm">
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & users</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
+                                    </ul>
+                                    <div className="mt-auto pt-6">
+                                        <Button asChild size="lg" className="w-full">
+                                            <Link href="/signup">Start Your Business Trial</Link>
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </section>
+
 
                     <section id="faq" className="py-24 px-6 border-t bg-white border-slate-100">
                         <div className="max-w-3xl mr-auto ml-auto">
