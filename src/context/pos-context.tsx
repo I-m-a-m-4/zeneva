@@ -313,6 +313,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch {} }, [discount]);
   useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch {} }, [paymentMethod]);
 
+  const resetPOS = useCallback(() => {
+    setCart([]);
+    setSelectedCustomer(null);
+    setDiscount(0);
+    setTaxRate(business?.settings?.defaultTaxRate ?? 0);
+    setPaymentMethod('Cash');
+    try {
+        localStorage.removeItem(POS_CART_KEY);
+        localStorage.removeItem(POS_CUSTOMER_KEY);
+        localStorage.removeItem(POS_DISCOUNT_KEY);
+        localStorage.removeItem(POS_TAX_RATE_KEY);
+        localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
+    } catch {}
+  }, [business]);
+
+  // Effect to reset POS state when user changes
+  useEffect(() => {
+    if (!isUserLoading) {
+      resetPOS();
+    }
+  }, [user?.uid, isUserLoading, resetPOS]);
+
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {
         setTaxRate(business.settings?.defaultTaxRate ?? 0);
@@ -324,28 +346,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const addToCart = useCallback((product: Product) => {
-    const existingItem = cart.find(item => item.product.id === product.id);
+    setCart(prevCart => {
+        const existingItem = prevCart.find(item => item.product.id === product.id);
 
-    if (existingItem) {
-      if (existingItem.quantity >= (product.stock || 0)) {
-        toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
-        return;
-      }
-      setCart(prevCart =>
-        prevCart.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
-    } else {
-      if ((product.stock || 0) <= 0) {
-        toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
-        return;
-      }
-      setCart(prevCart => [...prevCart, { product, quantity: 1 }]);
-    }
-  }, [cart, toast]);
+        if (existingItem) {
+          if (existingItem.quantity >= (product.stock || 0)) {
+            toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
+            return prevCart;
+          }
+          return prevCart.map(item =>
+            item.product.id === product.id
+                ? { ...item, quantity: item.quantity + 1 }
+                : item
+          );
+        } else {
+          if ((product.stock || 0) <= 0) {
+            toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
+            return prevCart;
+          }
+          return [...prevCart, { product, quantity: 1 }];
+        }
+    });
+  }, [toast]);
 
   const removeFromCart = (productId: string) => setCart(prev => prev.filter(item => item.product.id !== productId));
   
@@ -372,20 +394,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
   const total = useMemo(() => subtotal + tax - discount, [subtotal, tax, discount]);
 
-  const resetPOS = () => {
-    clearCart();
-    selectCustomer(null);
-    setDiscount(0);
-    setTaxRate(business?.settings?.defaultTaxRate ?? 0);
-    setPaymentMethod('Cash');
-    try {
-        localStorage.removeItem(POS_CART_KEY);
-        localStorage.removeItem(POS_CUSTOMER_KEY);
-        localStorage.removeItem(POS_DISCOUNT_KEY);
-        localStorage.removeItem(POS_TAX_RATE_KEY);
-        localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
-    } catch {}
-  };
 
   const value = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, users: null, isLoading, isUserLoading, user,
@@ -427,3 +435,5 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
     'NGN': '₦',
     'USD': '$',
 };
+
+    

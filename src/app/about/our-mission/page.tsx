@@ -1,269 +1,305 @@
-
 'use client';
+
 import {
-  Server,
   TrendingUp,
-  Database,
-  ArrowRight,
-  Workflow,
-  Check,
-  Binary,
-  Monitor,
-  Users,
-  Cpu,
-  Globe,
+  Target,
   Zap,
-  CloudLightning,
+  ShieldCheck,
+  BrainCircuit,
+  Users,
+  ArrowRight,
+  Database,
   Layers,
-  ShoppingBag,
-  BarChart2,
-  AlertTriangle,
-  ChevronRight,
-  Bot,
-  ShoppingCart,
-  Shirt,
-  Coffee,
   Sparkles,
-  BookOpen,
-  Smartphone,
+  Bot,
+  Check,
+  Search,
+  ShoppingCart,
+  Store
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import MarketingHeader from '@/components/layout/marketing-header';
+import MarketingFooter from '@/components/layout/marketing-footer';
 
 export default function OurMissionPage() {
   return (
-    <div className="min-h-screen overflow-x-hidden selection:bg-primary/20 selection:text-foreground text-foreground font-body bg-neutral-100 relative">
-      
+    <div className="min-h-screen bg-[#F9F8F6] text-slate-900 font-sans selection:bg-primary/20 overflow-x-hidden">
+      <MarketingHeader />
 
-      <div className="relative z-10 flex flex-col min-h-screen pt-16 lg:pt-20">
-        <main className="flex-1 w-full">
-
-          <section className="lg:px-12 lg:pt-16 lg:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 min-h-[60vh] lg:min-h-[75vh] max-w-[1600px] mr-auto ml-auto pt-8 pr-6 pb-12 pl-6 items-center">
-            <div className="animate-clip-in lg:col-span-7 space-y-6" style={{ animationDelay: '0.1s' }}>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium bg-white border-border text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                The OS for Modern Commerce
-              </div>
-              <h1 className="leading-[0.95] lg:text-7xl xl:text-8xl text-5xl font-medium text-foreground tracking-tighter font-display">
-                Your Commerce,
-                <span className="text-muted-foreground/80 relative inline-block"> Optimized
-                  <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
-                </span> for Growth.
-              </h1>
-              <p className="leading-relaxed lg:text-xl text-lg font-normal text-muted-foreground font-body max-w-2xl">
-                We design, build, and manage the digital systems—inventory, sales, and marketing—that power your business. No silos, just results.
-              </p>
-                <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                    <Button asChild size="lg" className="font-medium px-8 py-4 rounded-full transition-transform hover:scale-105 shadow-xl w-full sm:w-auto">
-                        <Link href="/signup">
-                            Start Your Free Trial
-                        </Link>
-                    </Button>
-                    <Button asChild variant="outline" size="lg" className="rounded-full px-8 py-4 bg-white/50 w-full sm:w-auto">
-                        <Link href="#features">
-                            Explore Features
-                        </Link>
-                    </Button>
-                </div>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden">
+        <div className="aura-background"></div>
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
+              <Sparkles className="w-3 h-3" />
+              Our Mission
+            </span>
+            <h1 className="text-5xl lg:text-7xl font-medium tracking-tighter font-display text-slate-900 mb-6 leading-[0.95]">
+              Turning Retail Data Into <span className="text-slate-400 relative inline-block">Clear Decisions.
+                <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
+              </span>
+            </h1>
+            <p className="text-xl text-slate-600 font-normal leading-relaxed mb-8 max-w-lg">
+              Retail businesses don’t fail because owners don’t work hard. <br className="hidden md:block" />
+              They fail because they’re forced to operate without clarity.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link href="/signup">
+                <Button size="lg" className="rounded-full px-8 h-12 text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-105 transition-all">
+                  Join the Mission
+                </Button>
+              </Link>
             </div>
-
-            <div className="lg:col-span-5 flex flex-col animate-fade-up lg:mt-0 h-full mt-8 relative justify-center" style={{ animationDelay: '0.3s' }}>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/20 blur-[100px] rounded-full pointer-events-none"></div>
-              <div className="relative space-y-4">
-                <div className="glass-panel p-4 rounded-xl flex items-center gap-4 animate-float shadow-lg lg:ml-0 max-w-sm mx-auto w-full" style={{ animationDelay: '0s' }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 bg-primary/10 text-primary border-primary/20">
-                    <Server width="20" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground">Inventory Sync</p>
-                    <p className="text-xs text-muted-foreground truncate">POS & Online Store Synced</p>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded border font-medium bg-background text-foreground border-border">99.9% Accuracy</span>
-                </div>
-                <div className="glass-panel p-4 rounded-xl flex items-center gap-4 animate-float shadow-lg lg:ml-8 max-w-sm mx-auto w-full" style={{ animationDelay: '1.5s' }}>
-                  <div className="flex shrink-0 bg-primary w-10 h-10 border rounded-full items-center justify-center text-primary-foreground border-primary/50">
-                    <TrendingUp width="20" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground">AI Sales Analytics</p>
-                    <p className="text-xs text-muted-foreground truncate">Q3 Sales Performance</p>
-                  </div>
-                  <span className="bg-primary text-[10px] px-2 py-0.5 rounded border border-primary/50 font-medium text-primary-foreground">+15.4%</span>
-                </div>
-                <div className="glass-panel p-4 rounded-xl flex items-center gap-4 animate-float shadow-lg lg:-ml-4 max-w-sm mx-auto w-full" style={{ animationDelay: '2.5s' }}>
-                  <div className="w-10 h-10 rounded-full text-primary flex items-center justify-center border shrink-0 bg-foreground border-border">
-                    <Database width="20" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground">CRM Update</p>
-                    <p className="text-xs text-muted-foreground truncate">New Customer Added</p>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded border font-medium bg-foreground text-background border-border">Active</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div className="bg-white w-full z-20 rounded-t-[40px] pt-12 pb-12 relative shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
-            <section className="max-w-[1600px] mx-auto w-full mb-16 lg:mb-24 px-6 lg:px-12">
-              <p className="text-left text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">Powering various high-growth businesses</p>
-              <div className="overflow-hidden w-full relative">
-                <div className="z-10 bg-gradient-to-r to-transparent w-12 lg:w-40 h-full absolute top-0 left-0 from-white"></div>
-                <div className="bg-gradient-to-l to-transparent w-12 lg:w-40 h-full z-10 absolute top-0 right-0 from-white"></div>
-                <div className="flex w-max animate-marquee hover:[animation-play-state:paused]">
-                  <div className="flex items-center gap-12 lg:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><ShoppingCart /> Online Retailers</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Shirt /> Fashion Boutiques</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Coffee /> Coffee Shops</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Sparkles /> Skincare Brands</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><BookOpen /> Book Stores</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Smartphone /> Electronics Shops</div>
-                  </div>
-                  <div className="flex items-center gap-12 lg:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-500 ml-12 lg:ml-24">
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><ShoppingCart /> Online Retailers</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Shirt /> Fashion Boutiques</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Coffee /> Coffee Shops</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Sparkles /> Skincare Brands</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><BookOpen /> Book Stores</div>
-                    <div className="flex items-center gap-3 text-xl lg:text-2xl font-semibold font-sans"><Smartphone /> Electronics Shops</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-            
-            <section className="max-w-[1600px] mx-auto px-6 lg:px-12 animate-fade-up w-full mb-12 lg:mb-20" style={{ animationDelay: '0.4s' }}>
-                <div className="text-center mb-12">
-                    <h2 className="lg:text-5xl text-3xl font-medium text-foreground tracking-tight font-display">
-                        Stop Guessing. <span className="text-muted-foreground">Start Growing.</span>
-                    </h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                    <div className="p-8 bg-neutral-50 border border-border rounded-2xl hover:shadow-md transition-shadow cursor-pointer">
-                        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center mb-6">
-                            <AlertTriangle width="24" height="24" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-foreground mb-2">Tired of stockouts?</h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">Our real-time inventory sync means you never oversell. Get proactive low-stock alerts before it’s too late.</p>
-                    </div>
-                    <div className="p-8 bg-neutral-50 border border-border rounded-2xl hover:shadow-md transition-shadow cursor-pointer">
-                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6">
-                            <Bot width="24" height="24" />
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2 text-foreground">Flying blind on insights?</h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">Our Zen AI analyzes your sales and customer data to provide actionable insights, from product recommendations to engagement tactics.</p>
-                    </div>
-                    <div className="p-8 bg-neutral-50 border border-border rounded-2xl hover:shadow-md transition-shadow cursor-pointer">
-                        <div className="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mb-6">
-                           <Users width="24" height="24" />
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2 text-foreground">Losing customer context?</h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">Our intelligent CRM links every sale to a customer profile, building a rich history so you can deliver personalized service and rewards.</p>
-                    </div>
-                </div>
-            </section>
-
-            <section id="features" className="lg:px-12 lg:mb-20 max-w-[1600px] mr-auto mb-12 ml-auto pr-6 pl-6">
-                <h2 className="text-3xl lg:text-5xl font-medium text-foreground tracking-tight font-display mb-10 lg:mb-12">The Future of Inventory Management</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 auto-rows-fr">
-                    <div className="row-span-1 lg:row-span-2 group overflow-hidden lg:p-10 flex flex-col min-h-[500px] lg:min-h-full transition-transform hover:scale-[1.01] duration-300 bg-primary/10 border-primary/20 border rounded-[32px] pt-6 pr-6 pb-6 pl-6 relative justify-between">
-                        <div className="z-20 mt-auto relative">
-                            <div className="flex text-primary bg-white/50 w-12 h-12 border-primary/20 border rounded-2xl mb-6 backdrop-blur-md items-center justify-center">
-                                <Database width="24" />
-                            </div>
-                            <h3 className="lg:text-3xl text-2xl font-bold text-foreground font-display mb-3">Unified Inventory Core</h3>
-                            <p className="text-muted-foreground mb-6 text-sm lg:text-base leading-relaxed max-w-sm">
-                                Your single source of truth. Manage stock across your physical store and online storefront from one powerful dashboard.
-                            </p>
-                        </div>
-                    </div>
-                     <div className="col-span-1 md:col-span-2 group overflow-hidden lg:p-10 min-h-[400px] flex flex-col md:flex-row transition-transform hover:scale-[1.01] duration-300 bg-foreground border-border border rounded-[32px] pt-6 pr-6 pb-6 pl-6 relative items-center justify-between text-background">
-                         <div className="relative z-20 flex flex-col h-full justify-between w-full md:w-1/2 mb-8 md:mb-0">
-                            <div>
-                                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mb-6 text-primary">
-                                    <Layers width="24" />
-                                </div>
-                                <h3 className="lg:text-3xl text-2xl font-bold text-white font-display mb-3">Integrated POS &amp; CRM</h3>
-                                <p className="text-muted mb-6 text-sm lg:text-base leading-relaxed max-w-xs">
-                                    Process sales at lightning speed while building valuable customer relationships. Every transaction enriches your data with our intelligent CRM.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="group relative overflow-hidden bg-primary/5 rounded-[32px] p-6 lg:p-10 flex flex-col justify-between min-h-[350px] transition-transform hover:scale-[1.01] duration-300 border border-primary/10 cursor-pointer">
-                        <div className="z-20 mt-auto relative">
-                             <div className="w-10 h-10 rounded-xl bg-white/60 backdrop-blur flex items-center justify-center mb-4 text-foreground">
-                                <ShoppingBag width="20" />
-                            </div>
-                            <h3 className="lg:text-2xl text-xl font-bold text-foreground font-display mb-2 flex items-center gap-2">E-Commerce Storefront <Bot className="text-primary"/></h3>
-                            <p className="text-muted-foreground text-sm mb-4 leading-relaxed">Launch a beautiful online store in minutes. No code required. Integrated with your inventory from day one.</p>
-                            <Link href="/signup" className="inline-flex items-center text-foreground font-bold text-xs uppercase tracking-wide hover:opacity-70">
-                                Launch Your Store <ChevronRight className="ml-1" />
-                            </Link>
-                        </div>
-                    </div>
-                    <div className="group relative overflow-hidden bg-purple-50 rounded-[32px] p-6 lg:p-10 flex flex-col justify-between min-h-[350px] transition-transform hover:scale-[1.01] duration-300 border border-purple-100 cursor-pointer">
-                        <div className="z-20 mt-auto relative">
-                            <div className="w-10 h-10 rounded-xl bg-white/60 backdrop-blur flex items-center justify-center mb-4 text-foreground">
-                                <Bot width="20" />
-                            </div>
-                            <h3 className="lg:text-2xl text-xl font-bold text-foreground font-display mb-2">Zen AI Copilot</h3>
-                            <p className="text-muted-foreground text-sm mb-4 leading-relaxed">Your AI-powered assistant. Get data-driven suggestions for inventory, customer engagement, and sales strategy.</p>
-                            <Link href="#features" className="inline-flex items-center text-foreground font-bold text-xs uppercase tracking-wide hover:opacity-70">
-                                Discover AI Features <ChevronRight className="ml-1" />
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            
-            <section className="py-12 lg:py-16 max-w-[1600px] mx-auto px-6 lg:px-12">
-              <div className="text-center max-w-4xl mx-auto space-y-8">
-                <h2 className="text-3xl lg:text-6xl font-medium text-foreground tracking-tight font-display leading-tight">
-                  Why Zeneva?
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6">
-                  <div className="space-y-3 p-6 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer">
-                    <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center text-foreground mb-2">
-                      <Binary width="24" height="24" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">Democratize Commerce Tech</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">We provide enterprise-grade inventory and sales tools in a simple, beautiful package that anyone can use.</p>
-                  </div>
-                  <div className="space-y-3 p-6 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer">
-                    <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center text-foreground mb-2">
-                      <Monitor width="24" height="24" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">Intelligence, Not Just Data</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">Zen AI analyzes your sales, troubleshoots your products, and provides actionable insights. We turn your data into your competitive advantage.</p>
-                  </div>
-                  <div className="space-y-3 p-6 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer">
-                    <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center text-foreground mb-2">
-                      <Users width="24" height="24" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">Obsessed with Your Growth</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">We're not just a software provider; we're your partner. We build the features real businesses need to thrive in a competitive landscape.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="max-w-[1600px] mx-auto px-6 lg:px-12 my-12 lg:my-20">
-              <div className="lg:p-20 overflow-hidden text-center bg-primary/10 rounded-[32px] pt-8 pr-8 pb-8 pl-8 relative">
-                <div className="relative z-10 max-w-3xl mx-auto space-y-8">
-                  <h2 className="text-3xl lg:text-6xl leading-tight font-medium text-foreground tracking-tight font-display">Ready to optimize your business?</h2>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                    <Link href="/signup" passHref>
-                      <Button size="lg" className="font-medium px-8 py-4 rounded-full transition-transform hover:scale-105 shadow-xl w-full sm:w-auto">
-                        Start Your Free Trial
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </section>
           </div>
-        </main>
-      </div>
+
+          {/* abstract visual */}
+          <div className="relative h-[400px] lg:h-[500px] bg-white rounded-3xl border border-slate-100 shadow-2xl p-8 flex flex-col justify-center items-center overflow-hidden">
+            <div className="absolute inset-0 bg-slate-50/50 pattern-bg opacity-50"></div>
+            <div className="relative z-10 text-center space-y-6 max-w-xs">
+              <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto shadow-xl ring-4 ring-white">
+                <Bot className="w-10 h-10 text-primary animate-pulse" />
+              </div>
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-sm font-medium text-slate-600 flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span> Stockout Warning: Rice (50kg)
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-sm font-medium text-slate-600 flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Recommended Order: 25 Units
+                </div>
+              </div>
+            </div>
+
+            {/* Decorative elements */}
+            <div className="absolute top-10 left-10 w-16 h-16 bg-blue-500/10 rounded-full blur-xl animate-pulse"></div>
+            <div className="absolute bottom-10 right-10 w-24 h-24 bg-primary/10 rounded-full blur-xl animate-pulse delay-700"></div>
+          </div>
+        </div>
+      </section>
+
+      {/* The Problem Section */}
+      <section className="py-24 px-6 bg-white border-y border-slate-100 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-light tracking-tight text-slate-900 mb-6 font-display">The Clarity Gap</h2>
+            <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+              Every day, store owners make dozens of decisions. Most are made reactively — based on instinct, incomplete data, or problems that have already happened.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
+            {[
+              { icon: ShoppingCart, text: "What to restock", color: "text-blue-500", bg: "bg-blue-50" },
+              { icon: Zap, text: "What to discount", color: "text-amber-500", bg: "bg-amber-50" },
+              { icon: TrendingUp, text: "What to promote", color: "text-emerald-500", bg: "bg-emerald-50" },
+              { icon: ShieldCheck, text: "What to stop buying", color: "text-red-500", bg: "bg-red-50" }
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-4 p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:border-slate-200 transition-colors">
+                <div className={`p-2.5 rounded-xl ${item.bg} ${item.color}`}>
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <span className="font-semibold text-slate-900">{item.text}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center">
+            <p className="text-2xl font-medium text-slate-900 inline-block relative">
+              <span className="relative z-10">Zeneva exists to change that.</span>
+              <span className="absolute bottom-1 left-0 w-full h-3 bg-primary/20 -z-0"></span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Zen AI Exists */}
+      <section className="py-24 px-6 bg-[#F9F8F6]">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display text-slate-900 mb-8">Why Zen AI Exists</h2>
+              <div className="prose prose-lg text-slate-600 leading-relaxed">
+                <p className="mb-6">
+                  Zen AI was built to solve a specific problem: <strong className="text-slate-900">Retail businesses generate massive amounts of data, but almost none of it turns into usable judgment.</strong>
+                </p>
+                <ul className="space-y-4 list-none pl-0 mb-8">
+                  <li className="flex items-center gap-3 text-slate-800 font-medium">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Sales happen.
+                  </li>
+                  <li className="flex items-center gap-3 text-slate-800 font-medium">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Inventory moves.
+                  </li>
+                  <li className="flex items-center gap-3 text-slate-800 font-medium">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Customers buy and leave.
+                  </li>
+                </ul>
+                <p className="mb-4">Yet the system never tells the owner:</p>
+                <div className="space-y-3 font-semibold text-slate-900 pl-4 border-l-2 border-primary">
+                  <p>What does this mean?</p>
+                  <p>What should I do next?</p>
+                  <p>Where am I silently losing money?</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/5 rounded-[40px] transform rotate-3"></div>
+              <div className="relative bg-white p-8 lg:p-12 rounded-[40px] shadow-xl border border-slate-100">
+                <h3 className="text-2xl font-bold text-slate-900 mb-8">Our Core Belief</h3>
+                <div className="space-y-8">
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                      <BrainCircuit className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-slate-900">Foresight, not hindsight</h4>
+                      <p className="text-slate-500 text-sm mt-1">Predicting problems before they happen.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-pink-600 shrink-0">
+                      <Target className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-slate-900">Decisions, not dashboards</h4>
+                      <p className="text-slate-500 text-sm mt-1">Actionable steps, not just charts.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-slate-900">Prevention, not post-mortems</h4>
+                      <p className="text-slate-500 text-sm mt-1">Stopping losses at the source.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* What Zen AI Actually Does */}
+      <section className="py-24 px-6 bg-slate-900 text-white relative overflow-hidden">
+        {/* Background Gradients */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute top-1/2 left-1/4 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600 rounded-full blur-[100px]"></div>
+        </div>
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <span className="text-primary font-bold tracking-wider uppercase text-sm mb-4 block">Capabilities</span>
+            <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display mb-8">What Zen AI Actually Does</h2>
+            <div className="flex flex-wrap justify-center gap-3">
+              {["Not a chatbot", "Not generic analytics", "Not surface-level reporting"].map((tag, i) => (
+                <span key={i} className="px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm font-medium text-slate-300">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary mb-6">
+                <Zap className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-4">From Data to Decisions</h3>
+              <ul className="space-y-3 text-slate-300 text-sm">
+                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> What is selling — and why</li>
+                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> What will sell next — and when</li>
+                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> Where revenue is being lost</li>
+              </ul>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 mb-6">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-4">Preventing Lost Sales</h3>
+              <p className="text-slate-300 text-sm leading-relaxed mb-4">
+                A customer walking out because a product is unavailable is a system failure. Zen AI prevents that.
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 mb-6">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-4">Freeing Trapped Capital</h3>
+              <p className="text-slate-300 text-sm leading-relaxed mb-4">
+                Turns dead stock into working capital by recommending:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {['Discount', 'Bundle', 'Exit'].map(action => (
+                  <span key={action} className="text-xs px-2 py-1 bg-white/10 rounded text-white">{action}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Built For Real Conditions */}
+      <section className="py-24 px-6 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display text-slate-900">Built for Real Retail Conditions</h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="p-10 rounded-[32px] bg-[#F9F8F6] border border-slate-100 flex flex-col items-start min-h-[300px] hover:shadow-lg transition-shadow">
+              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-700 mb-6">
+                <Database className="w-7 h-7" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Offline-First Foundation</h3>
+              <p className="text-slate-600 text-lg leading-relaxed">
+                Sales continue without internet. Transactions queue automatically. Zen AI never loses context.
+              </p>
+            </div>
+            <div className="p-10 rounded-[32px] bg-[#F9F8F6] border border-slate-100 flex flex-col items-start min-h-[300px] hover:shadow-lg transition-shadow">
+              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-700 mb-6">
+                <Layers className="w-7 h-7" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Unified Intelligence</h3>
+              <p className="text-slate-600 text-lg leading-relaxed">
+                POS, inventory, CRM, and storefront all feed into one shared data layer. No silos. No conflicting numbers.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The Vision CTA */}
+      <section className="py-32 px-6 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-primary/5 pattern-bg opacity-30"></div>
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <span className="text-sm font-bold text-primary tracking-widest uppercase mb-6 block">The Long-Term Vision</span>
+          <h2 className="text-4xl lg:text-6xl font-medium tracking-tighter font-display text-slate-900 mb-8 leading-tight">
+            Retail decisions effectively proactive. <br />
+            <span className="text-slate-400">Sales losses visible before they happen.</span>
+          </h2>
+          <p className="text-xl text-slate-600 mb-12 max-w-2xl mx-auto font-light">
+            We are building a future where business owners spend time on strategy, not firefighting.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/signup">
+              <Button size="lg" className="rounded-full px-10 h-14 text-lg shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-105">
+                Join the Mission
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <MarketingFooter />
     </div>
   );
 }
