@@ -1075,9 +1075,9 @@ export default function Home() {
                             </div>
                             <div className="relative">
                                 {/* Glow Effect */}
-                                <div className="absolute -inset-4 bg-primary/20 blur-3xl rounded-full opacity-50"></div>
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-orange-500/30 blur-[100px] rounded-full -z-10 mix-blend-multiply"></div>
                                 <Image
-                                    src="/maximize.png"
+                                    src="/zen-mission.png"
                                     alt="Zeneva Profit Dial Interface"
                                     width={500}
                                     height={500}
