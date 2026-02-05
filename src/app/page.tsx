@@ -349,9 +349,9 @@ export default function Home() {
                                             <div className="codepen-button rounded-md">
 
                                                 <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'}>
-                                                    <span className="block w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-sm font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
+                                                    <span className="block w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-xs font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
                                                         Get Started Free
-                                                        <ArrowRight className="inline w-5 h-5 ml-2" />
+                                                        <ArrowRight className="inline w-4 h-4 ml-2" />
                                                     </span>
                                                 </Link>
                                             </div>
@@ -440,7 +440,7 @@ export default function Home() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-8 mt-8">
+                            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 mt-8">
                                 {slides.map((slide, index) => (
                                     <button
                                         key={index}
@@ -881,7 +881,7 @@ export default function Home() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 {/* Starter Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5">Starter</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For new businesses getting started with inventory management.</p>
 
@@ -901,7 +901,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Pro Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-xl shadow-2xl shadow-primary/10">
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
                                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
                                     <h3 className="text-lg font-semibold leading-5">Pro</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
@@ -925,7 +925,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Business Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5">Business</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
