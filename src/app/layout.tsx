@@ -1,4 +1,4 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";

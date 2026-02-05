@@ -58,6 +58,8 @@ import {
     ScanBarcode,
     Monitor,
     BarChart3,
+    TrendingUp,
+    Store,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -646,42 +648,83 @@ export default function Home() {
                                     </div>
                                     <div className="grid md:grid-cols-2 gap-8 relative z-10">
                                         <div>
-                                            <h3 className="text-xl font-semibold mb-4 text-slate-900">What Zen AI actually does:</h3>
-                                            <ul className="space-y-3">
-                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
-                                                    <Check className="w-5 h-5 text-primary shrink-0" />
-                                                    Predicts what will sell, when, and how much
+                                            <h3 className="text-xl font-semibold mb-8 text-slate-900">What Zen AI actually does:</h3>
+                                            <ul className="space-y-8">
+                                                <li className="flex items-start gap-4">
+                                                    <div className="bg-emerald-100 p-2.5 rounded-xl shrink-0">
+                                                        <TrendingUp className="w-6 h-6 text-emerald-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-900 text-base">Revenue Opportunities</h4>
+                                                        <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                                                            Predicts what will sell, when, and how much. Identifies best-selling SKUs by time and day.
+                                                        </p>
+                                                    </div>
                                                 </li>
-                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
-                                                    <Check className="w-5 h-5 text-primary shrink-0" />
-                                                    Identifies best-selling SKUs by time and day
+                                                <li className="flex items-start gap-4">
+                                                    <div className="bg-blue-100 p-2.5 rounded-xl shrink-0">
+                                                        <Store className="w-6 h-6 text-blue-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-900 text-base">Smart Merchandising</h4>
+                                                        <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                                                            The best merchandiser that would increase impulse buying by showing optimal product placement.
+                                                        </p>
+                                                    </div>
                                                 </li>
-                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
-                                                    <Check className="w-5 h-5 text-primary shrink-0" />
-                                                    Recommends exact stock quantities — not estimates
-                                                </li>
-                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
-                                                    <Check className="w-5 h-5 text-primary shrink-0" />
-                                                    Flags cash trapped in slow-moving inventory
+                                                <li className="flex items-start gap-4">
+                                                    <div className="bg-purple-100 p-2.5 rounded-xl shrink-0">
+                                                        <Search className="w-6 h-6 text-purple-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-900 text-base">Market Opportunities</h4>
+                                                        <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                                                            Shows the business owner new untapped market opportunities and flags cash trapped in inventory.
+                                                        </p>
+                                                    </div>
                                                 </li>
                                             </ul>
                                         </div>
-                                        <div className="bg-white rounded-xl border border-blue-100 p-6 shadow-sm flex flex-col justify-center">
-                                            <div className="flex items-center gap-2 mb-4 text-blue-600 font-semibold text-xs uppercase tracking-wider">
-                                                <Sparkles className="w-4 h-4" />
-                                                Live Insight Examples
+
+                                        <div className="relative flex flex-col justify-center items-center py-4">
+                                            {/* AI Connection Visual */}
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-[300px] pointer-events-none">
+                                                <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-0.5 h-[60%] bg-gradient-to-b from-slate-200 via-primary/20 to-slate-200"></div>
                                             </div>
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <p className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wide">Food & Perishables</p>
-                                                    <p className="text-slate-800 font-medium italic text-sm leading-relaxed">
-                                                        “This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash. Producing less loses sales.”
+
+                                            {/* Central AI Node */}
+                                            <div className="relative z-10 mb-8">
+                                                <div className="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center shadow-lg ring-4 ring-white">
+                                                    <Sparkles className="w-7 h-7 text-primary animate-pulse" />
+                                                </div>
+                                            </div>
+
+                                            {/* Chat Bubbles */}
+                                            <div className="space-y-6 w-full max-w-sm relative z-10">
+                                                {/* Bubble 1 */}
+                                                <div className="bg-white p-5 rounded-2xl rounded-tl-sm shadow-xl border border-slate-100 transform hover:scale-[1.02] transition-transform duration-300 relative">
+                                                    <div className="absolute -top-3 -left-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm">
+                                                        <Bot className="w-4 h-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Food & Perishables</span>
+                                                    </div>
+                                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
+                                                        “This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash.”
                                                     </p>
                                                 </div>
-                                                <div className="h-px w-full bg-slate-100"></div>
-                                                <div>
-                                                    <p className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wide">Fashion & Retail</p>
-                                                    <p className="text-slate-800 font-medium italic text-sm leading-relaxed">
+
+                                                {/* Bubble 2 */}
+                                                <div className="bg-white p-5 rounded-2xl rounded-tr-sm shadow-xl border border-slate-100 transform hover:scale-[1.02] transition-transform duration-300 relative ml-6">
+                                                    <div className="absolute -top-3 -right-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm">
+                                                        <Bot className="w-4 h-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Fashion & Retail</span>
+                                                    </div>
+                                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
                                                         “Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand.”
                                                     </p>
                                                 </div>

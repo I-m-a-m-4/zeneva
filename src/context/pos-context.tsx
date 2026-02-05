@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
@@ -323,23 +324,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const addToCart = useCallback((product: Product) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.product.id === product.id);
-      if (existingItem) {
-        if (existingItem.quantity >= (product.stock || 0)) {
-          toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
-          return prevCart;
-        }
-        return prevCart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
-      } else {
-        if ((product.stock || 0) <= 0) {
-          toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
-          return prevCart;
-        }
-        return [...prevCart, { product, quantity: 1 }];
+    const existingItem = cart.find(item => item.product.id === product.id);
+
+    if (existingItem) {
+      if (existingItem.quantity >= (product.stock || 0)) {
+        toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
+        return;
       }
-    });
-  }, [toast]);
+      setCart(prevCart =>
+        prevCart.map(item =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
+    } else {
+      if ((product.stock || 0) <= 0) {
+        toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
+        return;
+      }
+      setCart(prevCart => [...prevCart, { product, quantity: 1 }]);
+    }
+  }, [cart, toast]);
 
   const removeFromCart = (productId: string) => setCart(prev => prev.filter(item => item.product.id !== productId));
   
