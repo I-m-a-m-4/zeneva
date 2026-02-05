@@ -83,24 +83,32 @@ import { ThemeProvider } from '@/components/theme-provider';
 
 const faqItems = [
     {
-        question: "What kind of businesses can use Zeneva?",
-        answer: "Zeneva is designed for a wide range of retail businesses, including fashion boutiques, electronics shops, cafes, skincare brands, and more. Its flexible inventory and sales tools can adapt to any environment where physical products are sold."
+        question: "Who is Zeneva built for?",
+        answer: "Zeneva is designed for serious retail businesses — mini-marts, pharmacies, boutiques, supermarkets, and online stores managing real inventory, real volume, and real money."
     },
     {
-        question: "Does Zeneva work offline?",
-        answer: "Yes! The Point of Sale (POS) is designed to be fully functional even without an internet connection. All sales made offline are saved securely on your device and will automatically sync with the cloud once you're back online."
+        question: "What makes Zeneva different from other inventory tools?",
+        answer: "Most tools report the past. Zeneva predicts the future. Zen AI analyzes demand patterns and recommends exact stock decisions to maximize profit."
     },
     {
-        question: "How secure is my business data?",
-        answer: "We take security very seriously. All your data is stored on secure cloud servers with enterprise-grade protection. We use industry-standard encryption for data in transit and at rest. Your business data is your property, and we will never share it with third parties."
+        question: "Does Zeneva work without internet?",
+        answer: "Yes. POS works fully offline. All transactions are queued and synced automatically once connectivity returns — no sales are ever lost."
     },
     {
-        question: "Can I import my existing product data?",
-        answer: "Absolutely. We provide an easy-to-use CSV import tool that can intelligently map your existing spreadsheet columns (e.g., from Shopify or WooCommerce) to Zeneva's fields, getting you set up in minutes."
+        question: "How accurate are Zen AI predictions?",
+        answer: "Zen AI improves continuously using your historical sales, time-based demand, and customer behavior. Accuracy increases as your data grows."
     },
     {
-        question: "What payment options are supported for online stores?",
-        answer: "Your public storefront can accept payments via Paystack for credit/debit cards and mobile money. You can also enable a 'Bank Transfer' option, and your banking details will be displayed to the customer at checkout."
+        question: "Can Zeneva replace my existing POS or inventory system?",
+        answer: "Yes. Zeneva is a full operating system — POS, inventory, storefront, CRM, and analytics in one unified platform."
+    },
+    {
+        question: "Is my data secure?",
+        answer: "Yes. All data is encrypted, isolated per business, and protected using enterprise-grade cloud infrastructure."
+    },
+    {
+        question: "How long does setup take?",
+        answer: "Most businesses are live within hours — products can be imported, staff invited, and selling started the same day."
     }
 ];
 
@@ -291,15 +299,18 @@ export default function Home() {
                             {/* Left Column: Copy & Form */}
                             <div className="max-w-xl z-10">
                                 <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
-                                <h1 className="leading-[0.95] lg:text-5xl xl:text-6xl text-4xl font-medium text-foreground tracking-tighter font-display mb-8">
-                                    The AI-Powered Commerce<br />
-                                    Platform for <span className="text-muted-foreground/80 relative inline-block">Growth.
+                                <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
+                                    Never Lose a Sale.<br />
+                                    Never Waste <span className="text-muted-foreground/80 relative inline-block">Stock.
                                         <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
                                     </span>
                                 </h1>
 
-                                <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-10 text-slate-900">
-                                    Zeneva is the AI-powered operating system for modern commerce. Go beyond simple tracking with predictive insights, guided workflows, and a customizable storefront to maximize profit and eliminate stockouts.
+                                <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-4 text-slate-900 font-medium">
+                                    Zeneva is the operating system for serious retail businesses — combining POS, inventory, storefront, CRM, and AI forecasting into one system that predicts demand, prevents stockouts, and maximizes profit.
+                                </p>
+                                <p className="leading-relaxed text-sm tracking-tight font-dm-sans max-w-lg mb-10 text-slate-500">
+                                    Built for modern retail. Works offline. Scales online. Powered by Zen AI.
                                 </p>
 
                                 <div className="flex sm:flex-row w-full gap-x-2 gap-y-4">
@@ -339,8 +350,8 @@ export default function Home() {
 
                                                 <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'}>
                                                     <span className="block w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-sm font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
-                                                        Get Started
-                                                        <ArrowRight className="inline w-5 h-5" />
+                                                        Get Started Free
+                                                        <ArrowRight className="inline w-5 h-5 ml-2" />
                                                     </span>
                                                 </Link>
                                             </div>
@@ -358,6 +369,53 @@ export default function Home() {
 
 
                     <MarqueeSection />
+
+                    {/* Bridge Section */}
+                    <section className="py-24 px-6 bg-white border-b border-slate-100">
+                        <div className="max-w-4xl mx-auto text-center">
+                            <h2 className="text-3xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
+                                Retail Isn’t Failing — Systems Are
+                            </h2>
+                            <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+                                Every day, customers walk into stores ready to buy — and walk out empty-handed.
+                                Not because demand isn’t there. But because businesses are guessing instead of predicting.
+                            </p>
+
+                            <div className="grid sm:grid-cols-2 gap-6 text-left max-w-3xl mx-auto mb-12">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2 bg-red-50 rounded-lg shrink-0">
+                                        <Zap className="w-5 h-5 text-red-500" />
+                                    </div>
+                                    <p className="text-slate-700 font-medium pt-1">Best-selling products run out without warning</p>
+                                </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2 bg-orange-50 rounded-lg shrink-0">
+                                        <Anchor className="w-5 h-5 text-orange-500" />
+                                    </div>
+                                    <p className="text-slate-700 font-medium pt-1">Capital is trapped in slow-moving stock</p>
+                                </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2 bg-yellow-50 rounded-lg shrink-0">
+                                        <Database className="w-5 h-5 text-yellow-600" />
+                                    </div>
+                                    <p className="text-slate-700 font-medium pt-1">Sales data exists, but insight doesn’t</p>
+                                </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2 bg-slate-100 rounded-lg shrink-0">
+                                        <Wind className="w-5 h-5 text-slate-500" />
+                                    </div>
+                                    <p className="text-slate-700 font-medium pt-1">Decisions are reactive, not strategic</p>
+                                </div>
+                            </div>
+
+                            <div className="inline-block bg-slate-50 border border-slate-200 rounded-lg px-6 py-4">
+                                <p className="text-slate-900 font-medium">
+                                    This is the silent profit leak in retail. <br />
+                                    <span className="text-primary font-bold">Zeneva was built to stop it.</span>
+                                </p>
+                            </div>
+                        </div>
+                    </section>
 
                     {/* Dashboard Preview Section - Carousel */}
                     <section className="relative w-full max-w-7xl mx-auto px-6 pb-24 mt-12 z-20">
@@ -388,8 +446,8 @@ export default function Home() {
                                         key={index}
                                         onClick={() => setActiveSlide(index)}
                                         className={`pb-2 text-sm font-medium transition-all duration-300 relative group ${index === activeSlide
-                                                ? 'text-primary'
-                                                : 'text-slate-500 hover:text-slate-700'
+                                            ? 'text-primary'
+                                            : 'text-slate-500 hover:text-slate-700'
                                             }`}
                                     >
                                         {slide.label}
@@ -573,14 +631,64 @@ export default function Home() {
                             <div className="text-center mb-16">
                                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] text-primary ring-1 ring-primary/20 uppercase tracking-tight mb-4 font-semibold">
                                     <Workflow className="mr-1 h-3 w-3" />
-                                    The Future is AI-Native
+                                    The Operating System for Profit-Driven Retail
                                 </span>
-                                <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-4 font-bricolage">
-                                    The Operating System for Modern Retail
+                                <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
+                                    Zen AI: The Brain Behind Every Sale
                                 </h2>
-                                <p className="text-lg text-slate-500 font-light">
-                                    Zeneva is more than a tool; it's an intelligent partner. We use AI to automate decisions, predict trends, and help you focus on what matters most: growing your business.
+                                <p className="text-lg text-slate-500 font-light max-w-3xl mx-auto mb-8">
+                                    Zeneva connects POS, inventory, storefront, CRM, and analytics into one intelligent system — with Zen AI at the center, turning daily operations into profit-maximizing decisions.
                                 </p>
+
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                        <BrainCircuit className="w-32 h-32 text-slate-900" />
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-8 relative z-10">
+                                        <div>
+                                            <h3 className="text-xl font-semibold mb-4 text-slate-900">What Zen AI actually does:</h3>
+                                            <ul className="space-y-3">
+                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
+                                                    <Check className="w-5 h-5 text-primary shrink-0" />
+                                                    Predicts what will sell, when, and how much
+                                                </li>
+                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
+                                                    <Check className="w-5 h-5 text-primary shrink-0" />
+                                                    Identifies best-selling SKUs by time and day
+                                                </li>
+                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
+                                                    <Check className="w-5 h-5 text-primary shrink-0" />
+                                                    Recommends exact stock quantities — not estimates
+                                                </li>
+                                                <li className="flex items-start gap-3 text-slate-600 text-sm">
+                                                    <Check className="w-5 h-5 text-primary shrink-0" />
+                                                    Flags cash trapped in slow-moving inventory
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div className="bg-white rounded-xl border border-blue-100 p-6 shadow-sm flex flex-col justify-center">
+                                            <div className="flex items-center gap-2 mb-4 text-blue-600 font-semibold text-xs uppercase tracking-wider">
+                                                <Sparkles className="w-4 h-4" />
+                                                Live Insight Examples
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <p className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wide">Food & Perishables</p>
+                                                    <p className="text-slate-800 font-medium italic text-sm leading-relaxed">
+                                                        “This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash. Producing less loses sales.”
+                                                    </p>
+                                                </div>
+                                                <div className="h-px w-full bg-slate-100"></div>
+                                                <div>
+                                                    <p className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wide">Fashion & Retail</p>
+                                                    <p className="text-slate-800 font-medium italic text-sm leading-relaxed">
+                                                        “Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand.”
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="relative mx-auto max-w-4xl">
@@ -719,6 +827,8 @@ export default function Home() {
                         </div>
                     </section>
 
+
+
                     <FeaturesFloatingSection />
 
                     <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
@@ -766,13 +876,15 @@ export default function Home() {
                                 <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
                                     Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
                                 </p>
+
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 {/* Starter Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5">Starter</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For new businesses getting started with inventory management.</p>
+
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">Free</span>
                                     </div>
@@ -789,10 +901,11 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Pro Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-2xl shadow-2xl shadow-primary/10">
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-xl shadow-2xl shadow-primary/10">
                                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
                                     <h3 className="text-lg font-semibold leading-5">Pro</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
+
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">₦10,000</span>
                                         <span className="text-base font-medium text-slate-500">/mo</span>
@@ -812,9 +925,10 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Business Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5">Business</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
+
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">₦30,000</span>
                                         <span className="text-base font-medium text-slate-500">/mo</span>
@@ -859,11 +973,84 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="whatsapp-button" aria-label="Contact us on WhatsApp">
+                    {/* Profit Dial Section */}
+                    <section className="py-24 px-6 bg-[#F9F8F6] text-slate-900 relative overflow-hidden text-center">
+                        <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
+                        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10 text-left">
+                            <div>
+                                <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6 font-bricolage text-slate-900">
+                                    Turn Data Into Profit — <span className="text-primary">Automatically</span>
+                                </h2>
+                                <p className="text-lg text-slate-500 mb-8 leading-relaxed">
+                                    Zeneva doesn’t just track activity. It actively pushes your business toward maximum profit by balancing demand, stock levels, and customer behavior in real time.
+                                </p>
+
+                                <div className="space-y-6 mb-10">
+                                    <div className="flex gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <ArrowUp className="w-6 h-6 text-primary" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900">Reduce stockouts</h4>
+                                            <p className="text-slate-500">Capture lost demand before it disappears.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                                            <Database className="w-6 h-6 text-emerald-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900">Reduce overstock</h4>
+                                            <p className="text-slate-500">Free locked capital for growth.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                            <Zap className="w-6 h-6 text-blue-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900">Optimize production timing</h4>
+                                            <p className="text-slate-500">Zero waste. Peak freshness.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                            <Sparkles className="w-6 h-6 text-purple-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900">Identify winning products</h4>
+                                            <p className="text-slate-500">Double down with confidence.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                    <p className="text-lg font-medium text-slate-900 text-center">
+                                        Every decision moves the profit dial forward.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="relative">
+                                {/* Glow Effect */}
+                                <div className="absolute -inset-4 bg-primary/20 blur-3xl rounded-full opacity-50"></div>
+                                <Image
+                                    src="/maximize.png"
+                                    alt="Zeneva Profit Dial Interface"
+                                    width={500}
+                                    height={500}
+                                    className="relative w-full max-w-xl mx-auto h-auto"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="whatsapp-button z-50" aria-label="Contact us on WhatsApp">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
                             <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z" fillRule="evenodd" fill="#ffffff"></path>
                         </svg>
                     </a>
+
+
 
                     <MarketingFooter />
                 </div >
