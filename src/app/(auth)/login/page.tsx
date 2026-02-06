@@ -125,7 +125,7 @@ export default function LoginPage() {
       </div>
        <div className="hidden bg-muted lg:block relative">
         <Image
-          src="https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidXNpbmVzcyUyMG1hbmFnZW1lbnR8ZW58MHx8fHwxNzY4NTkyNzUyfDA&ixlib=rb-4.1.0&q=80&w=1080"
+          src="/unify.png"
           alt="A modern business management software interface on a laptop."
           width="1920"
           height="1080"
