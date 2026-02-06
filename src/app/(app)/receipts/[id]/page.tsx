@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
 import { useParams, notFound } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -20,9 +20,36 @@ export default function ReceiptPage() {
   const receiptId = params.id as string;
   
   const firestore = useFirestore();
-  const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
-  const { data: receipt, isLoading } = useDoc<Receipt>(receiptRef);
+  const [receiptData, setReceiptData] = useState<Receipt | null>(null);
 
+  // Attempt to load optimistic data first
+  useEffect(() => {
+    try {
+      const optimisticData = sessionStorage.getItem(`optimistic-receipt-${receiptId}`);
+      if (optimisticData) {
+        const parsedData = JSON.parse(optimisticData);
+        // Convert ISO string back to Date object for consistency
+        setReceiptData({ ...parsedData, createdAt: new Date(parsedData.createdAt) });
+        // Clean up immediately
+        sessionStorage.removeItem(`optimistic-receipt-${receiptId}`);
+      }
+    } catch (e) {
+      console.error("Could not load optimistic receipt", e);
+    }
+  }, [receiptId]);
+
+  const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
+  const { data: serverReceipt, isLoading: isServerLoading } = useDoc<Receipt>(receiptRef);
+
+  // When server data arrives, it becomes the source of truth
+  useEffect(() => {
+    if (serverReceipt) {
+      setReceiptData(serverReceipt);
+    }
+  }, [serverReceipt]);
+
+  const isLoading = isServerLoading && !receiptData;
+  const receipt = receiptData;
   const business = useBusiness();
   const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
@@ -32,8 +59,13 @@ export default function ReceiptPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Receipt...</span></div>;
   }
   
-  if (!receipt) {
+  // If still no receipt after loading, then it's a true notFound
+  if (!receipt && !isLoading) {
     notFound();
+  }
+  
+  if (!receipt) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Finalizing Receipt...</span></div>;
   }
 
   const handlePrint = () => {

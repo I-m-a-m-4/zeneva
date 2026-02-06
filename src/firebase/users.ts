@@ -40,55 +40,52 @@ export const createUserProfileDocument = async (
     const invitationSnapshot = await getDocs(invitationQuery);
     const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
 
-    await runTransaction(firestore, async (transaction) => {
-      const userDoc = await transaction.get(userDocRef);
-      if (userDoc.exists()) {
-        console.warn(`User profile for ${user.uid} already exists. Aborting document creation.`);
-        if (invitationDoc) {
-          transaction.delete(invitationDoc.ref);
-        }
-        return;
-      }
+    // Use a write batch to perform atomic writes without a pre-read.
+    // This avoids the race condition during signup.
+    const batch = writeBatch(firestore);
       
-      let businessId: string;
-      let userRole: UserRole;
-      let surveyCompleted = true; // Default for invited users
+    let businessId: string;
+    let userRole: UserRole;
+    let surveyCompleted = true; // Default for invited users
 
-      if (invitationDoc) {
-        const invitationData = invitationDoc.data();
-        businessId = invitationData.businessId;
-        userRole = invitationData.role;
-        transaction.delete(invitationDoc.ref);
-      } else {
-        const businessDocRef = doc(collection(firestore, 'businessInstances'));
-        businessId = businessDocRef.id;
-        userRole = 'admin';
-        surveyCompleted = false; // New businesses must go through onboarding
-        const trialEndDate = add(new Date(), { days: 30 });
-        const newBusiness: Omit<BusinessInstance, 'id'> = {
-          name: `${displayName}'s Business`,
-          createdAt: serverTimestamp(),
-          ownerId: user.uid,
-          plan: 'starter',
-          trialExpiresAt: trialEndDate,
-          status: 'active',
-          settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
-        };
-        transaction.set(businessDocRef, newBusiness);
-      }
-
-      const userProfile: Omit<UserProfile, 'id'> = {
-        email: user.email!,
-        name: displayName,
-        phone: phone || '',
+    if (invitationDoc) {
+      const invitationData = invitationDoc.data();
+      businessId = invitationData.businessId;
+      userRole = invitationData.role;
+      batch.delete(invitationDoc.ref); // Delete the invitation
+    } else {
+      // Create a new business for a new user
+      const businessDocRef = doc(collection(firestore, 'businessInstances'));
+      businessId = businessDocRef.id;
+      userRole = 'admin';
+      surveyCompleted = false; // New businesses must go through onboarding
+      const trialEndDate = add(new Date(), { days: 30 });
+      const newBusiness: Omit<BusinessInstance, 'id'> = {
+        name: `${displayName}'s Business`,
         createdAt: serverTimestamp(),
-        businessId: businessId,
-        role: userRole,
-        surveyCompleted: surveyCompleted,
+        ownerId: user.uid,
+        plan: 'starter',
+        trialExpiresAt: trialEndDate,
         status: 'active',
+        settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
       };
-      transaction.set(userDocRef, userProfile);
-    });
+      batch.set(businessDocRef, newBusiness);
+    }
+
+    const userProfile: Omit<UserProfile, 'id'> = {
+      email: user.email!,
+      name: displayName,
+      phone: phone || '',
+      createdAt: serverTimestamp(),
+      businessId: businessId,
+      role: userRole,
+      surveyCompleted: surveyCompleted,
+      status: 'active',
+    };
+    batch.set(userDocRef, userProfile);
+
+    // Commit all writes atomically
+    await batch.commit();
 
   } catch (error) {
     console.error("FATAL: User and Business creation transaction failed.", error);
@@ -97,7 +94,7 @@ export const createUserProfileDocument = async (
 };
 
 /**
- * Polls Firestore until the user's profile document and their associated business document are available.
+ * Polls Firestore until the user's profile document is available.
  * This is used after signup to prevent a race condition where the app
  * tries to read the profile before it has been created.
  */
@@ -110,26 +107,15 @@ export const waitForUserProfile = (firestore: Firestore, userId: string, timeout
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          const userProfile = userDoc.data() as UserProfile;
-          if (userProfile.businessId) {
-            const businessDocRef = doc(firestore, 'businessInstances', userProfile.businessId);
-            const businessDoc = await getDoc(businessDocRef);
-            if (businessDoc.exists()) {
-              // Both user and business docs exist, we can resolve.
-              resolve();
-              return;
-            }
-          }
-        } 
-        
-        if (Date.now() - startTime > timeout) {
-          reject(new Error("Timed out waiting for user and business profile creation."));
+          resolve();
+        } else if (Date.now() - startTime > timeout) {
+          reject(new Error("Timed out waiting for user profile creation."));
         } else {
           setTimeout(check, 300); // Poll every 300ms
         }
-
       } catch (error) {
          console.error("Polling for user profile failed:", error);
+         // Keep polling unless we time out
          if (Date.now() - startTime > timeout) {
            reject(error);
          } else {
