@@ -1,3 +1,4 @@
+
 'use client';
 import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export default function ReceiptPage() {
   }, [receiptId]);
 
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
-  const { data: serverReceipt, isLoading: isServerLoading } = useDoc<Receipt>(receiptRef);
+  const { data: serverReceipt, isLoading: isServerLoading, error } = useDoc<Receipt>(receiptRef);
 
   // When server data arrives, it becomes the source of truth
   useEffect(() => {
@@ -59,9 +60,14 @@ export default function ReceiptPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Receipt...</span></div>;
   }
   
-  // If still no receipt after loading, then it's a true notFound
+  // If still no receipt after loading (and there's an error), it's a true notFound
   if (!receipt && !isLoading) {
-    notFound();
+    if (error) {
+      // The permission error will be caught by Next.js error boundary,
+      // but we can log it here for debugging if needed.
+      console.error("Receipt fetch error:", error);
+    }
+    return notFound();
   }
   
   if (!receipt) {

@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import ReceiptDetails from "@/components/receipts/receipt-details";
@@ -40,6 +41,7 @@ export default function ReviewPage() {
         )
     }
     
+    // Create a temporary receipt object for display before saving
     const displayReceipt = {
         id: 'temp-id',
         businessId: business?.id || 'temp-biz-id',
@@ -57,7 +59,7 @@ export default function ReviewPage() {
         discount,
         total,
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer',
-        createdAt: new Date(),
+        createdAt: new Date(), // Use a real date for optimistic display
     };
 
 
@@ -67,7 +69,6 @@ export default function ReviewPage() {
             return;
         }
 
-        // Pre-flight check for stock against the cached product data
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
             if (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity) {
@@ -78,17 +79,22 @@ export default function ReviewPage() {
         
         setIsCompleting(true);
         
-        // Generate the new receipt reference locally to get the ID
         const newReceiptRef = doc(collection(firestore, 'receipts'));
         
-        // Immediately navigate to the optimistic receipt page and clear the POS state
+        // **OPTIMISTIC UI FIX**: Save a temporary version to sessionStorage
+        // Note: We use a real Date object and convert to ISO string for storage
+        const optimisticReceipt = { ...displayReceipt, id: newReceiptRef.id, createdAt: displayReceipt.createdAt.toISOString() };
+        try {
+            sessionStorage.setItem(`optimistic-receipt-${newReceiptRef.id}`, JSON.stringify(optimisticReceipt));
+        } catch (e) {
+            console.error("Could not save optimistic receipt to session storage", e);
+        }
+
         router.push(`/receipts/${newReceiptRef.id}`);
         resetPOS();
 
-        // Perform all database operations in the background as a fire-and-forget async task
         (async () => {
             try {
-                // Using writeBatch for offline capability
                 const batch = writeBatch(firestore);
 
                 let totalCost = 0;
@@ -96,12 +102,9 @@ export default function ReviewPage() {
                     const product = products.find(p => p.id === cartItem.product.id);
                     const costPrice = product?.costPrice || 0;
                     totalCost += costPrice * cartItem.quantity;
-
-                    // Decrement stock for each product in the batch
                     const productRef = doc(firestore, 'products', cartItem.product.id);
                     const newStock = (product?.stock || 0) - cartItem.quantity;
                     batch.update(productRef, { stock: newStock });
-
                     return { 
                         productId: cartItem.product.id, 
                         name: cartItem.product.name, 
@@ -112,7 +115,6 @@ export default function ReviewPage() {
                 });
                 const profit = total - totalCost;
                 
-                // Update customer loyalty points in the batch
                 if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
                     const customerRef = doc(firestore, 'customers', selectedCustomer.id);
                     const pointsPerUnit = business.settings.pointsPerUnit || 0;
@@ -122,7 +124,6 @@ export default function ReviewPage() {
                     batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
                 }
 
-                // Create the new receipt in the batch
                 const receiptData = {
                     businessId: business.id,
                     receiptNumber: displayReceipt.receiptNumber,
@@ -153,7 +154,6 @@ export default function ReviewPage() {
                     details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
                 });
 
-                // Send email (fire-and-forget) - only if online
                 const canSendEmail = (business.plan === 'business' || business.accessLevel === 'lifetime');
                 if (navigator.onLine && canSendEmail && shouldSendEmail && selectedCustomer?.email) {
                     const items_html = cart.map(item => 
@@ -187,7 +187,7 @@ export default function ReviewPage() {
                 console.error("Background sale completion failed:", error);
                 toast({ variant: 'destructive', title: 'Sale Sync Failed', description: error.message || 'The sale was completed locally but could not be saved to the cloud. It will sync automatically when you are back online.', duration: 8000 });
             }
-        })(); // Immediately invoke the async function
+        })();
     }
     
     const canSendEmail = (business?.plan === 'business' || business?.accessLevel === 'lifetime');
@@ -238,5 +238,3 @@ export default function ReviewPage() {
         </div>
     )
 }
-
-    
