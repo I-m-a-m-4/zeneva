@@ -187,6 +187,29 @@ export default function Home() {
     const form = useRef<HTMLFormElement>(null);
     const [isSending, setIsSending] = useState(false);
 
+
+    // Insight Data
+    const foodInsights = [
+        "This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash.",
+        "Fresh bread moves fast on rainy mornings. Bake 15 extra loaves to meet demand.",
+        "Milk expires in 2 days. Mark down by 20% now to clear stock before loss.",
+        "Lunch rush incoming. Pre-pack 50 sandwiches to reduce wait times.",
+        "Vegetable waste is up 10%. Reduce order quantity for next shipment."
+    ];
+
+    const fashionInsights = [
+        "Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand.",
+        "Summer dresses are trending. Move to front window display to increase foot traffic.",
+        "Red sneakers are low in stock. Reorder now to avoid missing weekend sales.",
+        "Customer X buys formal wear every 3 months. Send personalized offer now.",
+        "Winter coats are moving slow. Bundle with scarves to clear inventory."
+    ];
+
+    const [foodIndex, setFoodIndex] = useState(0);
+    const [fashionIndex, setFashionIndex] = useState(0);
+    const [isFoodPulsing, setIsFoodPulsing] = useState(false);
+    const [isFashionPulsing, setIsFashionPulsing] = useState(false);
+
     // Carousel State
     const [activeSlide, setActiveSlide] = useState(0);
     const slides = [
@@ -197,6 +220,34 @@ export default function Home() {
         { src: "/storelytics.svg", alt: "Storefront Page", label: "Storefront" },
         { src: "/reportlytics.svg", alt: "Reports Page", label: "Advanced Report " }
     ];
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFoodIndex((prev) => (prev + 1) % foodInsights.length);
+        }, 6000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFashionIndex((prev) => (prev + 1) % fashionInsights.length);
+        }, 8000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleFoodClick = () => {
+        setIsFoodPulsing(true);
+        setTimeout(() => setIsFoodPulsing(false), 3000);
+    };
+
+    const handleFashionClick = () => {
+        setIsFashionPulsing(true);
+        setTimeout(() => setIsFashionPulsing(false), 3000);
+    };
+
+
+
+
 
     const handleContactSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -702,31 +753,56 @@ export default function Home() {
                                             {/* Chat Bubbles */}
                                             <div className="space-y-6 w-full max-w-sm relative z-10">
                                                 {/* Bubble 1 */}
-                                                <div className="bg-white p-5 rounded-2xl rounded-tl-sm shadow-xl border border-slate-100 transform hover:scale-[1.02] transition-transform duration-300 relative">
-                                                    <div className="absolute -top-3 -left-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm">
-                                                        <Bot className="w-4 h-4 text-primary" />
+                                                <div
+                                                    onClick={handleFoodClick}
+                                                    className="relative group cursor-pointer transform hover:scale-[1.02] transition-transform duration-300"
+                                                >
+                                                    {/* Icon - Outside Clipping */}
+                                                    <div className="absolute -top-3 -left-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
+                                                        <Bot className="w-4 h-4 text-emerald-600" />
                                                     </div>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Food & Perishables</span>
+
+                                                    {/* Clipped Card Container */}
+                                                    <div className={`relative rounded-2xl rounded-tl-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFoodPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
+
+                                                        {/* Spinning Beam Background */}
+                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,#10b981_360deg)] animate-spin opacity-0 transition-opacity duration-300 ${isFoodPulsing ? 'opacity-100' : ''}`}></div>
+
+                                                        {/* Content */}
+                                                        <div className="relative bg-white p-5 h-full rounded-[inherit]">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Food & Perishables</span>
+                                                            </div>
+                                                            <p className="text-slate-600 text-sm leading-relaxed font-medium min-h-[60px] flex items-center transition-opacity duration-300">
+                                                                “{foodInsights[foodIndex]}”
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
-                                                        “This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash.”
-                                                    </p>
                                                 </div>
 
                                                 {/* Bubble 2 */}
-                                                <div className="bg-white p-5 rounded-2xl rounded-tr-sm shadow-xl border border-slate-100 transform hover:scale-[1.02] transition-transform duration-300 relative ml-6">
-                                                    <div className="absolute -top-3 -right-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm">
-                                                        <Bot className="w-4 h-4 text-primary" />
+                                                <div
+                                                    onClick={handleFashionClick}
+                                                    className="relative group cursor-pointer transform hover:scale-[1.02] transition-transform duration-300 ml-6"
+                                                >
+                                                    <div className="absolute -top-3 -right-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
+                                                        <Bot className="w-4 h-4 text-blue-600" />
                                                     </div>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Fashion & Retail</span>
+
+                                                    <div className={`relative rounded-2xl rounded-tr-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFashionPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
+                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,#3b82f6_360deg)] animate-spin opacity-0 transition-opacity duration-300 ${isFashionPulsing ? 'opacity-100' : ''}`}></div>
+
+                                                        <div className="relative bg-white p-5 h-full rounded-[inherit]">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Fashion & Retail</span>
+                                                            </div>
+                                                            <p className="text-slate-600 text-sm leading-relaxed font-medium min-h-[60px] flex items-center transition-opacity duration-300">
+                                                                “{fashionInsights[fashionIndex]}”
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
-                                                        “Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand.”
-                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
