@@ -40,9 +40,8 @@ export const createUserProfileDocument = async (
     const invitationSnapshot = await getDocs(invitationQuery);
     const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
 
-    // Use a write batch to perform atomic writes.
-    // This is more resilient to race conditions during signup than runTransaction,
-    // as it doesn't require a pre-read of the user document.
+    // Use a write batch to perform atomic writes without a pre-read.
+    // This avoids the race condition during signup.
     const batch = writeBatch(firestore);
       
     let businessId: string;
