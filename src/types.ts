@@ -1,6 +1,5 @@
 
 
-
 export interface Product {
     id: string;
     businessId: string;
@@ -43,6 +42,12 @@ export interface UserProfile {
     lastSeen?: any;
 }
 
+export interface CustomerInsightsOutput {
+  summary: string;
+  productSuggestions: string[];
+  engagementTactics: string[];
+  createdAt?: any;
+}
 
 export interface Customer {
     id: string;
@@ -53,6 +58,7 @@ export interface Customer {
     loyaltyPoints?: number;
     createdAt?: any;
     updatedAt?: any;
+    aiInsights?: CustomerInsightsOutput;
 }
 
 export interface Receipt {

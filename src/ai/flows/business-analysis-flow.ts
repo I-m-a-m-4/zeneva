@@ -61,8 +61,7 @@ Analyze the provided business data (Products, Customers, and historical Sales wi
     *   Provide a clear reason (e.g., "Understocked before weekend rush") and a specific recommendation ("Increasing stock by 30% before Fridays could recover an estimated ₦X monthly.").
 
 5.  **Smart Merchandising (Bundling):**
-    *   Analyze receipts to find products that are frequently purchased together.
-    *   **Also, use your general knowledge of product types to suggest novel pairings** that are not yet in the data but are highly likely to lead to impulse buys (e.g., suggest pairing a new coffee blend with croissants even if they haven't been bought together before).
+    *   Analyze receipts to find products that are frequently purchased together. Use ONLY the product names provided in the 'Products' dataset.
     *   Calculate the correlation percentage if co-purchase data exists.
     *   Example: "Customers who buy 'Coffee' also buy a 'Croissant' 45% of the time. Suggest placing croissants near the coffee machine to boost impulse buys."
 

@@ -1,12 +1,12 @@
+
 'use client';
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
-import { doc, deleteDoc } from 'firebase/firestore';
-import type { Customer, Receipt } from '@/types';
+import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import type { Customer, Receipt, CustomerInsightsOutput } from '@/types';
 import { getCustomerInsights } from '@/ai/flows/customer-insights-flow';
-import type { CustomerInsightsOutput } from '@/ai/flows/customer-insights-types';
 import NProgress from 'nprogress';
 
 import { Button } from '@/components/ui/button';
@@ -39,19 +39,25 @@ export default function CustomerDetailPage() {
     const { firestore, currencySymbol, customers, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile } = usePOS();
     
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
-
     const receipts = React.useMemo(() => {
         if (!allReceipts) return [];
         return allReceipts.filter(r => r.customer?.id === customerId);
     }, [allReceipts, customerId]);
-
-    const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(null);
+    
+    const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(customer?.aiInsights || null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
     const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
 
+    React.useEffect(() => {
+        if (customer?.aiInsights) {
+            setInsights(customer.aiInsights);
+        }
+    }, [customer]);
+
+
     const handleGenerateInsights = async () => {
-        if (!customer || !receipts) return;
+        if (!customer || !receipts || !firestore || !currentUserProfile) return;
         setIsGeneratingInsights(true);
         setInsights(null);
         try {
@@ -62,9 +68,25 @@ export default function CustomerDetailPage() {
                 totalSpent: receipts.reduce((sum, r) => sum + r.total, 0),
                 orderCount: receipts.length,
             });
+            
+            const insightsWithTimestamp = { ...result, createdAt: serverTimestamp() };
+            
+            const customerRef = doc(firestore, 'customers', customerId);
+            await updateDoc(customerRef, { aiInsights: insightsWithTimestamp });
+
+            logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
+                action: 'customer.update',
+                entity: { type: 'Customer', id: customerId, name: customer.name },
+                details: { change: 'Generated AI Insights' }
+            });
+
+            // Optimistically update local state to avoid re-fetch
             setInsights(result);
+            toast({ variant: 'success', title: 'Insights Generated!', description: 'New insights are available for this customer.' });
+
         } catch (error) {
             console.error("Failed to generate insights:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate insights.' });
         } finally {
             setIsGeneratingInsights(false);
         }

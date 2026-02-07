@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -21,11 +22,12 @@ import { useFirestore } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
 import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePOS } from '@/context/pos-context';
+import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
 
 function ReceiptRowSkeleton() {
@@ -122,6 +124,7 @@ export default function ReceiptsPage() {
                 <CardTitle>Transaction History</CardTitle>
                 <CardDescription>A log of all completed sales.</CardDescription>
             </div>
+            <RefreshButton />
         </div>
       </CardHeader>
       <CardContent>
@@ -162,7 +165,7 @@ export default function ReceiptsPage() {
               <TableRow key={receipt.id}>
                 <TableCell className="font-medium">{receipt.id.substring(0,8)}...</TableCell>
                 <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
-                <TableCell>{format(receipt.createdAt.toDate(), 'PP')}</TableCell>
+                <TableCell>{receipt.createdAt.toDate ? format(receipt.createdAt.toDate(), 'PP') : format(new Date(receipt.createdAt), 'PP')}</TableCell>
                 <TableCell>{receipt.paymentMethod}</TableCell>
                 <TableCell className="text-right">{currencySymbol}{receipt.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                 <TableCell className="text-right">

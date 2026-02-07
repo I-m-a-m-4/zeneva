@@ -1,3 +1,4 @@
+
 'use client';
 
 import *as React from 'react';
@@ -9,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award } from 'lucide-react'; 
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeSwitcher } from '@/components/settings/theme-switcher';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
@@ -139,6 +141,10 @@ function SettingsPageContent() {
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
     const [verifiedAccountName, setVerifiedAccountName] = React.useState('');
 
+    // Loyalty state
+    const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
+    const [pointsPerUnit, setPointsPerUnit] = React.useState('1');
+
     const [industry, setIndustry] = React.useState('');
     const [country, setCountry] = React.useState('Nigeria');
     const [state, setState] = React.useState('');
@@ -152,7 +158,7 @@ function SettingsPageContent() {
 
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
-        if (business) {
+        if (business?.settings) {
             setBusinessName(business.name || '');
             setBusinessAddress(business.address || '');
             setBusinessPhone(business.settings?.phone || '');
@@ -164,7 +170,10 @@ function SettingsPageContent() {
             setDefaultTaxRate(String(business.settings?.defaultTaxRate || 0));
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');
-            setVerifiedAccountName(''); // Reset on load
+            setVerifiedAccountName('');
+
+            setLoyaltyEnabled(business.settings.loyaltyProgramEnabled || false);
+            setPointsPerUnit(String(business.settings.pointsPerUnit || 1));
 
             setIndustry(business.settings?.industry || '');
             setCountry(business.settings?.country || 'Nigeria');
@@ -353,6 +362,44 @@ function SettingsPageContent() {
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('profile', { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail })} disabled={isSaving["profile"]}>
                             {isSaving["profile"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Profile
+                        </Button>
+                    </CardFooter>
+                </Card>
+                
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Loyalty Program</CardTitle>
+                        <CardDescription>Reward your returning customers and encourage repeat business.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="loyalty-switch" className="text-base">Enable Loyalty Program</Label>
+                                    <p className="text-sm text-muted-foreground">Allow customers to earn points for their purchases.</p>
+                                </div>
+                                <Switch id="loyalty-switch" checked={loyaltyEnabled} onCheckedChange={setLoyaltyEnabled} />
+                            </div>
+                            {loyaltyEnabled && (
+                                <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t">
+                                    <div>
+                                        <Label htmlFor="points-per-unit">Points per ₦1</Label>
+                                        <Input
+                                            id="points-per-unit"
+                                            type="number"
+                                            value={pointsPerUnit}
+                                            onChange={e => setPointsPerUnit(e.target.value)}
+                                            placeholder="e.g., 0.1 for 1 point per ₦10"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">For 1 point per ₦100, enter 0.01.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <Button type="button" onClick={() => handleSettingsSubmit('loyalty', { 'settings.loyaltyProgramEnabled': loyaltyEnabled, 'settings.pointsPerUnit': parseFloat(pointsPerUnit) || 0 })} disabled={isSaving["loyalty"]}>
+                            {isSaving["loyalty"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Loyalty Settings
                         </Button>
                     </CardFooter>
                 </Card>
