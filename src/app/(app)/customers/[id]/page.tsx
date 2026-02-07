@@ -190,7 +190,8 @@ export default function CustomerDetailPage() {
                             <p className="font-medium">Ready for some AI magic?</p>
                             <p className="text-sm text-muted-foreground mb-4">Analyze this customer's purchase history to get actionable insights.</p>
                             <Button onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
-                                <Sparkles className="mr-2 h-4 w-4" /> Generate Insights
+                                {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Generate Insights
                             </Button>
                         </div>
                     )}

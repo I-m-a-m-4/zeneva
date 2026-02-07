@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award } from "lucide-react";
 import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
@@ -206,7 +206,12 @@ export default function CustomersPage() {
               </TableHead>
               <TableHead>Name</TableHead>
               <TableHead className="hidden sm:table-cell">Phone</TableHead>
-              <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
+              <TableHead className="hidden md:table-cell">
+                <div className="flex items-center gap-1.5">
+                    <Award className="h-4 w-4" />
+                    Loyalty Points
+                </div>
+              </TableHead>
               <TableHead className="text-right">Total Spent</TableHead>
               <TableHead><span className="sr-only">Actions</span></TableHead>
             </TableRow>

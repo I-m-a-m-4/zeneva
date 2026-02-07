@@ -395,7 +395,7 @@ const CustomerSegmentsCard = ({ segments, customers: allCustomers }: { segments:
 const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, currencySymbol, allProducts }: { opportunities: RevenueOpportunity[], merchandising: SmartMerchandising[], slowMoving: SlowMovingInventory[], currencySymbol: string, allProducts: Product[] }) => {
     const allEmpty = !opportunities?.length && !merchandising?.length && !slowMoving?.length;
 
-    const findImage = (name: string) => allProducts.find(p => p.name === name)?.imageUrl;
+    const findProduct = (name: string) => allProducts.find(p => p.name === name);
 
     return (
     <Card>
@@ -416,12 +416,15 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100 text-amber-600 border border-amber-200"><DollarSign /></div><h4 className="font-semibold text-foreground">Revenue Opportunities</h4></div>
                             </AccordionTrigger>
                             <AccordionContent className="p-4 pt-0 space-y-3">
-                                {opportunities.map((opp, i) => (
-                                    <div key={`opp-${i}`} className="p-2 border-b last:border-b-0">
-                                        <p className="text-muted-foreground text-sm">Lost Revenue on <span className="font-semibold text-foreground">{opp.name}</span>: <strong className="text-destructive">{currencySymbol}{opp.lostRevenue.toLocaleString()}</strong> due to {opp.reason}.</p>
-                                        <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {opp.suggestion}</p>
-                                    </div>
-                                ))}
+                                {opportunities.map((opp, i) => {
+                                    const product = findProduct(opp.name);
+                                    return (
+                                        <div key={`opp-${i}`} className="p-2 border-b last:border-b-0">
+                                            <p className="text-muted-foreground text-sm">Lost Revenue on <Link href={`/inventory/${product?.id}`} className="font-semibold text-foreground hover:underline">{opp.name}</Link>: <strong className="text-destructive">{currencySymbol}{opp.lostRevenue.toLocaleString()}</strong> due to {opp.reason}.</p>
+                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {opp.suggestion}</p>
+                                        </div>
+                                    )
+                                })}
                             </AccordionContent>
                         </AccordionItem>
                     )}
@@ -431,18 +434,22 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-sky-100 text-sky-600 border border-sky-200"><ShoppingCart /></div><h4 className="font-semibold text-foreground">Smart Merchandising</h4></div>
                             </AccordionTrigger>
                              <AccordionContent className="p-4 pt-0 space-y-3">
-                                {merchandising.map((merch, i) => (
-                                    <div key={`merch-${i}`} className="flex gap-4 p-2 border-b last:border-b-0">
-                                        <div className="flex gap-1">
-                                            <div className="w-12 h-12 bg-muted rounded-md relative"><Image src={findImage(merch.primaryProductName) || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></div>
-                                            <div className="w-12 h-12 bg-muted rounded-md relative"><Image src={findImage(merch.pairedProductName) || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></div>
+                                {merchandising.map((merch, i) => {
+                                    const product1 = findProduct(merch.primaryProductName);
+                                    const product2 = findProduct(merch.pairedProductName);
+                                    return (
+                                        <div key={`merch-${i}`} className="flex gap-4 p-2 border-b last:border-b-0">
+                                            <div className="flex gap-1">
+                                                <Link href={`/inventory/${product1?.id}`} className="block w-12 h-12 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product1?.imageUrl || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></Link>
+                                                <Link href={`/inventory/${product2?.id}`} className="block w-12 h-12 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product2?.imageUrl || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></Link>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-muted-foreground text-sm">{merch.insight}</p>
+                                                <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
+                                            </div>
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="text-muted-foreground text-sm">{merch.insight}</p>
-                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </AccordionContent>
                         </AccordionItem>
                     )}
@@ -452,12 +459,15 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-100 text-red-600 border border-red-200"><Layers /></div><h4 className="font-semibold text-foreground">Slow-Moving Inventory</h4></div>
                             </AccordionTrigger>
                             <AccordionContent className="p-4 pt-0 space-y-3">
-                                {slowMoving.map((item, i) => (
-                                    <div key={`slow-${i}`} className="p-2 border-b last:border-b-0">
-                                        <p className="text-muted-foreground text-sm"><span className="font-semibold text-foreground">{item.name}</span> has <strong className="text-destructive">{currencySymbol}{item.capitalLocked.toLocaleString()}</strong> in capital locked up and has been unsold for {item.daysUnsold} days.</p>
-                                        <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {item.suggestion} this product to recover capital.</p>
-                                    </div>
-                                ))}
+                                {slowMoving.map((item, i) => {
+                                    const product = findProduct(item.name);
+                                    return (
+                                        <div key={`slow-${i}`} className="p-2 border-b last:border-b-0">
+                                            <p className="text-muted-foreground text-sm"><Link href={`/inventory/${product?.id}`} className="font-semibold text-foreground hover:underline">{item.name}</Link> has <strong className="text-destructive">{currencySymbol}{item.capitalLocked.toLocaleString()}</strong> in capital locked up and has been unsold for {item.daysUnsold} days.</p>
+                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {item.suggestion} this product to recover capital.</p>
+                                        </div>
+                                    )
+                                })}
                             </AccordionContent>
                         </AccordionItem>
                     )}
