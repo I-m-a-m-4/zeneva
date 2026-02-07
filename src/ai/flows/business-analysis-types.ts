@@ -79,7 +79,7 @@ const SlowMovingInventorySchema = z.object({
     name: z.string(),
     daysUnsold: z.number(),
     capitalLocked: z.number(),
-    suggestion: z.enum(['Bundle', 'Discount', 'Promote with fast-seller']).describe("A suggested action to recover capital."),
+    suggestion: z.string().describe("A strategic recommendation to recover capital. e.g., 'Bundle with [Fast-Seller]' or 'Apply a 20% discount.'"),
 });
 
 const BusinessHealthSchema = z.object({
@@ -99,18 +99,30 @@ const CustomerSegmentSchema = z.object({
     customers: z.array(SegmentCustomerSchema).describe("A list of the customers (name and email) in this segment."),
     suggestedCampaign: z.object({
         title: z.string().describe("A catchy email subject line for a marketing campaign targeting this segment."),
-        body: z.string().describe("The full body content of the suggested email campaign. Use placeholders like {{customerName}} if applicable."),
+        body: z.string().describe("The full body content of the suggested email campaign, at least 10 lines long and highly personalized. Use placeholders like {{customerName}} if applicable."),
+        ctaText: z.string().describe("The text for a call-to-action button, e.g., 'Shop Now', 'Claim Your Offer'.")
     }),
 });
 
+const PricingRecommendationSchema = z.object({
+    productId: z.string(),
+    name: z.string(),
+    currentPrice: z.number(),
+    suggestedPrice: z.number(),
+    strategy: z.enum(['Psychological', 'Prestige', 'Penetration', 'Bundle']),
+    reasoning: z.string().describe("A clear explanation of why this pricing strategy is recommended for this specific product."),
+});
+
+
 export const BusinessAnalysisOutputSchema = z.object({
-  smartStockRecommendations: z.array(SmartStockRecommendationSchema).optional().describe("Predictive stock recommendations for key products."),
+  smartStockRecommendations: z.array(SmartStockRecommendationSchema).optional().describe("Predictive stock recommendations for at least 20 key products, if data is available."),
   demandHeatmap: DemandHeatmapSchema.optional().describe("An analysis of when customers are most active."),
   revenueOpportunities: z.array(RevenueOpportunitySchema).optional().describe("Analysis of revenue missed due to stockouts."),
   smartMerchandising: z.array(SmartMerchandisingSchema).optional().describe("Suggestions for bundling products to increase sales."),
-  slowMovingInventory: z.array(SlowMovingInventorySchema).optional().describe("Products that are not selling and are trapping capital."),
+  slowMovingInventory: z.array(SlowMovingInventorySchema).optional().describe("Products that are not selling and are trapping capital, with recovery strategies."),
   businessHealth: BusinessHealthSchema.optional().describe("The overall business health assessment."),
   customerSegments: z.array(CustomerSegmentSchema).optional().describe("Segments of customers grouped by behavior, with targeted campaign suggestions."),
+  pricingRecommendations: z.array(PricingRecommendationSchema).optional().describe("Suggestions for price adjustments to increase sales or perceived value."),
 });
 
 export type BusinessAnalysisOutput = z.infer<typeof BusinessAnalysisOutputSchema>;

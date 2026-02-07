@@ -2,7 +2,7 @@
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment } from "@/types";
+import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { usePOS } from "@/context/pos-context";
@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Label } from "@/components/ui/label";
 
 
 // --- Skeleton Components ---
@@ -184,6 +185,107 @@ function StockRecDetailModal({ recommendation, product, isOpen, onOpenChange }: 
     )
 }
 
+function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, businessPrimaryColor }: { segment: CustomerSegment | null; isOpen: boolean; onOpenChange: (open: boolean) => void; business: BusinessInstance | null; businessPrimaryColor?: string; }) {
+    const { toast } = useToast();
+    if (!segment || !business) return null;
+
+    const customerEmails = (segment.customers || []).map(c => c.email).join(',');
+
+    const handleSendEmail = () => {
+        const subject = encodeURIComponent(segment.suggestedCampaign.title);
+        const body = encodeURIComponent(segment.suggestedCampaign.body.replace(/\{\{customerName\}\}/g, 'Valued Customer'));
+        window.location.href = `mailto:?bcc=${customerEmails}&subject=${subject}&body=${body}`;
+    }
+    
+    const handleCopy = (content: string) => {
+        navigator.clipboard.writeText(content);
+        toast({ title: "Copied to clipboard!" });
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>{segment.segmentName}</DialogTitle>
+                    <DialogDescription>{segment.description}</DialogDescription>
+                </DialogHeader>
+                <div className="grid md:grid-cols-2 gap-6 max-h-[70vh]">
+                    <div className="space-y-4">
+                        <h4 className="font-semibold">Customers in this Segment ({(segment.customers || []).length})</h4>
+                        <ScrollArea className="h-96 border rounded-lg">
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Email</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {(segment.customers || []).map(customer => (
+                                        <TableRow key={customer.email}>
+                                            <TableCell className="font-medium">{customer.name}</TableCell>
+                                            <TableCell className="text-muted-foreground">{customer.email}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
+                    <div className="space-y-4">
+                        <h4 className="font-semibold">Suggested Email Campaign</h4>
+                        <div className="border rounded-lg bg-muted/30 flex flex-col h-full">
+                             <div className="p-4 border-b">
+                                <Label>Subject</Label>
+                                <Input value={segment.suggestedCampaign.title} readOnly />
+                             </div>
+                             <ScrollArea className="flex-1 bg-gray-200 dark:bg-gray-800">
+                                 <div className="p-4 md:p-8">
+                                    <div className="w-full max-w-lg mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+                                        <div className="p-4 flex justify-between items-center" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
+                                            <div className="flex items-center gap-2">
+                                                <img src={business.settings?.logoUrl || AppConfig.logoIconUrl} alt={`${business.name} Logo`} className="h-8 w-8 rounded-md bg-white p-1" />
+                                                <span className="font-bold text-white text-lg">{business.name}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-white/80">Your Reward Points</p>
+                                                <p className="text-sm font-bold text-white">1,250 pts</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-6 text-foreground">
+                                            <h2 className="text-2xl font-bold mb-4">{segment.suggestedCampaign.title}</h2>
+                                            <div 
+                                                className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground" 
+                                                dangerouslySetInnerHTML={{ __html: segment.suggestedCampaign.body.replace(/\n/g, '<br />').replace(/\{\{customerName\}\}/g, 'Valued Customer') }} 
+                                            />
+                                        </div>
+
+                                        <div className="px-6 pb-6">
+                                            <Button className="w-full h-12 text-base" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
+                                                {segment.suggestedCampaign.ctaText || 'Learn More'}
+                                            </Button>
+                                        </div>
+                                        
+                                        <div className="bg-muted p-4 text-center text-xs text-muted-foreground">
+                                            <p>{business.address}</p>
+                                            <p>© {new Date().getFullYear()} {business.name}. All rights reserved.</p>
+                                        </div>
+                                    </div>
+                                 </div>
+                             </ScrollArea>
+                             <div className="flex flex-wrap gap-2 p-4 border-t bg-background rounded-b-lg">
+                                <Button size="sm" variant="default" onClick={handleSendEmail}><Mail className="mr-2 h-4 w-4" /> Send Email</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleCopy(segment.suggestedCampaign.body)}><Copy className="mr-2 h-4 w-4"/> Copy Body</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleCopy(customerEmails)}><Users className="mr-2 h-4 w-4"/> Copy Emails ({(segment.customers || []).length})</Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 // --- New UI Card Components ---
 
 const TopPerformingProductsCard = ({ products, onProductClick, currencySymbol }: { products: TopPerformingProduct[], onProductClick: (product: TopPerformingProduct) => void, currencySymbol: string }) => (
@@ -238,7 +340,7 @@ const SmartStockRecommendationCard = ({ recommendations, allProducts, searchTerm
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Bot /> Smart Stock Recommendation</CardTitle>
-                <CardDescription>Predictive forecast to avoid stockouts. Search for any product to get a recommendation.</CardDescription>
+                <CardDescription>Predictive forecast to avoid stockouts. The AI will recommend at least 20 items if enough data is available.</CardDescription>
                 <div className="relative pt-2">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
                     <Input placeholder="Search for a product..." value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} className="pl-9" />
@@ -292,19 +394,7 @@ const SmartStockRecommendationCard = ({ recommendations, allProducts, searchTerm
     );
 };
 
-const CustomerSegmentsCard = ({ segments, customers: allCustomers }: { segments: CustomerSegment[], customers: Customer[] | null }) => {
-    const { toast } = useToast();
-
-    const handleCopy = (text: string, type: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            toast({ variant: 'success', title: `${type} Copied!`, description: `The ${type.toLowerCase()} has been copied to your clipboard.` });
-        });
-    };
-
-    const getCustomerDetails = (email: string) => {
-        return allCustomers?.find(c => c.email === email);
-    }
-
+const CustomerSegmentsCard = ({ segments, onSegmentClick }: { segments: CustomerSegment[], onSegmentClick: (segment: CustomerSegment) => void }) => {
     if (!segments || segments.length === 0) {
         return (
             <Card>
@@ -335,53 +425,9 @@ const CustomerSegmentsCard = ({ segments, customers: allCustomers }: { segments:
                                     <p className="text-sm text-muted-foreground">{(segment.customers || []).length} Customers</p>
                                 </div>
                             </AccordionTrigger>
-                            <AccordionContent className="space-y-6">
+                            <AccordionContent className="space-y-4">
                                 <p className="text-sm text-muted-foreground">{segment.description}</p>
-                                
-                                {segment.customers && segment.customers.length > 0 && (
-                                    <div className="space-y-2">
-                                        <h4 className="font-semibold text-sm">Customers in this Segment</h4>
-                                        <ScrollArea className="h-48 border rounded-lg">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Name</TableHead>
-                                                        <TableHead>Email</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {(segment.customers || []).map(customer => {
-                                                        const fullCustomer = getCustomerDetails(customer.email);
-                                                        return (
-                                                            <TableRow key={customer.email}>
-                                                                <TableCell className="font-medium">{customer.name}</TableCell>
-                                                                <TableCell className="text-muted-foreground">{customer.email}</TableCell>
-                                                                <TableCell className="text-right">
-                                                                    {fullCustomer && (
-                                                                        <Button asChild variant="ghost" size="sm">
-                                                                            <Link href={`/customers/${fullCustomer.id}`}>View</Link>
-                                                                        </Button>
-                                                                    )}
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        )
-                                                    })}
-                                                </TableBody>
-                                            </Table>
-                                        </ScrollArea>
-                                    </div>
-                                )}
-
-                                <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
-                                    <h4 className="font-semibold">Suggested Email Campaign:</h4>
-                                    <Input value={segment.suggestedCampaign.title} readOnly />
-                                    <Textarea value={segment.suggestedCampaign.body} readOnly className="h-48 font-mono text-xs" />
-                                    <div className="flex flex-wrap gap-2 pt-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleCopy(segment.suggestedCampaign.body, 'Email Body')}><Copy className="mr-2 h-4 w-4" /> Copy Body</Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleCopy((segment.customers || []).map(c => c.email).join(', '), 'Email List')}><Mail className="mr-2 h-4 w-4" /> Copy Emails ({(segment.customers || []).length})</Button>
-                                    </div>
-                                </div>
+                                <Button onClick={() => onSegmentClick(segment)}>View Details & Campaign</Button>
                             </AccordionContent>
                         </AccordionItem>
                     ))}
@@ -392,10 +438,8 @@ const CustomerSegmentsCard = ({ segments, customers: allCustomers }: { segments:
 };
 
 
-const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, currencySymbol, allProducts }: { opportunities: RevenueOpportunity[], merchandising: SmartMerchandising[], slowMoving: SlowMovingInventory[], currencySymbol: string, allProducts: Product[] }) => {
-    const allEmpty = !opportunities?.length && !merchandising?.length && !slowMoving?.length;
-
-    const findProduct = (name: string) => allProducts.find(p => p.name === name);
+const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, pricing, currencySymbol, allProducts }: { opportunities: RevenueOpportunity[], merchandising: SmartMerchandising[], slowMoving: SlowMovingInventory[], pricing: PricingRecommendation[], currencySymbol: string, allProducts: Product[] }) => {
+    const allEmpty = !opportunities?.length && !merchandising?.length && !slowMoving?.length && !pricing?.length;
 
     return (
     <Card>
@@ -409,7 +453,7 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                     <p>No specific strategic recommendations at this time. More data will unlock insights on revenue opportunities, product bundling, and slow-moving stock.</p>
                 </div>
             ) : (
-                <Accordion type="multiple" className="space-y-2">
+                <Accordion type="multiple" className="w-full space-y-2">
                     {opportunities && opportunities.length > 0 && (
                         <AccordionItem value="revenue-opportunities" className="border rounded-lg">
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-amber-600">
@@ -417,10 +461,9 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                             </AccordionTrigger>
                             <AccordionContent className="p-4 pt-0 space-y-3">
                                 {opportunities.map((opp, i) => {
-                                    const product = findProduct(opp.name);
                                     return (
                                         <div key={`opp-${i}`} className="p-2 border-b last:border-b-0">
-                                            <p className="text-muted-foreground text-sm">Lost Revenue on <Link href={`/inventory/${product?.id}`} className="font-semibold text-foreground hover:underline">{opp.name}</Link>: <strong className="text-destructive">{currencySymbol}{opp.lostRevenue.toLocaleString()}</strong> due to {opp.reason}.</p>
+                                            <p className="text-muted-foreground text-sm">Lost Revenue on <Link href={`/inventory/${opp.productId}`} className="font-semibold text-foreground hover:underline">{opp.name}</Link>: <strong className="text-destructive">{currencySymbol}{opp.lostRevenue.toLocaleString()}</strong> due to {opp.reason}.</p>
                                             <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {opp.suggestion}</p>
                                         </div>
                                     )
@@ -433,21 +476,21 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-sky-600">
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-sky-100 text-sky-600 border border-sky-200"><ShoppingCart /></div><h4 className="font-semibold text-foreground">Smart Merchandising</h4></div>
                             </AccordionTrigger>
-                             <AccordionContent className="p-4 pt-0 space-y-3">
+                             <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 gap-4">
                                 {merchandising.map((merch, i) => {
-                                    const product1 = findProduct(merch.primaryProductName);
-                                    const product2 = findProduct(merch.pairedProductName);
+                                    const product1 = allProducts.find(p => p.name === merch.primaryProductName);
+                                    const product2 = allProducts.find(p => p.name === merch.pairedProductName);
                                     return (
-                                        <div key={`merch-${i}`} className="flex gap-4 p-2 border-b last:border-b-0">
-                                            <div className="flex gap-1">
-                                                <Link href={`/inventory/${product1?.id}`} className="block w-12 h-12 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product1?.imageUrl || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></Link>
-                                                <Link href={`/inventory/${product2?.id}`} className="block w-12 h-12 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product2?.imageUrl || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></Link>
+                                        <Card key={`merch-${i}`} className="overflow-hidden hover:shadow-lg transition-shadow">
+                                            <div className="flex gap-2 p-4 bg-muted/30">
+                                                <Link href={`/inventory/${product1?.id}`} className="block w-20 h-20 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product1?.imageUrl || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></Link>
+                                                <Link href={`/inventory/${product2?.id}`} className="block w-20 h-20 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product2?.imageUrl || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></Link>
                                             </div>
-                                            <div className="flex-1">
-                                                <p className="text-muted-foreground text-sm">{merch.insight}</p>
-                                                <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
+                                            <div className="p-4 pt-2">
+                                                <p className="text-muted-foreground text-sm font-medium">{merch.insight}</p>
+                                                <p className="text-sm text-foreground mt-2"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
                                             </div>
-                                        </div>
+                                        </Card>
                                     )
                                 })}
                             </AccordionContent>
@@ -459,15 +502,29 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-100 text-red-600 border border-red-200"><Layers /></div><h4 className="font-semibold text-foreground">Slow-Moving Inventory</h4></div>
                             </AccordionTrigger>
                             <AccordionContent className="p-4 pt-0 space-y-3">
-                                {slowMoving.map((item, i) => {
-                                    const product = findProduct(item.name);
+                                {slowMoving.filter(item => item.capitalLocked > 0).map((item, i) => {
                                     return (
                                         <div key={`slow-${i}`} className="p-2 border-b last:border-b-0">
-                                            <p className="text-muted-foreground text-sm"><Link href={`/inventory/${product?.id}`} className="font-semibold text-foreground hover:underline">{item.name}</Link> has <strong className="text-destructive">{currencySymbol}{item.capitalLocked.toLocaleString()}</strong> in capital locked up and has been unsold for {item.daysUnsold} days.</p>
-                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {item.suggestion} this product to recover capital.</p>
+                                            <p className="text-muted-foreground text-sm"><Link href={`/inventory/${item.productId}`} className="font-semibold text-foreground hover:underline">{item.name}</Link> has <strong className="text-destructive">{currencySymbol}{item.capitalLocked.toLocaleString()}</strong> in capital locked up and has been unsold for {item.daysUnsold} days.</p>
+                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {item.suggestion}</p>
                                         </div>
                                     )
                                 })}
+                            </AccordionContent>
+                        </AccordionItem>
+                    )}
+                    {pricing && pricing.length > 0 && (
+                         <AccordionItem value="pricing-recommendations" className="border rounded-lg">
+                            <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-green-600">
+                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-100 text-green-600 border border-green-200"><DollarSign /></div><h4 className="font-semibold text-foreground">Pricing Strategies</h4></div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 pt-0 space-y-3">
+                                {pricing.map((item, i) => (
+                                    <div key={`price-${i}`} className="p-2 border-b last:border-b-0">
+                                        <p className="text-sm">For <Link href={`/inventory/${item.productId}`} className="font-semibold text-foreground hover:underline">{item.name}</Link>, consider a <strong className="text-primary">{item.strategy}</strong> strategy.</p>
+                                        <p className="text-sm text-muted-foreground mt-1">Change price from <strong>{currencySymbol}{item.currentPrice.toLocaleString()}</strong> to <strong className="text-green-600">{currencySymbol}{item.suggestedPrice.toLocaleString()}</strong>. {item.reasoning}</p>
+                                    </div>
+                                ))}
                             </AccordionContent>
                         </AccordionItem>
                     )}
@@ -486,6 +543,7 @@ function ExecutiveBriefingTab() {
   const [analysis, setAnalysis] = useState<BusinessAnalysisOutput | null>(business?.settings?.businessAnalysis || null);
   const [detailProduct, setDetailProduct] = React.useState<TopPerformingProduct | null>(null);
   const [stockRecProduct, setStockRecProduct] = React.useState<SmartStockRecommendation | null>(null);
+  const [segmentDetail, setSegmentDetail] = React.useState<CustomerSegment | null>(null);
   const firestore = useFirestore();
   const { toast } = useToast();
   const [progress, setProgress] = React.useState(0);
@@ -725,12 +783,13 @@ function ExecutiveBriefingTab() {
                     onRowClick={setStockRecProduct}
                 />
                 
-                <CustomerSegmentsCard segments={displayData.customerSegments || []} customers={customers} />
+                <CustomerSegmentsCard segments={displayData.customerSegments || []} onSegmentClick={setSegmentDetail} />
 
                 <StrategicInsightsAccordion 
                     opportunities={displayData.revenueOpportunities || []} 
                     merchandising={displayData.smartMerchandising || []}
                     slowMoving={displayData.slowMovingInventory || []}
+                    pricing={displayData.pricingRecommendations || []}
                     currencySymbol={currencySymbol}
                     allProducts={products || []}
                 />
@@ -750,6 +809,13 @@ function ExecutiveBriefingTab() {
             product={stockRecProduct ? products?.find(p => p.id === stockRecProduct.productId) || null : null}
             isOpen={!!stockRecProduct}
             onOpenChange={(open) => !open && setStockRecProduct(null)}
+        />
+        <CustomerSegmentDetailModal
+            segment={segmentDetail}
+            isOpen={!!segmentDetail}
+            onOpenChange={(open) => !open && setSegmentDetail(null)}
+            business={business}
+            businessPrimaryColor={business?.settings?.primaryColor}
         />
     </FeatureGate>
   );
