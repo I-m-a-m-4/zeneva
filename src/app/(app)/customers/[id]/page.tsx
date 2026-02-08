@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { Customer, Receipt, CustomerInsightsOutput } from '@/types';
+import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
 import { getCustomerInsights } from '@/ai/flows/customer-insights-flow';
 import NProgress from 'nprogress';
 
@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { logAuditEvent } from '@/lib/audit';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export default function CustomerDetailPage() {
     const params = useParams();
@@ -36,7 +38,7 @@ export default function CustomerDetailPage() {
     const customerId = params.id as string;
     const { toast } = useToast();
 
-    const { firestore, currencySymbol, customers, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
+    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
     
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     const receipts = React.useMemo(() => {
@@ -55,9 +57,52 @@ export default function CustomerDetailPage() {
         }
     }, [customer]);
 
+    const purchaseSummary = React.useMemo(() => {
+        if (!receipts || !allProducts) return [];
+
+        const productMap: Record<string, {
+            product: Product;
+            totalQuantity: number;
+            totalRevenue: number;
+            lastPurchase: Date;
+        }> = {};
+
+        receipts.forEach(receipt => {
+            const purchaseDate = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
+            receipt.items.forEach(item => {
+                const productInfo = allProducts.find(p => p.id === item.productId);
+                if (!productInfo) return;
+
+                if (!productMap[item.productId]) {
+                    productMap[item.productId] = {
+                        product: productInfo,
+                        totalQuantity: 0,
+                        totalRevenue: 0,
+                        lastPurchase: purchaseDate,
+                    };
+                }
+
+                productMap[item.productId].totalQuantity += item.quantity;
+                productMap[item.productId].totalRevenue += item.price * item.quantity;
+                if (purchaseDate > productMap[item.productId].lastPurchase) {
+                    productMap[item.productId].lastPurchase = purchaseDate;
+                }
+            });
+        });
+
+        return Object.values(productMap).sort((a, b) => b.lastPurchase.getTime() - a.lastPurchase.getTime());
+    }, [receipts, allProducts]);
+
 
     const handleGenerateInsights = async () => {
-        if (!customer || !receipts || !firestore || !currentUserProfile) return;
+        if (!customer || !receipts || !firestore || !currentUserProfile) {
+             toast({
+                variant: "destructive",
+                title: "Unable to Generate Insights",
+                description: "Required customer or business data is missing. Please try refreshing the page."
+            });
+            return;
+        }
         setIsGeneratingInsights(true);
         setInsights(null);
         try {
@@ -162,18 +207,39 @@ export default function CustomerDetailPage() {
                 <Card className="md:col-span-2">
                     <CardHeader>
                         <CardTitle>Purchase History</CardTitle>
+                        <CardDescription>Products this customer has purchased, sorted by most recent.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
-                            <TableHeader><TableRow><TableHead>Receipt ID</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Product</TableHead>
+                                    <TableHead className="text-center">Total Quantity</TableHead>
+                                    <TableHead className="text-right">Total Spent</TableHead>
+                                    <TableHead className="text-right">Last Purchased</TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
-                                {receipts && receipts.length > 0 ? receipts.map(r => (
-                                    <TableRow key={r.id}>
-                                        <TableCell className="font-mono text-xs">{r.id.substring(0, 8)}</TableCell>
-                                        <TableCell>{format(r.createdAt.toDate(), 'PP')}</TableCell>
-                                        <TableCell className="text-right">{currencySymbol}{r.total.toLocaleString()}</TableCell>
+                                {purchaseSummary && purchaseSummary.length > 0 ? purchaseSummary.map(summary => (
+                                    <TableRow key={summary.product.id}>
+                                        <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 bg-muted rounded-md relative flex-shrink-0">
+                                                    {summary.product.imageUrl ? (
+                                                        <Image src={summary.product.imageUrl} alt={summary.product.name} fill className="object-cover rounded-md" />
+                                                    ) : <Package className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />}
+                                                </div>
+                                                <div>
+                                                    <Link href={`/inventory/${summary.product.id}`} className="font-medium hover:underline">{summary.product.name}</Link>
+                                                    <div className="text-xs text-muted-foreground">{summary.product.sku}</div>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-center">{summary.totalQuantity}</TableCell>
+                                        <TableCell className="text-right">{currencySymbol}{summary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                        <TableCell className="text-right">{format(summary.lastPurchase, 'PP')}</TableCell>
                                     </TableRow>
-                                )) : <TableRow><TableCell colSpan={3} className="text-center h-24">No purchases yet.</TableCell></TableRow>}
+                                )) : <TableRow><TableCell colSpan={4} className="text-center h-24">No purchases yet.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
