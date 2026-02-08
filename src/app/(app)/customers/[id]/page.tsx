@@ -36,7 +36,7 @@ export default function CustomerDetailPage() {
     const customerId = params.id as string;
     const { toast } = useToast();
 
-    const { firestore, currencySymbol, customers, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile } = usePOS();
+    const { firestore, currencySymbol, customers, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
     
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     const receipts = React.useMemo(() => {
@@ -69,10 +69,10 @@ export default function CustomerDetailPage() {
                 orderCount: receipts.length,
             });
             
-            const insightsWithTimestamp = { ...result, createdAt: serverTimestamp() };
+            const insightsWithTimestamp = { ...result, createdAt: new Date() };
             
             const customerRef = doc(firestore, 'customers', customerId);
-            await updateDoc(customerRef, { aiInsights: insightsWithTimestamp });
+            await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp()} });
 
             logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
                 action: 'customer.update',
@@ -81,7 +81,8 @@ export default function CustomerDetailPage() {
             });
 
             // Optimistically update local state to avoid re-fetch
-            setInsights(result);
+            setInsights(insightsWithTimestamp);
+            triggerRefresh(); // Manually trigger a refresh to get the updated customer data
             toast({ variant: 'success', title: 'Insights Generated!', description: 'New insights are available for this customer.' });
 
         } catch (error) {
@@ -260,6 +261,8 @@ export default function CustomerDetailPage() {
                                         entity: { type: 'Customer', id: customerToDelete.id, name: customerToDelete.name },
                                         details: { customerName: customerToDelete.name, customerEmail: customerToDelete.email }
                                     });
+                                    
+                                    triggerRefresh();
 
                                     toast({
                                         variant: 'success',
