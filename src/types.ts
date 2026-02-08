@@ -1,6 +1,5 @@
 
 
-
 export interface Product {
     id: string;
     businessId: string;
@@ -168,7 +167,26 @@ export interface SlowMovingInventory {
     name: string;
     daysUnsold: number;
     capitalLocked: number;
-    suggestion: 'Bundle' | 'Discount' | 'Promote with fast-seller';
+    suggestion: string;
+}
+
+export interface PricingRecommendation {
+    productId: string;
+    name: string;
+    currentPrice: number;
+    suggestedPrice: number;
+    strategy: 'Psychological' | 'Penetration' | 'Bundle';
+    reasoning: string;
+}
+
+export interface IrresistibleOffer {
+    offerName: string;
+    productIds: string[];
+    productNames: string[];
+    originalTotalPrice: number;
+    suggestedBundlePrice: number;
+    savings: number;
+    marketingPitch: string;
 }
 
 export interface BusinessHealth {
@@ -178,16 +196,17 @@ export interface BusinessHealth {
 }
 
 export interface CustomerSegment {
-  segmentName: string;
-  description: string;
-  customers: {
-      name: string;
-      email: string;
-  }[];
-  suggestedCampaign: {
-    title: string;
-    body: string;
-  };
+    segmentName: string;
+    description: string;
+    customers: {
+        name: string;
+        email: string;
+    }[];
+    suggestedCampaign: {
+        title: string;
+        body: string;
+        ctaText: string;
+    };
 }
 
 
@@ -196,9 +215,11 @@ export interface BusinessAnalysisOutput {
   demandHeatmap?: DemandHeatmap;
   revenueOpportunities?: RevenueOpportunity[];
   smartMerchandising?: SmartMerchandising[];
+  irresistibleOffers?: IrresistibleOffer[];
   slowMovingInventory?: SlowMovingInventory[];
   businessHealth?: BusinessHealth;
   customerSegments?: CustomerSegment[];
+  pricingRecommendations?: PricingRecommendation[];
   createdAt?: any;
 }
 

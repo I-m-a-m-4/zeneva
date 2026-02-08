@@ -2,11 +2,11 @@
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance } from "@/types";
+import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance, IrresistibleOffer } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { usePOS } from "@/context/pos-context";
-import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search } from "lucide-react";
+import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search, ShoppingBasket } from "lucide-react";
 import React, { useState, useTransition, useEffect, useMemo } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
@@ -193,7 +193,7 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
 
     const handleSendEmail = () => {
         const subject = encodeURIComponent(segment.suggestedCampaign.title);
-        const body = encodeURIComponent(segment.suggestedCampaign.body.replace(/\{\{customerName\}\}/g, 'Valued Customer'));
+        const body = encodeURIComponent(segment.suggestedCampaign.body.replace(/\{\{customerName\}\}/g, 'Valued Customer').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'));
         window.location.href = `mailto:?bcc=${customerEmails}&subject=${subject}&body=${body}`;
     }
     
@@ -202,17 +202,23 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
         toast({ title: "Copied to clipboard!" });
     }
 
+    const formattedBody = segment.suggestedCampaign.body
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br />')
+      .replace(/\{\{customerName\}\}/g, 'Valued Customer');
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-5xl flex flex-col h-[90vh]">
                 <DialogHeader>
                     <DialogTitle>{segment.segmentName}</DialogTitle>
                     <DialogDescription>{segment.description}</DialogDescription>
                 </DialogHeader>
-                <div className="grid md:grid-cols-2 gap-6 max-h-[70vh]">
-                    <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-6 flex-1 overflow-hidden">
+                    <div className="space-y-4 flex flex-col">
                         <h4 className="font-semibold">Customers in this Segment ({(segment.customers || []).length})</h4>
-                        <ScrollArea className="h-96 border rounded-lg">
+                        <ScrollArea className="flex-1 border rounded-lg">
                              <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -231,48 +237,50 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
                             </Table>
                         </ScrollArea>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-4 flex flex-col">
                         <h4 className="font-semibold">Suggested Email Campaign</h4>
-                        <div className="border rounded-lg bg-muted/30 flex flex-col h-full">
+                        <div className="border rounded-lg bg-muted/30 flex flex-col flex-1 overflow-hidden">
                              <div className="p-4 border-b">
                                 <Label>Subject</Label>
                                 <Input value={segment.suggestedCampaign.title} readOnly />
                              </div>
-                             <ScrollArea className="flex-1 bg-gray-200 dark:bg-gray-800">
-                                 <div className="p-4 md:p-8">
-                                    <div className="w-full max-w-lg mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
-                                        <div className="p-4 flex justify-between items-center" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
-                                            <div className="flex items-center gap-2">
-                                                <img src={business.settings?.logoUrl || AppConfig.logoIconUrl} alt={`${business.name} Logo`} className="h-8 w-8 rounded-md bg-white p-1" />
-                                                <span className="font-bold text-white text-lg">{business.name}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-xs text-white/80">Your Reward Points</p>
-                                                <p className="text-sm font-bold text-white">1,250 pts</p>
-                                            </div>
-                                        </div>
+                             <div className="flex-1 bg-gray-200 dark:bg-gray-800 p-4 md:p-8 overflow-y-auto">
+                                 <div className="w-full max-w-lg mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-lg flex flex-col h-full">
+                                     <div className="p-4 flex justify-between items-center" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
+                                         <div className="flex items-center gap-2">
+                                             <img src={business.settings?.logoUrl || AppConfig.logoIconUrl} alt={`${business.name} Logo`} className="h-8 w-8 rounded-md bg-white p-1" />
+                                             <span className="font-bold text-white text-lg">{business.name}</span>
+                                         </div>
+                                         <div className="text-right">
+                                             <p className="text-xs text-white/80">Your Reward Points</p>
+                                             <p className="text-sm font-bold text-white">1,250 pts</p>
+                                         </div>
+                                     </div>
 
+                                     <ScrollArea className="flex-1">
                                         <div className="p-6 text-foreground">
                                             <h2 className="text-2xl font-bold mb-4">{segment.suggestedCampaign.title}</h2>
                                             <div 
                                                 className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground" 
-                                                dangerouslySetInnerHTML={{ __html: segment.suggestedCampaign.body.replace(/\n/g, '<br />').replace(/\{\{customerName\}\}/g, 'Valued Customer') }} 
+                                                dangerouslySetInnerHTML={{ __html: formattedBody }} 
                                             />
                                         </div>
+                                     </ScrollArea>
 
-                                        <div className="px-6 pb-6">
-                                            <Button className="w-full h-12 text-base" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
-                                                {segment.suggestedCampaign.ctaText || 'Learn More'}
-                                            </Button>
-                                        </div>
-                                        
-                                        <div className="bg-muted p-4 text-center text-xs text-muted-foreground">
-                                            <p>{business.address}</p>
-                                            <p>© {new Date().getFullYear()} {business.name}. All rights reserved.</p>
-                                        </div>
-                                    </div>
+                                     <div className="px-6 pb-6 mt-auto">
+                                         <Button asChild className="w-full h-12 text-base" style={{ backgroundColor: `hsl(${businessPrimaryColor || '24 9.8% 10%'})` }}>
+                                            <Link href={`/store/${business?.settings?.publicStore?.slug || business.id}`} target="_blank">
+                                                 {segment.suggestedCampaign.ctaText || 'Learn More'}
+                                            </Link>
+                                         </Button>
+                                     </div>
+                                     
+                                     <div className="bg-muted p-4 text-center text-xs text-muted-foreground">
+                                         <p>{business.address}</p>
+                                         <p>© {new Date().getFullYear()} {business.name}. All rights reserved.</p>
+                                     </div>
                                  </div>
-                             </ScrollArea>
+                             </div>
                              <div className="flex flex-wrap gap-2 p-4 border-t bg-background rounded-b-lg">
                                 <Button size="sm" variant="default" onClick={handleSendEmail}><Mail className="mr-2 h-4 w-4" /> Send Email</Button>
                                 <Button size="sm" variant="outline" onClick={() => handleCopy(segment.suggestedCampaign.body)}><Copy className="mr-2 h-4 w-4"/> Copy Body</Button>
@@ -285,6 +293,253 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
         </Dialog>
     )
 }
+
+function MerchandisingDetailModal({
+  recommendation,
+  allProducts,
+  isOpen,
+  onOpenChange,
+}: {
+  recommendation: SmartMerchandising | null;
+  allProducts: Product[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!recommendation) return null;
+
+  const product1 = allProducts.find(
+    (p) => p.name === recommendation.primaryProductName
+  );
+  const product2 = allProducts.find(
+    (p) => p.name === recommendation.pairedProductName
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Smart Merchandising</DialogTitle>
+          <DialogDescription>
+            AI-powered product bundling recommendation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Link href={`/inventory/${product1?.id}`}>
+              <Card className="overflow-hidden hover:border-primary">
+                <div className="aspect-square relative bg-muted">
+                  <Image
+                    src={
+                      product1?.imageUrl ||
+                      `https://picsum.photos/seed/${product1?.id}/300`
+                    }
+                    alt={product1?.name || ""}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <CardContent className="p-3">
+                  <p className="font-semibold text-sm line-clamp-2">
+                    {product1?.name}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+             <Link href={`/inventory/${product2?.id}`}>
+              <Card className="overflow-hidden hover:border-primary">
+                <div className="aspect-square relative bg-muted">
+                  <Image
+                    src={
+                      product2?.imageUrl ||
+                      `https://picsum.photos/seed/${product2?.id}/300`
+                    }
+                    alt={product2?.name || ""}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <CardContent className="p-3">
+                  <p className="font-semibold text-sm line-clamp-2">
+                    {product2?.name}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+          <div>
+            <p className="text-sm font-semibold">AI Insight</p>
+            <p className="text-sm text-muted-foreground italic">
+              "{recommendation.insight}"
+            </p>
+          </div>
+           <div>
+            <p className="text-sm font-semibold">Recommendation</p>
+            <p className="text-sm text-foreground">
+              {recommendation.recommendation}
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OfferDetailModal({ offer, allProducts, isOpen, onOpenChange, currencySymbol }: { offer: IrresistibleOffer | null, allProducts: Product[], isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
+    if (!offer) return null;
+
+    const offerProducts = offer.productIds.map(id => allProducts.find(p => p.id === id)).filter((p): p is Product => !!p);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{offer.offerName}</DialogTitle>
+                    <DialogDescription>AI-generated irresistible offer details.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="p-4 bg-primary/10 rounded-lg">
+                        <p className="text-sm text-primary font-semibold">Marketing Pitch</p>
+                        <p className="text-sm text-primary/90 italic">"{offer.marketingPitch}"</p>
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="font-semibold">Products in this Bundle:</h4>
+                        {offerProducts.map(p => (
+                             <Link key={p.id} href={`/inventory/${p.id}`} className="block group">
+                                <div className="flex items-center gap-4 p-2 border rounded-md hover:bg-muted/50">
+                                    <div className="w-16 h-16 bg-muted rounded-md relative flex-shrink-0">
+                                        <Image src={p.imageUrl || `https://picsum.photos/seed/${p.id}/100`} alt={p.name} fill className="object-cover rounded-md" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-medium group-hover:underline">{p.name}</p>
+                                        <p className="text-sm text-muted-foreground">Original Price: {currencySymbol}{p.price.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                             </Link>
+                        ))}
+                    </div>
+                     <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="p-2 bg-muted/50 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Original Total</p>
+                            <p className="font-bold text-lg line-through">{currencySymbol}{offer.originalTotalPrice.toLocaleString()}</p>
+                        </div>
+                         <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                            <p className="text-xs text-primary/80">Bundle Price</p>
+                            <p className="font-bold text-lg text-primary">{currencySymbol}{offer.suggestedBundlePrice.toLocaleString()}</p>
+                        </div>
+                         <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg border border-green-200 dark:border-green-800">
+                            <p className="text-xs text-green-700 dark:text-green-300">You Save</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-400">{currencySymbol}{offer.savings.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function RevenueOpportunityModal({ opportunity, product, isOpen, onOpenChange, currencySymbol }: { opportunity: RevenueOpportunity | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
+    if (!opportunity || !product) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{opportunity.name}</DialogTitle>
+                     <DialogDescription>AI-powered revenue opportunity.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="aspect-[4/3] bg-muted relative overflow-hidden rounded-lg">
+                        <Image src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300`} alt={product.name} fill className="object-cover" />
+                    </div>
+                     <div className="p-3 bg-destructive/10 rounded-lg text-center border border-destructive/20">
+                        <p className="text-xs text-destructive/80">Estimated Lost Revenue</p>
+                        <p className="text-2xl font-bold text-destructive">{currencySymbol}{opportunity.lostRevenue.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold">Reason</p>
+                        <p className="text-sm text-muted-foreground italic">"{opportunity.reason}"</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold">Suggestion</p>
+                        <p className="text-sm text-foreground bg-muted/50 p-2 rounded-md">{opportunity.suggestion}</p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currencySymbol }: { item: SlowMovingInventory | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
+    if (!item || !product) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{item.name}</DialogTitle>
+                     <DialogDescription>AI-powered capital recovery suggestion.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="aspect-[4/3] bg-muted relative overflow-hidden rounded-lg">
+                        <Image src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300`} alt={product.name} fill className="object-cover" />
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-amber-500/10 rounded-lg text-center border border-amber-500/20">
+                            <p className="text-xs text-amber-600/80">Capital Locked</p>
+                            <p className="text-2xl font-bold text-amber-600">{currencySymbol}{item.capitalLocked.toLocaleString()}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg text-center">
+                            <p className="text-xs text-muted-foreground">Days Unsold</p>
+                            <p className="text-2xl font-bold">{item.daysUnsold}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold">Recovery Suggestion</p>
+                        <p className="text-sm text-foreground bg-muted/50 p-2 rounded-md" dangerouslySetInnerHTML={{ __html: item.suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}/>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, currencySymbol }: { recommendation: PricingRecommendation | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
+    if (!recommendation || !product) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{recommendation.name}</DialogTitle>
+                     <DialogDescription>AI-powered pricing strategy recommendation.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="aspect-[4/3] bg-muted relative overflow-hidden rounded-lg">
+                        <Image src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300`} alt={product.name} fill className="object-cover" />
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg text-center">
+                        <p className="text-sm">Change from <s className="text-muted-foreground">{currencySymbol}{recommendation.currentPrice.toLocaleString()}</s> to</p>
+                        <p className="text-3xl font-bold text-green-600">{currencySymbol}{recommendation.suggestedPrice.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold">Strategy: <strong className="text-primary">{recommendation.strategy}</strong></p>
+                        <p className="text-sm text-muted-foreground italic mt-2">"{recommendation.reasoning}"</p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 // --- New UI Card Components ---
 
@@ -438,8 +693,8 @@ const CustomerSegmentsCard = ({ segments, onSegmentClick }: { segments: Customer
 };
 
 
-const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, pricing, currencySymbol, allProducts }: { opportunities: RevenueOpportunity[], merchandising: SmartMerchandising[], slowMoving: SlowMovingInventory[], pricing: PricingRecommendation[], currencySymbol: string, allProducts: Product[] }) => {
-    const allEmpty = !opportunities?.length && !merchandising?.length && !slowMoving?.length && !pricing?.length;
+const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, pricing, offers, currencySymbol, allProducts, onMerchClick, onRevenueOppClick, onSlowMovingClick, onPricingClick, onOfferClick }: { opportunities: RevenueOpportunity[], merchandising: SmartMerchandising[], slowMoving: SlowMovingInventory[], pricing: PricingRecommendation[], offers: IrresistibleOffer[], currencySymbol: string, allProducts: Product[], onMerchClick: (merch: SmartMerchandising) => void, onRevenueOppClick: (opp: RevenueOpportunity) => void, onSlowMovingClick: (item: SlowMovingInventory) => void, onPricingClick: (item: PricingRecommendation) => void, onOfferClick: (offer: IrresistibleOffer) => void }) => {
+    const allEmpty = !opportunities?.length && !merchandising?.length && !slowMoving?.length && !pricing?.length && !offers?.length;
 
     return (
     <Card>
@@ -454,18 +709,69 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                 </div>
             ) : (
                 <Accordion type="multiple" className="w-full space-y-2">
+                    {offers && offers.length > 0 && (
+                        <AccordionItem value="irresistible-offers" className="border rounded-lg">
+                            <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-green-600">
+                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-100 text-green-600 border border-green-200"><ShoppingBasket /></div><h4 className="font-semibold text-foreground">Irresistible Offers</h4></div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                               {offers.map((offer, i) => {
+                                   const offerProducts = offer.productIds.slice(0, 4).map(id => allProducts.find(p => p.id === id)).filter((p): p is Product => !!p);
+                                   return (
+                                        <button key={`offer-${i}`} className="block group text-left w-full" onClick={() => onOfferClick(offer)}>
+                                            <Card className="flex flex-col h-full hover:shadow-lg transition-shadow">
+                                                <CardHeader className="p-3">
+                                                    <CardTitle className="text-base font-semibold">{offer.offerName}</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="p-3 pt-0 flex-grow">
+                                                     <div className="relative h-24 mb-2">
+                                                        {offerProducts.map((p, idx) => (
+                                                            <div key={p.id} className="absolute w-16 h-16 bg-white border rounded-full shadow-md" style={{ zIndex: idx, left: `${idx * 25}%`, top: '50%', transform: 'translateY(-50%)' }}>
+                                                                <Image src={p.imageUrl || `https://picsum.photos/seed/${p.id}/80`} alt={p.name} fill className="object-cover rounded-full" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground italic mt-4">"{offer.marketingPitch}"</p>
+                                                </CardContent>
+                                                <CardFooter className="p-3 pt-0 flex justify-end items-baseline gap-2">
+                                                    <span className="text-sm text-muted-foreground line-through">{currencySymbol}{offer.originalTotalPrice.toLocaleString()}</span>
+                                                    <span className="text-lg font-bold text-primary">{currencySymbol}{offer.suggestedBundlePrice.toLocaleString()}</span>
+                                                </CardFooter>
+                                            </Card>
+                                        </button>
+                                   )
+                               })}
+                            </AccordionContent>
+                        </AccordionItem>
+                    )}
                     {opportunities && opportunities.length > 0 && (
                         <AccordionItem value="revenue-opportunities" className="border rounded-lg">
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-amber-600">
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100 text-amber-600 border border-amber-200"><DollarSign /></div><h4 className="font-semibold text-foreground">Revenue Opportunities</h4></div>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 pt-0 space-y-3">
+                            <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {opportunities.map((opp, i) => {
+                                    const product = allProducts.find(p => p.id === opp.productId);
                                     return (
-                                        <div key={`opp-${i}`} className="p-2 border-b last:border-b-0">
-                                            <p className="text-muted-foreground text-sm">Lost Revenue on <Link href={`/inventory/${opp.productId}`} className="font-semibold text-foreground hover:underline">{opp.name}</Link>: <strong className="text-destructive">{currencySymbol}{opp.lostRevenue.toLocaleString()}</strong> due to {opp.reason}.</p>
-                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {opp.suggestion}</p>
-                                        </div>
+                                        <button key={`opp-${i}`} className="block group text-left w-full" onClick={() => onRevenueOppClick(opp)}>
+                                            <Card className="flex flex-col h-full hover:shadow-lg transition-shadow">
+                                                 <CardHeader className="p-3">
+                                                     <div className="flex items-center gap-3">
+                                                        <div className="w-16 h-16 bg-muted rounded-md relative flex-shrink-0">
+                                                            {product?.imageUrl && <Image src={product.imageUrl} alt={opp.name} fill className="object-cover rounded-md" />}
+                                                        </div>
+                                                         <CardTitle className="text-sm font-medium">{opp.name}</CardTitle>
+                                                     </div>
+                                                 </CardHeader>
+                                                 <CardContent className="p-3 pt-0 flex-grow">
+                                                    <p className="text-destructive text-sm font-semibold">Lost Revenue: {currencySymbol}{opp.lostRevenue.toLocaleString()}</p>
+                                                    <p className="text-xs text-muted-foreground">Reason: {opp.reason}</p>
+                                                 </CardContent>
+                                                 <CardFooter className="p-3 pt-0">
+                                                    <p className="text-xs bg-muted/50 p-2 rounded-md"><strong className="text-primary">Suggestion:</strong> {opp.suggestion}</p>
+                                                 </CardFooter>
+                                            </Card>
+                                        </button>
                                     )
                                 })}
                             </AccordionContent>
@@ -476,21 +782,25 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-sky-600">
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-sky-100 text-sky-600 border border-sky-200"><ShoppingCart /></div><h4 className="font-semibold text-foreground">Smart Merchandising</h4></div>
                             </AccordionTrigger>
-                             <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 gap-4">
+                             <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {merchandising.map((merch, i) => {
                                     const product1 = allProducts.find(p => p.name === merch.primaryProductName);
                                     const product2 = allProducts.find(p => p.name === merch.pairedProductName);
                                     return (
-                                        <Card key={`merch-${i}`} className="overflow-hidden hover:shadow-lg transition-shadow">
-                                            <div className="flex gap-2 p-4 bg-muted/30">
-                                                <Link href={`/inventory/${product1?.id}`} className="block w-20 h-20 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product1?.imageUrl || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></Link>
-                                                <Link href={`/inventory/${product2?.id}`} className="block w-20 h-20 bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product2?.imageUrl || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></Link>
-                                            </div>
-                                            <div className="p-4 pt-2">
-                                                <p className="text-muted-foreground text-sm font-medium">{merch.insight}</p>
-                                                <p className="text-sm text-foreground mt-2"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
-                                            </div>
-                                        </Card>
+                                        <button key={`merch-${i}`} className="block group text-left" onClick={() => onMerchClick(merch)}>
+                                            <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
+                                                <div className="flex gap-2 p-4 bg-muted/30">
+                                                    <div className="block w-full aspect-square bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product1?.imageUrl || `https://picsum.photos/seed/${merch.primaryProductName}/100`} alt={merch.primaryProductName} fill className="object-cover rounded-md" /></div>
+                                                    <div className="block w-full aspect-square bg-muted rounded-md relative hover:scale-105 transition-transform"><Image src={product2?.imageUrl || `https://picsum.photos/seed/${merch.pairedProductName}/100`} alt={merch.pairedProductName} fill className="object-cover rounded-md" /></div>
+                                                </div>
+                                                <div className="p-4 pt-2 flex-grow">
+                                                    <p className="text-muted-foreground text-sm font-medium">{merch.insight}</p>
+                                                </div>
+                                                <CardFooter className="p-4 pt-0">
+                                                    <p className="text-sm text-foreground"><strong className="text-primary">Suggestion:</strong> {merch.recommendation}</p>
+                                                </CardFooter>
+                                            </Card>
+                                        </button>
                                     )
                                 })}
                             </AccordionContent>
@@ -501,13 +811,29 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-red-600">
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-100 text-red-600 border border-red-200"><Layers /></div><h4 className="font-semibold text-foreground">Slow-Moving Inventory</h4></div>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 pt-0 space-y-3">
+                           <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {slowMoving.filter(item => item.capitalLocked > 0).map((item, i) => {
+                                    const product = allProducts.find(p => p.id === item.productId);
                                     return (
-                                        <div key={`slow-${i}`} className="p-2 border-b last:border-b-0">
-                                            <p className="text-muted-foreground text-sm"><Link href={`/inventory/${item.productId}`} className="font-semibold text-foreground hover:underline">{item.name}</Link> has <strong className="text-destructive">{currencySymbol}{item.capitalLocked.toLocaleString()}</strong> in capital locked up and has been unsold for {item.daysUnsold} days.</p>
-                                            <p className="text-sm text-foreground mt-1"><strong className="text-primary">Suggestion:</strong> {item.suggestion}</p>
-                                        </div>
+                                        <button key={`slow-${i}`} className="block group text-left w-full" onClick={() => onSlowMovingClick(item)}>
+                                            <Card className="flex flex-col h-full hover:shadow-lg transition-shadow">
+                                                <CardHeader className="p-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-16 h-16 bg-muted rounded-md relative flex-shrink-0">
+                                                            {product?.imageUrl && <Image src={product.imageUrl} alt={item.name} fill className="object-cover rounded-md" />}
+                                                        </div>
+                                                         <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="p-3 pt-0 flex-grow">
+                                                    <p className="text-destructive text-sm font-semibold">Capital Locked: {currencySymbol}{item.capitalLocked.toLocaleString()}</p>
+                                                    <p className="text-xs text-muted-foreground">Unsold for {item.daysUnsold} days</p>
+                                                </CardContent>
+                                                <CardFooter className="p-3 pt-0">
+                                                    <p className="text-xs bg-muted/50 p-2 rounded-md"><strong className="text-primary">Suggestion:</strong> <span dangerouslySetInnerHTML={{ __html: item.suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /></p>
+                                                 </CardFooter>
+                                            </Card>
+                                        </button>
                                     )
                                 })}
                             </AccordionContent>
@@ -518,13 +844,31 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                             <AccordionTrigger className="p-4 text-left hover:no-underline [&>svg]:text-green-600">
                                 <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-100 text-green-600 border border-green-200"><DollarSign /></div><h4 className="font-semibold text-foreground">Pricing Strategies</h4></div>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 pt-0 space-y-3">
-                                {pricing.map((item, i) => (
-                                    <div key={`price-${i}`} className="p-2 border-b last:border-b-0">
-                                        <p className="text-sm">For <Link href={`/inventory/${item.productId}`} className="font-semibold text-foreground hover:underline">{item.name}</Link>, consider a <strong className="text-primary">{item.strategy}</strong> strategy.</p>
-                                        <p className="text-sm text-muted-foreground mt-1">Change price from <strong>{currencySymbol}{item.currentPrice.toLocaleString()}</strong> to <strong className="text-green-600">{currencySymbol}{item.suggestedPrice.toLocaleString()}</strong>. {item.reasoning}</p>
-                                    </div>
-                                ))}
+                           <AccordionContent className="p-4 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {pricing.map((item, i) => {
+                                     const product = allProducts.find(p => p.id === item.productId);
+                                     return (
+                                        <button key={`price-${i}`} className="block group text-left w-full" onClick={() => onPricingClick(item)}>
+                                            <Card className="flex flex-col h-full hover:shadow-lg transition-shadow">
+                                                <CardHeader className="p-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-16 h-16 bg-muted rounded-md relative flex-shrink-0">
+                                                            {product?.imageUrl && <Image src={product.imageUrl} alt={item.name} fill className="object-cover rounded-md" />}
+                                                        </div>
+                                                         <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="p-3 pt-0 flex-grow space-y-2">
+                                                    <p className="text-sm font-semibold">Strategy: <strong className="text-primary">{item.strategy}</strong></p>
+                                                     <p className="text-sm">
+                                                        Change price from <s className="text-muted-foreground">{currencySymbol}{item.currentPrice.toLocaleString()}</s> to <strong className="text-green-600">{currencySymbol}{item.suggestedPrice.toLocaleString()}</strong>
+                                                     </p>
+                                                     <p className="text-xs text-muted-foreground italic">"{item.reasoning}"</p>
+                                                </CardContent>
+                                            </Card>
+                                        </button>
+                                     )
+                                })}
                             </AccordionContent>
                         </AccordionItem>
                     )}
@@ -544,6 +888,11 @@ function ExecutiveBriefingTab() {
   const [detailProduct, setDetailProduct] = React.useState<TopPerformingProduct | null>(null);
   const [stockRecProduct, setStockRecProduct] = React.useState<SmartStockRecommendation | null>(null);
   const [segmentDetail, setSegmentDetail] = React.useState<CustomerSegment | null>(null);
+  const [merchDetail, setMerchDetail] = React.useState<SmartMerchandising | null>(null);
+  const [revenueOppDetail, setRevenueOppDetail] = React.useState<RevenueOpportunity | null>(null);
+  const [slowMovingDetail, setSlowMovingDetail] = React.useState<SlowMovingInventory | null>(null);
+  const [pricingDetail, setPricingDetail] = React.useState<PricingRecommendation | null>(null);
+  const [offerDetail, setOfferDetail] = React.useState<IrresistibleOffer | null>(null);
   const firestore = useFirestore();
   const { toast } = useToast();
   const [progress, setProgress] = React.useState(0);
@@ -596,7 +945,7 @@ function ExecutiveBriefingTab() {
     const productSales: Record<string, { name: string; revenue: number; unitsSold: number; salesTimestamps: Date[] }> = {};
 
     recentSales.forEach(sale => {
-        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
+        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(s.createdAt);
 
         sale.items.forEach(item => {
             if (!productSales[item.productId]) {
@@ -790,8 +1139,14 @@ function ExecutiveBriefingTab() {
                     merchandising={displayData.smartMerchandising || []}
                     slowMoving={displayData.slowMovingInventory || []}
                     pricing={displayData.pricingRecommendations || []}
+                    offers={displayData.irresistibleOffers || []}
                     currencySymbol={currencySymbol}
                     allProducts={products || []}
+                    onMerchClick={setMerchDetail}
+                    onRevenueOppClick={setRevenueOppDetail}
+                    onSlowMovingClick={setSlowMovingDetail}
+                    onPricingClick={setPricingDetail}
+                    onOfferClick={setOfferDetail}
                 />
             </div>
         )}
@@ -816,6 +1171,40 @@ function ExecutiveBriefingTab() {
             onOpenChange={(open) => !open && setSegmentDetail(null)}
             business={business}
             businessPrimaryColor={business?.settings?.primaryColor}
+        />
+        <MerchandisingDetailModal
+            recommendation={merchDetail}
+            allProducts={products || []}
+            isOpen={!!merchDetail}
+            onOpenChange={(open) => !open && setMerchDetail(null)}
+        />
+        <RevenueOpportunityModal
+            opportunity={revenueOppDetail}
+            product={revenueOppDetail ? products?.find(p => p.id === revenueOppDetail.productId) || null : null}
+            isOpen={!!revenueOppDetail}
+            onOpenChange={(open) => !open && setRevenueOppDetail(null)}
+            currencySymbol={currencySymbol}
+        />
+        <SlowMovingInventoryModal
+            item={slowMovingDetail}
+            product={slowMovingDetail ? products?.find(p => p.id === slowMovingDetail.productId) || null : null}
+            isOpen={!!slowMovingDetail}
+            onOpenChange={(open) => !open && setSlowMovingDetail(null)}
+            currencySymbol={currencySymbol}
+        />
+        <PricingStrategyModal
+            recommendation={pricingDetail}
+            product={pricingDetail ? products?.find(p => p.id === pricingDetail.productId) || null : null}
+            isOpen={!!pricingDetail}
+            onOpenChange={(open) => !open && setPricingDetail(null)}
+            currencySymbol={currencySymbol}
+        />
+        <OfferDetailModal
+            offer={offerDetail}
+            allProducts={products || []}
+            isOpen={!!offerDetail}
+            onOpenChange={(open) => !open && setOfferDetail(null)}
+            currencySymbol={currencySymbol}
         />
     </FeatureGate>
   );

@@ -74,6 +74,17 @@ const SmartMerchandisingSchema = z.object({
     recommendation: z.string().describe("A suggestion to boost sales, e.g., 'Place coffee near the donut display.'"),
 });
 
+const IrresistibleOfferSchema = z.object({
+  offerName: z.string().describe("A catchy, marketable name for the bundle offer, e.g., 'Ultimate Hydration Kit'."),
+  productIds: z.array(z.string()).describe("An array of the product IDs included in this bundle."),
+  productNames: z.array(z.string()).describe("An array of the product names included in this bundle, matching the order of productIds."),
+  originalTotalPrice: z.number().describe("The total price if all items were bought separately."),
+  suggestedBundlePrice: z.number().describe("The AI-recommended discounted price for the bundle."),
+  savings: z.number().describe("The amount the customer saves with this bundle (originalTotalPrice - suggestedBundlePrice)."),
+  marketingPitch: z.string().describe("A short, compelling marketing pitch (2-3 sentences) explaining the value of the bundle to the customer."),
+});
+
+
 const SlowMovingInventorySchema = z.object({
     productId: z.string(),
     name: z.string(),
@@ -99,7 +110,7 @@ const CustomerSegmentSchema = z.object({
     customers: z.array(SegmentCustomerSchema).describe("A list of the customers (name and email) in this segment."),
     suggestedCampaign: z.object({
         title: z.string().describe("A catchy email subject line for a marketing campaign targeting this segment."),
-        body: z.string().describe("The full body content of the suggested email campaign, at least 10 lines long and highly personalized. Use placeholders like {{customerName}} if applicable."),
+        body: z.string().describe("The full body content of the suggested email campaign, at least 10 lines long and highly personalized. Use **Markdown for emphasis** (e.g., `**15% off**`) and include a compelling offer. Use placeholders like {{customerName}} if applicable."),
         ctaText: z.string().describe("The text for a call-to-action button, e.g., 'Shop Now', 'Claim Your Offer'.")
     }),
 });
@@ -109,7 +120,7 @@ const PricingRecommendationSchema = z.object({
     name: z.string(),
     currentPrice: z.number(),
     suggestedPrice: z.number(),
-    strategy: z.enum(['Psychological', 'Prestige', 'Penetration', 'Bundle']),
+    strategy: z.enum(['Psychological', 'Penetration', 'Bundle']),
     reasoning: z.string().describe("A clear explanation of why this pricing strategy is recommended for this specific product."),
 });
 
@@ -119,6 +130,7 @@ export const BusinessAnalysisOutputSchema = z.object({
   demandHeatmap: DemandHeatmapSchema.optional().describe("An analysis of when customers are most active."),
   revenueOpportunities: z.array(RevenueOpportunitySchema).optional().describe("Analysis of revenue missed due to stockouts."),
   smartMerchandising: z.array(SmartMerchandisingSchema).optional().describe("Suggestions for bundling products to increase sales."),
+  irresistibleOffers: z.array(IrresistibleOfferSchema).optional().describe("Creates specific, priced bundle deals with a marketing pitch to attract customers."),
   slowMovingInventory: z.array(SlowMovingInventorySchema).optional().describe("Products that are not selling and are trapping capital, with recovery strategies."),
   businessHealth: BusinessHealthSchema.optional().describe("The overall business health assessment."),
   customerSegments: z.array(CustomerSegmentSchema).optional().describe("Segments of customers grouped by behavior, with targeted campaign suggestions."),

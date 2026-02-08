@@ -57,21 +57,30 @@ Analyze the provided business data to generate a structured JSON object strictly
 4.  **Slow-Moving Inventory Recovery (Capital Recovery):**
     *   Identify products that haven't sold in a significant time (e.g., 60-90 days).
     *   Calculate the total capital locked in this dead stock (quantity * cost price).
-    *   Suggest a concrete recovery strategy. **Prioritize bundling with a fast-selling, complementary product.** Also consider targeted discounts or promotions.
+    *   Suggest a concrete recovery strategy. **Prioritize bundling with a fast-selling, complementary product.** Also consider targeted discounts or promotions. **Use Markdown for emphasis**, e.g., 'Apply a **25% flash sale**'.
     *   Example Recommendation: "Bundle 'Slow-Moving Item X' with the popular 'Fast-Seller Y' as a free gift to clear stock and attract customers."
 
-5.  **Pricing Strategy Recommendations (NEW):**
-    *   Analyze products and suggest specific pricing strategies to increase purchase likelihood or profit.
+5.  **Pricing Strategy Recommendations:**
+    *   Analyze products and suggest specific pricing strategies to increase purchase likelihood or profit. Focus only on 'Psychological' and 'Penetration' pricing. Do NOT suggest 'Prestige' pricing.
     *   **Psychological Pricing:** Suggest changing a price from a round number to one ending in .99 (e.g., from ₦20,000 to ₦19,999). Explain the psychological effect.
-    *   **Prestige Pricing:** For luxury or high-quality items, recommend maintaining a high price point to reinforce perceived value.
     *   **Penetration Pricing:** For new products, suggest a lower introductory price to gain market share, with a plan to increase it later.
 
 6.  **Customer Segments & Personalized Campaigns:**
     *   Analyze customer purchase histories to group them into 1-3 distinct segments (e.g., 'High-Value Frequent Shoppers', 'Occasional Skincare Explorers').
     *   For each segment, provide a ready-to-use marketing email campaign in the \`suggestedCampaign\` field.
-    *   **The email body MUST be detailed, personalized, and at least 10 lines long.** It should feel like it was written by a human marketing expert, using a friendly and engaging tone. Use placeholders like {{customerName}}.
+    *   **The email body MUST be detailed, personalized, and at least 10 lines long.** It should feel like it was written by a human marketing expert.
+    *   **Use Markdown for emphasis on key phrases**, such as \`**15% off**\` or \`*exclusive access*\`. Strategically use emojis like ✨, 🎁, or 🎉 to make it more engaging.
     *   **IMPORTANT:** The email MUST include a compelling offer (e.g., a discount code, free gift, early access to a sale).
     *   **You MUST also provide a short, punchy text for a call-to-action button** in the \`ctaText\` field (e.g., "Shop Now", "Claim Your Offer").
+
+7.  **Irresistible Offers (Bundles with Pricing):**
+    *   This is different from Smart Merchandising. Your goal here is to create a complete, priced *offer*.
+    *   Identify 2-4 complementary products that create a high-value routine or solution (e.g., 'Cleanser + Toner + Moisturizer').
+    *   Give the bundle a catchy \`offerName\` (e.g., "The Glow-Up Kit").
+    *   Calculate the \`originalTotalPrice\` if bought separately.
+    *   Calculate a \`suggestedBundlePrice\` that offers a compelling discount (e.g., 10-15% off).
+    *   Calculate the exact \`savings\` for the customer.
+    *   Write a short, powerful \`marketingPitch\` that sells the benefit of the bundle.
 
 Your entire response MUST be a single, valid JSON object that strictly follows the output schema. Be thorough and strategic.
 `,
