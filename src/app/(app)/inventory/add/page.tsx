@@ -44,9 +44,9 @@ import { format } from 'date-fns';
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
     description: z.string().optional(),
-    price: z.coerce.number().min(0, "Price must be a positive number."),
-    costPrice: z.coerce.number().min(0, "Cost price must be a positive number.").optional(),
-    stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+    price: z.coerce.number().min(0.01, "Price is required and must be greater than 0."),
+    costPrice: z.coerce.number().optional(),
+    stock: z.coerce.number().int("Stock must be a whole number.").optional(),
     sku: z.string().optional(),
     category: z.string().optional(),
     expiryDate: z.date().optional(),
@@ -76,11 +76,12 @@ export default function AddProductPage() {
         defaultValues: {
             name: "",
             description: "",
-            price: 0,
-            costPrice: 0,
-            stock: 0,
+            price: undefined,
+            costPrice: undefined,
+            stock: undefined,
             sku: "",
             category: "",
+            expiryDate: undefined,
         },
     });
 
@@ -159,13 +160,21 @@ export default function AddProductPage() {
                 imageUrl = result.data.url;
             }
 
-            const productsCollection = collection(firestore, 'products');
-            const newDocRef = await addDoc(productsCollection, {
+            const dataToSave = {
                 ...values,
                 businessId: userProfile.businessId,
                 imageUrl: imageUrl,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
+            };
+
+            // This one-liner will create a new object without any keys that have an `undefined` value.
+            const cleanDataForFirestore = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
+
+            const productsCollection = collection(firestore, 'products');
+            const newDocRef = await addDoc(productsCollection, {
+                ...cleanDataForFirestore,
+                stock: cleanDataForFirestore.stock ?? 0, // Ensure stock is at least 0
             });
 
             // Log audit event (fire-and-forget)
@@ -180,7 +189,7 @@ export default function AddProductPage() {
 
         } catch (error: any) {
             console.error("Failed to save product:", error);
-            toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'An unexpected error occurred.' });
+            toast({ variant: 'destructive', title: 'Save Failed', description: "Could not save the product. Please check the details and try again." });
         } finally {
             setIsSaving(false);
         }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import *as React from 'react';
@@ -139,7 +138,7 @@ function SettingsPageContent() {
     const [defaultTaxRate, setDefaultTaxRate] = React.useState('0');
     const [paymentBankCode, setPaymentBankCode] = React.useState('');
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
-    const [verifiedAccountName, setVerifiedAccountName] = React.useState('');
+    const [paymentAccountName, setPaymentAccountName] = React.useState('');
 
     // Loyalty state
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
@@ -170,7 +169,7 @@ function SettingsPageContent() {
             setDefaultTaxRate(String(business.settings?.defaultTaxRate || 0));
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');
-            setVerifiedAccountName('');
+            setPaymentAccountName(business.settings?.paymentAccountName || '');
 
             setLoyaltyEnabled(business.settings.loyaltyProgramEnabled || false);
             setPointsPerUnit(String(business.settings.pointsPerUnit || 1));
@@ -185,7 +184,7 @@ function SettingsPageContent() {
     }, [business]);
 
     React.useEffect(() => {
-        setVerifiedAccountName('');
+        setPaymentAccountName('');
     }, [paymentBankAccountId, paymentBankCode]);
 
 
@@ -209,7 +208,7 @@ function SettingsPageContent() {
             return;
         }
         setIsVerifying(true);
-        setVerifiedAccountName('');
+        setPaymentAccountName('');
         try {
             const response = await fetch('/api/paystack/resolve-account', {
                 method: 'POST',
@@ -223,7 +222,7 @@ function SettingsPageContent() {
                 throw new Error(result.message || 'Could not verify account.');
             }
 
-            setVerifiedAccountName(result.data.account_name);
+            setPaymentAccountName(result.data.account_name);
             toast({
                 variant: 'success',
                 title: 'Account Verified',
@@ -461,12 +460,12 @@ function SettingsPageContent() {
                                     </div>
                                     <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Verify Account</Button>
                                 </div>
-                                {verifiedAccountName && <div><Label>Account Name</Label><Input value={verifiedAccountName} readOnly className="bg-muted"/></div>}
+                                {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted"/></div>}
                             </div>
                          </div>
                     </CardContent>
                     <CardFooter>
-                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId })} disabled={isSaving["financials"]}>
+                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
                         </Button>
                     </CardFooter>

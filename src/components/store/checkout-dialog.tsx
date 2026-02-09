@@ -16,6 +16,7 @@ import { sendReceiptEmail } from '@/lib/email';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
 import { useStore } from '@/context/store-context';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
@@ -201,69 +202,73 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg flex flex-col h-full max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Complete Your Order</DialogTitle>
           <DialogDescription>Provide your details for fulfillment and payment.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} required /></div>
-                <div><Label htmlFor="email">Email Address</Label><Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-            </div>
-             <div><Label htmlFor="phone">Phone Number</Label><Input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
-             <div><Label htmlFor="address">Delivery Address</Label><Textarea id="address" value={address} onChange={e => setAddress(e.target.value)} required /></div>
-             {shippingOptions.length > 0 && (
-                <div>
-                    <Label>Shipping Method</Label>
-                    <Select onValueChange={setSelectedShipping} value={selectedShipping}>
-                        <SelectTrigger><SelectValue placeholder="Select a shipping option..." /></SelectTrigger>
-                        <SelectContent>
-                            {shippingOptions.map(opt => (
-                                <SelectItem key={opt.name} value={opt.name}>
-                                    <div className="flex flex-col text-left">
-                                        <div className="flex justify-between w-full">
-                                            <span>{opt.name}{opt.type === 'pickup' ? ' (Pickup)' : ''}</span>
-                                            <span className="font-semibold ml-4">₦{opt.price.toLocaleString()}</span>
-                                        </div>
-                                        {opt.type === 'pickup' && opt.location && (
-                                            <p className="text-xs text-muted-foreground">{opt.location}</p>
-                                        )}
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+        <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} required /></div>
+                    <div><Label htmlFor="email">Email Address</Label><Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
                 </div>
-             )}
+                <div><Label htmlFor="phone">Phone Number</Label><Input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
+                <div><Label htmlFor="address">Delivery Address</Label><Textarea id="address" value={address} onChange={e => setAddress(e.target.value)} required /></div>
+                {shippingOptions.length > 0 && (
+                    <div>
+                        <Label>Shipping Method</Label>
+                        <Select onValueChange={setSelectedShipping} value={selectedShipping}>
+                            <SelectTrigger><SelectValue placeholder="Select a shipping option..." /></SelectTrigger>
+                            <SelectContent>
+                                {shippingOptions.map(opt => (
+                                    <SelectItem key={opt.name} value={opt.name}>
+                                        <div className="flex flex-col text-left">
+                                            <div className="flex justify-between w-full">
+                                                <span>{opt.name}{opt.type === 'pickup' ? ' (Pickup)' : ''}</span>
+                                                <span className="font-semibold ml-4">₦{opt.price.toLocaleString()}</span>
+                                            </div>
+                                            {opt.type === 'pickup' && opt.location && (
+                                                <p className="text-xs text-muted-foreground">{opt.location}</p>
+                                            )}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+        </ScrollArea>
+        <div className="mt-auto pt-4 space-y-4">
+            <Separator />
+            <div className="text-sm space-y-2">
+                <div className="flex justify-between"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span>Shipping</span><span>₦{shippingCost.toLocaleString()}</span></div>
+                <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
+            </div>
+            
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold mb-2">Payment Instructions</h4>
+                {hasPaystack && <p className="text-sm text-muted-foreground">You can pay securely with your card.</p>}
+                {hasBankDetails && (
+                    <>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            {hasPaystack ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."}
+                        </p>
+                        <p className="text-sm font-medium mt-1">Bank: {business.settings.paymentBankName}</p>
+                        <p className="text-sm font-medium">Account: {business.settings.paymentBankAccountId}</p>
+                    </>
+                )}
+            </div>
+            <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    {hasPaystack ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
+                </Button>
+            </DialogFooter>
         </div>
-        <Separator />
-        <div className="text-sm space-y-2">
-            <div className="flex justify-between"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
-            <div className="flex justify-between"><span>Shipping</span><span>₦{shippingCost.toLocaleString()}</span></div>
-            <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
-        </div>
-        
-        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-            <h4 className="font-semibold mb-2">Payment Instructions</h4>
-            {hasPaystack && <p className="text-sm text-muted-foreground">You can pay securely with your card.</p>}
-            {hasBankDetails && (
-                 <>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        {hasPaystack ? "Alternatively, you can make a direct bank transfer." : "Please make a direct bank transfer to the account below."}
-                    </p>
-                    <p className="text-sm font-medium mt-1">Bank: {business.settings.paymentBankName}</p>
-                    <p className="text-sm font-medium">Account: {business.settings.paymentBankAccountId}</p>
-                </>
-            )}
-        </div>
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                {hasPaystack ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
-            </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -245,6 +245,7 @@ export interface BusinessInstance {
         logoUrl?: string;
         paymentBankAccountId?: string;
         paymentBankName?: string;
+        paymentAccountName?: string;
         paymentBankCode?: string;
         paymentInstructions?: string;
         paystackSubaccount?: string;
