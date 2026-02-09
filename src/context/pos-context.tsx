@@ -76,7 +76,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isConfettiActive, setIsConfettiActive] = useState(false);
 
   // --- Centralized Data Fetching ---
-  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore, refreshKey]);
+  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const isProfileReady = !!(user && currentUserProfile && user.uid === currentUserProfile.id);
@@ -436,4 +436,5 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
     'USD': '$',
 };
 
+    
     
