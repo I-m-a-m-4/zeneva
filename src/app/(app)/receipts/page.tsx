@@ -44,7 +44,7 @@ function ReceiptRowSkeleton() {
 }
 
 export default function ReceiptsPage() {
-  const { receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol } = usePOS();
+  const { receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol, triggerRefresh } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -106,6 +106,7 @@ export default function ReceiptsPage() {
         });
 
         toast({ title: 'Sale Voided', description: `Receipt ${receiptToDelete.id.substring(0,8)} has been voided and stock levels restored.`, variant: 'success' });
+        triggerRefresh();
     } catch (e: any) {
         console.error("Failed to void sale:", e);
         toast({ title: 'Error', description: e.message || 'Could not void the sale.', variant: 'destructive' });

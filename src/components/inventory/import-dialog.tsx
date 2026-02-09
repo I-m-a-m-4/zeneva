@@ -52,7 +52,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
   const { toast } = useToast();
   const firestore = useFirestore();
   const business = useBusiness();
-  const { triggerConfetti } = usePOS();
+  const { triggerConfetti, triggerRefresh } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedProduct[]>([]);
@@ -211,6 +211,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         description: `${parsedData.length} products have been added to your inventory.`,
       });
       onSuccess();
+      triggerRefresh();
     } catch (e) {
       console.error("Import failed:", e);
       toast({

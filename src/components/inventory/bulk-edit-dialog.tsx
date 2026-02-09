@@ -21,7 +21,7 @@ interface BulkEditDialogProps {
 }
 
 export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuccess }: BulkEditDialogProps) {
-  const { products, currentUserProfile, currencySymbol } = usePOS();
+  const { products, currentUserProfile, currencySymbol, triggerRefresh } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -85,6 +85,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
       });
       onSuccess();
       onOpenChange(false);
+      triggerRefresh();
     } catch (error) {
       toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not save changes.' });
     } finally {

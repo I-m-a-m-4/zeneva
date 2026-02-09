@@ -63,7 +63,7 @@ function CustomerRowSkeleton() {
 }
 
 export default function CustomersPage() {
-  const { customers, receipts, isLoading, business, currentUserProfile: currentUser } = usePOS();
+  const { customers, receipts, isLoading, business, currentUserProfile: currentUser, triggerRefresh } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -134,6 +134,7 @@ export default function CustomersPage() {
       await batch.commit();
       toast({ variant: 'success', title: 'Customers Deleted', description: `${selectedCustomerIds.length} customers have been removed.` });
       setSelectedCustomerIds([]);
+      triggerRefresh();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete customers.' });
     }

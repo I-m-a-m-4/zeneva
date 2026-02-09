@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,6 +14,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { Product, UserProfile } from '@/types';
+import { usePOS } from '@/context/pos-context';
 
 interface QuickEditDialogProps {
   product: Product | null;
@@ -32,6 +34,7 @@ type QuickEditFormValues = z.infer<typeof quickEditSchema>;
 export default function QuickEditDialog({ product, userProfile, isOpen, onOpenChange }: QuickEditDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { triggerRefresh } = usePOS();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
@@ -81,6 +84,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
             description: `${product.name} has been updated.`,
         });
         onOpenChange(false);
+        triggerRefresh();
     } catch (error) {
         toast({
             variant: 'destructive',

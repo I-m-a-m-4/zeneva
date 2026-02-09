@@ -107,7 +107,7 @@ export default function InventoryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { products: allProducts, isLoading, business, currencySymbol, currentUserProfile } = usePOS();
+  const { products: allProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh } = usePOS();
   
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -217,6 +217,7 @@ export default function InventoryPage() {
       await batch.commit();
       toast({ variant: 'success', title: 'Products Deleted', description: `${selectedProductIds.length} products have been removed.` });
       setSelectedProductIds([]);
+      triggerRefresh();
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete products.' });
     }

@@ -129,6 +129,7 @@ function UsersPageSkeleton() {
 function UserManagementDashboard({ businessId, currentUserId, inviterName }: { businessId: string, currentUserId: string, inviterName: string }) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { triggerRefresh } = usePOS();
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
   const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
@@ -161,6 +162,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     try {
         await deleteDoc(invitationRef);
         toast({ title: 'Invitation Revoked', description: `The invitation for ${invitationToRevoke.email} has been revoked.`, variant: 'success' });
+        triggerRefresh();
     } catch (e) {
         toast({ title: 'Error', description: 'Could not revoke invitation.', variant: 'destructive' });
     } finally {
@@ -177,6 +179,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     try {
         await updateDoc(userRef, { status: newStatus });
         toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
+        triggerRefresh();
     } catch(e: any) {
         toast({ title: 'Error', description: e.message || 'Could not update user status.', variant: 'destructive' });
     } finally {
