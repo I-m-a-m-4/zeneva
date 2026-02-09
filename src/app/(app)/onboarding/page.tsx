@@ -38,10 +38,10 @@ const onboardingSchema = z.object({
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 const industries = [
-    'Retail & E-commerce', 'Fashion & Apparel', 'Electronics', 'Food & Beverage', 'Health & Beauty', 'Home & Furniture', 'Other'
+  'Retail & E-commerce', 'Fashion & Apparel', 'Electronics', 'Food & Beverage', 'Health & Beauty', 'Home & Furniture', 'Other'
 ];
 const months = [
-    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
+  'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 const steps = [
@@ -52,52 +52,52 @@ const steps = [
 ];
 
 const OnboardingStepper = ({ currentStep }: { currentStep: number }) => (
-    <nav aria-label="Progress" className="w-full max-w-lg mx-auto">
-      <ol role="list" className="flex items-center">
-        {steps.map((step, stepIdx) => (
-          <li key={step.name} className={cn("relative", stepIdx !== steps.length - 1 ? "flex-1" : "")}>
-            {stepIdx < currentStep - 1 ? (
-              <>
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div className="h-0.5 w-full bg-primary" />
-                </div>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all duration-300">
-                  <step.icon className="h-5 w-5" />
-                </div>
-              </>
-            ) : stepIdx === currentStep - 1 ? (
-              <>
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div className="h-px w-full border-t-2 border-dashed border-border" />
-                </div>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-background ring-4 ring-primary/20 transition-all duration-300">
-                  <step.icon className="h-5 w-5 text-primary" />
-                </div>
-                <p className="absolute -bottom-7 text-xs text-primary font-semibold left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
-              </>
-            ) : (
-              <>
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div className="h-px w-full border-t-2 border-dashed border-border" />
-                </div>
-                <div className="group relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-border bg-background transition-all duration-300">
-                  <step.icon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="absolute -bottom-7 text-xs text-muted-foreground left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
-              </>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
+  <nav aria-label="Progress" className="w-full max-w-lg mx-auto">
+    <ol role="list" className="flex items-center">
+      {steps.map((step, stepIdx) => (
+        <li key={step.name} className={cn("relative", stepIdx !== steps.length - 1 ? "flex-1" : "")}>
+          {stepIdx < currentStep - 1 ? (
+            <>
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="h-0.5 w-full bg-primary" />
+              </div>
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all duration-300">
+                <step.icon className="h-5 w-5" />
+              </div>
+            </>
+          ) : stepIdx === currentStep - 1 ? (
+            <>
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="h-px w-full border-t-2 border-dashed border-border" />
+              </div>
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-background ring-4 ring-primary/20 transition-all duration-300">
+                <step.icon className="h-5 w-5 text-primary" />
+              </div>
+              <p className="absolute -bottom-7 text-xs text-primary font-semibold left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="h-px w-full border-t-2 border-dashed border-border" />
+              </div>
+              <div className="group relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-border bg-background transition-all duration-300">
+                <step.icon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="absolute -bottom-7 text-xs text-muted-foreground left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
+            </>
+          )}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const firestore = useFirestore();
   const { business, currentUserProfile, triggerRefresh } = usePOS();
-  
+
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -145,6 +145,9 @@ export default function OnboardingPage() {
 
       triggerRefresh();
 
+      // Wait for the context to refresh and pick up the 'surveyCompleted' change
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       router.push('/dashboard');
     } catch (error) {
@@ -174,10 +177,10 @@ export default function OnboardingPage() {
     <div className="onboarding-bg flex flex-col items-center justify-center min-h-screen p-4 sm:p-6">
       <div className="w-full max-w-3xl space-y-12">
         <div className="text-center">
-            <h1 className="text-3xl font-bold text-center mb-2">Welcome, {currentUserProfile.name}!</h1>
-            <p className="text-muted-foreground text-center">Let's set up your organization profile.</p>
+          <h1 className="text-3xl font-bold text-center mb-2">Welcome, {currentUserProfile.name}!</h1>
+          <p className="text-muted-foreground text-center">Let's set up your organization profile.</p>
         </div>
-        
+
         <OnboardingStepper currentStep={step} />
 
         <Card className="shadow-xl shadow-slate-200/50">
@@ -185,105 +188,105 @@ export default function OnboardingPage() {
             <form onSubmit={form.handleSubmit(onSubmit)}>
               {step === 1 && (
                 <CardContent className="pt-6 space-y-6">
-                    <CardTitle className="flex items-center gap-3"><Building className="text-primary"/> Organizational Details</CardTitle>
-                    <FormField control={form.control} name="organizationName" render={({ field }) => (
-                        <FormItem><FormLabel>Organization Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                     <FormField control={form.control} name="industry" render={({ field }) => (
-                        <FormItem><FormLabel>Industry</FormLabel>
+                  <CardTitle className="flex items-center gap-3"><Building className="text-primary" /> Organizational Details</CardTitle>
+                  <FormField control={form.control} name="organizationName" render={({ field }) => (
+                    <FormItem><FormLabel>Organization Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="industry" render={({ field }) => (
+                    <FormItem><FormLabel>Industry</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select an industry" /></SelectTrigger></FormControl>
+                        <SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                      </Select><FormMessage /></FormItem>
+                  )} />
+                </CardContent>
+              )}
+              {step === 2 && (
+                <CardContent className="pt-6 space-y-6">
+                  <CardTitle className="flex items-center gap-3"><MapPin className="text-primary" /> Organization Location</CardTitle>
+                  <FormField control={form.control} name="address" render={({ field }) => (
+                    <FormItem><FormLabel>Organization Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="state" render={({ field }) => (
+                      <FormItem><FormLabel>State/Province</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="country" render={({ field }) => (
+                      <FormItem><FormLabel>Country</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select an industry" /></SelectTrigger></FormControl>
-                            <SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem><SelectItem value="Ghana">Ghana</SelectItem><SelectItem value="Kenya">Kenya</SelectItem><SelectItem value="United States">United States</SelectItem><SelectItem value="United Kingdom">United Kingdom</SelectItem></SelectContent>
                         </Select><FormMessage /></FormItem>
-                    )}/>
+                    )} />
+                  </div>
                 </CardContent>
               )}
-               {step === 2 && (
+              {step === 3 && (
                 <CardContent className="pt-6 space-y-6">
-                    <CardTitle className="flex items-center gap-3"><MapPin className="text-primary"/> Organization Location</CardTitle>
-                     <FormField control={form.control} name="address" render={({ field }) => (
-                        <FormItem><FormLabel>Organization Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name="state" render={({ field }) => (
-                            <FormItem><FormLabel>State/Province</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={form.control} name="country" render={({ field }) => (
-                            <FormItem><FormLabel>Country</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem><SelectItem value="Ghana">Ghana</SelectItem><SelectItem value="Kenya">Kenya</SelectItem><SelectItem value="United States">United States</SelectItem><SelectItem value="United Kingdom">United Kingdom</SelectItem></SelectContent>
-                            </Select><FormMessage /></FormItem>
-                        )}/>
-                    </div>
-                </CardContent>
-              )}
-               {step === 3 && (
-                <CardContent className="pt-6 space-y-6">
-                    <CardTitle className="flex items-center gap-3"><Globe className="text-primary"/> Regional Settings</CardTitle>
-                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <FormField control={form.control} name="currency" render={({ field }) => (
-                            <FormItem><FormLabel>Currency</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent>
-                            </Select><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={form.control} name="language" render={({ field }) => (
-                            <FormItem><FormLabel>Language</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent><SelectItem value="English">English</SelectItem></SelectContent>
-                            </Select><FormMessage /></FormItem>
-                        )}/>
-                         <FormField control={form.control} name="timezone" render={({ field }) => (
-                            <FormItem><FormLabel>Time Zone</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent><SelectItem value="Africa/Lagos">(GMT+1) West Africa Time</SelectItem><SelectItem value="America/New_York">(GMT-4) Eastern Time</SelectItem></SelectContent>
-                            </Select><FormMessage /></FormItem>
-                        )}/>
-                    </div>
-                     <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg">
-                        <strong>Note:</strong> The language you select will be the default for email templates and other customizations.
-                    </div>
-                </CardContent>
-              )}
-               {step === 4 && (
-                <CardContent className="pt-6 space-y-6">
-                    <CardTitle className="flex items-center gap-3"><Landmark className="text-primary"/> Financial Year</CardTitle>
-                     <FormField control={form.control} name="inventoryStartDate" render={({ field }) => (
-                        <FormItem className="flex flex-col"><FormLabel>Inventory Start Date</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <FormControl>
-                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                                </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
-                            </PopoverContent>
-                        </Popover><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={form.control} name="fiscalYearStart" render={({ field }) => (
-                        <FormItem><FormLabel>Fiscal Year Starts In</FormLabel>
+                  <CardTitle className="flex items-center gap-3"><Globe className="text-primary" /> Regional Settings</CardTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField control={form.control} name="currency" render={({ field }) => (
+                      <FormItem><FormLabel>Currency</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent>
                         </Select><FormMessage /></FormItem>
-                    )}/>
+                    )} />
+                    <FormField control={form.control} name="language" render={({ field }) => (
+                      <FormItem><FormLabel>Language</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent><SelectItem value="English">English</SelectItem></SelectContent>
+                        </Select><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="timezone" render={({ field }) => (
+                      <FormItem><FormLabel>Time Zone</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent><SelectItem value="Africa/Lagos">(GMT+1) West Africa Time</SelectItem><SelectItem value="America/New_York">(GMT-4) Eastern Time</SelectItem></SelectContent>
+                        </Select><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                    <strong>Note:</strong> The language you select will be the default for email templates and other customizations.
+                  </div>
+                </CardContent>
+              )}
+              {step === 4 && (
+                <CardContent className="pt-6 space-y-6">
+                  <CardTitle className="flex items-center gap-3"><Landmark className="text-primary" /> Financial Year</CardTitle>
+                  <FormField control={form.control} name="inventoryStartDate" render={({ field }) => (
+                    <FormItem className="flex flex-col"><FormLabel>Inventory Start Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                        </PopoverContent>
+                      </Popover><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="fiscalYearStart" render={({ field }) => (
+                    <FormItem><FormLabel>Fiscal Year Starts In</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                      </Select><FormMessage /></FormItem>
+                  )} />
                 </CardContent>
               )}
               <CardContent className="flex justify-between mt-6">
-                {step > 1 ? (<Button type="button" variant="outline" onClick={handlePrevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>) : (<div />) }
+                {step > 1 ? (<Button type="button" variant="outline" onClick={handlePrevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>) : (<div />)}
                 {step < steps.length ? (<Button type="button" onClick={handleNextStep}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>) : (
-                <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Finish Setup
-                </Button>)}
+                  </Button>)}
               </CardContent>
             </form>
           </Form>
