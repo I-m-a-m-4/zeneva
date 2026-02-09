@@ -7,14 +7,6 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
 import { POSProvider } from '@/context/pos-context';
-import { Inter, Plus_Jakarta_Sans, Bricolage_Grotesque, DM_Sans, Instrument_Serif } from 'next/font/google';
-import { ConsoleBanner } from '@/components/console-banner';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' });
-const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage' });
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
-const instrumentSerif = Instrument_Serif({ weight: "400", subsets: ['latin'], variable: '--font-instrument' });
 
 const siteUrl = 'https://zeneva.vercel.app';
 
@@ -46,6 +38,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -54,27 +47,23 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <meta name="google-site-verification" content="WGdoPB1C5sq9ITs96lwQAtR1DRpLwcKfDCN9-taB9e8" />
+        <link rel="icon" href="data:image/svg+xml,%3csvg width='400' height='400' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3e%3crect x='10' y='10' width='180' height='180' rx='24' ry='24' fill='%23F97316' /%3e%3cg transform='translate(-30, -30) scale(1.3)'%3e%3cpath d='M 100 55 A 35 35 0 1 0 100 125 A 35 35 0 1 0 100 55 Z M 100 63 A 27 27 0 1 1 100 117 A 27 27 0 1 1 100 63 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='6' /%3e%3cpath d='M 60 127 Q 100 154 140 127 Q 100 142 60 127 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='6' /%3e%3c/g%3e%3c/svg%3e" type="image/svg+xml" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className={cn(
-        "min-h-screen bg-background font-sans antialiased",
-        inter.variable,
-        plusJakarta.variable,
-        bricolage.variable,
-        dmSans.variable,
-        instrumentSerif.variable
-      )}>
+      <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
           <POSProvider>
-            <ConsoleBanner />
             <Loader />
             <Suspense>
               <NavigationEvents />
             </Suspense>
             {children}
-            <Toaster />
           </POSProvider>
         </FirebaseClientProvider>
+        <Toaster />
       </body>
     </html>
   );

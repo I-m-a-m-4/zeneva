@@ -100,7 +100,6 @@ export default function OnboardingPage() {
 
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isSuccess, setIsSuccess] = React.useState(false);
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
@@ -146,9 +145,6 @@ export default function OnboardingPage() {
 
       triggerRefresh();
 
-      // Set success state to hide the form
-      setIsSuccess(true);
-
       // Wait for the context to refresh and pick up the 'surveyCompleted' change
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -158,7 +154,6 @@ export default function OnboardingPage() {
       console.error('Onboarding submission error:', error);
       toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not save your preferences.' });
       setIsSubmitting(false);
-      setIsSuccess(false);
     }
   };
 
@@ -176,16 +171,6 @@ export default function OnboardingPage() {
 
   if (!business || !currentUserProfile) {
     return <div className="flex justify-center items-center h-screen bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-  }
-
-  if (isSuccess) {
-    return (
-      <div className="flex flex-col justify-center items-center h-screen bg-background gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <h2 className="text-xl font-semibold">Finishing up...</h2>
-        <p className="text-muted-foreground">Setting up your dashboard.</p>
-      </div>
-    );
   }
 
   return (
