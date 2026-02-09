@@ -26,8 +26,8 @@ interface POSContextType {
   onlineOrders: OnlineOrder[] | null;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
-  isUserLoading: boolean; 
-  user: any; 
+  isUserLoading: boolean;
+  user: any;
 
   // POS State
   cart: CartItem[];
@@ -55,7 +55,7 @@ interface POSContextType {
   isConfettiActive: boolean;
   triggerConfetti: () => void;
   setIsConfettiActive: (active: boolean) => void;
-  
+
   // Offline Queue State
   queuedActions: QueuedAction[];
   isQueueProcessing: boolean;
@@ -76,11 +76,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isConfettiActive, setIsConfettiActive] = useState(false);
 
   // --- Centralized Data Fetching ---
-  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore]);
+  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const isProfileReady = !!(user && currentUserProfile && user.uid === currentUserProfile.id);
-  
+
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
@@ -97,9 +97,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
-  
+
   const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders;
-  
+
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
   }, []);
@@ -129,120 +129,120 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const processQueue = useCallback(async () => {
     if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !currentUserProfile) {
-        return;
+      return;
     }
-    
+
     const pendingActions = queuedActions.filter(a => a.status === 'pending');
     if (pendingActions.length === 0) {
-        return;
+      return;
     }
 
     setIsQueueProcessing(true);
     toast({ title: "Syncing...", description: `Processing ${pendingActions.length} queued action(s).` });
 
     const results = await Promise.allSettled(pendingActions.map(async (action) => {
-        try {
-            const batch = writeBatch(firestore);
-            switch (action.type) {
-                case 'add-customer': {
-                    const customersRef = collection(firestore, 'customers');
-                    const newCustomerRef = doc(customersRef);
-                    batch.set(newCustomerRef, { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-                    await logAuditEvent(firestore, businessId, currentUserProfile, {
-                      action: 'customer.create',
-                      entity: { type: 'Customer', id: newCustomerRef.id, name: action.payload.name },
-                      details: { source: 'offline-queue' }
-                    });
-                    break;
-                }
-                case 'update-product': {
-                    const productRef = doc(firestore, 'products', action.payload.productId);
-                    batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
-                    await logAuditEvent(firestore, businessId, currentUserProfile, {
-                      action: 'product.update',
-                      entity: { type: 'Product', id: action.payload.productId },
-                      details: { changes: Object.keys(action.payload.values), source: 'offline-queue' }
-                    });
-                    break;
-                }
-                case 'bulk-update-products': {
-                    action.payload.productIds.forEach((id: string) => {
-                        const productRef = doc(firestore, 'products', id);
-                        batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
-                    });
-                     await logAuditEvent(firestore, businessId, currentUserProfile, {
-                      action: 'product.update',
-                      entity: { type: 'Product', id: 'multiple' },
-                      details: { count: action.payload.productIds.length, changes: Object.keys(action.payload.values), source: 'offline-queue-bulk' }
-                    });
-                    break;
-                }
-                case 'complete-sale': {
-                    const { receiptData, productUpdates } = action.payload;
-                    const newReceiptRef = doc(collection(firestore, 'receipts'));
-                    batch.set(newReceiptRef, { ...receiptData, createdAt: serverTimestamp() });
+      try {
+        const batch = writeBatch(firestore);
+        switch (action.type) {
+          case 'add-customer': {
+            const customersRef = collection(firestore, 'customers');
+            const newCustomerRef = doc(customersRef);
+            batch.set(newCustomerRef, { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'customer.create',
+              entity: { type: 'Customer', id: newCustomerRef.id, name: action.payload.name },
+              details: { source: 'offline-queue' }
+            });
+            break;
+          }
+          case 'update-product': {
+            const productRef = doc(firestore, 'products', action.payload.productId);
+            batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'product.update',
+              entity: { type: 'Product', id: action.payload.productId },
+              details: { changes: Object.keys(action.payload.values), source: 'offline-queue' }
+            });
+            break;
+          }
+          case 'bulk-update-products': {
+            action.payload.productIds.forEach((id: string) => {
+              const productRef = doc(firestore, 'products', id);
+              batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
+            });
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'product.update',
+              entity: { type: 'Product', id: 'multiple' },
+              details: { count: action.payload.productIds.length, changes: Object.keys(action.payload.values), source: 'offline-queue-bulk' }
+            });
+            break;
+          }
+          case 'complete-sale': {
+            const { receiptData, productUpdates } = action.payload;
+            const newReceiptRef = doc(collection(firestore, 'receipts'));
+            batch.set(newReceiptRef, { ...receiptData, createdAt: serverTimestamp() });
 
-                    productUpdates.forEach((update: {id: string, newStock: number}) => {
-                        const productRef = doc(firestore, 'products', update.id);
-                        batch.update(productRef, { stock: update.newStock, updatedAt: serverTimestamp() });
-                    });
-                    
-                    if (receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
-                        const customerRef = doc(firestore, 'customers', receiptData.customer.id);
-                        const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                        const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
-                        const customer = customers?.find(c => c.id === receiptData.customer.id);
-                        const currentPoints = customer?.loyaltyPoints || 0;
-                        batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned, updatedAt: serverTimestamp() });
-                    }
-                    await logAuditEvent(firestore, businessId, currentUserProfile, {
-                      action: 'sale.create',
-                      entity: { type: 'Receipt', id: newReceiptRef.id },
-                      details: { total: receiptData.total, source: 'offline-queue' }
-                    });
-                    break;
-                }
+            productUpdates.forEach((update: { id: string, newStock: number }) => {
+              const productRef = doc(firestore, 'products', update.id);
+              batch.update(productRef, { stock: update.newStock, updatedAt: serverTimestamp() });
+            });
+
+            if (receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
+              const customerRef = doc(firestore, 'customers', receiptData.customer.id);
+              const pointsPerUnit = business.settings.pointsPerUnit || 0;
+              const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+              const customer = customers?.find(c => c.id === receiptData.customer.id);
+              const currentPoints = customer?.loyaltyPoints || 0;
+              batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned, updatedAt: serverTimestamp() });
             }
-            await batch.commit();
-            return { id: action.id, status: 'fulfilled' };
-        } catch (error: any) {
-            console.error(`Failed to process action ${action.id}:`, error);
-            return { id: action.id, status: 'rejected', reason: error.message || 'An unknown error occurred.' };
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'sale.create',
+              entity: { type: 'Receipt', id: newReceiptRef.id },
+              details: { total: receiptData.total, source: 'offline-queue' }
+            });
+            break;
+          }
         }
+        await batch.commit();
+        return { id: action.id, status: 'fulfilled' };
+      } catch (error: any) {
+        console.error(`Failed to process action ${action.id}:`, error);
+        return { id: action.id, status: 'rejected', reason: error.message || 'An unknown error occurred.' };
+      }
     }));
-    
+
     setQueuedActions(prev => {
-        const newQueue = [...prev];
-        const successfulIds = new Set();
-        results.forEach(result => {
-            if (result.status === 'fulfilled') {
-                successfulIds.add(result.value.id);
-            } else if (result.status === 'rejected') {
-                const index = newQueue.findIndex(a => a.id === result.reason.id);
-                if (index > -1) {
-                    newQueue[index].status = 'failed';
-                    newQueue[index].errorMessage = result.reason.reason;
-                }
-            }
-        });
-        return newQueue.filter(a => !successfulIds.has(a.id));
+      const newQueue = [...prev];
+      const successfulIds = new Set();
+      results.forEach(result => {
+        if (result.status === 'fulfilled') {
+          successfulIds.add(result.value.id);
+        } else if (result.status === 'rejected') {
+          const index = newQueue.findIndex(a => a.id === result.reason.id);
+          if (index > -1) {
+            newQueue[index].status = 'failed';
+            newQueue[index].errorMessage = result.reason.reason;
+          }
+        }
+      });
+      return newQueue.filter(a => !successfulIds.has(a.id));
     });
 
     const failedCount = results.filter(r => r.status === 'rejected').length;
     if (failedCount > 0) {
-        toast({ variant: 'destructive', title: 'Sync Partially Failed', description: `${failedCount} actions could not be synced. Check the queue for details.` });
+      toast({ variant: 'destructive', title: 'Sync Partially Failed', description: `${failedCount} actions could not be synced. Check the queue for details.` });
     } else {
-        toast({ variant: 'success', title: 'Sync Complete!', description: 'All queued actions have been synced.' });
+      toast({ variant: 'success', title: 'Sync Complete!', description: 'All queued actions have been synced.' });
     }
 
     setIsQueueProcessing(false);
     triggerRefresh();
 
   }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast, business, customers, triggerRefresh]);
-  
+
   const clearFailedActions = useCallback(() => {
-      setQueuedActions(prev => prev.filter(a => a.status !== 'failed'));
-      toast({ title: 'Cleared Failed Actions', description: 'Removed failed items from the queue.' });
+    setQueuedActions(prev => prev.filter(a => a.status !== 'failed'));
+    toast({ title: 'Cleared Failed Actions', description: 'Removed failed items from the queue.' });
   }, []);
 
   const addToQueue = useCallback((action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => {
@@ -255,8 +255,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     };
     setQueuedActions(prev => [...prev, newAction]);
     toast({ title: 'Action Queued', description: `"${description}" will sync when you're online.` });
-    if(navigator.onLine) {
-        setTimeout(processQueue, 500); 
+    if (navigator.onLine) {
+      setTimeout(processQueue, 500);
     }
   }, [processQueue, toast]);
 
@@ -284,34 +284,34 @@ export function POSProvider({ children }: { children: ReactNode }) {
   });
 
   const [taxRate, setTaxRate] = useState<number>(() => {
-     if (typeof window === 'undefined') return business?.settings?.defaultTaxRate ?? 0;
-     try {
-        const savedTax = localStorage.getItem(POS_TAX_RATE_KEY);
-        return savedTax ? parseFloat(savedTax) : (business?.settings?.defaultTaxRate ?? 0);
-     } catch { return business?.settings?.defaultTaxRate ?? 0; }
+    if (typeof window === 'undefined') return business?.settings?.defaultTaxRate ?? 0;
+    try {
+      const savedTax = localStorage.getItem(POS_TAX_RATE_KEY);
+      return savedTax ? parseFloat(savedTax) : (business?.settings?.defaultTaxRate ?? 0);
+    } catch { return business?.settings?.defaultTaxRate ?? 0; }
   });
 
   const [discount, setDiscount] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     try {
-        const savedDiscount = localStorage.getItem(POS_DISCOUNT_KEY);
-        return savedDiscount ? parseFloat(savedDiscount) : 0;
+      const savedDiscount = localStorage.getItem(POS_DISCOUNT_KEY);
+      return savedDiscount ? parseFloat(savedDiscount) : 0;
     } catch { return 0; }
   });
 
   const [paymentMethod, setPaymentMethod] = useState<string>(() => {
-     if (typeof window === 'undefined') return 'Cash';
-     try {
-        const savedMethod = localStorage.getItem(POS_PAYMENT_METHOD_KEY);
-        return savedMethod || 'Cash';
-     } catch { return 'Cash'; }
+    if (typeof window === 'undefined') return 'Cash';
+    try {
+      const savedMethod = localStorage.getItem(POS_PAYMENT_METHOD_KEY);
+      return savedMethod || 'Cash';
+    } catch { return 'Cash'; }
   });
 
-  useEffect(() => { try { localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); } catch {} }, [cart]);
-  useEffect(() => { try { localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); } catch {} }, [selectedCustomer]);
-  useEffect(() => { try { localStorage.setItem(POS_TAX_RATE_KEY, String(taxRate)); } catch {} }, [taxRate]);
-  useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch {} }, [discount]);
-  useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch {} }, [paymentMethod]);
+  useEffect(() => { try { localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); } catch { } }, [cart]);
+  useEffect(() => { try { localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); } catch { } }, [selectedCustomer]);
+  useEffect(() => { try { localStorage.setItem(POS_TAX_RATE_KEY, String(taxRate)); } catch { } }, [taxRate]);
+  useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch { } }, [discount]);
+  useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch { } }, [paymentMethod]);
 
   const resetPOS = useCallback(() => {
     setCart([]);
@@ -320,12 +320,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setTaxRate(business?.settings?.defaultTaxRate ?? 0);
     setPaymentMethod('Cash');
     try {
-        localStorage.removeItem(POS_CART_KEY);
-        localStorage.removeItem(POS_CUSTOMER_KEY);
-        localStorage.removeItem(POS_DISCOUNT_KEY);
-        localStorage.removeItem(POS_TAX_RATE_KEY);
-        localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
-    } catch {}
+      localStorage.removeItem(POS_CART_KEY);
+      localStorage.removeItem(POS_CUSTOMER_KEY);
+      localStorage.removeItem(POS_DISCOUNT_KEY);
+      localStorage.removeItem(POS_TAX_RATE_KEY);
+      localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
+    } catch { }
   }, [business]);
 
   // Effect to reset POS state when user changes
@@ -337,7 +337,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {
-        setTaxRate(business.settings?.defaultTaxRate ?? 0);
+      setTaxRate(business.settings?.defaultTaxRate ?? 0);
     }
   }, [business]);
 
@@ -347,30 +347,30 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((product: Product) => {
     setCart(prevCart => {
-        const existingItem = prevCart.find(item => item.product.id === product.id);
+      const existingItem = prevCart.find(item => item.product.id === product.id);
 
-        if (existingItem) {
-          if (existingItem.quantity >= (product.stock || 0)) {
-            toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
-            return prevCart;
-          }
-          return prevCart.map(item =>
-            item.product.id === product.id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-          );
-        } else {
-          if ((product.stock || 0) <= 0) {
-            toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
-            return prevCart;
-          }
-          return [...prevCart, { product, quantity: 1 }];
+      if (existingItem) {
+        if (existingItem.quantity >= (product.stock || 0)) {
+          toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'warning' });
+          return prevCart;
         }
+        return prevCart.map(item =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        if ((product.stock || 0) <= 0) {
+          toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
+          return prevCart;
+        }
+        return [...prevCart, { product, quantity: 1 }];
+      }
     });
   }, [toast]);
 
   const removeFromCart = (productId: string) => setCart(prev => prev.filter(item => item.product.id !== productId));
-  
+
   const updateQuantity = (productId: string, quantity: number) => {
     const itemInCart = cart.find(item => item.product.id === productId);
     if (!itemInCart) return;
@@ -380,14 +380,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity: itemInCart.product.stock || 0 } : item));
       return;
     }
-    
+
     if (quantity <= 0) {
       removeFromCart(productId);
     } else {
       setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity } : item));
     }
   };
-  
+
   const clearCart = () => setCart([]);
   const selectCustomer = (customer: Customer | null) => setSelectedCustomer(customer);
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), [cart]);
@@ -424,17 +424,16 @@ export const usePOS = () => {
 };
 
 export const useBusiness = () => {
-    const context = useContext(POSContext);
-    if (context === undefined) {
-        throw new Error('useBusiness must be used within a POSProvider');
-    }
-    return context.business;
+  const context = useContext(POSContext);
+  if (context === undefined) {
+    throw new Error('useBusiness must be used within a POSProvider');
+  }
+  return context.business;
 }
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
-    'NGN': '₦',
-    'USD': '$',
+  'NGN': '₦',
+  'USD': '$',
 };
 
-    
-    
+
