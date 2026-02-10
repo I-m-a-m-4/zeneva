@@ -9,27 +9,27 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award } from 'lucide-react'; 
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { BusinessInstance, UserProfile } from '@/types';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -148,8 +148,8 @@ function SettingsPageContent() {
     const [country, setCountry] = React.useState('Nigeria');
     const [state, setState] = React.useState('');
     const [fiscalYearStart, setFiscalYearStart] = React.useState('January');
-    
-    const [shippingOptions, setShippingOptions] = React.useState<{name: string, price: number, type: 'delivery' | 'pickup', location?: string}[]>([]);
+
+    const [shippingOptions, setShippingOptions] = React.useState<{ name: string, price: number, type: 'delivery' | 'pickup', location?: string }[]>([]);
     const [newShippingOption, setNewShippingOption] = React.useState({ name: '', price: '', type: 'delivery' as 'delivery' | 'pickup', location: '' });
 
     const [productCategories, setProductCategories] = React.useState<string[]>([]);
@@ -230,7 +230,7 @@ function SettingsPageContent() {
             });
 
         } catch (error: any) {
-             toast({ variant: "destructive", title: 'Verification Failed', description: error.message });
+            toast({ variant: "destructive", title: 'Verification Failed', description: error.message });
         } finally {
             setIsVerifying(false);
         }
@@ -259,7 +259,7 @@ function SettingsPageContent() {
                 return;
             }
         }
-        
+
         if (formName === "financials") {
             try {
                 if (paymentBankAccountId && paymentBankCode && businessName) {
@@ -279,7 +279,7 @@ function SettingsPageContent() {
                     finalData['settings.paystackSubaccount'] = subaccountResult.subaccount_code;
                 }
             } catch (error: any) {
-                 toast({ variant: "destructive", title: "Paystack Setup Failed", description: error.message });
+                toast({ variant: "destructive", title: "Paystack Setup Failed", description: error.message });
             }
         }
 
@@ -294,7 +294,7 @@ function SettingsPageContent() {
             setIsSaving(prev => ({ ...prev, [formName]: false }));
         }
     };
-    
+
     const handleAddShippingOption = () => {
         const name = newShippingOption.name.trim();
         const price = parseFloat(newShippingOption.price);
@@ -332,7 +332,7 @@ function SettingsPageContent() {
     return (
         <div className="space-y-6">
             <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
-            
+
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
@@ -360,12 +360,12 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('profile', { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail })} disabled={isSaving["profile"]}>
-                            {isSaving["profile"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Profile
+                            {isSaving["profile"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Profile
                         </Button>
                     </CardFooter>
                 </Card>
-                
-                 <Card>
+
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Loyalty Program</CardTitle>
                         <CardDescription>Reward your returning customers and encourage repeat business.</CardDescription>
@@ -398,12 +398,12 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('loyalty', { 'settings.loyaltyProgramEnabled': loyaltyEnabled, 'settings.pointsPerUnit': parseFloat(pointsPerUnit) || 0 })} disabled={isSaving["loyalty"]}>
-                            {isSaving["loyalty"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Loyalty Settings
+                            {isSaving["loyalty"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Loyalty Settings
                         </Button>
                     </CardFooter>
                 </Card>
 
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Product Categories</CardTitle>
                         <CardDescription>Manage the categories for your products. This helps in organizing and filtering your inventory.</CardDescription>
@@ -420,13 +420,13 @@ function SettingsPageContent() {
                             ))}
                             <div className="flex items-end gap-2 pt-4 border-t">
                                 <div className="flex-1"><Label>New Category</Label><Input placeholder="e.g., Electronics" value={newCategory} onChange={e => setNewCategory(e.target.value)} /></div>
-                                <Button type="button" onClick={handleAddCategory}><Plus className="h-4 w-4 mr-2"/>Add Category</Button>
+                                <Button type="button" onClick={handleAddCategory}><Plus className="h-4 w-4 mr-2" />Add Category</Button>
                             </div>
                         </div>
                     </CardContent>
-                     <CardFooter>
+                    <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('categories', { 'settings.productCategories': productCategories })} disabled={isSaving["categories"]}>
-                            {isSaving["categories"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Categories
+                            {isSaving["categories"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Categories
                         </Button>
                     </CardFooter>
                 </Card>
@@ -438,13 +438,13 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-4">
-                            <div><Label>Currency</Label><Select value={currency} onValueChange={setCurrency}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent></Select></div>
-                            <div><Label>Timezone</Label><Select value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem></SelectContent></Select></div>
+                            <div><Label>Currency</Label><Select value={currency} onValueChange={setCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent></Select></div>
+                            <div><Label>Timezone</Label><Select value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem></SelectContent></Select></div>
                             <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>
                         <Separator />
-                         <div>
-                            <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground"/>Bank Transfer Details</h4>
+                        <div>
+                            <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
                             <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.</p>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
@@ -452,26 +452,26 @@ function SettingsPageContent() {
                                         <div>
                                             <Label>Bank Name</Label>
                                             <Select value={paymentBankCode} onValueChange={setPaymentBankCode}>
-                                                <SelectTrigger><SelectValue placeholder="Select a bank"/></SelectTrigger>
+                                                <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
                                                 <SelectContent>{NIGERIAN_BANKS.map(b => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
                                             </Select>
                                         </div>
                                         <div><Label>Account Number</Label><Input value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
                                     </div>
-                                    <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Verify Account</Button>
+                                    <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account</Button>
                                 </div>
-                                {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted"/></div>}
+                                {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted" /></div>}
                             </div>
-                         </div>
+                        </div>
                     </CardContent>
                     <CardFooter>
-                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName })} disabled={isSaving["financials"]}>
-                            {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Financials
+                        <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName })} disabled={isSaving["financials"]}>
+                            {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Financials
                         </Button>
                     </CardFooter>
                 </Card>
 
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5 text-primary" />Shipping & Delivery</CardTitle>
                         <CardDescription>Set up the shipping options available for your online store customers.</CardDescription>
@@ -493,58 +493,58 @@ function SettingsPageContent() {
                             ))}
                             <div className="pt-4 border-t space-y-4">
                                 <Label>Add New Option</Label>
-                                <RadioGroup value={newShippingOption.type} onValueChange={(value: 'delivery' | 'pickup') => setNewShippingOption({...newShippingOption, type: value})} className="flex space-x-4">
+                                <RadioGroup value={newShippingOption.type} onValueChange={(value: 'delivery' | 'pickup') => setNewShippingOption({ ...newShippingOption, type: value })} className="flex space-x-4">
                                     <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="delivery" id="delivery"/>
+                                        <RadioGroupItem value="delivery" id="delivery" />
                                         <Label htmlFor="delivery">Delivery</Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="pickup" id="pickup"/>
+                                        <RadioGroupItem value="pickup" id="pickup" />
                                         <Label htmlFor="pickup">In-Store Pickup</Label>
                                     </div>
                                 </RadioGroup>
                                 <div className="flex items-end gap-2">
-                                    <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({...newShippingOption, name: e.target.value})} /></div>
-                                    <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({...newShippingOption, price: e.target.value})}/></div>
+                                    <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({ ...newShippingOption, name: e.target.value })} /></div>
+                                    <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({ ...newShippingOption, price: e.target.value })} /></div>
                                 </div>
-                                 {newShippingOption.type === 'pickup' && (
+                                {newShippingOption.type === 'pickup' && (
                                     <div className="space-y-2">
                                         <Label htmlFor="pickup-location">Pickup Location</Label>
-                                        <Input id="pickup-location" placeholder="e.g., 123 Main St, Lagos" value={newShippingOption.location} onChange={e => setNewShippingOption({...newShippingOption, location: e.target.value})} />
+                                        <Input id="pickup-location" placeholder="e.g., 123 Main St, Lagos" value={newShippingOption.location} onChange={e => setNewShippingOption({ ...newShippingOption, location: e.target.value })} />
                                     </div>
                                 )}
-                                <Button type="button" onClick={handleAddShippingOption} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2"/>Add Option</Button>
+                                <Button type="button" onClick={handleAddShippingOption} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Add Option</Button>
                             </div>
                         </div>
                     </CardContent>
-                     <CardFooter>
+                    <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('shipping', { 'settings.publicStore.shippingOptions': shippingOptions })} disabled={isSaving["shipping"]}>
-                            {isSaving["shipping"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Shipping Options
+                            {isSaving["shipping"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Shipping Options
                         </Button>
                     </CardFooter>
                 </Card>
 
                 <Card>
-                     <CardHeader>
+                    <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Organization</CardTitle>
                         <CardDescription>Manage your business's industry, location, and financial year settings.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div><Label>Industry</Label><Select value={industry} onValueChange={setIndustry}><SelectTrigger><SelectValue placeholder="Select an industry"/></SelectTrigger><SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-                            <div><Label>Country</Label><Select value={country} onValueChange={setCountry}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem></SelectContent></Select></div>
+                            <div><Label>Industry</Label><Select value={industry} onValueChange={setIndustry}><SelectTrigger><SelectValue placeholder="Select an industry" /></SelectTrigger><SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
+                            <div><Label>Country</Label><Select value={country} onValueChange={setCountry}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem></SelectContent></Select></div>
                             <div><Label>State/Province</Label><Input value={state} onChange={e => setState(e.target.value)} /></div>
-                            <div><Label>Fiscal Year Start</Label><Select value={fiscalYearStart} onValueChange={setFiscalYearStart}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                            <div><Label>Fiscal Year Start</Label><Select value={fiscalYearStart} onValueChange={setFiscalYearStart}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
                         </div>
                     </CardContent>
                     <CardFooter>
-                         <Button type="button" onClick={() => handleSettingsSubmit('organization', { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart })} disabled={isSaving["organization"]}>
-                            {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Organization
+                        <Button type="button" onClick={() => handleSettingsSubmit('organization', { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart })} disabled={isSaving["organization"]}>
+                            {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Organization
                         </Button>
                     </CardFooter>
                 </Card>
 
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
                         <CardDescription>Customize the look and feel of your dashboard.</CardDescription>
@@ -560,9 +560,9 @@ function SettingsPageContent() {
 
 
 export default function SettingsPage() {
-    const { isLoading: isPosLoading } = usePOS();
-    if (isPosLoading) {
-      return <SettingsPageSkeleton />;
+    const { isLoading: isPosLoading, business } = usePOS();
+    if (isPosLoading && !business) {
+        return <SettingsPageSkeleton />;
     }
     return <SettingsPageContent />;
 }

@@ -1,5 +1,5 @@
 'use client';
-    
+
 import { useState, useEffect } from 'react';
 import {
   DocumentReference,
@@ -58,7 +58,6 @@ export function useDoc<T = any>(
         return;
       }
       setIsLoading(true);
-      setData(null);
       setError(null);
 
       try {
