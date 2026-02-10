@@ -10,11 +10,14 @@ import { POSProvider } from '@/context/pos-context';
 
 const siteUrl = 'https://zeneva.vercel.app';
 
+import InstallPrompt from '@/components/pwa/install-prompt';
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: 'Zeneva - Inventory Management and Point of Sale',
   description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships. Streamline your inventory and maximize your profit.',
   keywords: ['inventory management', 'pos', 'point of sale', 'sales analytics', 'crm', 'business management', 'nigeria', 'retail'],
+  manifest: '/manifest.json',
   openGraph: {
     title: 'Zeneva - Inventory Management and Point of Sale',
     description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships.',
@@ -57,6 +60,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <POSProvider>
             <Loader />
+            <InstallPrompt />
             <Suspense>
               <NavigationEvents />
             </Suspense>
