@@ -11,9 +11,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { usePWA } from '@/context/pwa-context';
 
 export default function InstallPrompt() {
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const { promptInstall, isInstallable, isAppInstalled } = usePWA();
     const [showInstallModal, setShowInstallModal] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
 
@@ -22,39 +23,25 @@ export default function InstallPrompt() {
         const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
         setIsIOS(isIosDevice);
 
-        // Listen for the beforeinstallprompt event
-        const handleBeforeInstallPrompt = (e: any) => {
-            // Prevent the mini-infobar from appearing on mobile
-            e.preventDefault();
-            // Stash the event so it can be triggered later.
-            setDeferredPrompt(e);
-            // Update UI notify the user they can install the PWA
+        const isDismissed = localStorage.getItem('pwa-prompt-dismissed') === 'true';
+
+        // Show modal if installable, not installed, and not dismissed.
+        // Also show for iOS since we can't detect "installable" event there easily, but we check if it's NOT standalone
+        const shouldShow = (isInstallable || (isIosDevice && !isAppInstalled)) && !isAppInstalled && !isDismissed;
+
+        if (shouldShow) {
             setShowInstallModal(true);
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-        // Check if app is already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            setShowInstallModal(false);
         }
-
-        return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        };
-    }, []);
+    }, [isInstallable, isAppInstalled]);
 
     const handleInstallClick = async () => {
-        if (!deferredPrompt) {
-            return;
-        }
-        // Show the install prompt
-        deferredPrompt.prompt();
-        // Wait for the user to respond to the prompt
-        const { outcome } = await deferredPrompt.userChoice;
-        // We've used the prompt, and can't use it again, throw it away
-        setDeferredPrompt(null);
+        await promptInstall();
         setShowInstallModal(false);
+    };
+
+    const handleDismiss = () => {
+        setShowInstallModal(false);
+        localStorage.setItem('pwa-prompt-dismissed', 'true');
     };
 
     if (!showInstallModal) return null;
@@ -68,25 +55,33 @@ export default function InstallPrompt() {
                         Install this app on your device for a better experience.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex items-center space-x-2">
-                    {isIOS ? (
-                        <div className="space-y-4 text-sm text-muted-foreground">
-                            <p>To install this app on your iPhone/iPad:</p>
-                            <ol className="list-decimal list-inside space-y-2">
-                                <li>Tap the <Share className="inline h-4 w-4" /> Share button in your browser menu.</li>
-                                <li>Scroll down and tap "Add to Home Screen".</li>
-                            </ol>
-                        </div>
-                    ) : (
-                        <div className="grid gap-4 py-4">
-                            <p className="text-sm text-muted-foreground">
-                                Get quick access to Zeneva directly from your home screen.
-                            </p>
-                            <Button onClick={handleInstallClick} className="w-full">
-                                <Download className="mr-2 h-4 w-4" /> Install App
-                            </Button>
-                        </div>
-                    )}
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center space-x-2">
+                        {isIOS ? (
+                            <div className="space-y-4 text-sm text-muted-foreground w-full">
+                                <p>To install this app on your iPhone/iPad:</p>
+                                <ol className="list-decimal list-inside space-y-2">
+                                    <li>Tap the <Share className="inline h-4 w-4" /> Share button in your browser menu.</li>
+                                    <li>Scroll down and tap "Add to Home Screen".</li>
+                                </ol>
+                                <Button variant="outline" onClick={handleDismiss} className="w-full mt-2">
+                                    Maybe Later
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4 py-4 w-full">
+                                <p className="text-sm text-muted-foreground">
+                                    Get quick access to Zeneva directly from your home screen.
+                                </p>
+                                <Button onClick={handleInstallClick} className="w-full">
+                                    <Download className="mr-2 h-4 w-4" /> Install App
+                                </Button>
+                                <Button variant="outline" onClick={handleDismiss} className="w-full">
+                                    Maybe Later
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

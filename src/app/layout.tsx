@@ -42,6 +42,8 @@ export const metadata: Metadata = {
 };
 
 
+import { PWAProvider } from '@/context/pwa-context';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -58,14 +60,16 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased')}>
         <FirebaseClientProvider>
-          <POSProvider>
-            <Loader />
-            <InstallPrompt />
-            <Suspense>
-              <NavigationEvents />
-            </Suspense>
-            {children}
-          </POSProvider>
+          <PWAProvider>
+            <POSProvider>
+              <Loader />
+              <InstallPrompt />
+              <Suspense>
+                <NavigationEvents />
+              </Suspense>
+              {children}
+            </POSProvider>
+          </PWAProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>
