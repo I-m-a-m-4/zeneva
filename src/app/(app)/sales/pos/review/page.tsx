@@ -161,10 +161,18 @@ export default function ReviewPage() {
                 const isEmailAllowed = plan === 'business' || access === 'lifetime' || plan === 'pro';
 
                 if (navigator.onLine && isEmailAllowed && shouldSendEmail && selectedCustomer?.email) {
+                    const numberFormat = new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    // Create formatted items HTML
                     const items_html = cart.map(item =>
                         `<tr>
-                            <td style="padding: 5px;">${item.product.name} (x${item.quantity})</td>
-                            <td style="padding: 5px; text-align: right;">${currencySymbol}${(item.product.price * item.quantity).toFixed(2)}</td>
+                            <td style="padding: 5px; border-bottom: 1px solid #eee;">
+                                <div style="font-weight: bold;">${item.product.name}</div>
+                                <div style="color: #666; font-size: 12px;">${item.quantity} x ${currencySymbol}${numberFormat.format(item.product.price)}</div>
+                            </td>
+                            <td style="padding: 5px; text-align: right; border-bottom: 1px solid #eee;">
+                                ${currencySymbol}${numberFormat.format(item.product.price * item.quantity)}
+                            </td>
                         </tr>`
                     ).join('');
 
@@ -173,12 +181,21 @@ export default function ReviewPage() {
                         to_name: selectedCustomer.name,
                         business_name: business.name,
                         receipt_id: newReceiptRef.id.substring(0, 8),
-                        items_html,
+                        items_html, // The template MUST use triple curly braces {{{items_html}}} to render this HTML
                         currency_symbol: currencySymbol,
-                        subtotal: subtotal.toFixed(2),
-                        tax: tax.toFixed(2),
-                        discount: discount.toFixed(2),
-                        total: total.toFixed(2),
+                        subtotal: numberFormat.format(subtotal),
+                        tax: numberFormat.format(tax),
+                        discount: numberFormat.format(discount),
+                        total: numberFormat.format(total),
+                        date: new Date().toLocaleString('en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            hour12: true
+                        }),
                     }).then(() => {
                         toast({ title: 'Email Sent', description: `Receipt sent to ${selectedCustomer.email}.` });
                     }).catch((emailError: any) => {

@@ -49,6 +49,7 @@ export interface ReceiptEmailParams {
     tax: string;
     discount: string;
     total: string;
+    date: string;
 }
 
 export const sendReceiptEmail = async (params: ReceiptEmailParams) => {

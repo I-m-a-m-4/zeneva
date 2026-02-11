@@ -33,6 +33,11 @@ service cloud.firestore {
       return request.auth != null && exists(userDocPath) && get(userDocPath).data.role in ['admin', 'manager'];
     }
 
+    function isRequestingUserStaff() {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role in ['admin', 'manager', 'vendor_operator'];
+    }
+
     function isBusinessOwner(businessId) {
        let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
        return request.auth != null && 
@@ -137,7 +142,8 @@ service cloud.firestore {
     match /products/{productId} {
       allow get, list: if true;
       allow create: if isUserAuthenticated() && isRequestingUserManager() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
-      allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
+      allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
 
     match /receipts/{receiptId} {
@@ -148,8 +154,9 @@ service cloud.firestore {
     
     match /customers/{customerId} {
       allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId);
-      allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
-      allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow create: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(request.resource.data.businessId);
+      allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
+      allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
   }
 }

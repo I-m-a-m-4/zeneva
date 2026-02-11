@@ -86,6 +86,14 @@ const moreNavLinks: { href: string; icon: React.ElementType; label: string; role
 
 // Helper component for full-screen loading
 function AppLoader({ text }: { text: string }) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
     <div
       suppressHydrationWarning
