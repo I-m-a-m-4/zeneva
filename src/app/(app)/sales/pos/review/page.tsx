@@ -90,9 +90,6 @@ export default function ReviewPage() {
             console.error("Could not save optimistic receipt to session storage", e);
         }
 
-        router.push(`/receipts/${newReceiptRef.id}`);
-        resetPOS();
-
         (async () => {
             try {
                 const batch = writeBatch(firestore);
@@ -137,6 +134,10 @@ export default function ReviewPage() {
 
                 await batch.commit();
 
+                // Move navigation here to ensure document exists before we try to read it
+                router.push(`/receipts/${newReceiptRef.id}`);
+                resetPOS();
+
                 if (navigator.onLine) {
                     toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
                 } else {
@@ -154,14 +155,10 @@ export default function ReviewPage() {
                     details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
                 });
 
-                // Use the memoized check from the component scope (captured primarily for the UI, but valid here too as 'business' is in scope)
-                // However, 'canSendEmail' is a const in the render scope. To be safe inside this async closure, re-evaluate or use the one we just defined if we pass it in.
-                // Let's re-evaluate to be safe since 'business' is in closure.
+                // Use the memoized check from the component scope
                 const plan = business.plan;
                 const access = business.accessLevel;
                 const isEmailAllowed = plan === 'business' || access === 'lifetime' || plan === 'pro';
-
-                console.log(`[ReviewPage] Processing receipt email. Allowed=${isEmailAllowed}, ShouldSend=${shouldSendEmail}, HasEmail=${!!selectedCustomer?.email}`);
 
                 if (navigator.onLine && isEmailAllowed && shouldSendEmail && selectedCustomer?.email) {
                     const items_html = cart.map(item =>
@@ -171,7 +168,6 @@ export default function ReviewPage() {
                         </tr>`
                     ).join('');
 
-                    console.log('[ReviewPage] Sending email now...');
                     sendReceiptEmail({
                         to_email: selectedCustomer.email,
                         to_name: selectedCustomer.name,
@@ -193,8 +189,9 @@ export default function ReviewPage() {
                 }
 
             } catch (error: any) {
-                console.error("Background sale completion failed:", error);
-                toast({ variant: 'destructive', title: 'Sale Sync Failed', description: error.message || 'The sale was completed locally but could not be saved to the cloud. It will sync automatically when you are back online.', duration: 8000 });
+                console.error("Sale completion failed:", error);
+                toast({ variant: 'destructive', title: 'Sale Failed', description: error.message || 'The sale could not be completed. Please try again.', duration: 8000 });
+                setIsCompleting(false); // Re-enable button on failure
             }
         })();
     }
@@ -206,7 +203,6 @@ export default function ReviewPage() {
         const plan = business?.plan;
         const access = business?.accessLevel;
         const allowed = plan === 'business' || access === 'lifetime' || plan === 'pro'; // Added 'pro' for testing if needed, or check your specific requirements.
-        console.log(`[ReviewPage] canSendEmail check: Plan=${plan}, Access=${access}, Allowed=${allowed}`);
         return allowed;
     }, [business]);
 

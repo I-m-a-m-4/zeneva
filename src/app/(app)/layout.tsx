@@ -85,9 +85,12 @@ const moreNavLinks: { href: string; icon: React.ElementType; label: string; role
 ];
 
 // Helper component for full-screen loading
-function FullScreenLoader({ text }: { text: string }) {
+function AppLoader({ text }: { text: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex h-screen w-full items-center justify-center overflow-hidden bg-background">
+    <div
+      suppressHydrationWarning
+      className="fixed inset-0 z-50 flex h-screen w-full items-center justify-center overflow-hidden bg-background"
+    >
       {/* Background decoration to emphasize glassmorphism */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-orange-100 via-background to-background dark:from-orange-950/30 dark:via-background dark:to-background"></div>
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-3xl"></div>
@@ -211,18 +214,18 @@ export default function AuthenticatedLayout({
   const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
 
   if (isLoggingOut) {
-    return <FullScreenLoader text="Logging out..." />;
+    return <AppLoader text="Logging out..." />;
   }
 
   // Show full-screen loader ONLY on initial auth load or if profile is missing
   if (isUserLoading || !user || (user && !currentUserProfile)) {
-    return <FullScreenLoader text="Loading your workspace..." />;
+    return <AppLoader text="Loading your workspace..." />;
   }
 
   // --- Start of Checks for Active/Valid Accounts ---
 
   if (currentUserProfile && currentUserProfile.surveyCompleted === false && pathname !== '/onboarding') {
-    return <FullScreenLoader text="Finalizing your setup..." />;
+    return <AppLoader text="Finalizing your setup..." />;
   }
 
   if (currentUserProfile && currentUserProfile.status === 'inactive') {
