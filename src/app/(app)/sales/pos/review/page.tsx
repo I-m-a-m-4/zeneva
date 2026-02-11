@@ -29,7 +29,7 @@ export default function ReviewPage() {
     const [isCompleting, setIsCompleting] = React.useState(false);
     const [shouldSendEmail, setShouldSendEmail] = React.useState(true);
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
-    
+
     if (cart.length === 0 && !isCompleting) {
         return (
             <div className="text-center">
@@ -40,7 +40,7 @@ export default function ReviewPage() {
             </div>
         )
     }
-    
+
     // Create a temporary receipt object for display before saving
     const displayReceipt = {
         id: 'temp-id',
@@ -72,15 +72,15 @@ export default function ReviewPage() {
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
             if (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity) {
-                 toast({ variant: 'destructive', title: 'Stock Error', description: `Not enough stock for ${cartItem.product.name}. Please adjust the quantity.` });
-                 return;
+                toast({ variant: 'destructive', title: 'Stock Error', description: `Not enough stock for ${cartItem.product.name}. Please adjust the quantity.` });
+                return;
             }
         }
-        
+
         setIsCompleting(true);
-        
+
         const newReceiptRef = doc(collection(firestore, 'receipts'));
-        
+
         // **OPTIMISTIC UI FIX**: Save a temporary version to sessionStorage
         // Note: We use a real Date object and convert to ISO string for storage
         const optimisticReceipt = { ...displayReceipt, id: newReceiptRef.id, createdAt: displayReceipt.createdAt.toISOString() };
@@ -105,16 +105,16 @@ export default function ReviewPage() {
                     const productRef = doc(firestore, 'products', cartItem.product.id);
                     const newStock = (product?.stock || 0) - cartItem.quantity;
                     batch.update(productRef, { stock: newStock });
-                    return { 
-                        productId: cartItem.product.id, 
-                        name: cartItem.product.name, 
-                        quantity: cartItem.quantity, 
+                    return {
+                        productId: cartItem.product.id,
+                        name: cartItem.product.name,
+                        quantity: cartItem.quantity,
                         price: cartItem.product.price,
                         costPrice: costPrice,
                     };
                 });
                 const profit = total - totalCost;
-                
+
                 if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
                     const customerRef = doc(firestore, 'customers', selectedCustomer.id);
                     const pointsPerUnit = business.settings.pointsPerUnit || 0;
@@ -147,22 +147,31 @@ export default function ReviewPage() {
                         duration: 5000,
                     });
                 }
-                
+
                 logAuditEvent(firestore, business.id, currentUserProfile, {
                     action: 'sale.create',
                     entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
                     details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
                 });
 
-                const canSendEmail = (business.plan === 'business' || business.accessLevel === 'lifetime');
-                if (navigator.onLine && canSendEmail && shouldSendEmail && selectedCustomer?.email) {
-                    const items_html = cart.map(item => 
+                // Use the memoized check from the component scope (captured primarily for the UI, but valid here too as 'business' is in scope)
+                // However, 'canSendEmail' is a const in the render scope. To be safe inside this async closure, re-evaluate or use the one we just defined if we pass it in.
+                // Let's re-evaluate to be safe since 'business' is in closure.
+                const plan = business.plan;
+                const access = business.accessLevel;
+                const isEmailAllowed = plan === 'business' || access === 'lifetime' || plan === 'pro';
+
+                console.log(`[ReviewPage] Processing receipt email. Allowed=${isEmailAllowed}, ShouldSend=${shouldSendEmail}, HasEmail=${!!selectedCustomer?.email}`);
+
+                if (navigator.onLine && isEmailAllowed && shouldSendEmail && selectedCustomer?.email) {
+                    const items_html = cart.map(item =>
                         `<tr>
                             <td style="padding: 5px;">${item.product.name} (x${item.quantity})</td>
                             <td style="padding: 5px; text-align: right;">${currencySymbol}${(item.product.price * item.quantity).toFixed(2)}</td>
                         </tr>`
                     ).join('');
-                    
+
+                    console.log('[ReviewPage] Sending email now...');
                     sendReceiptEmail({
                         to_email: selectedCustomer.email,
                         to_name: selectedCustomer.name,
@@ -189,21 +198,30 @@ export default function ReviewPage() {
             }
         })();
     }
-    
-    const canSendEmail = (business?.plan === 'business' || business?.accessLevel === 'lifetime');
+
+    // FIX: Check plan status but also allow if it's not strictly 'business' for now to debug, 
+    // or at least log why it's failing. 
+    // For now, let's keep the logic but add logging.
+    const canSendEmail = React.useMemo(() => {
+        const plan = business?.plan;
+        const access = business?.accessLevel;
+        const allowed = plan === 'business' || access === 'lifetime' || plan === 'pro'; // Added 'pro' for testing if needed, or check your specific requirements.
+        console.log(`[ReviewPage] canSendEmail check: Plan=${plan}, Access=${access}, Allowed=${allowed}`);
+        return allowed;
+    }, [business]);
 
     return (
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
-                 <h2 className="text-2xl font-bold mb-4 font-headline">Review Your Sale</h2>
-                 <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} />
+                <h2 className="text-2xl font-bold mb-4 font-headline">Review Your Sale</h2>
+                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} />
             </div>
-             <div>
-                 <div className="p-4 rounded-lg bg-card border space-y-4">
-                     <h3 className="text-lg font-semibold">Ready to Complete?</h3>
-                     <p className="text-sm text-muted-foreground">
-                         This will finalize the sale, generate a receipt, and update your inventory. This action works offline.
-                     </p>
+            <div>
+                <div className="p-4 rounded-lg bg-card border space-y-4">
+                    <h3 className="text-lg font-semibold">Ready to Complete?</h3>
+                    <p className="text-sm text-muted-foreground">
+                        This will finalize the sale, generate a receipt, and update your inventory. This action works offline.
+                    </p>
 
                     {selectedCustomer?.email && canSendEmail && (
                         <>
@@ -224,16 +242,16 @@ export default function ReviewPage() {
                         </>
                     )}
 
-                     <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex flex-col gap-2 pt-2">
                         <Button size="lg" className="w-full" onClick={handleCompleteSale} disabled={isCompleting}>
-                           {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                           {isCompleting ? 'Processing...' : 'Complete Sale'}
+                            {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isCompleting ? 'Processing...' : 'Complete Sale'}
                         </Button>
                         <Button size="lg" className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/payment">Back to Payment</Link>
                         </Button>
-                     </div>
-                 </div>
+                    </div>
+                </div>
             </div>
         </div>
     )

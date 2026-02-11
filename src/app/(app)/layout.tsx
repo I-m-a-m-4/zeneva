@@ -87,9 +87,16 @@ const moreNavLinks: { href: string; icon: React.ElementType; label: string; role
 // Helper component for full-screen loading
 function FullScreenLoader({ text }: { text: string }) {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4">
-      <Loader className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-sm text-muted-foreground animate-pulse font-body">{text}</p>
+    <div className="fixed inset-0 z-50 flex h-screen w-full items-center justify-center overflow-hidden bg-background">
+      {/* Background decoration to emphasize glassmorphism */}
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-orange-100 via-background to-background dark:from-orange-950/30 dark:via-background dark:to-background"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-3xl"></div>
+
+      {/* Minimal Container without Glassmorphism Box */}
+      <div className="relative flex flex-col items-center justify-center p-8 z-10">
+        <Loader className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-4 text-sm font-medium text-foreground animate-pulse font-body">{text}</p>
+      </div>
     </div>
   );
 }
@@ -139,9 +146,9 @@ export default function AuthenticatedLayout({
     combined.sort((a, b) => {
       const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
       const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-      return dateB.getTime() - a.getTime();
+      return dateB.getTime() - dateA.getTime();
     });
-    return combined.slice(0, 20);  
+    return combined.slice(0, 20);
   }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
   const unreadCount = React.useMemo(() => {
@@ -214,11 +221,11 @@ export default function AuthenticatedLayout({
 
   // --- Start of Checks for Active/Valid Accounts ---
 
-  if (currentUserProfile.surveyCompleted === false && pathname !== '/onboarding') {
+  if (currentUserProfile && currentUserProfile.surveyCompleted === false && pathname !== '/onboarding') {
     return <FullScreenLoader text="Finalizing your setup..." />;
   }
 
-  if (currentUserProfile.status === 'inactive') {
+  if (currentUserProfile && currentUserProfile.status === 'inactive') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md text-center shadow-lg">
@@ -274,7 +281,7 @@ export default function AuthenticatedLayout({
     return <main className="p-4 sm:p-6">{children}</main>;
   }
 
-  const userRole = currentUserProfile.role;
+  const userRole = currentUserProfile?.role;
   const plan = businessInstance?.plan || 'starter';
   const hasLifetimeAccess = businessInstance?.accessLevel === 'lifetime';
 

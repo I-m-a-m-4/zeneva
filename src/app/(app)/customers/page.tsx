@@ -34,32 +34,32 @@ import { logAuditEvent } from '@/lib/audit';
 import { Checkbox } from '@/components/ui/checkbox';
 
 function CustomerRowSkeleton() {
-    return (
-        <TableRow>
-            <TableCell className="w-12"><Skeleton className="h-4 w-4" /></TableCell>
-            <TableCell>
-                <div className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="space-y-2 w-full">
-                        <Skeleton className="h-5 w-1/2" />
-                        <Skeleton className="h-4 w-full" />
-                    </div>
-                </div>
-            </TableCell>
-            <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-5 w-full" />
-            </TableCell>
-            <TableCell className="hidden md:table-cell">
-                 <Skeleton className="h-5 w-full" />
-            </TableCell>
-            <TableCell className="text-right">
-                <Skeleton className="h-5 w-1/2 ml-auto" />
-            </TableCell>
-             <TableCell className="text-right">
-                <Skeleton className="h-8 w-8 ml-auto rounded-md" />
-            </TableCell>
-        </TableRow>
-    )
+  return (
+    <TableRow>
+      <TableCell className="w-12"><Skeleton className="h-4 w-4" /></TableCell>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="space-y-2 w-full">
+            <Skeleton className="h-5 w-1/2" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
+        <Skeleton className="h-5 w-full" />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Skeleton className="h-5 w-full" />
+      </TableCell>
+      <TableCell className="text-right">
+        <Skeleton className="h-5 w-1/2 ml-auto" />
+      </TableCell>
+      <TableCell className="text-right">
+        <Skeleton className="h-8 w-8 ml-auto rounded-md" />
+      </TableCell>
+    </TableRow>
+  )
 }
 
 export default function CustomersPage() {
@@ -102,17 +102,17 @@ export default function CustomersPage() {
   };
 
   const handleRowSelect = (customerId: string) => {
-    setSelectedCustomerIds(prev => 
-      prev.includes(customerId) 
-        ? prev.filter(id => id !== customerId) 
+    setSelectedCustomerIds(prev =>
+      prev.includes(customerId)
+        ? prev.filter(id => id !== customerId)
         : [...prev, customerId]
     );
   };
-  
+
   const handleBulkDelete = async () => {
     if (!firestore || selectedCustomerIds.length === 0 || !business || !currentUser) {
-        toast({ title: 'Error', description: 'Could not perform deletion. Session data missing.', variant: 'destructive' });
-        return;
+      toast({ title: 'Error', description: 'Could not perform deletion. Session data missing.', variant: 'destructive' });
+      return;
     }
 
     const batch = writeBatch(firestore);
@@ -123,9 +123,9 @@ export default function CustomersPage() {
       const deletedCustomer = customers?.find(p => p.id === id);
       if (deletedCustomer) {
         logAuditEvent(firestore, business.id, currentUser, {
-            action: 'customer.delete',
-            entity: { type: 'Customer', id: id, name: deletedCustomer.name },
-            details: { customerName: deletedCustomer.name, customerEmail: deletedCustomer.email }
+          action: 'customer.delete',
+          entity: { type: 'Customer', id: id, name: deletedCustomer.name },
+          details: { customerName: deletedCustomer.name, customerEmail: deletedCustomer.email }
         });
       }
     });
@@ -143,132 +143,132 @@ export default function CustomersPage() {
 
   return (
     <>
-    <Card className="w-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <Card className="w-full">
+        <CardHeader>
+          <div className="flex items-center justify-between">
             <div>
-                <CardTitle>Customers</CardTitle>
-                <CardDescription>
+              <CardTitle>Customers</CardTitle>
+              <CardDescription>
                 Manage your customers and view their purchase history.
-                </CardDescription>
+              </CardDescription>
             </div>
-             <div className="flex items-center gap-2">
-                {selectedCustomerIds.length > 0 && (
-                    <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                            Delete ({selectedCustomerIds.length})
-                        </span>
-                    </Button>
-                )}
-                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
-                    <Upload className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                        Import
-                    </span>
+            <div className="flex items-center gap-2">
+              {selectedCustomerIds.length > 0 && (
+                <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Delete ({selectedCustomerIds.length})
+                  </span>
                 </Button>
-                <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                        Add Customer
-                    </span>
-                </Button>
+              )}
+              <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Import
+                </span>
+              </Button>
+              <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Add Customer
+                </span>
+              </Button>
             </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-             <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead className="w-12"><Checkbox disabled/></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Phone</TableHead>
-                    <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
-                    <TableHead className="text-right">Total Spent</TableHead>
-                    <TableHead><span className="sr-only">Actions</span></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <CustomerRowSkeleton />
-                    <CustomerRowSkeleton />
-                    <CustomerRowSkeleton />
-                </TableBody>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"><Checkbox disabled /></TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                  <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
+                  <TableHead className="text-right">Total Spent</TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <CustomerRowSkeleton />
+                <CustomerRowSkeleton />
+                <CustomerRowSkeleton />
+              </TableBody>
             </Table>
-        ) : customers && customers.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                   <Checkbox
+          ) : customers && customers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
                       checked={customers.length > 0 && selectedCustomerIds.length === customers.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
                       onCheckedChange={handleSelectAll}
                     />
-              </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead className="hidden sm:table-cell">Phone</TableHead>
-              <TableHead className="hidden md:table-cell">
-                <div className="flex items-center gap-1.5">
-                    <Award className="h-4 w-4" />
-                    Loyalty Points
-                </div>
-              </TableHead>
-              <TableHead className="text-right">Total Spent</TableHead>
-              <TableHead><span className="sr-only">Actions</span></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {customers.map((customer) => {
-              const totalSpent = customerTotals[customer.id]?.total ?? 0;
-              return (
-              <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
-                <TableCell>
-                    <Checkbox
-                      checked={selectedCustomerIds.includes(customer.id)}
-                      onCheckedChange={() => handleRowSelect(customer.id)}
-                    />
-                </TableCell>
-                <TableCell>
-                    <div 
-                        className="font-medium hover:underline cursor-pointer"
-                        onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}
-                    >
-                        {customer.name}
+                  </TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    <div className="flex items-center gap-1.5">
+                      <Award className="h-4 w-4" />
+                      Loyalty Points
                     </div>
-                    <div className="text-sm text-muted-foreground">{customer.email}</div>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
-                <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
-                <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </TableCell>
-              </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-        ) : (
-             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
-                <User className="h-12 w-12 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mt-4">No Customers Found</h3>
-                <p className="text-muted-foreground mt-2 mb-4">Get started by adding your first customer.</p>
-                <Button size="sm" asChild className="h-8 gap-1">
-                    <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
-                        <PlusCircle className="h-3.5 w-3.5" />
-                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                            Add Customer
-                        </span>
-                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right">Total Spent</TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.map((customer) => {
+                  const totalSpent = customerTotals[customer.id]?.total ?? 0;
+                  return (
+                    <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedCustomerIds.includes(customer.id)}
+                          onCheckedChange={() => handleRowSelect(customer.id)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div
+                          className="font-medium hover:underline cursor-pointer"
+                          onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}
+                        >
+                          {customer.name}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{customer.email}</div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
+                      <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
+              <User className="h-12 w-12 text-muted-foreground" />
+              <h3 className="text-xl font-semibold mt-4">No Customers Found</h3>
+              <p className="text-muted-foreground mt-2 mb-4">Get started by adding your first customer.</p>
+              <Button size="sm" asChild className="h-8 gap-1">
+                <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Add Customer
+                  </span>
                 </Button>
+              </Button>
             </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
 
-    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -283,23 +283,26 @@ export default function CustomersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-    {currentUser?.businessId && (
+      {currentUser?.businessId && (
         <AddCustomerDialog
-            isOpen={isAddCustomerOpen}
-            onOpenChange={setIsAddCustomerOpen}
-            businessId={currentUser.businessId}
-            customers={customers}
+          isOpen={isAddCustomerOpen}
+          onOpenChange={setIsAddCustomerOpen}
+          businessId={currentUser.businessId}
+          customers={customers}
         />
-    )}
-     {currentUser?.businessId && (
+      )}
+      {currentUser?.businessId && (
         <ImportCustomersDialog
-            isOpen={isImportOpen}
-            onOpenChange={setIsImportOpen}
-            businessId={currentUser.businessId}
-            existingCustomers={customers || []}
-            onSuccess={() => setIsImportOpen(false)}
+          isOpen={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          businessId={currentUser.businessId}
+          existingCustomers={customers || []}
+          onSuccess={() => {
+            triggerRefresh();
+            setIsImportOpen(false);
+          }}
         />
-     )}
+      )}
     </>
   );
 }

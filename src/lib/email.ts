@@ -16,6 +16,14 @@ export const sendInvitationEmail = async (params: ContactEmailParams) => {
     const templateId = process.env.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID;
     const publicKey = process.env.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY;
 
+    console.log('[EmailJS] Attempting to send invitation email with params:', params);
+
+    console.log('[EmailJS] Config Check:', {
+        serviceId: serviceId ? 'Set' : 'Missing',
+        templateId: templateId ? 'Set' : 'Missing',
+        publicKey: publicKey ? 'Set' : 'Missing',
+    });
+
     if (!serviceId || !templateId || !publicKey) {
         const missing = [
             !serviceId && 'NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID',
@@ -27,7 +35,14 @@ export const sendInvitationEmail = async (params: ContactEmailParams) => {
         throw new Error(errorMessage);
     }
 
-    return emailjs.send(serviceId, templateId, params as any, publicKey);
+    try {
+        const response = await emailjs.send(serviceId, templateId, params as any, publicKey);
+        console.log('[EmailJS] Invitation email sent successfully!', response);
+        return response;
+    } catch (error) {
+        console.error('[EmailJS] Failed to send invitation email:', error);
+        throw error;
+    }
 };
 
 
@@ -50,6 +65,14 @@ export const sendReceiptEmail = async (params: ReceiptEmailParams) => {
     const templateId = process.env.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID;
     const publicKey = process.env.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY;
 
+    console.log('[EmailJS] Attempting to send receipt email:', {
+        to: params.to_email,
+        receiptId: params.receipt_id,
+        serviceId: serviceId ? 'Set' : 'Missing',
+        templateId: templateId ? 'Set' : 'Missing',
+        publicKey: publicKey ? 'Set' : 'Missing',
+    });
+
     if (!serviceId || !templateId || !publicKey) {
         const missing = [
             !serviceId && 'NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID',
@@ -61,7 +84,14 @@ export const sendReceiptEmail = async (params: ReceiptEmailParams) => {
         throw new Error(errorMessage);
     }
 
-    return emailjs.send(serviceId, templateId, params as any, publicKey);
+    try {
+        const response = await emailjs.send(serviceId, templateId, params as any, publicKey);
+        console.log('[EmailJS] Receipt email sent successfully!', response);
+        return response;
+    } catch (error) {
+        console.error('[EmailJS] Failed to send receipt email:', error);
+        throw error;
+    }
 };
 
 // --- For Marketing Contact Form ---

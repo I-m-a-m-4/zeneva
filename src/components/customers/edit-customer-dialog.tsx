@@ -17,17 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
-import type { Customer } from '@/types';
-
-interface EditCustomerDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  customer: Customer | null;
-}
+import { usePOS } from '@/context/pos-context';
 
 export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: EditCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { triggerRefresh } = usePOS();
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
@@ -35,12 +30,12 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
 
   React.useEffect(() => {
     if (customer) {
-        setName(customer.name);
-        setEmail(customer.email);
-        setPhone(customer.phone || '');
+      setName(customer.name);
+      setEmail(customer.email);
+      setPhone(customer.phone || '');
     }
   }, [customer]);
-  
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
@@ -48,7 +43,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
       toast({ title: 'Missing fields', description: 'Name and email are required.', variant: 'destructive' });
       return;
     }
-    
+
     setIsSaving(true);
     try {
       const customerRef = doc(firestore, 'customers', customer.id);
@@ -59,6 +54,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
         updatedAt: serverTimestamp(),
       });
       toast({ title: 'Customer Updated', description: `${name} has been updated.`, variant: 'success' });
+      triggerRefresh();
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Error', description: 'Could not update customer.', variant: 'destructive' });

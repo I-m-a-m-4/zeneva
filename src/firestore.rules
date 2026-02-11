@@ -141,7 +141,7 @@ service cloud.firestore {
     }
 
     match /receipts/{receiptId} {
-        allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId);
+        allow read, list: if isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid);
         allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
         allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
