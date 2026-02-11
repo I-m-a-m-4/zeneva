@@ -27,7 +27,7 @@ export default function ReviewPage() {
     const business = useBusiness();
     const { user } = useUser();
     const [isCompleting, setIsCompleting] = React.useState(false);
-    const [shouldSendEmail, setShouldSendEmail] = React.useState(true);
+    const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
 
     if (cart.length === 0 && !isCompleting) {
