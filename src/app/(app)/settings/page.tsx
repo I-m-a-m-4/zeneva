@@ -291,7 +291,7 @@ function SettingsPageContent() {
                 toast({ variant: 'destructive', title: 'Location Required', description: 'Please provide a location for the pickup option.' });
                 return;
             }
-            setShippingOptions([...shippingOptions, { name, price, type, location: type === 'pickup' ? location : undefined }]);
+            setShippingOptions([...shippingOptions, { name, price, type, location: type === 'pickup' ? location : null }]);
             setNewShippingOption({ name: '', price: '', type: 'delivery', location: '' });
         } else {
             toast({ variant: 'destructive', title: 'Invalid Option', description: 'Please provide a valid name and price.' });

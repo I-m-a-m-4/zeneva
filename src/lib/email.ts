@@ -8,6 +8,7 @@ export interface ContactEmailParams {
     to_name: string;
     business_name: string;
     inviter_name: string;
+    invitation_link: string;
 }
 
 export const sendInvitationEmail = async (params: ContactEmailParams) => {

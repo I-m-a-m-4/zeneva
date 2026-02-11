@@ -14,10 +14,11 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader, ChevronLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader, ChevronLeft, Building, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
+import { doc, getDoc } from 'firebase/firestore';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -33,65 +34,86 @@ export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const searchParams = useSearchParams();
-  const { triggerRefresh, currentUserProfile } = usePOS();
+  const { triggerRefresh } = usePOS();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+
+  const [invitationDetails, setInvitationDetails] = useState<{ businessName: string, role: string } | null>(null);
+  const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
+  const invitationCode = searchParams.get('invitationCode');
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: { email: '', password: '', name: '', phone: '' },
   });
 
-  useEffect(() => {
-    const emailFromQuery = searchParams.get('email');
-    if (emailFromQuery) {
-      form.setValue('email', emailFromQuery);
+   useEffect(() => {
+    if (invitationCode && firestore) {
+      const fetchInvitation = async () => {
+        setIsLoadingInvitation(true);
+        const invRef = doc(firestore, 'invitations', invitationCode);
+        try {
+          const invSnap = await getDoc(invRef);
+          if (invSnap.exists()) {
+            const invData = invSnap.data();
+            const businessRef = doc(firestore, 'businessInstances', invData.businessId);
+            const businessSnap = await getDoc(businessRef);
+            if (businessSnap.exists()) {
+              setInvitationDetails({
+                businessName: businessSnap.data().name,
+                role: invData.role.replace('_', ' '),
+              });
+              form.setValue('email', invData.email);
+            } else {
+                 throw new Error("Associated business not found.");
+            }
+          } else {
+            toast({ variant: "destructive", title: "Invalid Invitation", description: "This invitation link is either invalid or has already been used." });
+            router.replace('/signup');
+          }
+        } catch (error) {
+           toast({ variant: "destructive", title: "Error", description: "Could not retrieve invitation details." });
+           router.replace('/signup');
+        } finally {
+            setIsLoadingInvitation(false);
+        }
+      };
+      fetchInvitation();
+    } else {
+        setIsLoadingInvitation(false);
+        const emailFromQuery = searchParams.get('email');
+        if (emailFromQuery) {
+          form.setValue('email', emailFromQuery);
+        }
     }
-  }, [searchParams, form]);
+  }, [invitationCode, firestore, router, form, toast]);
 
   const onSubmit = async (data: SignupFormValues) => {
     if (!auth || !firestore) return;
     setIsLoading(true);
     try {
-      // Step 1: Create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-
-      // Step 2: Update their Auth profile with the display name
       await updateProfile(userCredential.user, { displayName: data.name });
 
-      // Step 3: Create all associated Firestore documents (user profile, business, etc.)
-      await createUserProfileDocument(firestore, userCredential.user, data.name, data.phone);
-
-      // Step 4: Wait for the user profile to be available to prevent race conditions
+      // Pass invitation code to the creation function
+      await createUserProfileDocument(firestore, userCredential.user, data.name, data.phone, invitationCode);
       await waitForUserProfile(firestore, userCredential.user.uid);
 
-      // Step 5: Force a context refresh and wait for the local state to sync
       triggerRefresh();
-
-      // Poll ensuring the POSContext has updated with the new user
-      // Step 6: Wait a moment for the context to pick up the new user profile
-      // This timeout ensures POSProvider has time to re-fetch the user profile
-      // after the triggerRefresh() call.
-
-      // Simple implementation: Wait a moment for the context to likely pick it up.
-      // Since we triggered refresh, the next render cycle of POSProvider will fetch the new user.
-      // We can iterate a few times checking specific conditions if we were in an effect, 
-      // but here we are in a handler. 
-
-      // Let's rely on a hard wait which is safer than complex state monitoring in a standard handler
-      // for this specific race condition. 1.5 seconds is usually plenty after Firestore is confirmed ready.
+      
       await new Promise(resolve => setTimeout(resolve, 1500));
-
-      router.push('/onboarding');
+      router.push(invitationCode ? '/dashboard' : '/onboarding');
 
     } catch (error: any) {
       let description = "Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         description = "This email is already registered. Please log in instead.";
+      } else {
+          description = error.message;
       }
       toast({ variant: "destructive", title: "Signup Failed", description });
-      setIsLoading(false); // Only set loading to false on failure
+      setIsLoading(false);
     }
   };
 
@@ -106,7 +128,7 @@ export default function SignupPage() {
             </Link>
           </Button>
         </div>
-        <div className="mx-auto grid w-full max-w-[350px] gap-6">
+        <div className="mx-auto grid w-full max-w-[380px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
               <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
@@ -116,6 +138,21 @@ export default function SignupPage() {
               Enter your information to create your account
             </p>
           </div>
+
+            {isLoadingInvitation ? (
+                <div className="flex justify-center items-center h-24"><Loader className="animate-spin" /></div>
+            ) : invitationDetails ? (
+                <div className="p-4 rounded-lg border bg-primary/5 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                        <Building className="h-5 w-5 text-primary" />
+                        <UserCheck className="h-5 w-5 text-primary" />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        You are joining <strong className="text-primary">{invitationDetails.businessName}</strong> as a <strong className="capitalize text-primary">{invitationDetails.role}</strong>.
+                    </p>
+                </div>
+            ) : null}
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               <FormField
@@ -138,7 +175,7 @@ export default function SignupPage() {
                   <FormItem>
                     <Label>Email</Label>
                     <FormControl>
-                      <Input type="email" placeholder="m@example.com" {...field} />
+                      <Input type="email" placeholder="m@example.com" {...field} disabled={!!invitationCode} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -179,7 +216,7 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || isLoadingInvitation}>
                 {isLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : 'Create an account'}
               </Button>
             </form>

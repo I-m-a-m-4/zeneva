@@ -31,35 +31,46 @@ export const createUserProfileDocument = async (
   firestore: Firestore,
   user: User,
   displayName: string,
-  phone?: string
+  phone?: string,
+  invitationCode?: string | null
 ) => {
   const userDocRef = doc(firestore, `users/${user.uid}`);
 
   try {
-    const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
-    const invitationSnapshot = await getDocs(invitationQuery);
-    const invitationDoc = !invitationSnapshot.empty ? invitationSnapshot.docs[0] : null;
-
-    // Use a write batch to perform atomic writes.
-    // This is more resilient to race conditions during signup than runTransaction,
-    // as it doesn't require a pre-read of the user document.
     const batch = writeBatch(firestore);
       
     let businessId: string;
     let userRole: UserRole;
     let surveyCompleted = true; // Default for invited users
 
-    if (invitationDoc) {
-      const invitationData = invitationDoc.data();
+    if (invitationCode) {
+      const invDocRef = doc(firestore, 'invitations', invitationCode);
+      const invDocSnap = await getDoc(invDocRef);
+
+      if (!invDocSnap.exists()) {
+        throw new Error("This invitation is invalid or has already been used.");
+      }
+      
+      const invitationData = invDocSnap.data();
+
+      if (invitationData.email.toLowerCase() !== user.email?.toLowerCase()) {
+        throw new Error("This invitation is for a different email address.");
+      }
+
       businessId = invitationData.businessId;
       userRole = invitationData.role;
-      batch.delete(invitationDoc.ref); // Delete the invitation
+      batch.delete(invDocRef);
     } else {
-      // Create a new business for a new user
+      const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
+      const invitationSnapshot = await getDocs(invitationQuery);
+      if (!invitationSnapshot.empty) {
+          throw new Error("You have a pending invitation. Please use the link in your invitation email to sign up.");
+      }
+
       const businessDocRef = doc(collection(firestore, 'businessInstances'));
       businessId = businessDocRef.id;
       userRole = 'admin';
-      surveyCompleted = false; // New businesses must go through onboarding
+      surveyCompleted = false;
       const trialEndDate = add(new Date(), { days: 30 });
       const newBusiness: Omit<BusinessInstance, 'id'> = {
         name: `${displayName}'s Business`,
@@ -85,11 +96,14 @@ export const createUserProfileDocument = async (
     };
     batch.set(userDocRef, userProfile);
 
-    // Commit all writes atomically
     await batch.commit();
 
   } catch (error) {
-    console.error("FATAL: User and Business creation transaction failed.", error);
+    console.error("FATAL: User creation transaction failed.", error);
+    // If Firestore fails, we should delete the auth user to prevent orphaned accounts.
+    await user.delete().catch(deleteError => {
+        console.error("FATAL: Failed to clean up orphaned auth user.", deleteError);
+    });
     throw error;
   }
 };

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,38 +8,37 @@ service cloud.firestore {
     // =================================================================
     
     function isSuperAdmin() {
-      // Super admin backdoor
-      return request.auth != null && request.auth.token.email == 'belloimam431@gmail.com';
+      return request.auth != null && 
+             request.auth.token != null &&
+             'email' in request.auth.token &&
+             request.auth.token.email == 'belloimam431@gmail.com';
     }
 
     function isUserAuthenticated() {
       return request.auth != null;
     }
 
-    function isUserAuthenticatedAndExists() {
-       return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    function isRequestingUserMemberOf(businessId) {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && exists(userDocPath) && get(userDocPath).data.businessId == businessId;
     }
-
-    function getRequestingUserData() {
-       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
+    
     function isRequestingUserAdmin() {
-      return isUserAuthenticatedAndExists() && getRequestingUserData().role == 'admin';
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role == 'admin';
     }
 
     function isRequestingUserManager() {
-      return isUserAuthenticatedAndExists() && (getRequestingUserData().role == 'admin' || getRequestingUserData().role == 'manager');
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role in ['admin', 'manager'];
     }
 
-    function isRequestingUserMemberOf(businessId) {
-      return isUserAuthenticatedAndExists() && getRequestingUserData().businessId == businessId;
-    }
-    
     function isBusinessOwner(businessId) {
-      return isUserAuthenticated() && 
-        exists(/databases/$(database)/documents/businessInstances/$(businessId)) &&
-        get(/databases/$(database)/documents/businessInstances/$(businessId)).data.ownerId == request.auth.uid;
+       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+       return request.auth != null && 
+              exists(userDocPath) &&
+              get(userDocPath).data.businessId == businessId && 
+              get(userDocPath).data.role == 'admin';
     }
 
     // =================================================================
@@ -59,100 +57,99 @@ service cloud.firestore {
     }
    
     match /purchases/{purchaseId} {
-      allow create: if isUserAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow read, list: if isSuperAdmin();
       allow update, delete: if false;
     }
 
     match /supportThreads/{threadId} {
-      allow read: if isSuperAdmin() || (isUserAuthenticated() && resource.data.userId == request.auth.uid);
-      allow create: if isUserAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSuperAdmin();
-      
-      match /messages/{messageId} {
-        allow read, create: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
-      }
+        allow read: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+        allow create: if isUserAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow update: if isSuperAdmin();
+
+        match /messages/{messageId} {
+            allow create: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+            allow read: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+        }
     }
+    
+    match /supportThreads {
+        allow list: if isSuperAdmin() || (isUserAuthenticated() && request.query.where.userId == request.auth.uid);
+    }
+    
 
     // =================================================================
     // Multi-Tenant Collections
     // =================================================================
 
     match /businessInstances/{businessId} {
-      // Allow public read for storefronts, or private read for members.
-      allow read: if true;
-      allow create: if isUserAuthenticated() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if (isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId) || isSuperAdmin();
+      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+      
+      allow list: if request.query.limit <= 1 || isSuperAdmin();
+      
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerId;
+      allow update: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId) || isSuperAdmin();
       allow delete: if isSuperAdmin();
       
       match /subscription_history/{historyId} {
-        allow read, list: if isRequestingUserMemberOf(businessId) || isBusinessOwner(businessId) || isSuperAdmin();
-        allow create: if isUserAuthenticated() || isSuperAdmin();
+        allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+        allow create: if isUserAuthenticated();
         allow update, delete: if false;
       }
 
       match /auditLogs/{logId} {
-        allow list, get: if (isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId);
-        allow create: if isRequestingUserMemberOf(businessId) || isBusinessOwner(businessId);
+        allow list, get: if isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId);
+        allow create: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
         allow update, delete: if false;
       }
 
       match /onlineOrders/{orderId} {
-        // Anyone can create an order.
-        allow create: if true;
-        // Only members of the business can manage orders.
-        allow read, list, update, delete: if isRequestingUserMemberOf(businessId) || isBusinessOwner(businessId) || isSuperAdmin();
+         allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+         allow write: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
       }
     }
 
     match /users/{userId} {
-      allow read: if (isUserAuthenticated() && request.auth.uid == userId) || 
-                  (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId) || 
-                  isSuperAdmin();
+      allow get: if (request.auth != null && request.auth.uid == userId) || (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
+      allow list: if isRequestingUserAdmin();
       
-      allow list: if isRequestingUserAdmin() || isSuperAdmin();
-      
-      allow update: if (isUserAuthenticated() && request.auth.uid == userId) || 
-                      (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId) ||
-                      isSuperAdmin();
+      allow update: if (request.auth != null && request.auth.uid == userId) || 
+                       (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
 
-      allow create: if isUserAuthenticated() && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
       
-      allow delete: if (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId && request.auth.uid != userId) || isSuperAdmin();
+      allow delete: if isSuperAdmin() ||
+                       (isRequestingUserAdmin() && request.auth != null && request.auth.uid != userId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
       
       match /notifications/{notificationId} {
-          allow read, list, create, update, delete: if isUserAuthenticated() && request.auth.uid == userId;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
    
     match /invitations/{invitationId} {
-      allow create: if isRequestingUserAdmin() && request.resource.data.businessId == getRequestingUserData().businessId;
-      allow list: if isRequestingUserAdmin() || isSuperAdmin();
-      allow read, delete: if (isUserAuthenticated() && (
-          resource.data.email == request.auth.token.email || 
-          (isRequestingUserAdmin() && getRequestingUserData().businessId == resource.data.businessId)
-      )) || isSuperAdmin();
+      allow read: if true; // Publicly readable by anyone with the unguessable link ID
+      allow create: if isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin());
+      allow delete: if (isUserAuthenticated() && isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
     }
 
+
     match /products/{productId} {
-      // Allow public read for storefronts.
       allow get, list: if true;
-      allow create: if isRequestingUserManager() && request.resource.data.businessId == getRequestingUserData().businessId;
-      allow update, delete: if isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow create: if isUserAuthenticated() && isRequestingUserManager() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
 
     match /receipts/{receiptId} {
-      allow get: if isRequestingUserMemberOf(resource.data.businessId) || isSuperAdmin();
-      allow list: if isUserAuthenticated() || isSuperAdmin();
-      allow create: if isUserAuthenticated() && request.resource.data.businessId == getRequestingUserData().businessId;
-      allow update, delete: if isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+        allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId);
+        allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
+        allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
     
     match /customers/{customerId} {
-      allow get: if isRequestingUserMemberOf(resource.data.businessId) || isSuperAdmin();
-      allow list: if isUserAuthenticated() || isSuperAdmin();
-      allow create: if isUserAuthenticated() && request.resource.data.businessId == getRequestingUserData().businessId;
-      allow update, delete: if isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId);
+      allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
+      allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
   }
 }

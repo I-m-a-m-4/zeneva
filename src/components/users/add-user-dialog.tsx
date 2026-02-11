@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { sendInvitationEmail } from '@/lib/email';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AddUserDialogProps {
   isOpen: boolean;
@@ -51,19 +52,24 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
     if (!firestore) return;
     setIsSubmitting(true);
     try {
-        const invitationsRef = collection(firestore, 'invitations');
-        await addDoc(invitationsRef, {
+        const invitationCode = uuidv4();
+        const invitationRef = doc(firestore, 'invitations', invitationCode);
+        
+        await setDoc(invitationRef, {
             ...values,
             businessId,
             createdAt: serverTimestamp(),
         });
         
+        const invitationLink = `${window.location.origin}/signup?invitationCode=${invitationCode}`;
+
         try {
             await sendInvitationEmail({
                 to_email: values.email,
                 to_name: values.name,
                 business_name: businessName,
                 inviter_name: inviterName,
+                invitation_link: invitationLink,
             });
             toast({
                 variant: 'success',
@@ -98,7 +104,7 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
         <DialogHeader>
           <DialogTitle>Invite New User</DialogTitle>
           <DialogDescription>
-            Enter the user's details. They will receive an email and be able to join your business once they sign up.
+            Enter the user's details. They will receive an email with a secure link to join your business.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
