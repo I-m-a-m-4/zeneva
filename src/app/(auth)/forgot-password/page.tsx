@@ -22,8 +22,8 @@ export default function ForgotPasswordPage() {
   const handleReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
-        toast({ title: "Authentication service not available.", variant: "destructive" });
-        return;
+      toast({ title: "Authentication service not available.", variant: "destructive" });
+      return;
     }
     setIsLoading(true);
     sendPasswordResetEmail(auth, email)
@@ -33,11 +33,13 @@ export default function ForgotPasswordPage() {
           description: `An email has been sent to ${email} with instructions.`,
           variant: 'success'
         });
+        console.log(`Password reset email sent successfully to ${email}`);
         setIsSent(true);
         setIsLoading(false);
       })
       .catch((error) => {
-         toast({
+        console.error("Error sending password reset email:", error);
+        toast({
           variant: 'destructive',
           title: 'Request Failed',
           description: error.code === 'auth/invalid-email' ? 'Please enter a valid email address.' : 'Could not send reset email. Please try again.',
@@ -52,12 +54,15 @@ export default function ForgotPasswordPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
+              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
             <h1 className="text-3xl font-bold">Forgot Password</h1>
             <p className="text-balance text-muted-foreground">
-              {isSent ? "Check your inbox for the reset link." : "Enter your email to receive a password reset link."}
+              {isSent
+                ? "Check your inbox (and Spam/Promotions folder) for the reset link."
+                : "Enter your email to receive a password reset link."}
             </p>
+
           </div>
           {!isSent ? (
             <form onSubmit={handleReset} className="grid gap-4">
@@ -78,9 +83,33 @@ export default function ForgotPasswordPage() {
               </Button>
             </form>
           ) : (
-             <Button className="w-full" asChild>
-              <Link href="/login">Back to Login</Link>
-            </Button>
+            <div className="space-y-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4 text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-medium">Can't find the email?</p>
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li>Check your Spam or Junk folder</li>
+                  <li>Check the Promotions tab (if using Gmail)</li>
+                  <li>Wait a few minutes, as delivery can be delayed</li>
+                </ul>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setIsSent(false);
+                  // Optional: pre-fill email again if needed, or just let them type it again to verify.
+                  // Keeping email state as is allows them to just hit send again if we want to support that flow,
+                  // but resetting isSent to false brings back the form.
+                }}
+              >
+                Resend Email
+              </Button>
+
+              <Button className="w-full" asChild>
+                <Link href="/login">Back to Login</Link>
+              </Button>
+            </div>
           )}
           <div className="mt-4 text-center text-sm">
             Remember your password?{" "}
@@ -99,8 +128,8 @@ export default function ForgotPasswordPage() {
           className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
         />
         <div className="absolute bottom-8 left-8 right-8 p-6 bg-black/50 backdrop-blur-md rounded-lg">
-            <h2 className="text-white text-3xl font-bold font-headline">The Operating System for Business</h2>
-            <p className="text-white/80 mt-2 text-lg">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one powerful platform.</p>
+          <h2 className="text-white text-3xl font-bold font-headline">The Operating System for Business</h2>
+          <p className="text-white/80 mt-2 text-lg">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one powerful platform.</p>
         </div>
       </div>
     </div>
