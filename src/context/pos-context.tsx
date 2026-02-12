@@ -62,6 +62,10 @@ interface POSContextType {
   addToQueue: (action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => void;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
+  optimisticProducts: Product[];
+  updateQueuedAction: (id: string, updates: Partial<QueuedAction>) => void;
+  addProductWithImage: (productData: any, imageFile: File | null) => Promise<void>;
+  removeFromQueue: (id: string) => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -84,16 +88,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
-  const { data: business, isLoading: isLoadingBusiness } = useDoc<BusinessInstance>(businessDocRef);
+  const { data: business, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
-  const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc")) : null), [businessId, firestore, refreshKey]);
-  const { data: receipts, isLoading: isLoadingReceipts } = useCollection<Receipt>(receiptsQuery);
+  const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  const { data: customers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
@@ -143,6 +147,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const results = await Promise.allSettled(pendingActions.map(async (action) => {
       try {
         const batch = writeBatch(firestore);
+        const resultData: any = { id: action.id };
+
         switch (action.type) {
           case 'add-customer': {
             const customersRef = collection(firestore, 'customers');
@@ -153,6 +159,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               entity: { type: 'Customer', id: newCustomerRef.id, name: action.payload.name },
               details: { source: 'offline-queue' }
             });
+            resultData.newId = newCustomerRef.id;
             break;
           }
           case 'update-product': {
@@ -160,7 +167,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.update',
-              entity: { type: 'Product', id: action.payload.productId },
+              entity: { type: 'Product', id: action.payload.productId, name: 'Product' }, // Name might be unknown without fetch, generic fallback
               details: { changes: Object.keys(action.payload.values), source: 'offline-queue' }
             });
             break;
@@ -172,7 +179,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             });
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.update',
-              entity: { type: 'Product', id: 'multiple' },
+              entity: { type: 'Product', id: 'multiple', name: 'Multiple Products' },
               details: { count: action.payload.productIds.length, changes: Object.keys(action.payload.values), source: 'offline-queue-bulk' }
             });
             break;
@@ -197,31 +204,105 @@ export function POSProvider({ children }: { children: ReactNode }) {
             }
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'sale.create',
-              entity: { type: 'Receipt', id: newReceiptRef.id },
+              entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt #${newReceiptRef.id.slice(0, 8)}` },
               details: { total: receiptData.total, source: 'offline-queue' }
             });
+            resultData.newReceiptId = newReceiptRef.id;
             break;
           }
+          case 'add-product':
+            const productsRef = collection(firestore, 'products');
+            const newProductRef = doc(productsRef, action.payload.id);
+            const { id, ...productData } = action.payload;
+
+            batch.set(newProductRef, {
+              ...productData,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'product.create',
+              entity: { type: 'Product', id: newProductRef.id, name: action.payload.name },
+              details: { name: action.payload.name, price: action.payload.price, source: 'offline-queue' }
+            });
+            resultData.newId = newProductRef.id; // Usually same as payload.id
+            break;
+          case 'delete-product':
+            action.payload.productIds.forEach((id: string) => {
+              const productRef = doc(firestore, 'products', id);
+              batch.delete(productRef);
+            });
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'product.delete',
+              entity: { type: 'Product', id: 'multiple', name: 'Multiple Products' },
+              details: { count: action.payload.productIds.length, source: 'offline-queue' }
+            });
+            break;
         }
         await batch.commit();
-        return { id: action.id, status: 'fulfilled' };
+        return { status: 'fulfilled', ...resultData };
       } catch (error: any) {
         console.error(`Failed to process action ${action.id}:`, error);
         return { id: action.id, status: 'rejected', reason: error.message || 'An unknown error occurred.' };
       }
     }));
 
+    // Optimistic Local State Updates (Mutation)
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const action = pendingActions[index];
+        const resValue = result.value as any; // Type assertion since we return custom objects
+
+        switch (action.type) {
+          case 'add-customer':
+            mutateCustomers((prev: Customer[] | null) => prev ? [...prev, { ...action.payload, id: resValue.newId, createdAt: new Date() as any, updatedAt: new Date() as any }] : null);
+            break;
+          case 'update-product':
+            mutateProducts((prev: Product[] | null) => prev ? prev.map((p: Product) => p.id === action.payload.productId ? { ...p, ...action.payload.values, updatedAt: new Date() as any } : p) : null);
+            break;
+          case 'bulk-update-products':
+            mutateProducts((prev) => prev ? prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values, updatedAt: new Date() as any } : p) : null);
+            break;
+          case 'add-product':
+            mutateProducts((prev) => prev ? [...prev, { ...action.payload, createdAt: new Date() as any, updatedAt: new Date() as any }] : null);
+            break;
+          case 'delete-product':
+            mutateProducts((prev) => prev ? prev.filter(p => !action.payload.productIds.includes(p.id)) : null);
+            break;
+          case 'complete-sale':
+            // 1. Add Receipt
+            mutateReceipts((prev) => prev ? [{ ...action.payload.receiptData, id: resValue.newReceiptId, createdAt: new Date() as any }, ...prev] : null);
+
+            // 2. Update Stock
+            const updates = action.payload.productUpdates as { id: string, newStock: number }[];
+            mutateProducts((prev) => prev ? prev.map(p => {
+              const update = updates.find(u => u.id === p.id);
+              return update ? { ...p, stock: update.newStock, updatedAt: new Date() as any } : p;
+            }) : null);
+
+            // 3. Update Loyalty Points
+            if (action.payload.receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
+              const pointsPerUnit = business.settings.pointsPerUnit || 0;
+              const pointsEarned = Math.floor(action.payload.receiptData.total * pointsPerUnit);
+              mutateCustomers((prev) => prev ? prev.map(c => c.id === action.payload.receiptData.customer.id ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsEarned, updatedAt: new Date() as any } : c) : null);
+            }
+            break;
+        }
+      }
+    });
+
     setQueuedActions(prev => {
       const newQueue = [...prev];
       const successfulIds = new Set();
-      results.forEach(result => {
+      results.forEach((result, idx) => {
         if (result.status === 'fulfilled') {
-          successfulIds.add(result.value.id);
+          successfulIds.add(pendingActions[idx].id);
         } else if (result.status === 'rejected') {
-          const index = newQueue.findIndex(a => a.id === result.reason.id);
+          const index = newQueue.findIndex(a => a.id === pendingActions[idx].id);
           if (index > -1) {
             newQueue[index].status = 'failed';
-            newQueue[index].errorMessage = result.reason.reason;
+            newQueue[index].errorMessage = (result.reason as any)?.reason || 'Unknown error';
           }
         }
       });
@@ -236,9 +317,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
 
     setIsQueueProcessing(false);
-    triggerRefresh();
-
-  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast, business, customers, triggerRefresh]);
+    // triggerRefresh(); // No longer needed!
+  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast, business, customers, mutateCustomers, mutateProducts, mutateReceipts]);
 
   const clearFailedActions = useCallback(() => {
     setQueuedActions(prev => prev.filter(a => a.status !== 'failed'));
@@ -253,18 +333,118 @@ export function POSProvider({ children }: { children: ReactNode }) {
       timestamp: Date.now(),
       status: 'pending',
     };
+    const isOnline = navigator.onLine;
+    toast({
+      title: isOnline ? 'Saving...' : 'Action Queued',
+      description: isOnline ? `Saving "${description}" in the background.` : `"${description}" will sync when you're online.`
+    });
     setQueuedActions(prev => [...prev, newAction]);
-    toast({ title: 'Action Queued', description: `"${description}" will sync when you're online.` });
-    if (navigator.onLine) {
-      setTimeout(processQueue, 500);
-    }
+    return newAction.id;
   }, [processQueue, toast]);
+
+  const updateQueuedAction = useCallback((id: string, updates: Partial<QueuedAction>) => {
+    setQueuedActions(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+  }, []);
+
+  const removeFromQueue = useCallback((id: string) => {
+    setQueuedActions(prev => prev.filter(a => a.id !== id));
+    toast({ title: 'Action Cancelled', description: 'Removed item from queue.' });
+  }, [toast]);
+
+  const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
+    // 1. Generate local blob URL for optimistic UI if image exists
+    const optimisticImageUrl = imageFile ? URL.createObjectURL(imageFile) : '';
+
+    // 2. Add to queue immediately with optimistic data
+    const actionId = addToQueue({
+      type: 'add-product',
+      payload: {
+        ...productData,
+        imageUrl: optimisticImageUrl,
+      }
+    }, `Adding ${productData.name}`);
+
+    // If no image, we are done (queue processor will handle sync)
+    // If online, addToQueue triggers sync. 
+    // If we have an image, we need to upload it.
+    if (imageFile) {
+      // Start background upload
+      // We don't await this function to block navigation, but we do want to ensure 
+      // the upload happens. Since this function is in Context (persists), it's safe.
+
+      const uploadImage = async () => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          toast({ variant: 'default', title: 'Offline', description: 'Image will be uploaded when you come online.' });
+          return;
+        }
+
+        try {
+          const formData = new FormData();
+          formData.append('image', imageFile);
+          const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
+
+          const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error('Upload failed');
+
+          const result = await response.json();
+
+          if (result.success) {
+            // Update the queued action payload with real URL
+            setQueuedActions(prev => prev.map(a => {
+              if (a.id === actionId) {
+                return {
+                  ...a,
+                  payload: {
+                    ...a.payload,
+                    imageUrl: result.data.url
+                  }
+                };
+              }
+              return a;
+            }));
+
+            addToQueue({
+              type: 'update-product',
+              payload: {
+                productId: productData.id, // Assuming ID is consistent
+                values: { imageUrl: result.data.url }
+              }
+            }, `Updating image for ${productData.name}`);
+
+          } else {
+            console.warn('Image Upload Failed:', result);
+            toast({ variant: 'destructive', title: 'Image Upload Failed', description: 'Could not upload product image.' });
+          }
+        } catch (e: any) {
+          // Suppress "Failed to fetch" errors which are common when offline/unstable
+          if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
+            console.warn("Background upload paused (network issue).");
+          } else {
+            console.error("Background upload error:", e);
+          }
+        }
+      };
+
+      uploadImage().catch(err => console.warn("Upload process error:", err));
+    }
+  }, [addToQueue, toast]);
 
   useEffect(() => {
     const goOnline = () => processQueue();
     window.addEventListener('online', goOnline);
     return () => window.removeEventListener('online', goOnline);
   }, [processQueue]);
+
+  // Effect to ensure queue keeps processing if items are added while processing
+  useEffect(() => {
+    if (!isQueueProcessing && queuedActions.some(a => a.status === 'pending') && navigator.onLine) {
+      processQueue();
+    }
+  }, [queuedActions, isQueueProcessing, processQueue]);
 
   // POS State
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -401,12 +581,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     paymentMethod, setPaymentMethod,
     resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
-    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions,
+    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
+    optimisticProducts: queuedActions
+      .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
+      .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
-    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions,
+    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, resetPOS
   ]);
 

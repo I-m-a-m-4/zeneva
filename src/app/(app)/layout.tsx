@@ -41,6 +41,7 @@ import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import { ThemeProvider } from '@/components/theme-provider';
+import QueueStatus from '@/components/layout/queue-status';
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -441,6 +442,7 @@ export default function AuthenticatedLayout({
                 <BusinessHealthIndicator />
                 <div className="flex-1" />
                 <div className="flex items-center gap-1 md:gap-2 ml-auto">
+                  <QueueStatus />
                   <NetworkStatusIndicator />
                   <Tooltip>
                     <TooltipTrigger asChild>

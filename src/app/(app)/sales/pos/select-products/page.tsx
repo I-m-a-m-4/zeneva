@@ -88,7 +88,7 @@ export default function SelectProductsPage() {
     const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
-    
+
     React.useEffect(() => {
         if (business) {
             const isTrialActive = business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date();
@@ -96,35 +96,35 @@ export default function SelectProductsPage() {
             const isLifetime = business.accessLevel === 'lifetime';
 
             if (!isTrialActive && !isPaidPlan && !isLifetime) {
-            toast({
-                variant: 'destructive',
-                title: 'Subscription Required',
-                description: 'Please subscribe to a plan to create sales.',
-            });
-            router.push('/billing');
+                toast({
+                    variant: 'destructive',
+                    title: 'Subscription Required',
+                    description: 'Please subscribe to a plan to create sales.',
+                });
+                router.push('/billing');
             }
         }
     }, [business, router, toast]);
 
     const filteredProducts = React.useMemo(() => {
         if (!products) return [];
-        
+
         let filtered = products;
 
         if (categoryFilter !== 'all') {
             filtered = filtered.filter(p => p.category === categoryFilter);
         }
-        
+
         if (searchTerm) {
-            filtered = filtered.filter(p => 
+            filtered = filtered.filter(p =>
                 p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
-        
+
         return filtered;
     }, [products, searchTerm, categoryFilter]);
-    
+
     const handleAddToCart = (product: Product) => {
         addToCart(product);
     };
@@ -137,17 +137,17 @@ export default function SelectProductsPage() {
     return (
         <div className="grid md:grid-cols-3 md:gap-8">
             <div className="md:col-span-2">
-                 <div className="flex items-center mb-4 gap-4 sticky top-0 bg-background py-2 z-10">
+                <div className="flex items-center mb-4 gap-4 sticky top-0 bg-background py-2 z-10">
                     <div className="relative w-full">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
+                        <Input
                             placeholder="Search by name or SKU..."
                             className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                     <DropdownMenu>
+                    <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className="h-10 gap-1.5">
                                 <ListFilter className="h-4 w-4" />
@@ -166,10 +166,10 @@ export default function SelectProductsPage() {
                             </DropdownMenuRadioGroup>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                     <Select onValueChange={setColumnClass} defaultValue={columnClass}>
+                    <Select onValueChange={setColumnClass} defaultValue={columnClass}>
                         <SelectTrigger className="w-[150px] hidden lg:flex">
-                           <Columns className="h-4 w-4 mr-2" />
-                           <SelectValue placeholder="Layout" />
+                            <Columns className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Layout" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="lg:grid-cols-3">3 Columns</SelectItem>
@@ -188,19 +188,19 @@ export default function SelectProductsPage() {
                             {filteredProducts.map(product => (
                                 <Card key={product.id} className="overflow-hidden flex flex-col">
                                     <CardContent className="p-0 relative aspect-square w-full">
-                                    {product.imageUrl ? (
-                                        <Image
-                                            src={product.imageUrl}
-                                            alt={product.name}
-                                            fill
-                                            className="object-cover"
-                                            data-ai-hint={product.imageHint}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-                                            <Package size={48} />
-                                        </div>
-                                    )}
+                                        {product.imageUrl ? (
+                                            <Image
+                                                src={product.imageUrl}
+                                                alt={product.name}
+                                                fill
+                                                className="object-cover"
+                                                data-ai-hint={product.imageHint}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+                                                <Package size={48} />
+                                            </div>
+                                        )}
                                     </CardContent>
                                     <CardHeader className="p-2 flex-grow flex justify-center">
                                         <CardTitle className="text-sm font-medium leading-snug">{product.name}</CardTitle>
@@ -224,10 +224,10 @@ export default function SelectProductsPage() {
                             {!searchTerm && categoryFilter === 'all' && (
                                 <Button size="sm" asChild className="h-8 gap-1">
                                     <Link href="/inventory/add">
-                                    <PlusCircle className="h-3.5 w-3.5" />
-                                    <span className="sm:whitespace-nowrap">
-                                        Add Product
-                                    </span>
+                                        <PlusCircle className="h-3.5 w-3.5" />
+                                        <span className="sm:whitespace-nowrap">
+                                            Add Product
+                                        </span>
                                     </Link>
                                 </Button>
                             )}
@@ -235,7 +235,7 @@ export default function SelectProductsPage() {
                     )}
                 </div>
             </div>
-            
+
             {/* Desktop Cart */}
             <div className="hidden md:block">
                 <Card className="sticky top-6">
@@ -246,9 +246,9 @@ export default function SelectProductsPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                       <ScrollArea className="h-96 pr-3">
-                           <CartContents />
-                       </ScrollArea>
+                        <ScrollArea className="h-96 pr-3">
+                            <CartContents />
+                        </ScrollArea>
                     </CardContent>
                     <CardFooter>
                         <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
@@ -264,13 +264,13 @@ export default function SelectProductsPage() {
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button variant="default" className="fixed bottom-[70px] left-4 right-4 z-20 h-16 shadow-lg rounded-xl text-lg">
-                             <div className="flex justify-between items-center w-full">
+                            <div className="flex justify-between items-center w-full">
                                 <div className="flex items-center gap-2">
-                                     <ChevronsUp className="h-5 w-5"/>
+                                    <ChevronsUp className="h-5 w-5" />
                                     <span>View Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})</span>
                                 </div>
                                 <span>{currencySymbol}{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                             </div>
+                            </div>
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="bottom" className="h-[75%] flex flex-col">

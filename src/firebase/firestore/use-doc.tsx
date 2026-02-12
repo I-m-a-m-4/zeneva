@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import {
   DocumentReference,
   getDoc, // Changed from onSnapshot
@@ -23,6 +23,7 @@ export interface UseDocResult<T> {
   data: WithId<T> | null; // Document data with ID, or null.
   isLoading: boolean;       // True if loading.
   error: FirestoreError | Error | null; // Error object, or null.
+  mutate: Dispatch<SetStateAction<WithId<T> | null>>; // Function to manually update data
 }
 
 /**
@@ -89,5 +90,5 @@ export function useDoc<T = any>(
     // This hook now fetches data once. It will re-run if memoizedDocRef changes.
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, mutate: setData };
 }

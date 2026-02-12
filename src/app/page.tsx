@@ -81,6 +81,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { MarqueeSection } from '@/components/marquee-section';
 import { FeaturesFloatingSection } from '@/components/features-floating-section';
 import { ThemeProvider } from '@/components/theme-provider';
+import { auth } from '@/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 
 const faqItems = [
@@ -186,6 +189,17 @@ export default function Home() {
     const { toast } = useToast();
     const form = useRef<HTMLFormElement>(null);
     const [isSending, setIsSending] = useState(false);
+    const router = useRouter();
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                router.push('/dashboard');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
 
 
     // Insight Data

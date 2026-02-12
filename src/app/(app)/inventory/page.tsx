@@ -107,7 +107,7 @@ export default function InventoryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { products: allProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh } = usePOS();
+  const { products: allProducts, optimisticProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh, removeFromQueue, addToQueue } = usePOS();
 
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -140,9 +140,24 @@ export default function InventoryPage() {
   const userRole = currentUserProfile?.role;
   const canManageStock = userRole === 'admin' || userRole === 'manager';
 
+  // Get IDs of products queued for deletion
+  const { queuedActions } = usePOS();
+  const queuedDeletionIds = React.useMemo(() => {
+    return queuedActions
+      .filter(a => a.type === 'delete-product' && (a.status === 'pending' || a.status === 'processing'))
+      .flatMap(a => a.payload.productIds as string[]);
+  }, [queuedActions]);
+
   const filteredAndSortedProducts = React.useMemo(() => {
     if (!allProducts) return [];
-    let filtered = allProducts
+
+    // Combine real and optimistic products
+    const combinedProducts = [...(optimisticProducts || []), ...allProducts];
+
+    // Filter out products queued for deletion
+    const validProducts = combinedProducts.filter(p => !queuedDeletionIds.includes(p.id));
+
+    let filtered = validProducts
       .filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -166,7 +181,7 @@ export default function InventoryPage() {
     }
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [allProducts, searchTerm, stockFilter, categoryFilter]);
+  }, [allProducts, optimisticProducts, searchTerm, stockFilter, categoryFilter]);
 
   const pageCount = Math.ceil(filteredAndSortedProducts.length / PRODUCTS_PER_PAGE);
 
@@ -196,31 +211,17 @@ export default function InventoryPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (!firestore || selectedProductIds.length === 0 || !business || !currentUserProfile) return;
+    if (selectedProductIds.length === 0 || !business || !currentUserProfile) return;
 
-    const batch = writeBatch(firestore);
-    selectedProductIds.forEach(id => {
-      const docRef = doc(firestore, 'products', id);
-      batch.delete(docRef);
+    addToQueue({
+      type: 'delete-product',
+      payload: { productIds: selectedProductIds }
+    }, `Deleting ${selectedProductIds.length} product(s)`);
 
-      const deletedProduct = allProducts?.find(p => p.id === id);
-      if (deletedProduct) {
-        logAuditEvent(firestore, business.id, currentUserProfile, {
-          action: 'product.delete',
-          entity: { type: 'Product', id: id, name: deletedProduct.name },
-          details: { name: deletedProduct.name }
-        });
-      }
-    });
+    // We don't need to manually mutate here because we will filter in the UI based on queuedActions
+    toast({ variant: 'default', title: 'Deletion Queued', description: `${selectedProductIds.length} product(s) will be deleted.` });
 
-    try {
-      await batch.commit();
-      toast({ variant: 'success', title: 'Products Deleted', description: `${selectedProductIds.length} products have been removed.` });
-      setSelectedProductIds([]);
-      triggerRefresh();
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete products.' });
-    }
+    setSelectedProductIds([]);
     setIsDeleteDialogOpen(false);
   };
 
@@ -270,7 +271,7 @@ export default function InventoryPage() {
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0);
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full pb-16 md:pb-0">
       <div className="flex items-center pb-4 gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -425,35 +426,50 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {paginatedProducts.map((product) => (
-                  <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"}>
+                  <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
                     <TableCell>
                       <Checkbox
                         checked={selectedProductIds.includes(product.id)}
                         onCheckedChange={() => handleRowSelect(product.id)}
+                        disabled={(product as any).isOptimistic}
                       />
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/inventory/${product.id}`)}>
+                    <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/${product.id}`)}>
                       {product.imageUrl ? (
-                        <Image
-                          alt={product.name}
-                          className="aspect-square rounded-md object-cover"
-                          height="64"
-                          src={product.imageUrl}
-                          width="64"
-                          data-ai-hint={product.imageHint || product.category}
-                        />
+                        <div className="relative h-16 w-16">
+                          <Image
+                            alt={product.name}
+                            className="aspect-square rounded-md object-cover"
+                            fill // Changed to fill for better responsiveness/layout in relative container
+                            src={product.imageUrl}
+                            data-ai-hint={product.imageHint || product.category}
+                          />
+                          {(product as any).isOptimistic && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors">
+                        <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
                           <Package />
+                          {(product as any).isOptimistic && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </div>
+                          )}
                         </div>
                       )}
                     </TableCell>
                     <TableCell className="font-medium whitespace-normal">
-                      <Link href={`/inventory/${product.id}`} className="hover:underline">{product.name}</Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline", (product as any).isOptimistic && "pointer-events-none")}>{product.name}</Link>
+                        {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">Saving...</Badge>}
+                      </div>
                       <div className="text-sm text-muted-foreground">{product.sku}</div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={(product.stock || 0) > 0 ? "outline" : "destructive"}>
+                      <Badge variant={(product.stock || 0) > 0 ? "outline" : "destructive"} className="whitespace-nowrap">
                         {(product.stock || 0) > 0 ? "In Stock" : "Out of Stock"}
                       </Badge>
                     </TableCell>
@@ -466,6 +482,7 @@ export default function InventoryPage() {
                             aria-haspopup="true"
                             size="icon"
                             variant="ghost"
+                            disabled={false} // Enable for cancellation
                           >
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Toggle menu</span>
@@ -473,10 +490,19 @@ export default function InventoryPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={() => { NProgress.start(); router.push(`/inventory/${product.id}`); }} disabled={!canManageStock}>
+                          {/* Cancel Optimistic Action */}
+                          {(product as any).isOptimistic && (product as any).queueId && (
+                            <DropdownMenuItem
+                              className="text-destructive cursor-pointer"
+                              onSelect={() => removeFromQueue((product as any).queueId)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Discard
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="cursor-pointer" onSelect={() => { NProgress.start(); router.push(`/inventory/${product.id}`); }} disabled={!canManageStock || (product as any).isOptimistic}>
                             <Edit className="mr-2 h-4 w-4" /> Full Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setQuickEditProduct(product) }} disabled={!canManageStock}>
+                          <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setQuickEditProduct(product) }} disabled={!canManageStock || (product as any).isOptimistic}>
                             <Edit className="mr-2 h-4 w-4" /> Quick Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setBarcodeProduct(product); }} disabled={!product.sku}>

@@ -43,10 +43,10 @@ export interface UserProfile {
 }
 
 export interface CustomerInsightsOutput {
-  summary: string;
-  productSuggestions: string[];
-  engagementTactics: string[];
-  createdAt?: any;
+    summary: string;
+    productSuggestions: string[];
+    engagementTactics: string[];
+    createdAt?: any;
 }
 
 export interface Customer {
@@ -100,10 +100,10 @@ export interface OnlineOrder {
     }[];
     total: number;
     shippingDetails?: {
-      name: string;
-      price: number;
-      type: 'delivery' | 'pickup';
-      location?: string;
+        name: string;
+        price: number;
+        type: 'delivery' | 'pickup';
+        location?: string;
     };
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
     paymentMethod?: 'Paystack' | 'Bank Transfer';
@@ -112,13 +112,13 @@ export interface OnlineOrder {
 }
 
 export interface QueuedAction {
-  id: string;
-  type: 'complete-sale' | 'update-product' | 'add-customer' | 'bulk-update-products';
-  description: string;
-  payload: any;
-  timestamp: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  errorMessage?: string;
+    id: string;
+    type: 'complete-sale' | 'update-product' | 'add-customer' | 'bulk-update-products' | 'add-product' | 'delete-product';
+    description: string;
+    payload: any;
+    timestamp: number;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    errorMessage?: string;
 }
 
 export interface AISuggestion {
@@ -190,9 +190,9 @@ export interface IrresistibleOffer {
 }
 
 export interface BusinessHealth {
-  score: number; // 0-100
-  status: 'Healthy' | 'Needs Attention' | 'At Risk';
-  summary: string; // A brief sentence about the score.
+    score: number; // 0-100
+    status: 'Healthy' | 'Needs Attention' | 'At Risk';
+    summary: string; // A brief sentence about the score.
 }
 
 export interface CustomerSegment {
@@ -211,16 +211,16 @@ export interface CustomerSegment {
 
 
 export interface BusinessAnalysisOutput {
-  smartStockRecommendations?: SmartStockRecommendation[];
-  demandHeatmap?: DemandHeatmap;
-  revenueOpportunities?: RevenueOpportunity[];
-  smartMerchandising?: SmartMerchandising[];
-  irresistibleOffers?: IrresistibleOffer[];
-  slowMovingInventory?: SlowMovingInventory[];
-  businessHealth?: BusinessHealth;
-  customerSegments?: CustomerSegment[];
-  pricingRecommendations?: PricingRecommendation[];
-  createdAt?: any;
+    smartStockRecommendations?: SmartStockRecommendation[];
+    demandHeatmap?: DemandHeatmap;
+    revenueOpportunities?: RevenueOpportunity[];
+    smartMerchandising?: SmartMerchandising[];
+    irresistibleOffers?: IrresistibleOffer[];
+    slowMovingInventory?: SlowMovingInventory[];
+    businessHealth?: BusinessHealth;
+    customerSegments?: CustomerSegment[];
+    pricingRecommendations?: PricingRecommendation[];
+    createdAt?: any;
 }
 
 

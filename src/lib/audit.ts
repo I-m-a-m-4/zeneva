@@ -3,7 +3,7 @@
 import { collection, addDoc, serverTimestamp, type Firestore } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 
-type AuditAction = 
+type AuditAction =
     | 'product.create' | 'product.update' | 'product.delete'
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete'
@@ -27,6 +27,14 @@ export const logAuditEvent = async (
     event: AuditEvent
 ) => {
     try {
+        const details: Record<string, any> = {
+            entityName: event.entity.name || null,
+            ...event.details,
+        };
+
+        // Remove undefined keys from details matching
+        Object.keys(details).forEach(key => details[key] === undefined && delete details[key]);
+
         const logData = {
             businessId,
             userId: user.id,
@@ -35,12 +43,10 @@ export const logAuditEvent = async (
             action: event.action,
             entityType: event.entity.type,
             entityId: event.entity.id,
-            details: {
-                entityName: event.entity.name,
-                ...event.details,
-            },
+            details,
             createdAt: serverTimestamp(),
         };
+
         const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
         await addDoc(auditLogRef, logData);
     } catch (error) {
