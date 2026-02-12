@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     siteName: 'Zeneva',
     images: [
       {
-        url: 'https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?w=1200&h=630&fit=crop',
+        url: '/maxima.png',
         width: 1200,
         height: 630,
       },
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Zeneva - Inventory Management and Point of Sale',
     description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships.',
-    images: [`https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?w=1200&h=630&fit=crop`],
+    images: [`/maxima.png`],
   },
 };
 
