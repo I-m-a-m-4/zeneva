@@ -2,7 +2,7 @@
     "name": "Zeneva",
     "short_name": "Zeneva",
     "description": "The all-in-one business management solution.",
-    "start_url": "/",
+    "start_url": "/dashboard",
     "display": "standalone",
     "background_color": "#241e1b",
     "theme_color": "#241e1b",
