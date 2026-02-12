@@ -191,15 +191,6 @@ export default function Home() {
     const [isSending, setIsSending] = useState(false);
     const router = useRouter();
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                router.push('/dashboard');
-            }
-        });
-
-        return () => unsubscribe();
-    }, [router]);
 
 
     // Insight Data
