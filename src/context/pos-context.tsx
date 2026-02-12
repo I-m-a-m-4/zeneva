@@ -540,7 +540,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       ));
     } else {
       if ((product.stock || 0) <= 0) {
-        toast({ title: 'Out of stock', description: `${product.name} is out of stock.`, variant: 'destructive' });
+        toast({ title: 'Out of Stock', variant: 'destructive' });
         return;
       }
       setCart(prev => [...prev, { product, quantity: 1 }]);
