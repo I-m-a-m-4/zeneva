@@ -348,6 +348,17 @@ export interface UserNotification {
     queuedActionId?: string;
 }
 
+export interface SystemBroadcast {
+    id: string;
+    title: string;
+    message: string;
+    type: 'info' | 'warning' | 'alert';
+    expiresAt: any; // Firestore Timestamp
+    createdAt: any; // Firestore Timestamp
+    isActive: boolean;
+    createdBy: string;
+}
+
 
 
 export interface SupportThread {

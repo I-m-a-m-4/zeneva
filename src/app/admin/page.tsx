@@ -20,9 +20,8 @@ import {
     Pie,
     Cell,
     CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
     Legend,
+    Tooltip as ReTooltip,
 } from 'recharts';
 import {
     Users,
@@ -54,6 +53,11 @@ import {
     BarChart2,
     AlertTriangle,
     Heart,
+    Megaphone,
+    MapPin,
+    LogIn,
+    AlertCircle,
+    ArrowRight,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect } from 'react';
@@ -67,8 +71,9 @@ import {
     updateDoc,
     addDoc,
     serverTimestamp,
+    Timestamp,
 } from 'firebase/firestore';
-import { format, formatDistanceToNow, subDays } from 'date-fns';
+import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
     Table,
@@ -97,8 +102,11 @@ import { Combobox } from '@/components/ui/combobox';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         const isRevenue = payload[0].name === 'Revenue';
         return (
@@ -113,6 +121,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         );
     }
     return null;
+};
+
+const CustomTooltip = (props: any) => {
+    return <CustomTooltipContent {...props} />;
 };
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) => (
@@ -303,6 +315,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
 
+    // Broadcast State
+    const [broadcastTitle, setBroadcastTitle] = useState('');
+    const [broadcastMessage, setBroadcastMessage] = useState('');
+    const [broadcastType, setBroadcastType] = useState<'info' | 'warning' | 'alert'>('info');
+    const [broadcastDuration, setBroadcastDuration] = useState('24'); // hours
+    const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+
     const userOptions = useMemo(() => (users || []).map(user => ({
         value: user.email,
         label: `${user.name} (${user.email})`
@@ -364,6 +383,57 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const aiAdoption7 = activeBusinesses.length > 0 ? (aiUsersLast7Days / activeBusinesses.length) * 100 : 0;
         const aiAdoption30 = activeBusinesses.length > 0 ? (aiUsersLast30Days / activeBusinesses.length) * 100 : 0;
 
+        // --- POWER FEATURES ANALYTICS ---
+
+        // 1. Churn Prediction
+        const churnRiskList = activeBusinesses.map(b => {
+            const owner = users?.find(u => u.id === b.ownerId);
+            const lastSeen = owner?.lastSeen?.toDate ? owner.lastSeen.toDate() : null;
+            const daysSinceLogin = lastSeen ? differenceInDays(new Date(), lastSeen) : 999;
+
+            // Check sales activity
+            const busReceipts = receiptsByBusiness[b.id] || [];
+            const recentSales = busReceipts.filter(r => r.createdAt.toDate() > subDays(new Date(), 7)).length;
+
+            let riskScore = 0;
+            let riskFactors = [];
+
+            if (daysSinceLogin > 7) { riskScore += 30; riskFactors.push('Inactive > 7 days'); }
+            if (daysSinceLogin > 30) { riskScore += 50; riskFactors.push('Inactive > 30 days'); }
+            if (recentSales === 0 && busReceipts.length > 0) { riskScore += 20; riskFactors.push('No sales in 7 days'); }
+
+            return { business: b, owner, riskScore, riskFactors, daysSinceLogin };
+        }).filter(item => item.riskScore >= 50).sort((a, b) => b.riskScore - a.riskScore).slice(0, 10); // Top 10 at risk
+
+        // 2. Trial Conversion
+        const expiredTrials = activeBusinesses.filter(b => b.trialExpiresAt && b.trialExpiresAt.toDate() < new Date() && (b.plan === 'starter' || !b.plan));
+        const paidUsers = activeBusinesses.filter(b => b.plan === 'pro' || b.plan === 'business');
+        const conversionRate = (expiredTrials.length + paidUsers.length) > 0
+            ? (paidUsers.length / (expiredTrials.length + paidUsers.length)) * 100
+            : 0;
+
+        const expiringSoonList = activeBusinesses.filter(b => {
+            if (!b.trialExpiresAt || b.plan === 'pro' || b.plan === 'business') return false;
+            const expiry = b.trialExpiresAt.toDate();
+            const now = new Date();
+            const diff = differenceInDays(expiry, now);
+            return diff >= 0 && diff <= 3;
+        });
+
+        // 3. Geographic Distribution
+        const locationCounts = activeBusinesses.reduce((acc, b) => {
+            // Try to find location from various sources
+            const state = b.settings?.state || (b.address ? b.address.split(',').pop()?.trim() : 'Unknown');
+            acc[state] = (acc[state] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const topLocations = Object.entries(locationCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+
+
         return {
             totalActiveBusinesses: activeBusinesses.length,
             activatedBusinessesCount: activatedBusinessesList.length,
@@ -377,8 +447,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             aiAdoption30,
             businessAnalysisUsers,
             troubleshootUsers,
+            churnRiskList,
+            conversionRate,
+            expiringSoonList,
+            topLocations
         }
-    }, [businesses, products, receipts]);
+    }, [businesses, products, receipts, users]);
 
 
     const analyticsData = useMemo(() => {
@@ -608,296 +682,389 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         }
     };
 
+    const handleSendBroadcast = async () => {
+        if (!broadcastTitle || !broadcastMessage) {
+            toast({ variant: 'destructive', title: 'Missing Information', description: 'Please provide both a title and a message for the broadcast.' });
+            return;
+        }
+
+        setIsSendingBroadcast(true);
+        try {
+            const broadcastsRef = collection(firestore, 'broadcasts');
+            const durationInHours = parseInt(broadcastDuration);
+            const expiryDate = new Date();
+            expiryDate.setHours(expiryDate.getHours() + durationInHours);
+
+            await addDoc(broadcastsRef, {
+                title: broadcastTitle,
+                message: broadcastMessage,
+                type: broadcastType,
+                createdAt: serverTimestamp(),
+                expiresAt: Timestamp.fromDate(expiryDate),
+                active: true,
+            });
+
+            toast({ variant: 'success', title: 'Broadcast Sent!', description: 'Your message has been sent to all active users.' });
+            setBroadcastTitle('');
+            setBroadcastMessage('');
+            setBroadcastType('info');
+            setBroadcastDuration('24');
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Broadcast Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSendingBroadcast(false);
+        }
+    };
+
+    const handleImpersonateUser = (user: UserProfile) => {
+        // This is a placeholder. In a real app, you'd likely redirect to an admin view
+        // of the user's dashboard or trigger a backend function to log in as them.
+        toast({
+            title: "Impersonate User",
+            description: `Functionality to impersonate ${user.name} (ID: ${user.id}) would go here.`,
+            variant: "default"
+        });
+        console.log("Impersonating user:", user);
+    };
+
     return (
         <div className="p-4 md:p-6 lg:p-8 space-y-6">
             <div className="mb-2">
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
                 <p className="text-muted-foreground">
-                    Platform-wide overview of Zeneva.
+                    Platform-wide overview, analytics, and admin tools.
                 </p>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <HeartPulse className="h-5 w-5 text-primary" />
-                        Platform Health Overview
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
-                        <StatCard title="Total Active Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
-                    </button>
-                    <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
-                        <StatCard title="Activated Businesses" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products & >=1 sale" />
-                    </button>
-                    <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
-                        <StatCard title="Businesses At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales in 14 days" />
-                    </button>
-                    <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
-                        <StatCard title="Paying Businesses" value={platformAnalytics.payingBusinessesCount} icon={ShieldCheck} description="Pro + Business Plans" />
-                    </button>
-                </CardContent>
-            </Card>
+            <Tabs defaultValue="overview" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
+                    <TabsTrigger value="users">User Management</TabsTrigger>
+                    <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
+                </TabsList>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <BarChart2 className="h-5 w-5 text-primary" />
-                        Platform Activity Overview
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
-                    <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
-                    <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
-                    <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
-                    <StatCard title="Total Revenue" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Check} description="Total value of completed sales" />
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <BarChart2 className="h-5 w-5 text-primary" />
-                            Business Health Distribution
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <RePieChart>
-                                <Pie data={platformAnalytics.healthDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} labelLine={false} >
-                                    {platformAnalytics.healthDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
-                                </Pie>
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend iconSize={10} />
-                            </RePieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <div className="lg:col-span-2 relative overflow-hidden rounded-lg border bg-card">
-                    <div className="grid-bg opacity-30 absolute inset-0 z-0"></div>
-                    <div className="relative z-10">
+                <TabsContent value="overview" className="space-y-6">
+                    <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Bot className="h-5 w-5 text-primary" />
-                                Zen AI Adoption & Impact
+                                <HeartPulse className="h-5 w-5 text-primary" />
+                                Platform Health Overview
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                            <div className="text-center">
-                                <p className="text-3xl font-bold">{platformAnalytics.aiAdoption7.toFixed(1)}%</p>
-                                <p className="text-sm text-muted-foreground">Adoption (7 days)</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-3xl font-bold">{platformAnalytics.aiAdoption30.toFixed(1)}%</p>
-                                <p className="text-sm text-muted-foreground">Adoption (30 days)</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-3xl font-bold">{platformAnalytics.businessAnalysisUsers}</p>
-                                <p className="text-sm text-muted-foreground">Used Business Analysis</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-3xl font-bold">{platformAnalytics.troubleshootUsers}</p>
-                                <p className="text-sm text-muted-foreground">Used Troubleshooter</p>
-                            </div>
+                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
+                                <StatCard title="Total Active Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
+                            </button>
+                            <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
+                                <StatCard title="Activated Businesses" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products & >=1 sale" />
+                            </button>
+                            <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
+                                <StatCard title="Businesses At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales in 14 days" />
+                            </button>
+                            <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
+                                <StatCard title="Paying Businesses" value={platformAnalytics.payingBusinessesCount} icon={ShieldCheck} description="Pro + Business Plans" />
+                            </button>
                         </CardContent>
+                    </Card>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" /> Top Locations</CardTitle><CardDescription>Where are your users located?</CardDescription></CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <ReBarChart data={platformAnalytics.topLocations} layout="vertical" margin={{ left: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                                        <ReTooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                                    </ReBarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Bot className="h-5 w-5 text-primary" />
+                                    Zen AI Adoption
+                                </CardTitle>
+                                <CardDescription>Feature usage stats.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-2 gap-4 items-center">
+                                <div className="text-center p-4 bg-muted/20 rounded-lg">
+                                    <p className="text-3xl font-bold text-primary">{platformAnalytics.aiAdoption30.toFixed(1)}%</p>
+                                    <p className="text-sm text-muted-foreground mt-1">30-Day Adoption</p>
+                                </div>
+                                <div className="text-center p-4 bg-muted/20 rounded-lg">
+                                    <p className="text-3xl font-bold text-primary">{platformAnalytics.businessAnalysisUsers}</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Analysis Users</p>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                </div>
-            </div>
 
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle>New User Growth</CardTitle></CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                            <ReBarChart data={analyticsData.newUserGrowth}>
-                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                                <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.1)' }} />
-                                <Bar dataKey="New Users" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                            </ReBarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle>Subscription Revenue Over Time</CardTitle></CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                            <ReLineChart data={analyticsData.revenueGrowth}>
-                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                                <YAxis tickFormatter={(value) => `₦${Number(value) >= 1000 ? (Number(value) / 1000).toLocaleString() : value}k`} allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                                <Line type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
-                            </ReLineChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><Layers className="text-primary" />Plan Distribution</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <RePieChart>
-                                <Pie data={analyticsData.planDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {analyticsData.planDistributionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
-                                </Pie>
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend iconSize={10} />
-                            </RePieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><PieChartIcon className="text-primary" />User Role Distribution</CardTitle></CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <ReBarChart data={Object.entries(analyticsData.userRoleData).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1).replace('_', ' '), value }))} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} style={{ fontSize: '12px' }} />
-                                <XAxis type="number" hide />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.1)' }} />
-                                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
-                            </ReBarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <div className="space-y-6">
-                    <StatCard title="Subscription Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} />
-                    <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={TrendingUp} />
-                    <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={CalendarIcon} />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>All Accounts</CardTitle>
-                            <CardDescription>List of all users on the platform.</CardDescription>
+                            <CardTitle className="flex items-center gap-2">
+                                <BarChart2 className="h-5 w-5 text-primary" />
+                                Platform Activity Overview
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <ScrollArea className="h-[330px]">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>User</TableHead>
-                                            <TableHead>Business Name</TableHead>
-                                            <TableHead>Plan</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Last Seen</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {analyticsData.activeUsers.map(user => {
-                                            const business = businesses?.find(b => b.id === user.businessId);
-                                            return (
-                                                <TableRow
-                                                    key={user.id}
-                                                    className="cursor-pointer hover:bg-muted/50"
-                                                    onClick={() => {
-                                                        setSelectedUserForDetail(user);
-                                                        setIsUserDetailOpen(true);
-                                                    }}
-                                                >
-                                                    <TableCell><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div></TableCell>
-                                                    <TableCell>{business?.name || 'N/A'}</TableCell>
-                                                    <TableCell>
-                                                        {business ? (
-                                                            business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
-                                                        ) : <Badge variant="outline">N/A</Badge>}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                                                            {user.status || 'active'}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <UserPresence lastSeen={user.lastSeen} />
-                                                    </TableCell>
-                                                </TableRow>
-                                            )
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
+                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
+                            <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
+                            <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
+                            <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
+                            <StatCard title="Total Revenue" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Check} description="Total value of completed sales" />
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="growth" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Trial Conversion</CardTitle>
+                                <CardDescription>How effectively trials convert to paid.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center py-6">
+                                    <div className="text-5xl font-bold text-primary mb-2">{platformAnalytics.conversionRate.toFixed(1)}%</div>
+                                    <p className="text-sm text-muted-foreground">Conversion Rate</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="lg:col-span-2">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-amber-500" /> Expiring Soon (Next 3 Days)</CardTitle>
+                                <CardDescription>Reach out to these users to close the sale.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[200px]">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Business</TableHead>
+                                                <TableHead>Expiry</TableHead>
+                                                <TableHead>Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {platformAnalytics.expiringSoonList.length > 0 ? (
+                                                platformAnalytics.expiringSoonList.map(b => (
+                                                    <TableRow key={b.id}>
+                                                        <TableCell className="font-medium">{b.name}</TableCell>
+                                                        <TableCell>{formatDistanceToNow(b.trialExpiresAt.toDate(), { addSuffix: true })}</TableCell>
+                                                        <TableCell>
+                                                            <Button size="sm" variant="outline" onClick={() => {
+                                                                const owner = users?.find(u => u.id === b.ownerId);
+                                                                if (owner?.email) window.location.href = `mailto:${owner.email}?subject=Your Trial is Expiring Soon!`;
+                                                            }}>Email</Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow><TableCell colSpan={3} className="text-center h-12">No trials expiring soon.</TableCell></TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
+
                     <Card>
                         <CardHeader>
-                            <CardTitle className='flex items-center gap-2'><UserX className="text-destructive" />Inactive Accounts</CardTitle>
-                            <CardDescription>Users who have deleted their accounts.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><AlertCircle className="h-5 w-5 text-destructive" /> Churn Risk Prediction</CardTitle>
+                            <CardDescription>High risk users based on inactivity and low sales.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ScrollArea className="h-72">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>User</TableHead>
-                                            <TableHead>Email</TableHead>
-                                            <TableHead>Status</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {analyticsData.inactiveUsers.length > 0 ? (
-                                            analyticsData.inactiveUsers.map(user => (
-                                                <TableRow key={user.id}>
-                                                    <TableCell>{user.name}</TableCell>
-                                                    <TableCell>{user.email}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                                                            {user.status || 'active'}
-                                                        </Badge>
-                                                    </TableCell>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Business</TableHead>
+                                        <TableHead>Owner</TableHead>
+                                        <TableHead>Risk Score</TableHead>
+                                        <TableHead>Factors</TableHead>
+                                        <TableHead>Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {platformAnalytics.churnRiskList.length > 0 ? (
+                                        platformAnalytics.churnRiskList.map(item => (
+                                            <TableRow key={item.business.id}>
+                                                <TableCell className="font-medium">{item.business.name}</TableCell>
+                                                <TableCell>{item.owner?.name || 'Unknown'}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="destructive">{item.riskScore}/100</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {item.riskFactors.join(', ')}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button size="sm" variant="ghost" className="text-primary hover:text-primary/80" onClick={() => {
+                                                        if (item.owner?.email) window.location.href = `mailto:${item.owner.email}?subject=How can we help at Zeneva?`;
+                                                    }}>Contact</Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow><TableCell colSpan={5} className="text-center h-12">No high-risk businesses detected.</TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="users" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>All Accounts</CardTitle>
+                                    <CardDescription>List of all users on the platform.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ScrollArea className="h-[500px]">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>User</TableHead>
+                                                    <TableHead>Business Name</TableHead>
+                                                    <TableHead>Plan</TableHead>
+                                                    <TableHead>Activity</TableHead>
+                                                    <TableHead>Actions</TableHead>
                                                 </TableRow>
-                                            ))
-                                        ) : (
-                                            <TableRow><TableCell colSpan={3} className="h-24 text-center">No inactive accounts found.</TableCell></TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className='space-y-6'>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {analyticsData.activeUsers.map(user => {
+                                                    const business = businesses?.find(b => b.id === user.businessId);
+                                                    return (
+                                                        <TableRow
+                                                            key={user.id}
+                                                            className="hover:bg-muted/50"
+                                                        >
+                                                            <TableCell onClick={() => { setSelectedUserForDetail(user); setIsUserDetailOpen(true); }} className="cursor-pointer">
+                                                                <div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div>
+                                                            </TableCell>
+                                                            <TableCell onClick={() => { setSelectedUserForDetail(user); setIsUserDetailOpen(true); }} className="cursor-pointer">
+                                                                {business?.name || 'N/A'}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {business ? (
+                                                                    business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
+                                                                ) : <Badge variant="outline">N/A</Badge>}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <UserPresence lastSeen={user.lastSeen} />
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleImpersonateUser(user); }} title="Inspect Data">
+                                                                    <LogIn className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <div className='space-y-6'>
+                            <Card>
+                                <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase />Assign Plan</CardTitle><CardDescription>Manually set a subscription plan.</CardDescription></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2"><Label htmlFor="plan-email">User Email</Label><Combobox options={userOptions} value={planUserEmail} onChange={setPlanUserEmail} placeholder="Select a user..." /></div>
+                                    <div className="space-y-2"><Label>Plan</Label><Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="starter">Starter</SelectItem><SelectItem value="pro">Pro</SelectItem><SelectItem value="business">Business</SelectItem></SelectContent></Select></div>
+                                </CardContent>
+                                <CardFooter><Button onClick={handleAssignPlan} disabled={isAssigningPlan} className="w-full">{isAssigningPlan && <Loader className="mr-2 h-4 w-4 animate-spin" />}Assign Plan</Button></CardFooter>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle>Grant Access</CardTitle><CardDescription>Extend trial or grant lifetime.</CardDescription></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="grant-email">User Email</Label>
+                                        <Combobox options={userOptions} value={grantEmail} onChange={setGrantEmail} placeholder="Select a user..." />
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Switch id="lifetime-mode" checked={grantLifetime} onCheckedChange={setGrantLifetime} />
+                                        <Label htmlFor="lifetime-mode">Lifetime Access</Label>
+                                    </div>
+                                    {!grantLifetime && (
+                                        <div className="space-y-2">
+                                            <Label>Expiry Date</Label>
+                                            <Calendar mode="single" selected={grantDate} onSelect={setGrantDate} className="rounded-md border" />
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <CardFooter>
+                                    <Button onClick={handleGrantAccess} disabled={isGranting} className="w-full">
+                                        {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                        {grantLifetime ? 'Grant Lifetime' : 'Extend Trial'}
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="broadcasts">
                     <Card>
-                        <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase />Assign Plan</CardTitle><CardDescription>Manually set a subscription plan for a business.</CardDescription></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2"><Label htmlFor="plan-email">User Email</Label><Combobox options={userOptions} value={planUserEmail} onChange={setPlanUserEmail} placeholder="Select a user..." /></div>
-                            <div className="space-y-2"><Label>Plan</Label><Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="starter">Starter</SelectItem><SelectItem value="pro">Pro</SelectItem><SelectItem value="business">Business</SelectItem></SelectContent></Select></div>
-                        </CardContent>
-                        <CardFooter><Button onClick={handleAssignPlan} disabled={isAssigningPlan} className="w-full">{isAssigningPlan && <Loader className="mr-2 h-4 w-4 animate-spin" />}Assign Plan</Button></CardFooter>
-                    </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Grant Trial / Lifetime Access</CardTitle><CardDescription>Extend a trial or grant permanent lifetime access.</CardDescription></CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className='space-y-2'><Label htmlFor='grant-email'>User Email</Label><Combobox options={userOptions} value={grantEmail} onChange={setGrantEmail} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found." /></div>
-                                <div className='flex items-center space-x-2'><Switch id="grant-lifetime" checked={grantLifetime} onCheckedChange={setGrantLifetime} /><Label htmlFor="grant-lifetime">Grant Lifetime Access</Label></div>
-                                <div className='space-y-2'><Label>New Expiry Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !grantDate && "text-muted-foreground")} disabled={grantLifetime}><CalendarIcon className="mr-2 h-4 w-4" />{grantDate && !grantLifetime ? format(grantDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={grantDate} onSelect={setGrantDate} initialFocus disabled={grantLifetime} /></PopoverContent></Popover></div>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-primary" /> System-Wide Broadcast</CardTitle>
+                            <CardDescription>Send a notification to all active users on the platform.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 max-w-2xl">
+                            <div className="space-y-2">
+                                <Label>Broadcast Title</Label>
+                                <Input placeholder="e.g. Scheduled Maintenance" value={broadcastTitle} onChange={(e) => setBroadcastTitle(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Message Body</Label>
+                                <Textarea placeholder="Details about the announcement..." value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Type</Label>
+                                    <Select value={broadcastType} onValueChange={(v: any) => setBroadcastType(v)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="info">Info (Blue)</SelectItem>
+                                            <SelectItem value="warning">Warning (Orange)</SelectItem>
+                                            <SelectItem value="alert">Alert (Red)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Duration (Hours)</Label>
+                                    <Select value={broadcastDuration} onValueChange={setBroadcastDuration}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">1 Hour</SelectItem>
+                                            <SelectItem value="6">6 Hours</SelectItem>
+                                            <SelectItem value="24">24 Hours</SelectItem>
+                                            <SelectItem value="48">48 Hours</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </CardContent>
-                        <CardFooter><Button onClick={handleGrantAccess} disabled={isGranting} className='w-full'>{isGranting && <Loader className='mr-2 h-4 w-4 animate-spin' />}Grant Access</Button></CardFooter>
+                        <CardFooter>
+                            <Button onClick={handleSendBroadcast} disabled={isSendingBroadcast} className="w-full sm:w-auto">
+                                {isSendingBroadcast && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                Send Broadcast
+                            </Button>
+                        </CardFooter>
                     </Card>
-                    <Card>
-                        <CardHeader><CardTitle className='flex items-center gap-2'><UserCog />User Account Management</CardTitle><CardDescription>Activate or deactivate a user account.</CardDescription></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className='space-y-2'><Label htmlFor='status-email'>User Email</Label><Combobox options={userOptions} value={userStatusEmail} onChange={handleUserStatusSelection} placeholder="Select a user..." searchPlaceholder="Search users..." emptyPlaceholder="No user found." /></div>
-                            <div className='flex items-center space-x-2'><Switch id="user-status" checked={isUserActive} onCheckedChange={setIsUserActive} /><Label htmlFor="user-status">{isUserActive ? "Active" : "Inactive"}</Label></div>
-                        </CardContent>
-                        <CardFooter><Button onClick={handleUpdateUserStatus} disabled={isUpdatingStatus} className='w-full'>{isUpdatingStatus && <Loader className='mr-2 h-4 w-4 animate-spin' />}{isUserActive ? <Check className='mr-2 h-4 w-4' /> : <Ban className='mr-2 h-4 w-4' />}Set Status</Button></CardFooter>
-                    </Card>
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
+
             <BusinessDetailDialog
                 open={detailModalState.open}
                 onOpenChange={(open) => setDetailModalState(prev => ({ ...prev, open }))}
