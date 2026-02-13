@@ -17,12 +17,12 @@ import InstallPrompt from '@/components/pwa/install-prompt';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: 'Zeneva - Inventory Management and Point of Sale',
-  description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships. Streamline your inventory and maximize your profit.',
+  description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform — so you can track every product, capture every opportunity, and maximize every naira.',
   keywords: ['inventory management', 'pos', 'point of sale', 'sales analytics', 'crm', 'business management', 'nigeria', 'retail'],
   manifest: '/manifest.json',
   openGraph: {
     title: 'Zeneva - Inventory Management and Point of Sale',
-    description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships.',
+    description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform ',
     url: siteUrl,
     siteName: 'Zeneva',
     images: [
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Zeneva - Inventory Management and Point of Sale',
-    description: 'The all-in-one platform for inventory management, sales analytics, and customer relationships.',
+    description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform',
     images: [`https://i.ibb.co/nsKPqKcC/zen-mission.png`],
   },
 };
