@@ -537,6 +537,12 @@ export default function AuthenticatedLayout({
               <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
                 {children}
               </main>
+              {currentUserProfile && currentUserProfile.id !== user?.uid && (
+                <div className="bg-destructive/10 border-t border-destructive/20 p-2 text-center text-sm text-destructive font-medium flex items-center justify-center gap-4">
+                  <span>You are viewing {currentUserProfile.name}'s account.</span>
+                  <Button size="sm" variant="destructive" onClick={() => window.location.href = '/admin'}>Exit View</Button>
+                </div>
+              )}
             </div>
           </div>
           <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />

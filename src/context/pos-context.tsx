@@ -66,6 +66,12 @@ interface POSContextType {
   updateQueuedAction: (id: string, updates: Partial<QueuedAction>) => void;
   addProductWithImage: (productData: any, imageFile: File | null) => Promise<void>;
   removeFromQueue: (id: string) => void;
+
+  // Impersonation
+  impersonatedUserId: string | null;
+  impersonateUser: (userId: string) => void;
+  stopImpersonation: () => void;
+  isImpersonating: boolean;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -79,8 +85,36 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // --- UI State ---
   const [isConfettiActive, setIsConfettiActive] = useState(false);
 
+  // --- Impersonation State ---
+  const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('zeneva_impersonated_user_id');
+    }
+    return null;
+  });
+
+  const impersonateUser = useCallback((userId: string) => {
+    setImpersonatedUserId(userId);
+    sessionStorage.setItem('zeneva_impersonated_user_id', userId);
+    toast({ title: 'Impersonating User', description: 'Switching view to user dashboard...' });
+    // Force refresh to ensure new data is fetched
+    setRefreshKey(prev => prev + 1);
+  }, [toast]);
+
+  const stopImpersonation = useCallback(() => {
+    setImpersonatedUserId(null);
+    sessionStorage.removeItem('zeneva_impersonated_user_id');
+    toast({ title: 'Impersonation Ended', description: 'Returning to your account.' });
+    setRefreshKey(prev => prev + 1);
+  }, [toast]);
+
+  const isImpersonating = !!impersonatedUserId;
+  // Effective User ID: Use impersonated ID if set, otherwise real user ID
+  const effectiveUserId = impersonatedUserId || user?.uid;
+
   // --- Centralized Data Fetching ---
-  const userDocRef = useMemoFirebase(() => (user && !isUserLoading ? doc(firestore, 'users', user.uid) : null), [user, isUserLoading, firestore, refreshKey]);
+  // MODIFIED: Use effectiveUserId instead of user.uid
+  const userDocRef = useMemoFirebase(() => (effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   const isProfileReady = !!(user && currentUserProfile && user.uid === currentUserProfile.id);
@@ -585,12 +619,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     optimisticProducts: queuedActions
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
+
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
-    addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, resetPOS
+    addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, resetPOS,
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

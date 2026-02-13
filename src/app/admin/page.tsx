@@ -103,6 +103,8 @@ import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { usePOS } from '@/context/pos-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -232,11 +234,13 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Business & User Details</DialogTitle>
+                    <DialogTitle>{user?.name}'s Profile</DialogTitle>
+                    <DialogDescription>Detailed view of user account and associated business data.</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-6">
+
+                <div className="grid gap-6 py-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className='col-span-2'>
                             <Label className="text-xs text-muted-foreground uppercase tracking-wider">Business Name</Label>
@@ -718,15 +722,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         }
     };
 
+    const { impersonateUser } = usePOS();
+    const router = useRouter();
+
     const handleImpersonateUser = (user: UserProfile) => {
-        // This is a placeholder. In a real app, you'd likely redirect to an admin view
-        // of the user's dashboard or trigger a backend function to log in as them.
-        toast({
-            title: "Impersonate User",
-            description: `Functionality to impersonate ${user.name} (ID: ${user.id}) would go here.`,
-            variant: "default"
-        });
-        console.log("Impersonating user:", user);
+        impersonateUser(user.id);
+        router.push('/dashboard');
     };
 
     return (
