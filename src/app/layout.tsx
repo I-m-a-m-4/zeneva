@@ -10,6 +10,7 @@ import { POSProvider } from '@/context/pos-context';
 
 const siteUrl = 'https://zeneva.vercel.app';
 
+import { UserActivityTracker } from '@/components/UserActivityTracker';
 import InstallPrompt from '@/components/pwa/install-prompt';
 
 export const metadata: Metadata = {
@@ -62,6 +63,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <PWAProvider>
             <POSProvider>
+              <UserActivityTracker />
               <Loader />
               <InstallPrompt />
               <Suspense>

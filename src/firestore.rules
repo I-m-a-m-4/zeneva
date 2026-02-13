@@ -116,7 +116,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if (request.auth != null && request.auth.uid == userId) || (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
-      allow list: if isRequestingUserAdmin();
+      allow list: if isRequestingUserAdmin() || isSuperAdmin();
       
       allow update: if (request.auth != null && request.auth.uid == userId) || 
                        (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
@@ -147,13 +147,13 @@ service cloud.firestore {
     }
 
     match /receipts/{receiptId} {
-        allow read, list: if isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid);
+        allow read, list: if (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid)) || isSuperAdmin();
         allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
         allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
     
     match /customers/{customerId} {
-      allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId);
+      allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId)) || isSuperAdmin();
       allow create: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(request.resource.data.businessId);
       allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
       allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
