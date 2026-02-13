@@ -21,7 +21,9 @@ import {
     Cell,
     CartesianGrid,
     Legend,
+    Legend,
     Tooltip as ReTooltip,
+    ResponsiveContainer,
 } from 'recharts';
 import {
     Users,
@@ -690,7 +692,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
         setIsSendingBroadcast(true);
         try {
-            const broadcastsRef = collection(firestore, 'broadcasts');
+            const broadcastsRef = collection(firestore, 'system_broadcasts');
             const durationInHours = parseInt(broadcastDuration);
             const expiryDate = new Date();
             expiryDate.setHours(expiryDate.getHours() + durationInHours);

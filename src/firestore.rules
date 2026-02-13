@@ -158,5 +158,10 @@ service cloud.firestore {
       allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
       allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
+
+    match /system_broadcasts/{broadcastId} {
+      allow read: if isUserAuthenticated();
+      allow write: if isSuperAdmin();
+    }
   }
 }
