@@ -117,7 +117,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-  const isProfileReady = !!(user && currentUserProfile && user.uid === currentUserProfile.id);
+  // MODIFIED: isProfileReady should be true if we have a user and a profile, and the profile matches our EFFECTIVE user ID.
+  const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
 
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
 

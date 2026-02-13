@@ -88,7 +88,7 @@ service cloud.firestore {
     // =================================================================
 
     match /businessInstances/{businessId} {
-      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
       
       allow list: if request.query.limit <= 1 || isSuperAdmin();
       
@@ -127,7 +127,7 @@ service cloud.firestore {
                        (isRequestingUserAdmin() && request.auth != null && request.auth.uid != userId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
       
       match /notifications/{notificationId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
       }
     }
    
