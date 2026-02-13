@@ -113,8 +113,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const effectiveUserId = impersonatedUserId || user?.uid;
 
   // --- Centralized Data Fetching ---
-  // MODIFIED: Use effectiveUserId instead of user.uid
-  const userDocRef = useMemoFirebase(() => (effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
+  // MODIFIED: Ensure we have an authenticated user before fetching, even if impersonating.
+  const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
   // MODIFIED: isProfileReady should be true if we have a user and a profile, and the profile matches our EFFECTIVE user ID.
@@ -543,12 +543,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch { }
   }, [business]);
 
-  // Effect to reset POS state when user changes
+  // Effect to reset POS state and CLEAR IMPERSONATION when user changes/logs out
   useEffect(() => {
     if (!isUserLoading) {
+      if (!user) {
+        setImpersonatedUserId(null);
+        sessionStorage.removeItem('zeneva_impersonated_user_id');
+      }
       resetPOS();
     }
-  }, [user?.uid, isUserLoading, resetPOS]);
+  }, [user, isUserLoading, resetPOS, setImpersonatedUserId]);
 
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {

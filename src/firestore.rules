@@ -97,20 +97,20 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
       
       match /subscription_history/{historyId} {
-        allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+        allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
         allow create: if isUserAuthenticated();
         allow update, delete: if false;
       }
 
       match /auditLogs/{logId} {
-        allow list, get: if isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId);
+        allow list, get: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
         allow create: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
         allow update, delete: if false;
       }
 
       match /onlineOrders/{orderId} {
-         allow read, list: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
-         allow write: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+         allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+         allow write: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
       }
     }
 
