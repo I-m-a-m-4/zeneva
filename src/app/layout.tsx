@@ -8,7 +8,7 @@ import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
 import { POSProvider } from '@/context/pos-context';
 
-const siteUrl = 'https://zeneva.vercel.app';
+const siteUrl = 'https://zeneva.space';
 
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
@@ -41,6 +41,42 @@ export const metadata: Metadata = {
     description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform',
     images: [`https://i.ibb.co/nsKPqKcC/zen-mission.png`],
   },
+  alternates: {
+    canonical: siteUrl,
+  }
+};
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}/#organization`,
+      name: 'Zeneva',
+      url: siteUrl,
+      logo: 'https://i.ibb.co/nsKPqKcC/zen-mission.png',
+      sameAs: [
+        'https://twitter.com/zenevahq',
+        'https://instagram.com/zenevahq'
+      ]
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Zeneva',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web, Android, iOS',
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'NGN'
+      },
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: '4.8',
+        ratingCount: '124'
+      }
+    }
+  ]
 };
 
 
@@ -76,6 +112,10 @@ export default function RootLayout({
           </PWAProvider>
         </FirebaseClientProvider>
         <Toaster />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </body>
     </html>
   );

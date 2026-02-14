@@ -5,6 +5,12 @@ export type StaticBlogPost = {
   excerpt: string;
   imageUrl: string;
   category: string;
+  isProgrammatic?: boolean;
+  programmaticData?: {
+    industry: string;
+    location: string;
+    topic: string;
+  };
 };
 
 export const blogPosts: StaticBlogPost[] = [
@@ -43,7 +49,7 @@ export const blogPosts: StaticBlogPost[] = [
     imageUrl: '/crm.webp',
     category: 'Insights',
   },
-    {
+  {
     slug: 'advanced-inventory-tips',
     title: 'Advanced Inventory: Tips & Tricks',
     excerpt: 'Learn how to manage variants, set low-stock alerts, and use categories effectively to become a power-user of Zeneva\'s inventory tools.',
@@ -65,3 +71,79 @@ export const blogPosts: StaticBlogPost[] = [
     category: 'Productivity',
   },
 ];
+
+// --- Programmatic SEO Data ---
+
+export const TARGET_INDUSTRIES = [
+  'Supermarket',
+  'Pharmacy',
+  'Fashion Boutique',
+  'Electronics Store',
+  'Restaurant',
+  'Hardware Store',
+  'Cosmetics Shop',
+  'Bookstore'
+];
+
+export const TARGET_LOCATIONS = [
+  'Lagos',
+  'Abuja',
+  'Port Harcourt',
+  'Ibadan',
+  'Kano',
+  'Enugu',
+  'Lekki',
+  'Ikeja'
+];
+
+export const TARGET_TOPICS = [
+  {
+    template: 'Best POS System for [Industry] in [Location]',
+    slugTemplate: 'best-pos-system-for-[industry]-in-[location]',
+    category: 'Software Reviews'
+  },
+  {
+    template: 'How to Manage [Industry] Inventory in [Location]',
+    slugTemplate: 'how-to-manage-[industry]-inventory-in-[location]',
+    category: 'Guides'
+  }
+];
+
+export function generateProgrammaticPosts(): StaticBlogPost[] {
+  const posts: StaticBlogPost[] = [];
+
+  // Helper to slugify
+  const toSlug = (str: string) => str.toLowerCase().replace(/\s+/g, '-');
+
+  TARGET_INDUSTRIES.forEach(industry => {
+    TARGET_LOCATIONS.forEach(location => {
+      TARGET_TOPICS.forEach(topic => {
+        const title = topic.template
+          .replace('[Industry]', industry)
+          .replace('[Location]', location);
+
+        const slug = topic.slugTemplate
+          .replace('[industry]', toSlug(industry))
+          .replace('[location]', toSlug(location));
+
+        posts.push({
+          slug,
+          title,
+          excerpt: `Discover why Zeneva is the top-rated choice for ${industry} owners in ${location}. Streamline operations, track stock, and boost sales with our all-in-one platform.`,
+          imageUrl: '/herolytics.svg', // Fallback or dynamic image logic could be added here
+          category: topic.category,
+          isProgrammatic: true,
+          programmaticData: {
+            industry,
+            location,
+            topic: topic.template
+          }
+        });
+      });
+    });
+  });
+
+  return posts;
+}
+
+export const allBlogPosts = [...blogPosts, ...generateProgrammaticPosts()];
