@@ -5,7 +5,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 
@@ -24,6 +24,7 @@ interface POSContextType {
   receipts: Receipt[] | null;
   customers: Customer[] | null;
   onlineOrders: OnlineOrder[] | null;
+  searchCustomers: (term: string) => Promise<Customer[]>;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
   isUserLoading: boolean;
@@ -128,10 +129,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
   const { data: products, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
-  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc")) : null), [businessId, firestore, refreshKey]);
+  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId)) : null), [businessId, firestore, refreshKey]);
+  const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
@@ -386,6 +387,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
     toast({ title: 'Action Cancelled', description: 'Removed item from queue.' });
   }, [toast]);
 
+  const searchCustomers = useCallback(async (term: string) => {
+    if (!term.trim() || !businessId || !firestore) return [];
+    try {
+      // Basic prefix search
+      const q = query(
+        collection(firestore, 'customers'),
+        where('businessId', '==', businessId),
+        where('name', '>=', term),
+        where('name', '<=', term + '\uf8ff'),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+      return results;
+    } catch (e) {
+      console.error("Error searching customers:", e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // 1. Generate local blob URL for optimistic UI if image exists
     const optimisticImageUrl = imageFile ? URL.createObjectURL(imageFile) : '';
@@ -625,14 +646,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, resetPOS,
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

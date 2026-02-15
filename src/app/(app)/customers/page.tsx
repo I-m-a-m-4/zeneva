@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award } from "lucide-react";
 import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
@@ -63,7 +64,7 @@ function CustomerRowSkeleton() {
 }
 
 export default function CustomersPage() {
-  const { customers, receipts, isLoading, business, currentUserProfile: currentUser, triggerRefresh } = usePOS();
+  const { customers, receipts, isLoading: isPosLoading, business, currentUserProfile: currentUser, triggerRefresh, searchCustomers } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -72,6 +73,32 @@ export default function CustomersPage() {
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+
+  const [displayedCustomers, setDisplayedCustomers] = React.useState<Customer[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
+
+  const isLoading = isPosLoading || isSearching;
+
+  React.useEffect(() => {
+    if (!customers) return;
+    setDisplayedCustomers(customers);
+  }, [customers]);
+
+  React.useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchTerm.trim()) {
+        setIsSearching(true);
+        const results = await searchCustomers(searchTerm);
+        setDisplayedCustomers(results);
+        setIsSearching(false);
+      } else {
+        setDisplayedCustomers(customers);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, customers, searchCustomers]);
 
   const customerTotals = React.useMemo(() => {
     const totals: Record<string, { total: number }> = {};
@@ -95,7 +122,7 @@ export default function CustomersPage() {
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      setSelectedCustomerIds(customers?.map(c => c.id) || []);
+      setSelectedCustomerIds(displayedCustomers?.map(c => c.id) || []);
     } else {
       setSelectedCustomerIds([]);
     }
@@ -151,6 +178,15 @@ export default function CustomersPage() {
               <CardDescription>
                 Manage your customers and view their purchase history.
               </CardDescription>
+              <div className="relative mt-2 max-w-sm">
+                <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search customers..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {selectedCustomerIds.length > 0 && (
@@ -195,13 +231,13 @@ export default function CustomersPage() {
                 <CustomerRowSkeleton />
               </TableBody>
             </Table>
-          ) : customers && customers.length > 0 ? (
+          ) : displayedCustomers && displayedCustomers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={customers.length > 0 && selectedCustomerIds.length === customers.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
+                      checked={displayedCustomers.length > 0 && selectedCustomerIds.length === displayedCustomers.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -218,7 +254,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.map((customer) => {
+                {displayedCustomers.map((customer) => {
                   const totalSpent = customerTotals[customer.id]?.total ?? 0;
                   return (
                     <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>

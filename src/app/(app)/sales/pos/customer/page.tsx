@@ -8,13 +8,13 @@ import { usePOS } from "@/context/pos-context";
 import { PlusCircle, Search, User, UserCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import { useUser, useFirestore } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -100,21 +100,33 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 }
 
 export default function CustomerPage() {
-    const { selectedCustomer, selectCustomer, customers, isLoading: areCustomersLoading, currentUserProfile: currentUser } = usePOS();
+    const { selectedCustomer, selectCustomer, customers, isLoading: isPosLoading, currentUserProfile: currentUser, searchCustomers } = usePOS();
     const router = useRouter();
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
+    const [isSearching, setIsSearching] = React.useState(false);
     const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
     const [isNavigating, setIsNavigating] = React.useState(false);
 
-    const filteredCustomers = React.useMemo(() => {
-        if (!customers) return [];
-        return customers.filter(c =>
-            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.email.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [customers, searchTerm]);
+    const filteredCustomers = searchedCustomers || customers || [];
+    const isLoading = isPosLoading || isSearching;
 
-    const isLoading = areCustomersLoading;
+    React.useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (searchTerm.trim()) {
+                setIsSearching(true);
+                const results = await searchCustomers(searchTerm);
+                setSearchedCustomers(results);
+                setIsSearching(false);
+            } else {
+                setSearchedCustomers(null);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, searchCustomers]);
+
+
 
     const handleNext = () => {
         setIsNavigating(true);
@@ -135,7 +147,7 @@ export default function CustomerPage() {
                                     placeholder="Search customers by name or email..."
                                     className="pl-8"
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                                 />
                             </div>
                             <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
@@ -146,10 +158,10 @@ export default function CustomerPage() {
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
-                                    <DialogTitle>Add New Customer</DialogTitle>
-                                    <DialogDescription>
-                                        Enter the details for the new customer.
-                                    </DialogDescription>
+                                        <DialogTitle>Add New Customer</DialogTitle>
+                                        <DialogDescription>
+                                            Enter the details for the new customer.
+                                        </DialogDescription>
                                     </DialogHeader>
                                     {currentUser?.businessId && <AddCustomerForm businessId={currentUser.businessId} onCustomerAdded={() => setIsAddCustomerOpen(false)} />}
                                 </DialogContent>
@@ -184,7 +196,7 @@ export default function CustomerPage() {
                 </Card>
             </div>
             <div>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>Selected Customer</CardTitle>
                     </CardHeader>
@@ -196,7 +208,7 @@ export default function CustomerPage() {
                                 <p className="text-sm text-muted-foreground">{selectedCustomer.email}</p>
                                 <Button variant="link" onClick={() => selectCustomer(null)}>Clear selection</Button>
                             </div>
-                        ): (
+                        ) : (
                             <div className="py-8">
                                 <User className="mx-auto h-12 w-12 text-muted-foreground" />
                                 <p className="text-muted-foreground mt-2">No customer selected.</p>
@@ -209,8 +221,8 @@ export default function CustomerPage() {
                             <Link href="/sales/pos/select-products">Back</Link>
                         </Button>
                         <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
-                           {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                           Next: Payment
+                            {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Next: Payment
                         </Button>
                     </CardFooter>
                 </Card>
