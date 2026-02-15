@@ -132,6 +132,15 @@
     background-size: 10px 10px;
   }
 
+  .grid-lines {
+    background-size: 40px 40px;
+    background-image:
+      linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  }
+
   .auth-bg {
     @apply bg-gray-50 dark:bg-gray-900;
     /* Simple fallback */

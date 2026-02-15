@@ -355,7 +355,7 @@ export default function Home() {
                         <div className="grid lg:grid-cols-2 max-w-7xl mr-auto ml-auto items-center">
 
                             {/* Left Column: Copy & Form */}
-                            <div className="max-w-xl z-10">
+                            <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-left">
                                 <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
                                 <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
                                     Never Lose a Sale.<br />
@@ -365,13 +365,13 @@ export default function Home() {
                                 </h1>
 
                                 <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-4 text-slate-900 font-medium">
-                                    Zeneva is the operating system for serious retail businesses — combining POS, inventory, storefront, CRM, and AI forecasting into one system that predicts demand, prevents stockouts, and maximizes profit.
+                                    Zeneva is the operating system for serious retail—combining POS, inventory, storefront, CRM, and AI to predict demand and maximize profit.
                                 </p>
-                                <p className="leading-relaxed text-sm tracking-tight font-dm-sans max-w-lg mb-10 text-slate-500">
+                                <p className="leading-relaxed text-sm tracking-tight font-dm-sans max-w-lg mb-10 text-slate-500 hidden md:block">
                                     Built for modern retail. Works offline. Scales online. Powered by Zen AI.
                                 </p>
 
-                                <div className="flex sm:flex-row w-full gap-x-2 gap-y-4">
+                                <div className="flex flex-col sm:flex-row w-full gap-x-2 gap-y-4 items-center sm:items-stretch">
                                     <Input
                                         type="email"
                                         placeholder="Enter your work email"
