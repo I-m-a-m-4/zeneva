@@ -1,6 +1,8 @@
 
 'use client';
 
+import { InteractiveGrid } from '@/components/interactive-grid';
+
 import {
     ArrowRight,
     Blocks,
@@ -349,8 +351,11 @@ export default function Home() {
                     </Head>
                     <MarketingHeader />
 
+
+
                     {/* Main Hero Section */}
                     <main className="bg-transparent lg:pt-48 lg:pb-48 w-full max-w-none mr-auto ml-auto pt-40 pr-6 pb-32 pl-6 relative overflow-hidden">
+                        <InteractiveGrid />
                         <div className="aura-background"></div>
                         <div className="grid lg:grid-cols-2 max-w-7xl mr-auto ml-auto items-center">
 
