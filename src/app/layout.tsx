@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     siteName: 'Zeneva',
     images: [
       {
-        url: 'https://i.ibb.co/nsKPqKcC/zen-mission.png',
+        url: 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png',
         width: 1200,
         height: 630,
       },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Zeneva - Inventory Management and Point of Sale',
     description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform',
-    images: [`https://i.ibb.co/nsKPqKcC/zen-mission.png`],
+    images: [`https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png`],
   },
   alternates: {
     canonical: siteUrl,
@@ -54,7 +54,7 @@ const jsonLd = {
       '@id': `${siteUrl}/#organization`,
       name: 'Zeneva',
       url: siteUrl,
-      logo: 'https://i.ibb.co/nsKPqKcC/zen-mission.png',
+      logo: 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png',
       sameAs: [
         'https://twitter.com/zenevahq',
         'https://instagram.com/zenevahq'
