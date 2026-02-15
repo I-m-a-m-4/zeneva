@@ -63,26 +63,36 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       if (!memoizedTargetRefOrQuery) {
-        setData(null);
-        setIsLoading(false);
-        setError(null);
+        if (isMounted) {
+          setData(null);
+          setIsLoading(false);
+          setError(null);
+        }
         return;
       }
 
-      setIsLoading(true);
-      setData(null);
-      setError(null);
+      if (isMounted) {
+        setIsLoading(true);
+        setData(null);
+        setError(null);
+      }
 
       try {
         const snapshot = await getDocs(memoizedTargetRefOrQuery);
-        const results: WithId<T>[] = snapshot.docs.map((doc) => ({
-          ...(doc.data() as T),
-          id: doc.id,
-        }));
-        setData(results);
+        if (isMounted) {
+          const results: WithId<T>[] = snapshot.docs.map((doc) => ({
+            ...(doc.data() as T),
+            id: doc.id,
+          }));
+          setData(results);
+        }
       } catch (error: any) {
+        if (!isMounted) return;
+
         if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: (memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString(),
@@ -96,13 +106,17 @@ export function useCollection<T = any>(
         }
         setData(null);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
-    // This hook now fetches data once. It will re-run if memoizedTargetRefOrQuery changes.
-    // The dependency array correctly handles re-fetching.
+
+    return () => {
+      isMounted = false;
+    };
   }, [memoizedTargetRefOrQuery]);
 
   if (memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {

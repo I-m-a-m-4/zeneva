@@ -51,24 +51,34 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       if (!memoizedDocRef) {
-        setData(null);
-        setIsLoading(false);
-        setError(null);
+        if (isMounted) {
+          setData(null);
+          setIsLoading(false);
+          setError(null);
+        }
         return;
       }
-      setIsLoading(true);
-      setError(null);
+      if (isMounted) {
+        setIsLoading(true);
+        setError(null);
+      }
 
       try {
         const snapshot = await getDoc(memoizedDocRef);
-        if (snapshot.exists()) {
-          setData({ ...(snapshot.data() as T), id: snapshot.id });
-        } else {
-          setData(null); // Document does not exist
+        if (isMounted) {
+          if (snapshot.exists()) {
+            setData({ ...(snapshot.data() as T), id: snapshot.id });
+          } else {
+            setData(null); // Document does not exist
+          }
         }
       } catch (error: any) {
+        if (!isMounted) return;
+
         if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: memoizedDocRef.path,
@@ -82,12 +92,17 @@ export function useDoc<T = any>(
         }
         setData(null);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
-    // This hook now fetches data once. It will re-run if memoizedDocRef changes.
+
+    return () => {
+      isMounted = false;
+    };
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 
   return { data, isLoading, error, mutate: setData };

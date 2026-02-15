@@ -12,24 +12,24 @@ import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, query, where, getDocs, doc, orderBy, limit } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 
-type ActivityItem = 
+type ActivityItem =
   | { type: 'sale', data: Receipt, timestamp: Date }
   | { type: 'new_customer', data: Customer, timestamp: Date };
 
 // This hook now returns the loading state along with the business ID.
 function useCurrentBusinessId() {
-    const { user, isUserLoading } = useUser(); // <-- Get the user loading state
-    const firestore = useFirestore();
-    const userDocRef = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [user, firestore]);
-    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+  const { user, isUserLoading } = useUser(); // <-- Get the user loading state
+  const firestore = useFirestore();
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-    return {
-        businessId: userProfile?.businessId ?? null,
-        isLoading: isUserLoading || isProfileLoading, // Combine loading states
-    };
+  return {
+    businessId: userProfile?.businessId ?? null,
+    isLoading: isUserLoading || isProfileLoading, // Combine loading states
+  };
 }
 
 export default function RecentActivity() {
@@ -39,19 +39,23 @@ export default function RecentActivity() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Abort if the business ID is loading or not available.
     if (isBusinessIdLoading || !currentBusinessId || !firestore) {
       // If we're not loading the business ID anymore (e.g., user logged out),
       // ensure the local loading state is also false.
       if (!isBusinessIdLoading) {
-        setIsLoading(false);
-        setActivities([]); // Clear activities on logout
+        if (isMounted) {
+          setIsLoading(false);
+          setActivities([]); // Clear activities on logout
+        }
       }
       return;
     }
 
     const fetchActivities = async () => {
-      setIsLoading(true);
+      if (isMounted) setIsLoading(true);
       try {
         const salesQuery = query(
           collection(firestore, "receipts"),
@@ -59,7 +63,7 @@ export default function RecentActivity() {
           orderBy("createdAt", "desc"),
           limit(10)
         );
-        
+
         const customersQuery = query(
           collection(firestore, "customers"),
           where("businessId", "==", currentBusinessId),
@@ -72,31 +76,41 @@ export default function RecentActivity() {
           getDocs(customersQuery)
         ]);
 
-        const salesActivities: ActivityItem[] = salesSnapshot.docs.map(doc => {
-          const data = doc.data() as Receipt;
-          const timestamp = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-          return { type: 'sale', data: { ...data, id: doc.id }, timestamp };
-        });
-        
-        const customerActivities: ActivityItem[] = customersSnapshot.docs.map(doc => {
+        if (isMounted) {
+          const salesActivities: ActivityItem[] = salesSnapshot.docs.map(doc => {
+            const data = doc.data() as Receipt;
+            const timestamp = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+            return { type: 'sale', data: { ...data, id: doc.id }, timestamp };
+          });
+
+          const customerActivities: ActivityItem[] = customersSnapshot.docs.map(doc => {
             const data = doc.data() as Customer;
             const timestamp = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
             return { type: 'new_customer', data: { ...data, id: doc.id }, timestamp };
-        });
+          });
 
-        const combined = [...salesActivities, ...customerActivities];
-        combined.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        
-        setActivities(combined.slice(0, 15));
+          const combined = [...salesActivities, ...customerActivities];
+          combined.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+          setActivities(combined.slice(0, 15));
+        }
 
       } catch (error) {
-        console.error("Error fetching recent activities:", error);
+        if (isMounted) {
+          console.error("Error fetching recent activities:", error);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchActivities();
+
+    return () => {
+      isMounted = false;
+    };
   }, [currentBusinessId, firestore, isBusinessIdLoading]);
 
 
@@ -127,16 +141,16 @@ export default function RecentActivity() {
                     <p className="text-xs text-muted-foreground truncate">
                       {activity.type === 'sale' ? `Total: ₦${activity.data.total.toLocaleString()}` : activity.data.email}
                     </p>
-                     <p className="text-xs text-muted-foreground">{formatDistanceToNow(activity.timestamp, { addSuffix: true })}</p>
+                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(activity.timestamp, { addSuffix: true })}</p>
                   </div>
                   <Button variant="ghost" size="sm" asChild>
-                      <Link href={activity.type === 'sale' ? `/receipts/${activity.data.id}` : `/customers`}>View</Link>
+                    <Link href={activity.type === 'sale' ? `/receipts/${activity.data.id}` : `/customers`}>View</Link>
                   </Button>
                 </li>
               ))}
             </ul>
           ) : (
-             <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
+            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
               <ListChecks className="h-16 w-16 opacity-50 mb-4" />
               <p className="text-lg font-medium">No Recent Activity</p>
               <p className="text-sm">New sales and customers will appear here.</p>
