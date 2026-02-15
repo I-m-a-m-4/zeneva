@@ -143,22 +143,27 @@ export default function CustomersPage() {
     }
 
     const batch = writeBatch(firestore);
+    const auditPromises: Promise<void>[] = [];
+
     selectedCustomerIds.forEach(id => {
       const docRef = doc(firestore, 'customers', id);
       batch.delete(docRef);
 
       const deletedCustomer = customers?.find(p => p.id === id);
       if (deletedCustomer) {
-        logAuditEvent(firestore, business.id, currentUser, {
+        auditPromises.push(logAuditEvent(firestore, business.id, currentUser, {
           action: 'customer.delete',
           entity: { type: 'Customer', id: id, name: deletedCustomer.name },
           details: { customerName: deletedCustomer.name, customerEmail: deletedCustomer.email }
-        });
+        }));
       }
     });
 
     try {
       await batch.commit();
+      // Ensure audit logs are written (best effort, but awaited so they run)
+      await Promise.all(auditPromises);
+
       toast({ variant: 'success', title: 'Customers Deleted', description: `${selectedCustomerIds.length} customers have been removed.` });
       setSelectedCustomerIds([]);
       triggerRefresh();

@@ -18,14 +18,14 @@ import { ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Tr
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { logAuditEvent } from '@/lib/audit';
@@ -39,13 +39,13 @@ export default function CustomerDetailPage() {
     const { toast } = useToast();
 
     const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
-    
+
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     const receipts = React.useMemo(() => {
         if (!allReceipts) return [];
         return allReceipts.filter(r => r.customer?.id === customerId);
     }, [allReceipts, customerId]);
-    
+
     const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(customer?.aiInsights || null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
     const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
@@ -96,7 +96,7 @@ export default function CustomerDetailPage() {
 
     const handleGenerateInsights = async () => {
         if (!customer || !receipts || !firestore || !currentUserProfile) {
-             toast({
+            toast({
                 variant: "destructive",
                 title: "Unable to Generate Insights",
                 description: "Required customer or business data is missing. Please try refreshing the page."
@@ -113,13 +113,13 @@ export default function CustomerDetailPage() {
                 totalSpent: receipts.reduce((sum, r) => sum + r.total, 0),
                 orderCount: receipts.length,
             });
-            
-            const insightsWithTimestamp = { ...result, createdAt: new Date() };
-            
-            const customerRef = doc(firestore, 'customers', customerId);
-            await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp()} });
 
-            logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
+            const insightsWithTimestamp = { ...result, createdAt: new Date() };
+
+            const customerRef = doc(firestore, 'customers', customerId);
+            await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp() } });
+
+            await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
                 action: 'customer.update',
                 entity: { type: 'Customer', id: customerId, name: customer.name },
                 details: { change: 'Generated AI Insights' }
@@ -137,28 +137,28 @@ export default function CustomerDetailPage() {
             setIsGeneratingInsights(false);
         }
     };
-    
+
     const isLoading = isPosLoading;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
         return (
-             <div className="space-y-6">
+            <div className="space-y-6">
                 <Skeleton className="h-10 w-48" />
                 <div className="grid md:grid-cols-3 gap-6">
                     <Skeleton className="h-48 md:col-span-1" />
                     <Skeleton className="h-96 md:col-span-2" />
                 </div>
-                 <Skeleton className="h-64" />
+                <Skeleton className="h-64" />
             </div>
         );
     }
-    
+
     if (!customer && !isLoading) {
         return (
             <div className="text-center p-8">
-                 <p className="font-bold text-lg">Customer not found.</p>
-                 <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mt-4">
+                <p className="font-bold text-lg">Customer not found.</p>
+                <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mt-4">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Customers
                 </Button>
             </div>
@@ -253,11 +253,11 @@ export default function CustomerDetailPage() {
                 </CardHeader>
                 <CardContent>
                     {!insights && !isGeneratingInsights && (
-                         <div className="text-center p-8 border-2 border-dashed rounded-lg">
+                        <div className="text-center p-8 border-2 border-dashed rounded-lg">
                             <p className="font-medium">Ready for some AI magic?</p>
                             <p className="text-sm text-muted-foreground mb-4">Analyze this customer's purchase history to get actionable insights.</p>
                             <Button onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
-                                {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                                {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 Generate Insights
                             </Button>
                         </div>
@@ -267,26 +267,26 @@ export default function CustomerDetailPage() {
                     )}
                     {insights && (
                         <div className="space-y-6">
-                             <div>
+                            <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> AI Summary</h3>
                                 <p className="text-muted-foreground prose prose-sm">{insights.summary}</p>
                             </div>
                             <Separator />
-                             <div>
+                            <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Package /> Product Suggestions</h3>
                                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                                     {insights.productSuggestions.map((p, i) => <li key={i}>{p}</li>)}
                                 </ul>
                             </div>
-                             <Separator />
+                            <Separator />
                             <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Bot /> Engagement Tactics</h3>
                                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                                     {insights.engagementTactics.map((t, i) => <li key={i}>{t}</li>)}
                                 </ul>
                             </div>
-                             <Button variant="outline" onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
-                                {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                            <Button variant="outline" onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
+                                {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 Regenerate
                             </Button>
                         </div>
@@ -304,7 +304,7 @@ export default function CustomerDetailPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeleting} onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
+                        <AlertDialogAction
                             onClick={async () => {
                                 if (!customerToDelete || !firestore || !currentUserProfile) {
                                     toast({
@@ -327,7 +327,7 @@ export default function CustomerDetailPage() {
                                         entity: { type: 'Customer', id: customerToDelete.id, name: customerToDelete.name },
                                         details: { customerName: customerToDelete.name, customerEmail: customerToDelete.email }
                                     });
-                                    
+
                                     triggerRefresh();
 
                                     toast({
@@ -335,7 +335,7 @@ export default function CustomerDetailPage() {
                                         title: 'Customer Deleted',
                                         description: `${customerToDelete.name} has been removed.`
                                     });
-                                    
+
                                     setCustomerToDelete(null);
                                     NProgress.start();
                                     router.push('/customers');
@@ -351,7 +351,7 @@ export default function CustomerDetailPage() {
                                     setIsDeleting(false);
                                 }
                             }}
-                            className="bg-destructive hover:bg-destructive/90" 
+                            className="bg-destructive hover:bg-destructive/90"
                             disabled={isDeleting}
                         >
                             {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

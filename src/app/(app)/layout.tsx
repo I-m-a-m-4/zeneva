@@ -209,6 +209,52 @@ export default function AuthenticatedLayout({
     }
   }, [isLoading, currentUserProfile, pathname, router]);
 
+  // --- RBAC Route Guard ---
+  React.useEffect(() => {
+    if (isLoading || !currentUserProfile) return;
+
+    const userRole = currentUserProfile.role;
+
+    // Define explicit permissions for routes
+    const ROUTE_PERMISSIONS: Record<string, string[]> = {
+      '/dashboard': ['admin', 'manager', 'vendor_operator'],
+      '/inventory': ['admin', 'manager', 'vendor_operator'],
+      '/sales': ['admin', 'manager', 'vendor_operator'], // Covers POS
+      '/storefront': ['admin'],
+      '/online-orders': ['admin', 'manager'],
+      '/receipts': ['admin', 'manager'],
+      '/reports': ['admin', 'manager'],
+      '/ai-insights': ['admin', 'manager'],
+      '/customers': ['admin', 'manager', 'vendor_operator'],
+      '/users': ['admin'],
+      '/audit-log': ['admin'],
+      '/billing': ['admin'],
+      '/settings': ['admin'],
+      '/support': ['admin', 'manager', 'vendor_operator'],
+      '/achievements': ['admin', 'manager', 'vendor_operator'],
+    };
+
+    // Find the matching permission rule for the current path
+    // We sort keys by length descending to match specific paths first (e.g. /settings/profile vs /settings)
+    // currently we only have top-level keys but this is good practice.
+    const protectedRoute = Object.keys(ROUTE_PERMISSIONS)
+      .sort((a, b) => b.length - a.length)
+      .find(route => pathname.startsWith(route));
+
+    if (protectedRoute) {
+      const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
+      if (!allowedRoles.includes(userRole)) {
+        console.warn(`Access denied to ${pathname} for role ${userRole}. Redirecting to dashboard.`);
+        toast({
+          variant: "destructive",
+          title: "Access Denied",
+          description: "You do not have permission to view this page.",
+        });
+        router.replace('/dashboard');
+      }
+    }
+  }, [pathname, currentUserProfile, isLoading, router, toast]);
+
   const getInitials = (name?: string) => {
     if (!name?.trim()) return "";
     const names = name.trim().split(' ').filter(Boolean);
