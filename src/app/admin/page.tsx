@@ -429,8 +429,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         // 3. Geographic Distribution
         const locationCounts = activeBusinesses.reduce((acc, b) => {
             // Try to find location from various sources
-            const state = b.settings?.state || (b.address ? b.address.split(',').pop()?.trim() : 'Unknown');
-            acc[state] = (acc[state] || 0) + 1;
+            const state = b.settings?.state || (b.address ? b.address.split(',').pop()?.trim() : undefined) || 'Unknown';
+            if (state) {
+                acc[state] = (acc[state] || 0) + 1;
+            }
             return acc;
         }, {} as Record<string, number>);
 

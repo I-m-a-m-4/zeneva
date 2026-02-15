@@ -1,18 +1,217 @@
-
 import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { blogPosts, type StaticBlogPost } from '@/lib/blog-data';
+import { ArrowLeft, ArrowRight, CheckCircle2, MapPin, Store } from 'lucide-react';
+import { allBlogPosts, type StaticBlogPost, getRelatedPosts } from '@/lib/blog-data';
 import Image from 'next/image';
+import { Card, CardContent } from "@/components/ui/card";
 
 export function generateStaticParams() {
-  return blogPosts.map((post) => ({
-    slug: post.slug,
-  }));
+    return allBlogPosts.map((post) => ({
+        slug: post.slug,
+    }));
 }
 
+const RelatedPosts = ({ currentSlug }: { currentSlug: string }) => {
+    const related = getRelatedPosts(currentSlug, 3);
+
+    if (related.length === 0) return null;
+
+    return (
+        <div className="mt-16 pt-16 border-t">
+            <h3 className="text-2xl font-bold font-bricolage mb-8">Related Articles</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {related.map(post => (
+                    <Link key={post.slug} href={`/blog/${post.slug}`} className="group block">
+                        <Card className="h-full overflow-hidden hover:shadow-lg transition-all border-border">
+                            <div className="aspect-video relative overflow-hidden">
+                                <Image
+                                    src={post.imageUrl || '/herolytics.svg'}
+                                    alt={post.title}
+                                    fill
+                                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                            </div>
+                            <CardContent className="p-4">
+                                <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">{post.category}</p>
+                                <h4 className="font-bold font-bricolage text-lg leading-tight group-hover:text-primary transition-colors">
+                                    {post.title}
+                                </h4>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const ProgrammaticContent = ({ post }: { post: StaticBlogPost }) => {
+    if (!post.programmaticData) return null;
+    const { industry, location, topic } = post.programmaticData;
+
+    // Template 1: Best POS System
+    if (topic.includes('Best POS System')) {
+        return (
+            <>
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 my-8">
+                    <h3 className="text-lg font-bold mb-2 flex items-center"><CheckCircle2 className="h-5 w-5 text-green-600 mr-2" /> Key Takeaways</h3>
+                    <ul className="space-y-2 text-sm">
+                        <li>• Why <strong>{industry}</strong> businesses in <strong>{location}</strong> need specialized software.</li>
+                        <li>• Top 5 features to look for in a Point of Sale system.</li>
+                        <li>• How Zeneva helps you track inventory, manage staff, and boost sales.</li>
+                    </ul>
+                </div>
+
+                <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">Why {industry} Owners in {location} are Switching to Modern POS Systems</h2>
+                <p>Running a successful <strong>{industry}</strong> in a bustling city like <strong>{location}</strong> comes with its unique set of challenges. From managing fluctuating foot traffic to tracking complex inventory, the old pen-and-paper methods simply don't cut it anymore. Business owners who want to scale and stay competitive are increasingly turning to digital solutions.</p>
+                <p>But with so many options out there, how do you choose the right Point of Sale (POS) system for your specific needs? In this guide, we'll break down why a cloud-based system like Zeneva is the perfect fit for your {industry}.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">1. Speed and Reliability for {location}'s Pace</h3>
+                <p>In {location}, customers expect speed. Long queues can kill sales faster than anything else. A modern POS system ensures checkout times are cut in half. Zeneva, specifically designed for the Nigerian market, works offline, ensuring that even if the internet in {location} fluctuates, your business keeps moving.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">2. Inventory Management Tailored for {industry}</h3>
+                <p>Managing stock for a {industry} is tricky. Product variants, expiration dates (if applicable), and restocks need precise tracking. Zeneva's inventory management suite automates this, decrementing stock instantly with every sale and alerting you before you run out of bestsellers.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">3. Data-Driven Decisions</h3>
+                <p>Do you know what your best-selling item in {location} is this week? With Zeneva's analytics, you don't have to guess. Our dashboard gives you real-time insights into your sales performance, helping you make smarter purchasing decisions for your {industry}.</p>
+
+                <div className="my-10 p-8 bg-primary/5 rounded-2xl border border-primary/10">
+                    <h3 className="text-xl font-bold font-bricolage mb-4 flex items-center">
+                        <Store className="mr-2 h-6 w-6 text-primary" />
+                        Case Study: A {industry} in {location}
+                    </h3>
+                    <p className="italic text-muted-foreground mb-4">
+                        "Before Zeneva, we were losing about ₦50,000 monthly to 'mystery' inventory disappearances. Within two months of switching, our shrinkage dropped to almost zero, and checkout times improved by 40%."
+                    </p>
+                    <p className="font-semibold text-primary">- Chinedu, {industry} Owner, {location}</p>
+                </div>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Top Features Every {industry} Needs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6 not-prose">
+                    <Card>
+                        <CardContent className="p-4 flex items-start">
+                            <CheckCircle2 className="h-5 w-5 text-primary mr-3 mt-0.5 shrink-0" />
+                            <div>
+                                <h4 className="font-bold">Offline Capability</h4>
+                                <p className="text-sm text-muted-foreground">Keep selling even when the {location} power or network goes down.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-start">
+                            <CheckCircle2 className="h-5 w-5 text-primary mr-3 mt-0.5 shrink-0" />
+                            <div>
+                                <h4 className="font-bold">Low Stock Alerts</h4>
+                                <p className="text-sm text-muted-foreground">Never run out of best-sellers. Get notified instantly.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-start">
+                            <CheckCircle2 className="h-5 w-5 text-primary mr-3 mt-0.5 shrink-0" />
+                            <div>
+                                <h4 className="font-bold">Multiple Locations</h4>
+                                <p className="text-sm text-muted-foreground">Manage multiple branches across {location} from one dashboard.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-start">
+                            <CheckCircle2 className="h-5 w-5 text-primary mr-3 mt-0.5 shrink-0" />
+                            <div>
+                                <h4 className="font-bold">Profit Analytics</h4>
+                                <p className="text-sm text-muted-foreground">See exactly how much profit you made today, locally.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-12 mb-4">Conclusion</h3>
+                <p>Don't let outdated tools hold your business back. Embrace the future of retail management. Sign up for Zeneva today and see why it's the preferred choice for {industry} businesses in {location}.</p>
+
+                <div className="mt-8 flex justify-center">
+                    <Button size="lg" className="font-semibold text-lg px-8 h-14" asChild>
+                        <Link href="/signup">Start Free Trial for Your {industry} <ArrowRight className="ml-2" /></Link>
+                    </Button>
+                </div>
+            </>
+        );
+    }
+
+    // Template 2: How to Manage Inventory
+    if (topic.includes('How to Manage')) {
+        return (
+            <>
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 my-8">
+                    <h3 className="text-lg font-bold mb-2 flex items-center"><CheckCircle2 className="h-5 w-5 text-green-600 mr-2" /> In This Guide</h3>
+                    <ul className="space-y-2 text-sm">
+                        <li>• The hidden costs of manual inventory management.</li>
+                        <li>• How to prevent theft and shrinkage in your <strong>{industry}</strong>.</li>
+                        <li>• Step-by-step: Automating reorders in <strong>{location}</strong>.</li>
+                    </ul>
+                </div>
+
+                <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">Mastering Inventory for Your {industry} in {location}</h2>
+                <p>Inventory is the lifeblood of any {industry}. Too much stock ties up your cash flow; too little means lost sales and disappointed customers. For business owners in {location}, finding that perfect balance is key to profitability.</p>
+                <p>This comprehensive guide explores the best practices for managing inventory specifically for a {industry}, and how utilizing software like Zeneva can transform your operations.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">The Challenge of Manual Counts</h3>
+                <p>Many {industry} businesses in {location} still rely on manual stock-taking. This is time-consuming and prone to human error. Digital inventory management eliminates these issues by providing a single source of truth that updates in real-time.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Preventing Shrinkage and Theft</h3>
+                <p>Loss prevention is a major concern for any {industry}. By tracking every item from purchase order to final sale, you can pinpoint exactly where discrepancies occur. Zeneva's detailed audit logs provide the accountability needed to secure your assets.</p>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Automated Reordering</h3>
+                <p>Never run out of your best-selling products again. Set low-stock alerts customized for your {industry}'s sales velocity. Zeneva will notify you exactly when it's time to reorder from your suppliers in {location} or beyond.</p>
+
+                <div className="my-10 p-8 bg-slate-100 rounded-2xl border border-slate-200">
+                    <h3 className="text-xl font-bold font-bricolage mb-4 flex items-center">
+                        <MapPin className="mr-2 h-6 w-6 text-slate-700" />
+                        Local Insight: Doing Business in {location}
+                    </h3>
+                    <p className="text-slate-600 mb-0">
+                        Supply chain logistics in {location} can sometimes be unpredictable. We recommend keeping a slightly higher "safety stock" level—about 15% more than average—to buffer against delivery delays common in the city. Zeneva allows you to adjust these thresholds instantly.
+                    </p>
+                </div>
+
+                <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Frequently Asked Questions</h3>
+                <div className="space-y-6">
+                    <div>
+                        <h4 className="font-bold text-lg">Can I track products with expiration dates?</h4>
+                        <p className="text-muted-foreground">Yes! Zeneva is perfect for {industry} businesses that sell perishable goods. You can track batches and expiry dates to ensure you sell older stock first.</p>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-lg">Do I need special hardware?</h4>
+                        <p className="text-muted-foreground">Not at all. Zeneva runs on any device—laptop, tablet, or smartphone. You can use your existing devices in {location} without buying expensive proprietary equipment.</p>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-lg">Does it work offline?</h4>
+                        <p className="text-muted-foreground">Absolutely. We know internet in {location} isn't always 100%. Zeneva's POS works offline and syncs when you reconnect.</p>
+                    </div>
+                </div>
+
+                <p className="mt-8">Start managing your inventory like a pro. With Zeneva, you can focus less on counting stock and more on growing your {industry} empire in {location}.</p>
+
+                <div className="mt-8 flex justify-center">
+                    <Button size="lg" className="font-semibold text-lg px-8 h-14" asChild>
+                        <Link href="/signup">Get Started Free <ArrowRight className="ml-2" /></Link>
+                    </Button>
+                </div>
+            </>
+        );
+    }
+
+    return <p>Content coming soon.</p>;
+};
+
 const PostContent = ({ post }: { post: StaticBlogPost }) => {
+    // If it's a programmatic post, use the generator component
+    if (post.isProgrammatic) {
+        return <ProgrammaticContent post={post} />;
+    }
+
+    // Otherwise, use the static content map
     const contentMap: { [key: string]: React.ReactNode } = {
         'getting-started-with-zeneva': (
             <>
@@ -71,7 +270,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
                 <blockquote className="border-l-4 border-primary pl-4 italic my-8">
                     "Our checkout times have been cut in half since we switched to Zeneva. Training new staff on the POS takes about 10 minutes, not hours." - A Zeneva Business Owner
                 </blockquote>
-                
+
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Integrated Inventory: Your Single Source of Truth</h3>
                 <p>This is the most powerful aspect of the Zeneva POS. It's not a separate system; it's a window directly into your live inventory. When you complete a sale, the following happens automatically:</p>
                 <ul className="list-disc list-inside space-y-2 my-4">
@@ -83,7 +282,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Building Customer Relationships at Checkout</h3>
                 <p>The POS is also a powerful Customer Relationship Management (CRM) tool. During the checkout flow, you have the option to attach the sale to a customer profile.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Add New Customers on the Fly:</strong> Don't see the customer in your list? You can create a new profile directly from the POS interface without interrupting the sale. Frame it as a benefit to them: "Would you like to join our loyalty program and get points on today's purchase?"</li>
                     <li><strong>Track Purchase History:</strong> By linking a sale to a customer, you build a valuable history of their buying habits. This allows you to offer personalized recommendations and targeted promotions in the future.</li>
                     <li><strong>Power Your Loyalty Program:</strong> If you have the loyalty program enabled (Pro Plan and above), points are automatically calculated and added to the customer's profile upon completion of the sale, encouraging repeat visits.</li>
@@ -92,7 +291,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
             </>
         ),
         'why-cloud-inventory-is-a-game-changer': (
-             <>
+            <>
                 <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">Escape the Spreadsheet Trap: The Power of Cloud Inventory</h2>
                 <p>For many small and growing businesses, the journey of inventory management begins with a spreadsheet. It's simple, familiar, and seems effective at first. But as your business grows, that spreadsheet becomes a liability—a static, error-prone, and isolated file that can't keep up with the dynamic nature of modern retail.</p>
                 <p>Switching to a cloud-based inventory system like Zeneva isn't just an upgrade; it's a fundamental transformation of how you operate. It moves your most critical business data from a fragile file on a single computer to a secure, accessible, and intelligent platform.</p>
@@ -114,7 +313,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">3. Intelligent Automation</h3>
                 <p>A cloud platform is more than just a digital spreadsheet; it's an active system that works for you.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Automatic Stock Updates:</strong> As mentioned, every sale through the Zeneva POS automatically updates your inventory. This is the core automation that saves hours of manual reconciliation.</li>
                     <li><strong>Low-Stock Alerts:</strong> The system can proactively notify you when items are running low based on thresholds you set, preventing costly stockouts.</li>
                     <li><strong>Data That Feeds Itself:</strong> Your sales data automatically feeds your analytics dashboards, showing you top-selling products and revenue trends without you having to lift a finger.</li>
@@ -122,7 +321,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">4. Enhanced Security and Reliability</h3>
                 <p>What happens if the computer with your inventory spreadsheet crashes? Or if the file gets corrupted? With a cloud system, your data is protected by enterprise-grade security measures.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Automatic Backups:</strong> Your data is continuously backed up on secure servers. You never have to worry about losing your business history.</li>
                     <li><strong>No Single Point of Failure:</strong> You can access your data from any device with an internet connection. If one device breaks, your business doesn't skip a beat.</li>
                     <li><strong>Controlled Access:</strong> With user roles and permissions, you can control who can see and modify your data, which is far more secure than emailing a spreadsheet around.</li>
@@ -131,7 +330,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
             </>
         ),
         'advanced-inventory-tips': (
-             <>
+            <>
                 <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">From Novice to Pro: Mastering Your Inventory in Zeneva</h2>
                 <p>You've added your products and you're making sales. That's a great start! But to truly unlock the power of Zeneva, you need to go beyond the basics. This guide will cover some of the more advanced features and best practices that can help you manage your inventory with greater precision and efficiency.</p>
 
@@ -143,7 +342,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
                     <li><strong>AI-Powered Insights:</strong> Our Zen AI features use categories to make more relevant suggestions. For example, it might notice that your 'Home Goods' products have less descriptive text than your 'Electronics' and suggest improvements.</li>
                 </ul>
                 <p><strong>Pro-Tip:</strong> Be consistent with your category names. 'Home Goods' and 'home-goods' will be treated as two different categories. Choose a format and stick with it. You can manage your categories in the Settings page.</p>
-                
+
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">2. Set Meaningful Low-Stock Thresholds</h3>
                 <p>By default, Zeneva might have a simple low-stock alert. However, on the Pro plan and above, you can set a custom <strong>lowStockThreshold</strong> for each product. This is crucial because not all products are created equal.</p>
                 <ul className="list-disc list-inside space-y-2 my-4">
@@ -152,31 +351,31 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
                 </ul>
                 <p>Tuning these thresholds turns your "Low Stock Alerts" from a simple warning into a proactive, intelligent reordering system.</p>
 
-                 <blockquote className="border-l-4 border-primary pl-4 italic my-8">
-                   "Once we customized our low-stock alerts, we practically eliminated stockouts on our bestsellers. It's been a game-changer for revenue." - Zeneva Business User
+                <blockquote className="border-l-4 border-primary pl-4 italic my-8">
+                    "Once we customized our low-stock alerts, we practically eliminated stockouts on our bestsellers. It's been a game-changer for revenue." - Zeneva Business User
                 </blockquote>
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">3. Use SKUs for Unambiguous Tracking</h3>
                 <p>SKU stands for "Stock Keeping Unit." It's a unique code that you assign to each specific product in your inventory. While product names can be similar (e.g., "Zeneva Hoodie - Large" and "Zeneva Hoodie - Medium"), SKUs should always be unique.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Eliminate Errors:</strong> Using SKUs prevents mix-ups between similar products during sales or stock counts.</li>
                     <li><strong>Integration-Ready:</strong> If you ever expand to other platforms or use barcode scanners, SKUs are the universal language that connects everything.</li>
                     <li><strong>Easy Searching:</strong> It's often faster and more accurate to search for a specific SKU than a long product name in both the Inventory and POS pages.</li>
                 </ul>
-                 <p><strong>Pro-Tip:</strong> Develop a consistent SKU format. For example: `BRAND-CATEGORY-ITEM-SIZE`. A large, blue Zeneva hoodie could be `ZNV-HDE-001-L-BLU`.</p>
+                <p><strong>Pro-Tip:</strong> Develop a consistent SKU format. For example: `BRAND-CATEGORY-ITEM-SIZE`. A large, blue Zeneva hoodie could be `ZNV-HDE-001-L-BLU`.</p>
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">4. Add Cost Prices for True Profitability Tracking</h3>
                 <p>Your 'Price' is what the customer pays. Your 'Cost Price' is what you paid for the item. Recording both is essential for understanding your business's true financial health. When you add a cost price to your products, Zeneva can automatically calculate:</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Profit per Sale:</strong> See your exact profit on every single receipt.</li>
                     <li><strong>Profit & Loss Reports:</strong> In the 'Reports' section (Pro Plan and above), you can view detailed charts on your revenue, cost of goods sold (COGS), and total profit over time.</li>
                     <li><strong>Inventory Valuation:</strong> Zen AI uses cost price to accurately calculate the value of your "Money Locked in Stock," giving you a real number for capital tied up in unsold goods.</li>
                 </ul>
-                <p className="mt-8">By implementing these advanced practices, you transform Zeneva from a simple record-keeping tool into the strategic core of your retail operation.</p>
+                <p>The Zen AI Copilot is more than a feature; it's a new way of running your business. It's about having an expert advisor who works 24/7 to find risks and opportunities, so you can spend less time analyzing data and more time growing your brand. This feature is available on the Business plan.</p>
             </>
         ),
         'understanding-your-customers-with-crm': (
-             <>
+            <>
                 <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">Beyond the Transaction: Building Relationships with Zeneva CRM</h2>
                 <p>In today's market, the most successful businesses don't just sell products; they build relationships. A one-time buyer is good, but a loyal, repeat customer is invaluable. Zeneva's integrated Customer Relationship Management (CRM) features are designed to help you turn transactions into long-term loyalty.</p>
 
@@ -190,7 +389,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">The POS as a CRM Tool</h3>
                 <p>Your checkout counter is one of the best opportunities to build your customer list. The Zeneva POS makes this seamless:</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Quick Search:</strong> When a returning customer is at the counter, a quick search for their name or email brings up their profile instantly.</li>
                     <li><strong>On-the-Spot Enrollment:</strong> If they're a new customer, you can add them to your system in seconds directly within the POS workflow. Frame it as a benefit to them: "Would you like to join our loyalty program and get points on today's purchase?"</li>
                 </ul>
@@ -201,7 +400,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Driving Repeat Business with the Loyalty Program</h3>
                 <p>The built-in loyalty program (available on Pro and Business plans) is one of the most powerful CRM features in Zeneva. Found in your settings, it allows you to automatically reward customers for their repeat business.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Effortless Point Accrual:</strong> When a sale is attached to a customer, Zeneva automatically calculates the loyalty points earned based on the total amount spent and adds it to their profile.</li>
                     <li><strong>Incentivize Return Visits:</strong> Customers are more likely to return when they know they are working towards a reward, such as a discount on a future purchase.</li>
                     <li><strong>Identify Your VIPs:</strong> The "Top Loyalty Customers" card on your dashboard and the detailed reports instantly show you who your most valuable and frequent shoppers are. These are the customers you should engage with the most.</li>
@@ -223,7 +422,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">2. The "Closed for Stock-Taking" Sign</h3>
                 <p>Closing your store for a full day (or more) just to count inventory means lost sales. It's a necessary evil in the manual world, but it directly impacts your bottom line. A digital system works 24/7 in the background. You get a real-time view of your inventory without ever having to turn away a customer. You can perform quick cycle counts on specific sections during slow periods instead of shutting down entirely.</p>
-                
+
                 <blockquote className="border-l-4 border-primary pl-4 italic my-8">
                     "We used to close for two full days every quarter. That's eight days of zero revenue a year. With Zeneva, we haven't closed for stock-taking in over a year." - Retail Store Owner
                 </blockquote>
@@ -233,7 +432,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">4. The Lack of Real-Time Insight</h3>
                 <p>A manual stock-take gives you a snapshot of your inventory on one specific day. The moment you re-open your doors, that data starts becoming obsolete. You have no way of knowing your exact stock level on a random Tuesday afternoon without doing another count. Zeneva gives you a live, dynamic view. You can see which products are flying off the shelves during a flash sale or identify slow-moving items that need to be discounted, all in real-time.</p>
-                
+
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">5. The Mystery of "Shrinkage"</h3>
                 <p>Shrinkage—the portion of inventory that is lost, stolen, or damaged—is a major cost for retailers. With manual counts done infrequently, it's almost impossible to pinpoint when or why items went missing. With Zeneva, you can track inventory movements more closely. Discrepancies between your digital count and a physical spot-check can be identified and investigated immediately, helping you tighten security and reduce losses.</p>
 
@@ -254,14 +453,14 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
                     <li><strong>Data Quality:</strong> How complete is your product data? Missing prices, descriptions, or cost prices can hinder sales and obscure your true profitability.</li>
                 </ul>
                 <p>This score, along with a one-word status ('Healthy', 'Needs Attention', or 'At Risk'), lets you know exactly where you stand at a glance.</p>
-                
+
                 <blockquote className="border-l-4 border-primary pl-4 italic my-8">
                     "The Health Score is the first thing I check every morning. It tells me instantly if I need to dig deeper into a potential problem or if things are running smoothly." - Zeneva Business Owner
                 </blockquote>
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">From Data to Dollars: Actionable Insights</h3>
                 <p>Zen AI doesn't just give you a score; it tells you exactly what to do to improve it. The analysis is broken down into three key areas:</p>
-                 <ol className="list-decimal list-inside space-y-4 my-4">
+                <ol className="list-decimal list-inside space-y-4 my-4">
                     <li><strong>Money Locked in Stock:</strong> The AI identifies "dead stock" (items not sold in 90+ days) and calculates the total value of this trapped capital. It then provides a clear recommendation, like running a clearance sale to liquidate these items and free up cash for better-performing products.</li>
                     <li><strong>Sales You Are About to Miss:</strong> Zen AI analyzes your sales velocity and current stock levels to identify fast-selling products at risk of stocking out. It estimates the potential monthly revenue you'll lose if these items aren't reordered, giving you a powerful incentive to act quickly.</li>
                     <li><strong>Actionable Recommendations:</strong> Based on the analysis, you get 2-3 direct, high-impact recommendations. Each one includes a clear title, a concise description of what to do, and a direct link to the relevant page in your Zeneva app (e.g., "View Slow-Moving Stock" linking to your inventory).</li>
@@ -284,7 +483,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Step 2: Customize Your Brand's Look and Feel</h3>
                 <p>This is where you make the store your own. All customization options provide a live preview, so you can see your changes instantly.</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li><strong>Upload a Banner Image:</strong> This is the large hero image at the top of your store. Choose a high-quality photo that represents your brand.</li>
                     <li><strong>Choose a Primary Color:</strong> Use the color sliders or select from presets to match your brand's primary color. This color will be used for buttons, links, and other accents throughout the store.</li>
                     <li><strong>Set Product Columns:</strong> Decide how many products you want to show per row on desktop screens (3, 4, or 5).</li>
@@ -297,7 +496,7 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">Step 3: Add Contact Information & Social Links</h3>
                 <p>Help your customers connect with you. In the "Location & Contact" and "Social Links" sections, you can add:</p>
-                 <ul className="list-disc list-inside space-y-2 my-4">
+                <ul className="list-disc list-inside space-y-2 my-4">
                     <li>Your physical store address(es) and a link to Google Maps.</li>
                     <li>Your business hours, contact phone number, and support email.</li>
                     <li>Links to your Twitter, Instagram, Facebook, and WhatsApp accounts.</li>
@@ -314,34 +513,36 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
 }
 
 export default function BlogPostPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
-  const post = blogPosts.find(p => p.slug === slug);
+    const { slug } = params;
+    const post = allBlogPosts.find(p => p.slug === slug);
 
-  if (!post) {
-    notFound();
-  }
+    if (!post) {
+        notFound();
+    }
 
-  return (
-    <div className="container mx-auto px-4 py-8 md:py-16 max-w-4xl">
-      <div className="mb-8">
-        <Button asChild variant="ghost" className="mb-4 hover:bg-muted">
-            <Link href="/blog"><ArrowLeft className="mr-2 h-4 w-4" />Back to Blog</Link>
-        </Button>
-        <p className="text-sm font-semibold uppercase text-primary tracking-wider">{post.category}</p>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tighter leading-tight font-bricolage mt-2 mb-4">
-            {post.title}
-        </h1>
-        <p className="text-lg text-muted-foreground">{post.excerpt}</p>
-      </div>
+    return (
+        <div className="container mx-auto px-4 py-8 md:py-16 max-w-4xl">
+            <div className="mb-8">
+                <Button asChild variant="ghost" className="mb-4 hover:bg-muted">
+                    <Link href="/blog"><ArrowLeft className="mr-2 h-4 w-4" />Back to Blog</Link>
+                </Button>
+                <p className="text-sm font-semibold uppercase text-primary tracking-wider">{post.category}</p>
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tighter leading-tight font-bricolage mt-2 mb-4">
+                    {post.title}
+                </h1>
+                <p className="text-lg text-muted-foreground">{post.excerpt}</p>
+            </div>
 
-      <div className="aspect-[16/9] w-full relative rounded-xl overflow-hidden mb-8 border shadow-lg">
-        <Image src={post.imageUrl} alt={post.title} fill className="object-cover" />
-      </div>
+            <div className="aspect-[16/9] w-full relative rounded-xl overflow-hidden mb-8 border shadow-lg">
+                <Image src={post.imageUrl || '/herolytics.svg'} alt={post.title} fill className="object-cover" />
+            </div>
 
-      <div className="prose lg:prose-xl dark:prose-invert max-w-none mx-auto">
-        <PostContent post={post} />
-      </div>
+            <div className="prose lg:prose-xl dark:prose-invert max-w-none mx-auto">
+                <PostContent post={post} />
+            </div>
 
-    </div>
-  );
+            <RelatedPosts currentSlug={post.slug} />
+
+        </div>
+    );
 }

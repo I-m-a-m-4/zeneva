@@ -1,6 +1,6 @@
 
 import { MetadataRoute } from 'next'
-import { blogPosts } from '@/lib/blog-data'
+import { allBlogPosts } from '@/lib/blog-data'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = 'https://zeneva.space';
@@ -50,7 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const blogPostRoutes: MetadataRoute.Sitemap = blogPosts.map(post => ({
+  const blogPostRoutes: MetadataRoute.Sitemap = allBlogPosts.map(post => ({
     url: `${siteUrl}/blog/${post.slug}`,
     lastModified: new Date(), // Ideally, use post's updated_at date
     changeFrequency: 'monthly',

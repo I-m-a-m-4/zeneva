@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowUpRight, ChevronDown, Loader2, ArrowRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Loader2, ArrowRight, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useMemo } from "react";
@@ -17,6 +17,7 @@ import { allBlogPosts } from '@/lib/blog-data';
 
 export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // NOTE: Firestore query has been removed from this public page to prevent permission errors.
   // The page now exclusively uses the static posts defined in `src/lib/blog-data.ts`.
@@ -43,11 +44,22 @@ export default function BlogPage() {
   }, [allPosts]);
 
   const filteredPosts = useMemo(() => {
-    if (selectedCategory === 'All') {
-      return allPosts;
+    let posts = allPosts;
+
+    if (selectedCategory !== 'All') {
+      posts = posts.filter(post => post.category === selectedCategory);
     }
-    return allPosts.filter(post => post.category === selectedCategory);
-  }, [selectedCategory, allPosts]);
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      posts = posts.filter(post =>
+        post.title.toLowerCase().includes(query) ||
+        post.excerpt.toLowerCase().includes(query)
+      );
+    }
+
+    return posts;
+  }, [selectedCategory, searchQuery, allPosts]);
 
   return (
     <div className="bg-white text-foreground">
@@ -65,13 +77,54 @@ export default function BlogPage() {
         </div>
       </div>
 
+      {/* Marquee Section */}
+      <div className="bg-primary text-primary-foreground py-3 overflow-hidden relative flex">
+        <div className="animate-marquee whitespace-nowrap flex min-w-full">
+          {allPosts.slice(0, 10).map((post, i) => (
+            <span key={i} className="mx-8 font-medium font-bricolage text-sm md:text-base flex items-center">
+              <span className="w-2 h-2 bg-white rounded-full mr-3 opacity-50"></span>
+              {post.title}
+            </span>
+          ))}
+          {allPosts.slice(0, 10).map((post, i) => (
+            <span key={`dup-${i}`} className="mx-8 font-medium font-bricolage text-sm md:text-base flex items-center">
+              <span className="w-2 h-2 bg-white rounded-full mr-3 opacity-50"></span>
+              {post.title}
+            </span>
+          ))}
+        </div>
+        <style jsx global>{`
+           @keyframes marquee {
+             0% { transform: translateX(0); }
+             100% { transform: translateX(-50%); }
+           }
+           .animate-marquee {
+             animation: marquee 60s linear infinite;
+           }
+           .animate-marquee:hover {
+             animation-play-state: paused;
+           }
+         `}</style>
+      </div>
+
       {/* Main Content Grid */}
       <div className="container mx-auto px-6 py-16 md:py-24">
 
-        <div className="w-full md:w-[480px] mx-auto mb-16">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between max-w-4xl mx-auto mb-16">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search articles..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-12 pl-10 pr-4 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            />
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-full bg-slate-100 text-slate-800 rounded-lg h-14 px-4 flex items-center justify-between border border-slate-200 hover:bg-slate-200 transition-colors">
+              <button className="w-full md:w-auto bg-slate-100 text-slate-800 rounded-lg h-12 px-6 flex items-center justify-between border border-slate-200 hover:bg-slate-200 transition-colors whitespace-nowrap">
                 <div className="flex items-center">
                   <span className="h-2 w-2 bg-primary rounded-full mr-3"></span>
                   <span className="font-medium">Filter by: {selectedCategory}</span>
@@ -81,7 +134,7 @@ export default function BlogPage() {
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+            <DropdownMenuContent className="w-[200px]">
               {categories.map(category => (
                 <DropdownMenuItem key={category} onSelect={() => setSelectedCategory(category)} className="focus:bg-slate-100 focus:text-slate-900 cursor-pointer">
                   <div className="flex items-center">

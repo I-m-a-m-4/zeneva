@@ -109,6 +109,17 @@ export const TARGET_TOPICS = [
   }
 ];
 
+export const IMAGE_MAP: Record<string, string> = {
+  'Supermarket': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=1974&auto=format&fit=crop', // Modern grocery aisle
+  'Pharmacy': 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=2069&auto=format&fit=crop', // Clean pharmacy shelves
+  'Fashion Boutique': 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop', // Chic clothing store
+  'Electronics Store': 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?q=80&w=2101&auto=format&fit=crop', // Electronics retail
+  'Restaurant': 'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2070&auto=format&fit=crop', // Modern restaurant interior
+  'Hardware Store': 'https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?q=80&w=1780&auto=format&fit=crop', // Tools and hardware
+  'Cosmetics Shop': 'https://images.unsplash.com/photo-1616401784845-180882ba9ba8?q=80&w=2070&auto=format&fit=crop', // Beauty products display
+  'Bookstore': 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=2190&auto=format&fit=crop', // Library/Bookstore vibe
+};
+
 export function generateProgrammaticPosts(): StaticBlogPost[] {
   const posts: StaticBlogPost[] = [];
 
@@ -130,7 +141,7 @@ export function generateProgrammaticPosts(): StaticBlogPost[] {
           slug,
           title,
           excerpt: `Discover why Zeneva is the top-rated choice for ${industry} owners in ${location}. Streamline operations, track stock, and boost sales with our all-in-one platform.`,
-          imageUrl: '/herolytics.svg', // Fallback or dynamic image logic could be added here
+          imageUrl: IMAGE_MAP[industry] || '/herolytics.svg',
           category: topic.category,
           isProgrammatic: true,
           programmaticData: {
@@ -147,3 +158,20 @@ export function generateProgrammaticPosts(): StaticBlogPost[] {
 }
 
 export const allBlogPosts = [...blogPosts, ...generateProgrammaticPosts()];
+
+// Helper to get related posts
+export function getRelatedPosts(currentSlug: string, count: number = 3): StaticBlogPost[] {
+  const currentPost = allBlogPosts.find(p => p.slug === currentSlug);
+  if (!currentPost) return [];
+
+  // Simple logic: prefer same category, then random
+  const sameCategory = allBlogPosts.filter(p => p.category === currentPost.category && p.slug !== currentSlug);
+
+  // Shuffle array (Fisher-Yates)
+  for (let i = sameCategory.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [sameCategory[i], sameCategory[j]] = [sameCategory[j], sameCategory[i]];
+  }
+
+  return sameCategory.slice(0, count);
+}

@@ -160,7 +160,7 @@ service cloud.firestore {
     }
 
     match /system_broadcasts/{broadcastId} {
-      allow read: if isUserAuthenticated();
+      allow read: if true;
       allow write: if isSuperAdmin();
     }
   }
