@@ -62,6 +62,8 @@ import {
     BarChart3,
     TrendingUp,
     Store,
+    DollarSign,
+    Trophy,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -1057,7 +1059,12 @@ export default function Home() {
 
                     {/* Profit Dial Section */}
                     <section className="py-24 px-6 bg-[#F9F8F6] text-slate-900 relative overflow-hidden text-center">
-                        <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
+                        {/* Grid Background */}
+                        <div className="absolute inset-0 z-0 opacity-[0.03]" style={{
+                            backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)',
+                            backgroundSize: '32px 32px'
+                        }}></div>
+
                         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10 text-left">
                             <div>
                                 <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6 font-bricolage text-slate-900">
@@ -1070,7 +1077,7 @@ export default function Home() {
                                 <div className="space-y-6 mb-10">
                                     <div className="flex gap-4">
                                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                            <ArrowUp className="w-6 h-6 text-primary" />
+                                            <TrendingUp className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Reduce stockouts</h4>
@@ -1079,7 +1086,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                                            <Database className="w-6 h-6 text-emerald-600" />
+                                            <DollarSign className="w-6 h-6 text-emerald-600" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Reduce overstock</h4>
@@ -1088,7 +1095,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                            <Zap className="w-6 h-6 text-blue-600" />
+                                            <Box className="w-6 h-6 text-blue-600" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Optimize production timing</h4>
@@ -1097,7 +1104,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex gap-4">
                                         <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                            <Sparkles className="w-6 h-6 text-purple-600" />
+                                            <Trophy className="w-6 h-6 text-purple-600" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Identify winning products</h4>

@@ -5,7 +5,8 @@ import * as React from 'react';
 import Image from 'next/image';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users } from 'lucide-react';
+import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { usePOS } from '@/context/pos-context';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -173,9 +174,37 @@ function GoalSetting() {
 }
 
 export default function AchievementsPage() {
+    const { toast } = useToast();
     const { receipts, products, customers, triggerConfetti } = usePOS();
     const [seenMilestones, setSeenMilestones] = React.useState<Set<string>>(new Set());
     const [selectedMilestone, setSelectedMilestone] = React.useState<{ label: string; date: Date; description: string; imageUrl: string; details?: string } | null>(null);
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [isDownloading, setIsDownloading] = React.useState(false);
+
+    const handleDownload = async () => {
+        if (!cardRef.current) return;
+        setIsDownloading(true);
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                useCORS: true,
+                scale: 3, // Higher scale for better quality
+                backgroundColor: null,
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `zeneva-achievement-${selectedMilestone?.label.replace(/\s+/g, '-').toLowerCase()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({ title: "Downloaded!", description: "Your achievement card has been saved." });
+        } catch (error) {
+            console.error("Download failed", error);
+            toast({ variant: "destructive", title: "Download Failed", description: "Could not save the image. Please try again." });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     React.useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -210,7 +239,7 @@ export default function AchievementsPage() {
                                 date: receiptDate,
                                 description: "You're on a roll! Keep up the incredible momentum.",
                                 imageUrl: milestone.image,
-                                details: `Total Year Sales at time: ₦${yearTotal.toLocaleString()}`
+                                details: `Total Year Sales: ₦${yearTotal.toLocaleString()}`
                             });
                         }
                     }
@@ -227,7 +256,7 @@ export default function AchievementsPage() {
                         date: new Date(), // This is approximate if not tracking history
                         description: "Your catalog is growing fast. Great job!",
                         imageUrl: milestone.image,
-                        details: `Total Products: ${products.length}`
+                        details: `Catalog Size: ${products.length} Products`
                     });
                 }
             }
@@ -242,7 +271,7 @@ export default function AchievementsPage() {
                         date: new Date(),
                         description: "Your community is expanding. Fantastic work!",
                         imageUrl: milestone.image,
-                        details: `Total Customers: ${customers.length}`
+                        details: `Community Size: ${customers.length} Customers`
                     });
                 }
             }
@@ -350,8 +379,8 @@ export default function AchievementsPage() {
             <GoalSetting />
 
             <Dialog open={!!selectedMilestone} onOpenChange={(open) => !open && setSelectedMilestone(null)}>
-                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0">
-                    <div className="relative p-6 pt-12 flex flex-col items-center text-center bg-background">
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 gap-0">
+                    <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-background min-h-[420px] justify-center">
                         {/* Dynamic Background for Modal */}
                         <div className="absolute inset-0 z-0">
                             <Image
@@ -363,48 +392,66 @@ export default function AchievementsPage() {
                             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
                         </div>
 
-                        <div className="relative z-10 w-24 h-24 bg-background/50 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg mb-4 ring-4 ring-primary/10">
+                        <div className="relative z-10 w-28 h-28 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-primary/20">
                             {selectedMilestone && (
                                 <Image
                                     src={selectedMilestone.imageUrl}
                                     alt="Achievement"
-                                    width={80}
-                                    height={80}
+                                    width={90}
+                                    height={90}
                                     className="object-contain p-2"
                                 />
                             )}
                         </div>
 
-                        <DialogHeader className="relative z-10 sm:text-center w-full">
-                            <DialogTitle className="text-2xl font-bold text-primary mb-2">
+                        <div className="relative z-10 w-full mb-6">
+                            <h2 className="text-2xl font-bold text-primary mb-2 leading-tight">
                                 {selectedMilestone?.label}
-                            </DialogTitle>
-                            <DialogDescription className="text-base text-foreground font-medium">
+                            </h2>
+                            <p className="text-base text-foreground/80 font-medium px-4">
                                 {selectedMilestone?.description}
-                            </DialogDescription>
-                        </DialogHeader>
+                            </p>
+                        </div>
 
-                        <div className="relative z-10 mt-6 grid grid-cols-2 gap-4 w-full bg-muted/50 p-4 rounded-lg">
-                            <div className="text-center">
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Achieved On</p>
-                                <p className="font-mono text-sm font-medium mt-1">
-                                    {selectedMilestone?.date && format(selectedMilestone.date, 'PPP')}
+                        <div className="relative z-10 grid grid-cols-2 gap-4 w-full bg-white/60 backdrop-blur-sm border border-white/20 p-4 rounded-xl shadow-sm">
+                            <div className="text-center border-r border-slate-200/60">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Achieved On</p>
+                                <p className="font-mono text-sm font-bold mt-1 text-slate-700">
+                                    {selectedMilestone?.date && format(selectedMilestone.date, 'MMM do, yyyy')}
                                 </p>
                             </div>
                             <div className="text-center">
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Stats</p>
-                                <p className="text-sm font-medium mt-1 text-primary">
-                                    {selectedMilestone?.details}
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Milestone</p>
+                                <p className="text-sm font-bold mt-1 text-primary">
+                                    {selectedMilestone?.details?.split(':')[1]?.trim() || selectedMilestone?.details}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="relative z-10 mt-8 w-full">
-                            <Button className="w-full gap-2 text-lg h-12" onClick={() => triggerConfetti?.()}>
-                                <PartyPopper className="h-5 w-5" />
-                                Celebrate Again!
-                            </Button>
+                        {/* Footer Branding */}
+                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                            <p className="text-[11px] font-bold tracking-[0.2em] text-primary/40 uppercase">
+                                zeneva.space
+                            </p>
                         </div>
+                    </div>
+
+                    {/* Action Buttons Area - Not captured */}
+                    <div className="p-4 bg-muted/30 border-t flex flex-col gap-3">
+                        <Button className="w-full gap-2 text-base h-11 shadow-md hover:shadow-lg transition-all" onClick={() => triggerConfetti?.()}>
+                            <PartyPopper className="h-4 w-4" />
+                            Celebrate Again!
+                        </Button>
+                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/5" onClick={handleDownload} disabled={isDownloading}>
+                            {isDownloading ? (
+                                <>Downloading...</>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4" />
+                                    Download Certificate
+                                </>
+                            )}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
