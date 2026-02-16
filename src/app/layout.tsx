@@ -57,8 +57,10 @@ const jsonLd = {
       url: siteUrl,
       logo: 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png',
       sameAs: [
-        'https://twitter.com/zenevahq',
-        'https://instagram.com/zenevahq'
+        'https://x.com/zeneva_retail',
+        'https://www.instagram.com/zeneva_pos/',
+        'https://www.tiktok.com/@zeneva_retail',
+        'https://www.youtube.com/@ZenevaPos'
       ]
     },
     {
