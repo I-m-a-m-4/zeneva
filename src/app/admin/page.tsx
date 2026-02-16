@@ -21,7 +21,6 @@ import {
     Cell,
     CartesianGrid,
     Legend,
-    Legend,
     Tooltip as ReTooltip,
     ResponsiveContainer,
 } from 'recharts';
@@ -74,6 +73,7 @@ import {
     addDoc,
     serverTimestamp,
     Timestamp,
+    collectionGroup,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -320,6 +320,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[] }>({ open: false, title: '', description: '', businesses: [] });
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+    const [totalSubscribers, setTotalSubscribers] = useState(0);
+
+    useEffect(() => {
+        const fetchSubscribers = async () => {
+            try {
+                // Use collectionGroup to query all 'fcmTokens' subcollections across all users
+                const tokensSnapshot = await getDocs(collectionGroup(firestore, 'fcmTokens'));
+                setTotalSubscribers(tokensSnapshot.size);
+            } catch (error) {
+                console.error("Error fetching subscribers:", error);
+            }
+        };
+        fetchSubscribers();
+    }, [firestore]);
 
     // Broadcast State
     const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -366,7 +380,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return true;
         });
 
-        const healthScores = activeBusinesses.map(b => b.settings?.businessAnalysis?.health?.score ?? -1);
+        const healthScores = activeBusinesses.map(b => (b.settings?.businessAnalysis as any)?.health?.score ?? -1);
         const healthDistribution = {
             healthy: healthScores.filter(s => s >= 70).length,
             attention: healthScores.filter(s => s >= 40 && s < 70).length,
@@ -818,6 +832,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatCard title="Push Subscribers" value={totalSubscribers} icon={Megaphone} description="Devices opted-in for updates" />
                             <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
                             <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
                             <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />

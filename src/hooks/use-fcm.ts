@@ -5,7 +5,7 @@ import { initializeMessaging } from '@/firebase/messaging';
 import { getToken, onMessage } from 'firebase/messaging';
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export function useFCM() {
@@ -91,5 +91,21 @@ export function useFCM() {
         }
     };
 
-    return { permission, requestPermission, fcmToken, isLoading };
+    const unsubscribe = async () => {
+        if (!fcmToken || !user) return;
+        setIsLoading(true);
+        try {
+            const tokenRef = doc(firestore, `users/${user.uid}/fcmTokens`, fcmToken);
+            await deleteDoc(tokenRef);
+            setFcmToken(null);
+            toast({ title: "Notifications Disabled", description: "This device will no longer receive alerts." });
+        } catch (error) {
+            console.error("Error unsubscribing:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to disable notifications." });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    return { permission, requestPermission, unsubscribe, fcmToken, isLoading };
 }

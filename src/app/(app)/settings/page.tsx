@@ -122,10 +122,21 @@ import { useFCM } from '@/hooks/use-fcm';
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh } = usePOS();
     const { promptInstall, isInstallable, isAppInstalled } = usePWA();
-    const { permission, requestPermission, isLoading: isFcmLoading } = useFCM();
+
+    const { permission, requestPermission, unsubscribe, fcmToken, isLoading: isFcmLoading } = useFCM();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
+    // ... (rest of component)
+    // In the JSX:
+    <Button
+        onClick={fcmToken ? unsubscribe : requestPermission}
+        disabled={isFcmLoading}
+        variant={fcmToken ? "destructive" : "default"}
+    >
+        {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {fcmToken ? "Disable" : "Enable"}
+    </Button>
 
     // General state
     const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
@@ -551,12 +562,12 @@ function SettingsPageContent() {
                                 </p>
                             </div>
                             <Button
-                                onClick={requestPermission}
-                                disabled={permission === 'granted' || isFcmLoading}
-                                variant={permission === 'granted' ? "outline" : "default"}
+                                onClick={fcmToken ? unsubscribe : requestPermission}
+                                disabled={isFcmLoading}
+                                variant={fcmToken ? "destructive" : "default"}
                             >
                                 {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {permission === 'granted' ? "Enabled" : "Enable"}
+                                {fcmToken ? "Disable" : "Enable"}
                             </Button>
                         </div>
                     </CardContent>
