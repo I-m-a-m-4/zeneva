@@ -345,14 +345,14 @@ export default function Home() {
     };
 
     const businessTypes = [
-        { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.' },
-        { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.' },
-        { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.' },
-        { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.' },
-        { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.' },
-        { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.' },
-        { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.' },
-        { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.' },
+        { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.', link: '/industries/fashion-boutique' },
+        { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.', link: '/signup' },
+        { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.', link: '/signup' },
+        { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.', link: '/industries/electronics' },
+        { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.', link: '/industries/restaurant-cafe' },
+        { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.', link: '/signup' },
+        { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.', link: '/industries/pharmacy' },
+        { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.', link: '/industries/restaurant-cafe' },
     ];
 
     return (
@@ -945,7 +945,7 @@ export default function Home() {
                                     const image = PlaceHolderImages.find(p => p.id === type.imageId);
                                     if (!image) return null;
                                     return (
-                                        <div key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer">
+                                        <Link href={type.link} key={type.name} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[4/5] cursor-pointer block">
                                             <Image
                                                 src={image.imageUrl}
                                                 alt={type.name}
@@ -958,7 +958,7 @@ export default function Home() {
                                                 <h3 className="text-2xl font-light tracking-tight font-bricolage">{type.name}</h3>
                                                 <p className="mt-1 text-sm text-white/90">{type.description}</p>
                                             </div>
-                                        </div>
+                                        </Link>
                                     )
                                 })}
                             </div>
