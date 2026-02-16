@@ -561,32 +561,14 @@ function SettingsPageContent() {
                                             : "Enable push notifications to stay updated on orders and stock."}
                                 </p>
                             </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={fcmToken ? unsubscribe : requestPermission}
-                                    disabled={isFcmLoading}
-                                    variant={fcmToken ? "destructive" : "default"}
-                                >
-                                    {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    {fcmToken ? "Disable" : "Enable"}
-                                </Button>
-                                {fcmToken && (
-                                    <Button variant="outline" onClick={async () => {
-                                        if (!currentUserProfile?.id) return;
-                                        toast({ title: "Sending...", description: "Triggering test notification." });
-                                        // Dynamic import or assumed import from top
-                                        const { sendTestNotification } = await import('@/actions/notifications');
-                                        const result = await sendTestNotification(currentUserProfile.id);
-                                        if (result.success) {
-                                            toast({ title: "Sent!", description: "Check your device for the alert." });
-                                        } else {
-                                            toast({ variant: "destructive", title: "Failed", description: result.error });
-                                        }
-                                    }} disabled={isFcmLoading}>
-                                        Test Alert
-                                    </Button>
-                                )}
-                            </div>
+                            <Button
+                                onClick={fcmToken ? unsubscribe : requestPermission}
+                                disabled={isFcmLoading}
+                                variant={fcmToken ? "destructive" : "default"}
+                            >
+                                {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {fcmToken ? "Disable" : "Enable"}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -609,7 +591,7 @@ function SettingsPageContent() {
                     )}
                 </Card>
             </div>
-        </div>
+        </div >
     );
 }
 

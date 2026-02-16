@@ -17,14 +17,14 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 const SALES_MILESTONES = [
-  { value: 100000, label: '₦100k in Sales', image: '/badges/sales-pioneer.png' },
-  { value: 500000, label: '₦500k in Sales', image: '/badges/sales-pioneer.png' },
-  { value: 1000000, label: '₦1 Million in Sales', image: '/badges/millionaire-milestone.png' },
-  { value: 5000000, label: '₦5 Million in Sales', image: '/badges/millionaire-milestone.png' },
-  { value: 10000000, label: '₦10 Million in Sales', image: '/badges/five-figure-club.png' },
-  { value: 30000000, label: '₦30 Million in Sales', image: '/badges/five-figure-club.png' },
-  { value: 50000000, label: '₦50 Million in Sales', image: '/badges/high-roller.png' },
-  { value: 100000000, label: '₦100 Million in Sales', image: '/badges/high-roller.png' },
+    { value: 100000, label: '₦100k in Sales', image: '/badges/sales-pioneer.png' },
+    { value: 500000, label: '₦500k in Sales', image: '/badges/sales-pioneer.png' },
+    { value: 1000000, label: '₦1 Million in Sales', image: '/badges/millionaire-milestone.png' },
+    { value: 5000000, label: '₦5 Million in Sales', image: '/badges/millionaire-milestone.png' },
+    { value: 10000000, label: '₦10 Million in Sales', image: '/badges/five-figure-club.png' },
+    { value: 30000000, label: '₦30 Million in Sales', image: '/badges/five-figure-club.png' },
+    { value: 50000000, label: '₦50 Million in Sales', image: '/badges/high-roller.png' },
+    { value: 100000000, label: '₦100 Million in Sales', image: '/badges/high-roller.png' },
 ];
 
 const PRODUCT_MILESTONES = [
@@ -75,7 +75,7 @@ function GoalSetting() {
         setNewGoal({ title: '', target: '', metric: 'totalSales' });
         toast({ variant: 'success', title: 'Goal Set!', description: 'Your new goal has been added.' });
     };
-    
+
     const handleDeleteGoal = (id: number) => {
         setGoals(goals.filter(g => g.id !== id));
         toast({ title: 'Goal Removed' });
@@ -101,7 +101,7 @@ function GoalSetting() {
                         <Target />
                         Your Goals
                     </div>
-                    <Button size="sm" onClick={() => setIsDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4"/> Set New Goal</Button>
+                    <Button size="sm" onClick={() => setIsDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Set New Goal</Button>
                 </CardTitle>
                 <CardDescription>Set custom targets for your business and track your progress. Goals are saved on this device.</CardDescription>
             </CardHeader>
@@ -136,7 +136,7 @@ function GoalSetting() {
                     </div>
                 )}
             </CardContent>
-             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Set a New Goal</DialogTitle>
@@ -145,21 +145,21 @@ function GoalSetting() {
                     <div className="space-y-4 py-4">
                         <div>
                             <Label htmlFor="goal-title">Goal Title</Label>
-                            <Input id="goal-title" value={newGoal.title} onChange={e => setNewGoal({...newGoal, title: e.target.value})} placeholder="e.g., Reach 1,000 Customers" />
+                            <Input id="goal-title" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })} placeholder="e.g., Reach 1,000 Customers" />
                         </div>
-                         <div>
+                        <div>
                             <Label htmlFor="goal-metric">Metric to Track</Label>
-                            <Select value={newGoal.metric} onValueChange={(value: GoalMetric) => setNewGoal({...newGoal, metric: value})}>
+                            <Select value={newGoal.metric} onValueChange={(value: GoalMetric) => setNewGoal({ ...newGoal, metric: value })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="totalSales"><DollarSign className="inline-block mr-2 h-4 w-4"/>Total Sales</SelectItem>
-                                    <SelectItem value="customerCount"><Users className="inline-block mr-2 h-4 w-4"/>Customer Count</SelectItem>
+                                    <SelectItem value="totalSales"><DollarSign className="inline-block mr-2 h-4 w-4" />Total Sales</SelectItem>
+                                    <SelectItem value="customerCount"><Users className="inline-block mr-2 h-4 w-4" />Customer Count</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
                             <Label htmlFor="goal-target">Target Value</Label>
-                            <Input id="goal-target" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} placeholder="e.g., 1000" />
+                            <Input id="goal-target" type="number" value={newGoal.target} onChange={e => setNewGoal({ ...newGoal, target: e.target.value })} placeholder="e.g., 1000" />
                         </div>
                     </div>
                     <DialogFooter>
@@ -194,38 +194,38 @@ export default function AchievementsPage() {
         const currentYear = new Date().getFullYear();
 
         if (receipts) {
-            const sortedReceipts = [...receipts].sort((a,b) => a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime());
-            
+            const sortedReceipts = [...receipts].sort((a, b) => a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime());
+
             let yearTotal = 0;
             for (const receipt of sortedReceipts) {
                 const receiptDate = receipt.createdAt.toDate();
                 if (receiptDate.getFullYear() === currentYear) {
                     yearTotal += receipt.total;
-                     for (const milestone of SALES_MILESTONES) {
-                         if (yearTotal >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
+                    for (const milestone of SALES_MILESTONES) {
+                        if (yearTotal >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
                             achieved.push({ label: `Crossed ${milestone.label} This Year`, date: receiptDate, description: "You're on a roll! Keep up the incredible momentum.", imageUrl: milestone.image });
                         }
                     }
                 }
             }
         }
-        
-        if(products) {
+
+        if (products) {
             for (const milestone of PRODUCT_MILESTONES) {
                 if (products.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
                     achieved.push({ label: `Reached ${milestone.label}`, date: new Date(), description: "Your catalog is growing fast. Great job!", imageUrl: milestone.image });
                 }
             }
         }
-        
+
         if (customers) {
-             for (const milestone of CUSTOMER_MILESTONES) {
+            for (const milestone of CUSTOMER_MILESTONES) {
                 if (customers.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
                     achieved.push({ label: `Reached ${milestone.label}`, date: new Date(), description: "Your community is expanding. Fantastic work!", imageUrl: milestone.image });
                 }
             }
         }
-        
+
         return achieved.sort((a, b) => b.date.getTime() - a.date.getTime());
 
     }, [receipts, products, customers]);
@@ -243,13 +243,13 @@ export default function AchievementsPage() {
             if (hasNewMilestone) {
                 triggerConfetti();
                 setSeenMilestones(newSeen);
-                 if (typeof window !== 'undefined') {
+                if (typeof window !== 'undefined') {
                     try {
                         localStorage.setItem('seenMilestones', JSON.stringify(Array.from(newSeen)));
                     } catch (e) {
-                       console.error("Could not save milestones to localStorage", e);
+                        console.error("Could not save milestones to localStorage", e);
                     }
-                 }
+                }
             }
         }
     }, [milestones, seenMilestones, triggerConfetti]);
@@ -258,7 +258,7 @@ export default function AchievementsPage() {
     return (
         <div className="space-y-6">
             <PageTitle title="Achievements & Goals" subtitle="Celebrate your milestones and set new targets for your business." />
-            
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary">
@@ -275,13 +275,24 @@ export default function AchievementsPage() {
                                     <div className="absolute left-6 top-1/2 w-4 h-4 mt-[-8px] -translate-x-1/2 rounded-full bg-primary border-4 border-background ring-4 ring-primary/20"></div>
                                     <div className="ml-10">
                                         <p className="text-xs text-muted-foreground mb-1">{format(milestone.date, 'PPP')}</p>
-                                        <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border">
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted flex-shrink-0 overflow-hidden">
-                                                <Image src={milestone.imageUrl} alt={milestone.label} width={48} height={48} className="object-contain p-1" />
+                                        <div className="relative flex items-center gap-6 p-6 rounded-xl border overflow-hidden group">
+                                            {/* Background Image with Overlay */}
+                                            <div className="absolute inset-0 z-0">
+                                                <Image
+                                                    src="/achievement_bg.png"
+                                                    alt="Background"
+                                                    fill
+                                                    className="object-cover opacity-20"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-r from-background/90 to-background/40" />
                                             </div>
-                                            <div className="flex-1">
-                                                <p className="font-semibold text-foreground">{milestone.label}</p>
-                                                <p className="text-sm text-muted-foreground">{milestone.description}</p>
+
+                                            <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-background/50 backdrop-blur-sm flex-shrink-0 overflow-hidden border shadow-sm">
+                                                <Image src={milestone.imageUrl} alt={milestone.label} width={96} height={96} className="object-contain p-2" />
+                                            </div>
+                                            <div className="flex-1 relative z-10">
+                                                <p className="font-bold text-lg text-foreground mb-1">{milestone.label}</p>
+                                                <p className="text-muted-foreground">{milestone.description}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -289,7 +300,7 @@ export default function AchievementsPage() {
                             ))}
                         </div>
                     ) : (
-                         <div className="text-center text-muted-foreground p-12 border-2 border-dashed rounded-lg">
+                        <div className="text-center text-muted-foreground p-12 border-2 border-dashed rounded-lg">
                             <p>Your milestones will appear here as you grow!</p>
                             <p className="text-sm">Keep adding products and making sales.</p>
                         </div>

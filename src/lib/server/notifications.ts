@@ -21,9 +21,12 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
             notification: {
                 title: payload.title,
                 body: payload.body,
+                imageUrl: 'https://zeneva.app/zeneva.png', // Optional: precise URL if possible, or relative if PWA
+                // icon: '/zeneva.png', // Note: icon is often ignored by FCM on iOS/Android unless handled in SW
             },
             data: {
                 url: payload.url || '/',
+                icon: '/zeneva.png', // Send in data for SW to use
             },
             tokens: tokens,
         };
