@@ -15,7 +15,7 @@ import { Progress } from '../ui/progress';
 
 export default function BusinessHealthIndicator() {
   const { business } = usePOS();
-  
+
   const healthData = business?.settings?.businessAnalysis?.businessHealth;
 
   if (!healthData) {
@@ -26,7 +26,7 @@ export default function BusinessHealthIndicator() {
             <Link href="/ai-insights" className="flex items-center gap-2 border rounded-md p-2 hover:bg-muted cursor-pointer transition-colors w-48">
               <div className="w-full">
                 <div className="text-sm font-semibold text-center flex items-center justify-center gap-2">
-                  <Bot className="h-4 w-4 text-primary"/>
+                  <Bot className="h-4 w-4 text-primary" />
                   Zen AI Briefing
                 </div>
                 <p className="text-xs text-muted-foreground text-center">Click to view insights</p>
@@ -34,8 +34,8 @@ export default function BusinessHealthIndicator() {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="start" className="max-w-xs">
-              <p className="font-semibold mb-1">AI Executive Briefing</p>
-              <p className="text-sm text-muted-foreground">Generate your first AI report to see your Business Health Score.</p>
+            <p className="font-semibold mb-1">AI Executive Briefing</p>
+            <p className="text-sm text-muted-foreground">Generate your first AI report to see your Business Health Score.</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -62,12 +62,12 @@ export default function BusinessHealthIndicator() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Link href="/ai-insights" className="flex items-center gap-3 border rounded-lg p-2 hover:bg-muted cursor-pointer transition-colors w-48">
-             <div className="text-2xl font-bold">{score}</div>
-             <div className="w-full">
-                <p className={`font-semibold text-sm ${getStatusColor()}`}>{status}</p>
-                <p className="text-xs text-muted-foreground">Business Health</p>
-                <Progress value={score} className="h-1 mt-1" indicatorClassName={getProgressColor()} />
-             </div>
+            <div className="text-2xl font-bold">{score}</div>
+            <div className="w-full">
+              {/* <p className={`font-semibold text-sm ${getStatusColor()}`}>{status}</p> */}
+              <p className="text-xs text-muted-foreground">Business Health</p>
+              <Progress value={score} className="h-1 mt-1" indicatorClassName={getProgressColor()} />
+            </div>
           </Link>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="start" className="max-w-xs">

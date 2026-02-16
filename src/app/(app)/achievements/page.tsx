@@ -261,9 +261,15 @@ export default function AchievementsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary">
-                        <Award />
-                        Your Milestone Timeline
+                    <CardTitle className="flex items-center justify-between text-primary">
+                        <div className="flex items-center gap-2">
+                            <Award />
+                            Your Milestone Timeline
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => triggerConfetti?.()}>
+                            <PartyPopper className="mr-2 h-4 w-4" />
+                            Celebrate!
+                        </Button>
                     </CardTitle>
                     <CardDescription>A timeline of your major business achievements. You're going at a high speed!</CardDescription>
                 </CardHeader>
