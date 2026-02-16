@@ -48,7 +48,16 @@ export function useFCM() {
                     return;
                 }
 
-                const token = await getToken(messaging, { vapidKey });
+                // Register Service Worker explicitly to avoid "Registration failed" errors
+                let serviceWorkerRegistration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+                if (!serviceWorkerRegistration) {
+                    serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                }
+
+                const token = await getToken(messaging, {
+                    vapidKey,
+                    serviceWorkerRegistration
+                });
 
                 if (token) {
                     setFcmToken(token);
