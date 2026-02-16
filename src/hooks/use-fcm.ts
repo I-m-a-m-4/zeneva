@@ -84,7 +84,7 @@ export function useFCM() {
             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: 'Could not enable notifications.'
+                description: error instanceof Error ? error.message : 'Could not enable notifications.'
             });
         } finally {
             setIsLoading(false);
