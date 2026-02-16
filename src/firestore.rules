@@ -108,9 +108,12 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      match /onlineOrders/{orderId} {
+       match /onlineOrders/{orderId} {
          allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
-         allow write: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+         // Allow public to create orders, but restrict updates to staff
+         allow create: if true; 
+         allow update: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+         allow delete: if false;
       }
     }
 
@@ -154,7 +157,8 @@ service cloud.firestore {
     
     match /customers/{customerId} {
       allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId)) || isSuperAdmin();
-      allow create: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(request.resource.data.businessId);
+      // Allow public creation for checkout
+      allow create: if true; 
       allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
       allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
