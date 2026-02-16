@@ -13,6 +13,7 @@ const siteUrl = 'https://zeneva.space';
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -116,6 +117,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        <Analytics />
       </body>
     </html>
   );
