@@ -362,7 +362,7 @@ export default function Home() {
                             {/* Left Column: Copy & Form */}
                             <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-left">
                                 <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
-                                <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-3xl md:text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
+                                <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-4xl md:text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
                                     Never Lose a Sale.<br />
                                     Never Waste <span className="text-muted-foreground/80 relative inline-block">Stock.
                                         <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
@@ -376,15 +376,15 @@ export default function Home() {
                                     Built for modern retail. Works offline. Scales online. Powered by Zen AI.
                                 </p>
 
-                                <div className="flex flex-row w-full gap-2 items-center">
+                                <div className="flex flex-row w-full gap-2 items-stretch">
                                     <Input
                                         type="email"
                                         placeholder="Enter your work email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="
-            !h-14
-            !min-h-0
+            !h-auto
+            !min-h-[4rem]
             !py-3
             !leading-tight
             placeholder-slate-400
@@ -407,13 +407,13 @@ export default function Home() {
                                     />
 
                                     <div className="cta-buttons-container flex gap-4 rounded-md items-center justify-center shrink-0">
-                                        <div className="inline-block rounded-md">
-                                            <div className="codepen-button rounded-md">
+                                        <div className="inline-block rounded-md h-full">
+                                            <div className="codepen-button rounded-md h-full">
 
-                                                <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'}>
-                                                    <span className="block w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-xs font-medium tracking-tight font-dm-sans rounded-md py-3 px-5 shadow-sm">
-                                                        Get Started Free
-                                                        <ArrowRight className="inline w-4 h-4 ml-2" />
+                                                <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'} className="h-full block">
+                                                    <span className="flex items-center justify-center w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-[6px] font-light tracking-wide font-dm-sans rounded-md py-2 px-3 shadow-sm whitespace-normal h-full min-h-[4rem] leading-tight max-w-[90px]">
+                                                        Get Started
+                                                        <ArrowRight className="inline w-3 h-3 ml-1 shrink-0" />
                                                     </span>
                                                 </Link>
                                             </div>
