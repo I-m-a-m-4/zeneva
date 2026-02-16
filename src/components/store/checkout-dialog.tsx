@@ -121,7 +121,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
             const verifyResponse = await fetch('/api/paystack/verify-transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference: transaction.reference, expectedAmount: total * 100 }),
+                body: JSON.stringify({ reference: transaction.reference, expectedAmount: total * 100, businessId: business?.id }),
             });
             const verifyResult = await verifyResponse.json();
             if (!verifyResponse.ok || verifyResult.status !== 'success' || verifyResult.data.amount !== total * 100) {

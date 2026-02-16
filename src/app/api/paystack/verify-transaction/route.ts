@@ -1,9 +1,11 @@
 
 import { NextResponse } from 'next/server';
+import { adminFirestore } from '@/firebase/admin';
+import { sendNotificationToUser } from '@/lib/server/notifications';
 
 export async function POST(request: Request) {
   try {
-    const { reference, expectedAmount } = await request.json();
+    const { reference, expectedAmount, businessId } = await request.json();
 
     if (!reference) {
       return NextResponse.json({ error: 'Transaction reference is required' }, { status: 400 });
@@ -42,6 +44,30 @@ export async function POST(request: Request) {
           status: 'failed',
           message: 'Payment amount mismatch. Please contact support.'
         }, { status: 400 });
+      }
+
+      // Trigger Notification to Merchant
+      if (businessId) {
+        try {
+          // 1. Find users associated with this business (Owner/Admin)
+          const employeesSnapshot = await adminFirestore.collection('users')
+            .where('businessId', '==', businessId)
+            .where('role', 'in', ['owner', 'admin', 'manager'])
+            .get();
+
+          if (!employeesSnapshot.empty) {
+            const notificationPromises = employeesSnapshot.docs.map(doc => {
+              return sendNotificationToUser(doc.id, {
+                title: 'New Online Order! 🛍️',
+                body: `Received payment of ${data.data.currency} ${(data.data.amount / 100).toLocaleString()}`,
+                url: '/dashboard/online-orders'
+              });
+            });
+            await Promise.all(notificationPromises);
+          }
+        } catch (notifyError) {
+          console.error("Failed to send notification:", notifyError);
+        }
       }
 
       // We only return the necessary, safe-to-use data to the client.

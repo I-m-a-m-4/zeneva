@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download } from 'lucide-react';
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -117,10 +117,12 @@ function SettingsPageSkeleton() {
 
 // ... imports
 import { usePWA } from '@/context/pwa-context';
+import { useFCM } from '@/hooks/use-fcm';
 
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh } = usePOS();
     const { promptInstall, isInstallable, isAppInstalled } = usePWA();
+    const { permission, requestPermission, isLoading: isFcmLoading } = useFCM();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
@@ -529,6 +531,35 @@ function SettingsPageContent() {
                             {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Organization
                         </Button>
                     </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Notifications</CardTitle>
+                        <CardDescription>Manage your push notification preferences.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Push Notifications</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {permission === 'granted'
+                                        ? "You are receiving notifications. (Test in background)"
+                                        : permission === 'denied'
+                                            ? "Notifications are blocked. Please enable them in your browser settings."
+                                            : "Enable push notifications to stay updated on orders and stock."}
+                                </p>
+                            </div>
+                            <Button
+                                onClick={requestPermission}
+                                disabled={permission === 'granted' || isFcmLoading}
+                                variant={permission === 'granted' ? "outline" : "default"}
+                            >
+                                {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {permission === 'granted' ? "Enabled" : "Enable"}
+                            </Button>
+                        </div>
+                    </CardContent>
                 </Card>
 
                 <Card>
