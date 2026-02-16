@@ -2,9 +2,10 @@ import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, CheckCircle2, MapPin, Store } from 'lucide-react';
-import { allBlogPosts, type StaticBlogPost, getRelatedPosts } from '@/lib/blog-data';
+import { allBlogPosts, type StaticBlogPost, getRelatedPosts, IMAGE_MAP } from '@/lib/blog-data';
 import Image from 'next/image';
 import { Card, CardContent } from "@/components/ui/card";
+import { DirectAnswerBox, ComparisonTable, FAQSection } from '@/components/blog/rich-content';
 
 export function generateStaticParams() {
     return allBlogPosts.map((post) => ({
@@ -54,6 +55,8 @@ const ProgrammaticContent = ({ post }: { post: StaticBlogPost }) => {
     if (topic.includes('Best POS System')) {
         return (
             <>
+                <DirectAnswerBox answer={post.directAnswer || ''} />
+
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 my-8">
                     <h3 className="text-lg font-bold mb-2 flex items-center"><CheckCircle2 className="h-5 w-5 text-green-600 mr-2" /> Key Takeaways</h3>
                     <ul className="space-y-2 text-sm">
@@ -66,6 +69,8 @@ const ProgrammaticContent = ({ post }: { post: StaticBlogPost }) => {
                 <h2 className="text-3xl font-bold font-bricolage mt-12 mb-4">Why {industry} Owners in {location} are Switching to Modern POS Systems</h2>
                 <p>Running a successful <strong>{industry}</strong> in a bustling city like <strong>{location}</strong> comes with its unique set of challenges. From managing fluctuating foot traffic to tracking complex inventory, the old pen-and-paper methods simply don't cut it anymore. Business owners who want to scale and stay competitive are increasingly turning to digital solutions.</p>
                 <p>But with so many options out there, how do you choose the right Point of Sale (POS) system for your specific needs? In this guide, we'll break down why a cloud-based system like Zeneva is the perfect fit for your {industry}.</p>
+
+                {post.tableData && <ComparisonTable data={post.tableData} />}
 
                 <h3 className="text-2xl font-bold font-bricolage mt-8 mb-4">1. Speed and Reliability for {location}'s Pace</h3>
                 <p>In {location}, customers expect speed. Long queues can kill sales faster than anything else. A modern POS system ensures checkout times are cut in half. Zeneva, specifically designed for the Nigerian market, works offline, ensuring that even if the internet in {location} fluctuates, your business keeps moving.</p>
@@ -135,6 +140,8 @@ const ProgrammaticContent = ({ post }: { post: StaticBlogPost }) => {
                         <Link href="/signup">Start Free Trial for Your {industry} <ArrowRight className="ml-2" /></Link>
                     </Button>
                 </div>
+
+                {post.faq && <FAQSection faq={post.faq} />}
             </>
         );
     }
@@ -509,7 +516,18 @@ const PostContent = ({ post }: { post: StaticBlogPost }) => {
         ),
     };
 
-    return contentMap[post.slug] || <p>Content for this post is not available.</p>;
+    const content = contentMap[post.slug];
+
+    if (!content) return <p>Content for this post is not available.</p>;
+
+    return (
+        <>
+            {post.directAnswer && <DirectAnswerBox answer={post.directAnswer} />}
+            {content}
+            {post.tableData && <ComparisonTable data={post.tableData} />}
+            {post.faq && <FAQSection faq={post.faq} />}
+        </>
+    );
 }
 
 export default function BlogPostPage({ params }: { params: { slug: string } }) {
