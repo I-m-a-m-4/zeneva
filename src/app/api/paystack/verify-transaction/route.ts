@@ -56,7 +56,9 @@ export async function POST(request: Request) {
             .get();
 
           if (!employeesSnapshot.empty) {
-            const notificationPromises = employeesSnapshot.docs.map(doc => {
+            const notificationPromises = employeesSnapshot.docs.map((doc: any) => {
+              const tokenData = doc.data();
+              // Note: sending to user ID, not directly to token here, helper handles token lookup
               return sendNotificationToUser(doc.id, {
                 title: 'New Online Order! 🛍️',
                 body: `Received payment of ${data.data.currency} ${(data.data.amount / 100).toLocaleString()}`,
