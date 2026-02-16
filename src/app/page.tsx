@@ -413,7 +413,6 @@ export default function Home() {
                                                 <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'} className="h-full block">
                                                     <span className="flex items-center justify-center w-full text-center bg-[#1e293b] text-primary-foreground hover:bg-[#0f172a] transition-colors text-[6px] font-light tracking-wide font-dm-sans rounded-md py-2 px-3 shadow-sm whitespace-normal h-full min-h-[4rem] leading-tight max-w-[90px]">
                                                         Get Started
-                                                        <ArrowRight className="inline w-3 h-3 ml-1 shrink-0" />
                                                     </span>
                                                 </Link>
                                             </div>
