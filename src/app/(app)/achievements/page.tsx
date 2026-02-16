@@ -175,7 +175,7 @@ function GoalSetting() {
 
 export default function AchievementsPage() {
     const { toast } = useToast();
-    const { receipts, products, customers, triggerConfetti } = usePOS();
+    const { receipts, products, customers, triggerConfetti, business } = usePOS();
     const [seenMilestones, setSeenMilestones] = React.useState<Set<string>>(new Set());
     const [selectedMilestone, setSelectedMilestone] = React.useState<{ label: string; date: Date; description: string; imageUrl: string; details?: string } | null>(null);
     const cardRef = React.useRef<HTMLDivElement>(null);
@@ -345,6 +345,7 @@ export default function AchievementsPage() {
                                                     src="/achievement_bg.png"
                                                     alt="Background"
                                                     fill
+                                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                                     className="object-cover opacity-20"
                                                 />
                                                 <div className="absolute inset-0 bg-gradient-to-r from-background/90 to-background/40" />
@@ -380,6 +381,9 @@ export default function AchievementsPage() {
 
             <Dialog open={!!selectedMilestone} onOpenChange={(open) => !open && setSelectedMilestone(null)}>
                 <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 gap-0">
+                    <DialogTitle className="sr-only">Achievement Details</DialogTitle>
+                    <DialogDescription className="sr-only">Detailed view of your selected achievement milestone</DialogDescription>
+
                     <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-background min-h-[420px] justify-center">
                         {/* Dynamic Background for Modal */}
                         <div className="absolute inset-0 z-0">
@@ -387,19 +391,27 @@ export default function AchievementsPage() {
                                 src="/achievement_bg.png"
                                 alt="Background"
                                 fill
-                                className="object-cover opacity-20"
+                                sizes="100vw"
+                                className="object-cover opacity-40" // Increased opacity
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
                         </div>
 
-                        <div className="relative z-10 w-28 h-28 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-primary/20">
+                        {/* Business Name Badge */}
+                        <div className="relative z-10 mb-4 px-3 py-1 bg-primary/10 backdrop-blur-md border border-primary/20 rounded-full">
+                            <p className="text-xs font-bold text-primary tracking-wide uppercase">
+                                {business?.name || 'My Store'}
+                            </p>
+                        </div>
+
+                        <div className="relative z-10 w-32 h-32 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-primary/20">
                             {selectedMilestone && (
                                 <Image
                                     src={selectedMilestone.imageUrl}
                                     alt="Achievement"
-                                    width={90}
-                                    height={90}
-                                    className="object-contain p-2"
+                                    width={128} // Increased size
+                                    height={128}
+                                    className="object-cover rounded-full" // Removed p-2, added object-cover
                                 />
                             )}
                         </div>
@@ -430,7 +442,7 @@ export default function AchievementsPage() {
 
                         {/* Footer Branding */}
                         <div className="absolute bottom-4 left-0 right-0 text-center">
-                            <p className="text-[11px] font-bold tracking-[0.2em] text-primary/40 uppercase">
+                            <p className="text-[11px] font-black tracking-[0.2em] text-primary/80 uppercase">
                                 zeneva.space
                             </p>
                         </div>
@@ -442,7 +454,7 @@ export default function AchievementsPage() {
                             <PartyPopper className="h-4 w-4" />
                             Celebrate Again!
                         </Button>
-                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/5" onClick={handleDownload} disabled={isDownloading}>
+                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary" onClick={handleDownload} disabled={isDownloading}>
                             {isDownloading ? (
                                 <>Downloading...</>
                             ) : (

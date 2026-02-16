@@ -83,7 +83,7 @@ import { sendContactFormEmail } from '@/lib/email';
 import { AppConfig } from '@/lib/config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MarqueeSection } from '@/components/marquee-section';
-import { FeaturesFloatingSection } from '@/components/features-floating-section';
+
 import { ThemeProvider } from '@/components/theme-provider';
 import { auth } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -913,7 +913,7 @@ export default function Home() {
 
 
 
-                    <FeaturesFloatingSection />
+
 
                     <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
                         <div className="max-w-7xl mx-auto">
@@ -1113,7 +1113,7 @@ export default function Home() {
                                     </div>
                                 </div>
 
-                                <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <div className="p-6 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 shadow-sm">
                                     <p className="text-lg font-medium text-slate-900 text-center">
                                         Every decision moves the profit dial forward.
                                     </p>
