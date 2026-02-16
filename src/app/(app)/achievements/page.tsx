@@ -175,6 +175,7 @@ function GoalSetting() {
 export default function AchievementsPage() {
     const { receipts, products, customers, triggerConfetti } = usePOS();
     const [seenMilestones, setSeenMilestones] = React.useState<Set<string>>(new Set());
+    const [selectedMilestone, setSelectedMilestone] = React.useState<{ label: string; date: Date; description: string; imageUrl: string; details?: string } | null>(null);
 
     React.useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -190,7 +191,7 @@ export default function AchievementsPage() {
     }, []);
 
     const milestones = React.useMemo(() => {
-        const achieved: { label: string; date: Date; description: string; imageUrl: string; }[] = [];
+        const achieved: { id: string; label: string; date: Date; description: string; imageUrl: string; details: string }[] = [];
         const currentYear = new Date().getFullYear();
 
         if (receipts) {
@@ -203,7 +204,14 @@ export default function AchievementsPage() {
                     yearTotal += receipt.total;
                     for (const milestone of SALES_MILESTONES) {
                         if (yearTotal >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
-                            achieved.push({ label: `Crossed ${milestone.label} This Year`, date: receiptDate, description: "You're on a roll! Keep up the incredible momentum.", imageUrl: milestone.image });
+                            achieved.push({
+                                id: `sales-${milestone.value}-${currentYear}`,
+                                label: `Crossed ${milestone.label}`,
+                                date: receiptDate,
+                                description: "You're on a roll! Keep up the incredible momentum.",
+                                imageUrl: milestone.image,
+                                details: `Total Year Sales at time: ₦${yearTotal.toLocaleString()}`
+                            });
                         }
                     }
                 }
@@ -213,7 +221,14 @@ export default function AchievementsPage() {
         if (products) {
             for (const milestone of PRODUCT_MILESTONES) {
                 if (products.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
-                    achieved.push({ label: `Reached ${milestone.label}`, date: new Date(), description: "Your catalog is growing fast. Great job!", imageUrl: milestone.image });
+                    achieved.push({
+                        id: `products-${milestone.value}`,
+                        label: `Reached ${milestone.label}`,
+                        date: new Date(), // This is approximate if not tracking history
+                        description: "Your catalog is growing fast. Great job!",
+                        imageUrl: milestone.image,
+                        details: `Total Products: ${products.length}`
+                    });
                 }
             }
         }
@@ -221,7 +236,14 @@ export default function AchievementsPage() {
         if (customers) {
             for (const milestone of CUSTOMER_MILESTONES) {
                 if (customers.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
-                    achieved.push({ label: `Reached ${milestone.label}`, date: new Date(), description: "Your community is expanding. Fantastic work!", imageUrl: milestone.image });
+                    achieved.push({
+                        id: `customers-${milestone.value}`,
+                        label: `Joined by ${milestone.label}`,
+                        date: new Date(),
+                        description: "Your community is expanding. Fantastic work!",
+                        imageUrl: milestone.image,
+                        details: `Total Customers: ${customers.length}`
+                    });
                 }
             }
         }
@@ -271,17 +293,23 @@ export default function AchievementsPage() {
                             Celebrate!
                         </Button>
                     </CardTitle>
-                    <CardDescription>A timeline of your major business achievements. You're going at a high speed!</CardDescription>
+                    <CardDescription>A timeline of your major major achievements. Click on any card to see details!</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {milestones.length > 0 ? (
-                        <div className="relative pl-6 before:absolute before:left-6 before:top-0 before:h-full before:w-0.5 before:bg-border before:-translate-x-1/2">
+                        <div className="relative pl-2 md:pl-6 before:absolute before:left-2 md:before:left-6 before:top-0 before:h-full before:w-0.5 before:bg-border before:-translate-x-1/2">
                             {milestones.map((milestone, index) => (
                                 <div key={index} className="relative pb-12">
-                                    <div className="absolute left-6 top-1/2 w-4 h-4 mt-[-8px] -translate-x-1/2 rounded-full bg-primary border-4 border-background ring-4 ring-primary/20"></div>
-                                    <div className="ml-10">
+                                    <div className="absolute left-2 md:left-6 top-1/2 w-4 h-4 mt-[-8px] -translate-x-1/2 rounded-full bg-primary border-4 border-background ring-4 ring-primary/20"></div>
+                                    <div className="ml-6 md:ml-10">
                                         <p className="text-xs text-muted-foreground mb-1">{format(milestone.date, 'PPP')}</p>
-                                        <div className="relative flex items-center gap-6 p-6 rounded-xl border overflow-hidden group">
+                                        <div
+                                            onClick={() => {
+                                                setSelectedMilestone(milestone);
+                                                triggerConfetti?.();
+                                            }}
+                                            className="relative flex items-center gap-3 md:gap-6 p-4 md:p-6 rounded-xl border overflow-hidden group cursor-pointer hover:shadow-md transition-all hover:scale-[1.01]"
+                                        >
                                             {/* Background Image with Overlay */}
                                             <div className="absolute inset-0 z-0">
                                                 <Image
@@ -293,12 +321,17 @@ export default function AchievementsPage() {
                                                 <div className="absolute inset-0 bg-gradient-to-r from-background/90 to-background/40" />
                                             </div>
 
-                                            <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-background/50 backdrop-blur-sm flex-shrink-0 overflow-hidden border shadow-sm">
+                                            <div className="relative z-10 flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-full bg-background/50 backdrop-blur-sm flex-shrink-0 overflow-hidden border shadow-sm group-hover:scale-110 transition-transform duration-500">
                                                 <Image src={milestone.imageUrl} alt={milestone.label} width={96} height={96} className="object-contain p-2" />
                                             </div>
                                             <div className="flex-1 relative z-10">
-                                                <p className="font-bold text-lg text-foreground mb-1">{milestone.label}</p>
-                                                <p className="text-muted-foreground">{milestone.description}</p>
+                                                <p className="font-bold text-base md:text-lg text-foreground mb-1 group-hover:text-primary transition-colors">{milestone.label}</p>
+                                                <p className="text-sm md:text-base text-muted-foreground">{milestone.description}</p>
+                                            </div>
+                                            <div className="relative z-10 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                                                <Button variant="ghost" size="icon" className="rounded-full">
+                                                    <PartyPopper className="h-5 w-5 text-primary" />
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -315,6 +348,66 @@ export default function AchievementsPage() {
             </Card>
 
             <GoalSetting />
+
+            <Dialog open={!!selectedMilestone} onOpenChange={(open) => !open && setSelectedMilestone(null)}>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0">
+                    <div className="relative p-6 pt-12 flex flex-col items-center text-center bg-background">
+                        {/* Dynamic Background for Modal */}
+                        <div className="absolute inset-0 z-0">
+                            <Image
+                                src="/achievement_bg.png"
+                                alt="Background"
+                                fill
+                                className="object-cover opacity-20"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
+                        </div>
+
+                        <div className="relative z-10 w-24 h-24 bg-background/50 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg mb-4 ring-4 ring-primary/10">
+                            {selectedMilestone && (
+                                <Image
+                                    src={selectedMilestone.imageUrl}
+                                    alt="Achievement"
+                                    width={80}
+                                    height={80}
+                                    className="object-contain p-2"
+                                />
+                            )}
+                        </div>
+
+                        <DialogHeader className="relative z-10 sm:text-center w-full">
+                            <DialogTitle className="text-2xl font-bold text-primary mb-2">
+                                {selectedMilestone?.label}
+                            </DialogTitle>
+                            <DialogDescription className="text-base text-foreground font-medium">
+                                {selectedMilestone?.description}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="relative z-10 mt-6 grid grid-cols-2 gap-4 w-full bg-muted/50 p-4 rounded-lg">
+                            <div className="text-center">
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Achieved On</p>
+                                <p className="font-mono text-sm font-medium mt-1">
+                                    {selectedMilestone?.date && format(selectedMilestone.date, 'PPP')}
+                                </p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Stats</p>
+                                <p className="text-sm font-medium mt-1 text-primary">
+                                    {selectedMilestone?.details}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 mt-8 w-full">
+                            <Button className="w-full gap-2 text-lg h-12" onClick={() => triggerConfetti?.()}>
+                                <PartyPopper className="h-5 w-5" />
+                                Celebrate Again!
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

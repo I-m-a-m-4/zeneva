@@ -431,52 +431,7 @@ export default function Home() {
 
                     <MarqueeSection />
 
-                    {/* Bridge Section */}
-                    <section className="py-24 px-6 bg-white border-b border-slate-100">
-                        <div className="max-w-4xl mx-auto text-center">
-                            <h2 className="text-3xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
-                                Retail Isn’t Failing — Systems Are
-                            </h2>
-                            <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-                                Every day, customers walk into stores ready to buy — and walk out empty-handed.
-                                Not because demand isn’t there. But because businesses are guessing instead of predicting.
-                            </p>
 
-                            <div className="grid sm:grid-cols-2 gap-6 text-left max-w-3xl mx-auto mb-12">
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2 bg-red-50 rounded-lg shrink-0">
-                                        <Zap className="w-5 h-5 text-red-500" />
-                                    </div>
-                                    <p className="text-slate-700 font-medium pt-1">Best-selling products run out without warning</p>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2 bg-orange-50 rounded-lg shrink-0">
-                                        <Anchor className="w-5 h-5 text-orange-500" />
-                                    </div>
-                                    <p className="text-slate-700 font-medium pt-1">Capital is trapped in slow-moving stock</p>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2 bg-yellow-50 rounded-lg shrink-0">
-                                        <Database className="w-5 h-5 text-yellow-600" />
-                                    </div>
-                                    <p className="text-slate-700 font-medium pt-1">Sales data exists, but insight doesn’t</p>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2 bg-slate-100 rounded-lg shrink-0">
-                                        <Wind className="w-5 h-5 text-slate-500" />
-                                    </div>
-                                    <p className="text-slate-700 font-medium pt-1">Decisions are reactive, not strategic</p>
-                                </div>
-                            </div>
-
-                            <div className="inline-block bg-slate-50 border border-slate-200 rounded-lg px-6 py-4">
-                                <p className="text-slate-900 font-medium">
-                                    This is the silent profit leak in retail. <br />
-                                    <span className="text-primary font-bold">Zeneva was built to stop it.</span>
-                                </p>
-                            </div>
-                        </div>
-                    </section>
 
                     {/* Dashboard Preview Section - Carousel */}
                     <section className="relative w-full max-w-7xl mx-auto px-6 pb-24 mt-12 z-20">

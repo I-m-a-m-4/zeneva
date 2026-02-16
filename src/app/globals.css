@@ -305,26 +305,26 @@ body {
   pointer-events: all;
 }
 
-@keyframes confetti-blast-left {
+@keyframes confetti-fall-left {
   from {
     transform: translateY(0) translateX(0) rotate(0);
     opacity: 1;
   }
 
   to {
-    transform: translateY(-110vh) translateX(-25vw) rotate(720deg);
+    transform: translateY(110vh) translateX(-15vw) rotate(720deg);
     opacity: 0;
   }
 }
 
-@keyframes confetti-blast-right {
+@keyframes confetti-fall-right {
   from {
     transform: translateY(0) translateX(0) rotate(0);
     opacity: 1;
   }
 
   to {
-    transform: translateY(-110vh) translateX(25vw) rotate(-720deg);
+    transform: translateY(110vh) translateX(15vw) rotate(-720deg);
     opacity: 0;
   }
 }
