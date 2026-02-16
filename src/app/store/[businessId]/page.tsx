@@ -34,7 +34,7 @@ const PRODUCTS_PER_PAGE = 24;
 function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: (product: Product) => void }) {
     const params = useParams();
     const isOutOfStock = !product.stock || product.stock <= 0;
-    
+
     const handleAddToCartClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
@@ -43,7 +43,7 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
 
     return (
         <Card className="overflow-hidden flex flex-col group cursor-pointer h-full">
-            <Link href={`/store/${params.businessId}/${product.id}`} className="contents">
+            <Link href={`${product.id}`} className="contents">
                 <CardHeader className="p-0">
                     <div className="aspect-square relative overflow-hidden bg-muted">
                         {product.imageUrl ? (
@@ -63,14 +63,14 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 flex-grow">
-                     <CardTitle className="text-base font-semibold leading-snug line-clamp-2">{product.name}</CardTitle>
+                    <CardTitle className="text-base font-semibold leading-snug line-clamp-2">{product.name}</CardTitle>
                 </CardContent>
             </Link>
             <CardFooter className="p-4 flex flex-col items-start gap-2 mt-auto bg-muted/50">
                 <span className="text-lg font-bold text-primary">₦{product.price.toLocaleString()}</span>
-                 <Button variant="default" size="sm" className="w-full h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAddToCartClick} disabled={isOutOfStock}>
+                <Button variant="default" size="sm" className="w-full h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAddToCartClick} disabled={isOutOfStock}>
                     Add to Cart
-                 </Button>
+                </Button>
             </CardFooter>
         </Card>
     );
@@ -79,31 +79,31 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
 export default function PublicStorePage() {
     const { business, products, isLoading } = useStore();
     const searchParams = useSearchParams();
-    
+
     const { addToCart } = useStore();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [currentPage, setCurrentPage] = React.useState(1);
     const [sortBy, setSortBy] = React.useState('default');
-    
+
     const showOutOfStock = business?.settings?.publicStore?.hideOutOfStock ? false : true;
 
     React.useEffect(() => {
         const category = searchParams.get('category');
-        if(category) {
+        if (category) {
             setCategoryFilter(category);
         }
     }, [searchParams]);
-    
+
     const filteredAndSortedProducts = React.useMemo(() => {
         let prods = products || [];
 
         if (!showOutOfStock) {
             prods = prods.filter(p => p.stock && p.stock > 0);
         }
-        
+
         if (searchTerm) {
-             prods = prods.filter(p => 
+            prods = prods.filter(p =>
                 p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
             );
@@ -112,7 +112,7 @@ export default function PublicStorePage() {
         if (categoryFilter !== 'all') {
             prods = prods.filter(p => p.category === categoryFilter);
         }
-        
+
         let sortedProds = [...prods];
         switch (sortBy) {
             case 'price-asc':
@@ -129,10 +129,10 @@ export default function PublicStorePage() {
                 });
                 break;
             case 'name-asc':
-                sortedProds.sort((a,b) => a.name.localeCompare(b.name));
+                sortedProds.sort((a, b) => a.name.localeCompare(b.name));
                 break;
             default:
-                sortedProds.sort((a,b) => a.name.localeCompare(b.name));
+                sortedProds.sort((a, b) => a.name.localeCompare(b.name));
                 break;
         }
 
@@ -141,7 +141,7 @@ export default function PublicStorePage() {
 
     const pageCount = Math.ceil(filteredAndSortedProducts.length / PRODUCTS_PER_PAGE);
     const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * PRODUCTS_PER_PAGE, currentPage * PRODUCTS_PER_PAGE);
-    
+
     React.useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, categoryFilter, sortBy, showOutOfStock]);
@@ -149,7 +149,7 @@ export default function PublicStorePage() {
     if (isLoading) {
         return null;
     }
-    
+
     if (!business) {
         return notFound();
     }
@@ -160,9 +160,9 @@ export default function PublicStorePage() {
         4: 'lg:grid-cols-4',
         5: 'lg:grid-cols-5',
     }[desktopCols];
-    
-    const settings = business.settings.publicStore;
-    
+
+    const settings = business.settings?.publicStore;
+
     return (
         <>
             <header className="h-[50vh] bg-muted flex items-center justify-center relative">
@@ -172,16 +172,16 @@ export default function PublicStorePage() {
                     <div className="text-muted-foreground"></div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent flex items-center justify-center p-8">
-                     <h1 className="text-4xl md:text-6xl font-bold text-white text-center drop-shadow-lg">{settings?.headline || `Welcome to ${business.name}`}</h1>
+                    <h1 className="text-4xl md:text-6xl font-bold text-white text-center drop-shadow-lg">{settings?.headline || `Welcome to ${business.name}`}</h1>
                 </div>
             </header>
-            
+
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 -mt-24 sm:-mt-16 relative z-10">
                 <div className="p-4 bg-background/80 backdrop-blur-sm rounded-lg shadow-lg border">
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                            <Input 
+                            <Input
                                 placeholder="Search products..."
                                 className="pl-10 h-12 text-base"
                                 value={searchTerm}
@@ -200,9 +200,9 @@ export default function PublicStorePage() {
                             </SelectContent>
                         </Select>
                     </div>
-                     <div className="flex items-center justify-between mt-4 flex-wrap gap-4 border-t pt-4">
+                    <div className="flex items-center justify-between mt-4 flex-wrap gap-4 border-t pt-4">
                         <div className="flex items-center space-x-2">
-                           {/* "Show out of stock" is now an admin setting, removed from public view */}
+                            {/* "Show out of stock" is now an admin setting, removed from public view */}
                         </div>
                         <Select onValueChange={setSortBy} value={sortBy}>
                             <SelectTrigger className="w-full sm:w-[180px]">
@@ -217,7 +217,7 @@ export default function PublicStorePage() {
                                 <SelectItem value="name-asc">Alphabetical (A-Z)</SelectItem>
                             </SelectContent>
                         </Select>
-                     </div>
+                    </div>
                 </div>
             </div>
 
@@ -244,14 +244,13 @@ export default function PublicStorePage() {
                     </>
                 ) : (
                     <div className="text-center py-20 border-2 border-dashed rounded-lg">
-                        <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4"/>
+                        <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
                         <p className="text-lg text-muted-foreground">No products found matching your criteria.</p>
                     </div>
                 )}
             </main>
-            
+
             <StoreFooter business={business} />
         </>
     );
 }
-    

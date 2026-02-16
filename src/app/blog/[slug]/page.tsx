@@ -6,6 +6,13 @@ import { allBlogPosts, type StaticBlogPost, getRelatedPosts, IMAGE_MAP } from '@
 import Image from 'next/image';
 import { Card, CardContent } from "@/components/ui/card";
 import { DirectAnswerBox, ComparisonTable, FAQSection } from '@/components/blog/rich-content';
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from "@/components/ui/carousel";
 
 export function generateStaticParams() {
     return allBlogPosts.map((post) => ({
@@ -540,22 +547,61 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
 
     return (
         <div className="container mx-auto px-4 py-8 md:py-16 max-w-4xl">
-            <div className="mb-8">
-                <Button asChild variant="ghost" className="mb-4 hover:bg-muted">
+            <div className="mb-8 relative z-10">
+                <Button asChild variant="ghost" className="mb-4 pl-0 hover:bg-transparent hover:text-primary transition-colors">
                     <Link href="/blog"><ArrowLeft className="mr-2 h-4 w-4" />Back to Blog</Link>
                 </Button>
-                <p className="text-sm font-semibold uppercase text-primary tracking-wider">{post.category}</p>
-                <h1 className="text-4xl md:text-6xl font-bold tracking-tighter leading-tight font-bricolage mt-2 mb-4">
-                    {post.title}
-                </h1>
-                <p className="text-lg text-muted-foreground">{post.excerpt}</p>
+                <div className="relative">
+                    <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]"></div>
+                    <p className="text-sm font-semibold uppercase text-primary tracking-wider mb-2">{post.category}</p>
+                    <h1 className="text-4xl md:text-5xl font-bold tracking-tighter leading-tight font-bricolage mb-4">
+                        {post.title}
+                    </h1>
+                    <p className="text-base md:text-lg text-muted-foreground">{post.excerpt}</p>
+                </div>
             </div>
 
-            <div className="aspect-[16/9] w-full relative rounded-xl overflow-hidden mb-8 border shadow-lg">
-                <Image src={post.imageUrl || '/herolytics.svg'} alt={post.title} fill className="object-cover" />
+            <div className="w-full relative rounded-xl overflow-hidden mb-8 border shadow-lg bg-slate-50">
+                <Carousel className="w-full">
+                    <CarouselContent>
+                        {/* Primary Image */}
+                        <CarouselItem>
+                            <div className="aspect-[16/9] w-full relative">
+                                <Image
+                                    src={post.imageUrl || '/herolytics.svg'}
+                                    alt={post.title}
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                />
+                            </div>
+                        </CarouselItem>
+                        {/* Metaphor Images Carousel */}
+                        {[
+                            'Protect your profit.png',
+                            'data wins.png',
+                            'rule your retail.png',
+                            'play smart win big.png',
+                            'fix the profit leakage.png'
+                        ].map((img, index) => (
+                            <CarouselItem key={index}>
+                                <div className="aspect-[16/9] w-full relative bg-slate-100 flex items-center justify-center">
+                                    <Image
+                                        src={`/metaphors/${img}`}
+                                        alt={`Slide ${index + 1}`}
+                                        fill
+                                        className="object-contain p-4"
+                                    />
+                                </div>
+                            </CarouselItem>
+                        ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="left-4" />
+                    <CarouselNext className="right-4" />
+                </Carousel>
             </div>
 
-            <div className="prose lg:prose-xl dark:prose-invert max-w-none mx-auto">
+            <div className="prose prose-slate dark:prose-invert max-w-none mx-auto prose-p:text-base prose-headings:font-bricolage">
                 <PostContent post={post} />
             </div>
 

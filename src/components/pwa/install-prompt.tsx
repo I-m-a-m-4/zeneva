@@ -25,9 +25,12 @@ export default function InstallPrompt() {
 
         const isDismissed = localStorage.getItem('pwa-prompt-dismissed') === 'true';
 
-        // Show modal if installable, not installed, and not dismissed.
+        // Check if current path is a storefront path
+        const isStorefront = window.location.pathname.startsWith('/store') || window.location.hostname.includes('shop.');
+
+        // Show modal if installable, not installed, not dismissed, and NOT a storefront.
         // Also show for iOS since we can't detect "installable" event there easily, but we check if it's NOT standalone
-        const shouldShow = (isInstallable || (isIosDevice && !isAppInstalled)) && !isAppInstalled && !isDismissed;
+        const shouldShow = (isInstallable || (isIosDevice && !isAppInstalled)) && !isAppInstalled && !isDismissed && !isStorefront;
 
         if (shouldShow) {
             setShowInstallModal(true);
