@@ -992,6 +992,7 @@ export default function Home() {
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 2 Staff Accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> <b>Free Online Storefront</b></li>
                                     </ul>
                                     <div className="mt-auto pt-6">
                                         <Button asChild size="lg" className="w-full">

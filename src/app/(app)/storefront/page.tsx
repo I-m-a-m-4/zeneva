@@ -412,7 +412,7 @@ function StorefrontCustomizationPage() {
                                         <div className="flex items-center space-x-2"><Switch id="enableStore" checked={storeSettings.enabled} onCheckedChange={handleToggleStore} /><Label htmlFor="enableStore" className="text-base">Enable Public Store</Label></div>
                                         {storeSettings.enabled && (
                                             <div className="space-y-4 pt-4 border-t">
-                                                <div><Label htmlFor="storeSlug">Store Slug</Label><Input id="storeSlug" value={storeSettings.slug} onChange={e => handleSettingsChange('slug', e.target.value)} className="mt-1" placeholder="e.g., my-zeneva-shop" /></div>
+                                                <div><Label htmlFor="storeSlug">Subdomain</Label><Input id="storeSlug" value={storeSettings.slug} onChange={e => handleSettingsChange('slug', e.target.value)} className="mt-1" placeholder="e.g., my-zeneva-shop" /></div>
                                                 <div>
                                                     <Label htmlFor="storeLink">Your Store Link</Label>
                                                     <div className="flex gap-2 mt-1">
