@@ -580,19 +580,7 @@ function StorefrontCustomizationPage() {
 
 
 export default function StorefrontPage() {
-    const { business } = usePOS();
-
-    return (
-        <FeatureGate
-            requiredPlan="pro"
-            currentPlan={business?.plan}
-            hasLifetimeAccess={business?.accessLevel === 'lifetime'}
-            featureName="Storefront Customization"
-            featureDescription="Customize and launch a public online store for your business."
-        >
-            <StorefrontCustomizationPage />
-        </FeatureGate>
-    )
+    return <StorefrontCustomizationPage />
 }
 
 
