@@ -23,6 +23,7 @@ import { Slider } from '@/components/ui/slider';
 import StoreFooter from '@/app/store/[businessId]/footer';
 import { AppConfig } from '@/lib/config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 const colorPresets = [
     { name: 'Orange (Default)', value: '22 90% 55%' },
@@ -155,6 +156,13 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
                 )}
 
             </main>
+
+
+
+
+
+
+
             <StoreFooter business={{ ...business, settings: { ...business?.settings, publicStore: settings } }} />
         </div>
     )
@@ -192,6 +200,15 @@ function StorefrontCustomizationPage() {
     const [isCopied, setIsCopied] = React.useState(false);
     const [hasSavedOnce, setHasSavedOnce] = React.useState(false);
 
+    // Bank Details Modal State
+    const [isBankModalOpen, setIsBankModalOpen] = React.useState(false);
+    const [bankDetails, setBankDetails] = React.useState({
+        bankName: '',
+        accountNumber: '',
+        accountName: ''
+    });
+    const [isSavingBankDetails, setIsSavingBankDetails] = React.useState(false);
+
     React.useEffect(() => {
         if (business?.settings) {
             setStoreSettings(prev => ({ ...prev, ...(business.settings?.publicStore || {}) }));
@@ -218,14 +235,11 @@ function StorefrontCustomizationPage() {
         if (checked) { // Only check when enabling
             const hasBankDetails = business?.settings?.paymentBankName && business?.settings?.paymentBankAccountId;
             const hasPaystack = business?.settings?.paystackSubaccount;
+
             if (!hasBankDetails && !hasPaystack) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Payment Details Missing',
-                    description: 'Please configure bank transfer details or a Paystack subaccount in Settings before enabling your store.',
-                    duration: 6000
-                });
-                return; // Prevent toggle
+                // Show modal instead of error toast
+                setIsBankModalOpen(true);
+                return; // Prevent toggle until details are saved
             }
         }
 
@@ -254,6 +268,56 @@ function StorefrontCustomizationPage() {
                 title: 'Update Failed',
                 description: 'Could not update your store status.',
             });
+        }
+    };
+
+    const handleSaveBankDetails = async () => {
+        if (!business?.id || !firestore) return;
+
+        if (!bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.accountName) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing Information',
+                description: 'Please fill in all bank details.',
+            });
+            return;
+        }
+
+        setIsSavingBankDetails(true);
+
+        try {
+            const businessDocRef = doc(firestore, 'businessInstances', business.id);
+
+            // 1. Save Bank Details
+            // 2. Enable Store
+            await updateDoc(businessDocRef, {
+                'settings.paymentBankName': bankDetails.bankName,
+                'settings.paymentBankAccountId': bankDetails.accountNumber,
+                'settings.paymentAccountName': bankDetails.accountName,
+                'settings.publicStore.enabled': true
+            });
+
+            // Update local state
+            setStoreSettings(prev => ({ ...prev, enabled: true }));
+            setIsBankModalOpen(false);
+            triggerConfetti();
+            setHasSavedOnce(true);
+
+            toast({
+                variant: 'success',
+                title: 'Store Enabled!',
+                description: 'Bank details saved and store is now live.',
+            });
+
+        } catch (error: any) {
+            console.error("Error saving bank details:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not save details. Please try again.',
+            });
+        } finally {
+            setIsSavingBankDetails(false);
         }
     };
 
@@ -574,6 +638,57 @@ function StorefrontCustomizationPage() {
                     </Card>
                 </div>
             </div>
+
+            <Dialog open={isBankModalOpen} onOpenChange={setIsBankModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Enable Online Payments</DialogTitle>
+                        <DialogDescription>
+                            To activate your public store, you need to provide bank details so customers can pay you via bank transfer.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="bankName">Bank Name</Label>
+                            <Input
+                                id="bankName"
+                                placeholder="e.g. GTBank, Zenith Bank"
+                                value={bankDetails.bankName}
+                                onChange={(e) => setBankDetails(prev => ({ ...prev, bankName: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="accountNumber">Account Number</Label>
+                            <Input
+                                id="accountNumber"
+                                placeholder="0123456789"
+                                maxLength={10}
+                                value={bankDetails.accountNumber}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, ''); // Only numbers
+                                    setBankDetails(prev => ({ ...prev, accountNumber: val }))
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="accountName">Account Name</Label>
+                            <Input
+                                id="accountName"
+                                placeholder="e.g. My Business Name"
+                                value={bankDetails.accountName}
+                                onChange={(e) => setBankDetails(prev => ({ ...prev, accountName: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsBankModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveBankDetails} disabled={isSavingBankDetails}>
+                            {isSavingBankDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save & Enable Store
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
