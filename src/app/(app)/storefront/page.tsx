@@ -201,13 +201,61 @@ function StorefrontCustomizationPage() {
     const [hasSavedOnce, setHasSavedOnce] = React.useState(false);
 
     // Bank Details Modal State
+    const [banks, setBanks] = React.useState<{ name: string; code: string; active: boolean }[]>([]);
     const [isBankModalOpen, setIsBankModalOpen] = React.useState(false);
     const [bankDetails, setBankDetails] = React.useState({
         bankName: '',
+        bankCode: '',
         accountNumber: '',
         accountName: ''
     });
+    const [isResolving, setIsResolving] = React.useState(false);
+    const [resolveError, setResolveError] = React.useState('');
     const [isSavingBankDetails, setIsSavingBankDetails] = React.useState(false);
+
+    React.useEffect(() => {
+        const fetchBanks = async () => {
+            try {
+                const res = await fetch('/api/paystack/banks');
+                if (res.ok) {
+                    const data = await res.json();
+                    setBanks(data.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+                }
+            } catch (error) {
+                console.error("Failed to fetch banks", error);
+            }
+        };
+        fetchBanks();
+    }, []);
+
+    React.useEffect(() => {
+        const resolveAccount = async () => {
+            if (bankDetails.bankCode && bankDetails.accountNumber.length === 10) {
+                setIsResolving(true);
+                setResolveError('');
+                setBankDetails(prev => ({ ...prev, accountName: '' })); // Clear previous name
+                try {
+                    const res = await fetch('/api/paystack/resolve-account', {
+                        method: 'POST',
+                        body: JSON.stringify({ account_number: bankDetails.accountNumber, bank_code: bankDetails.bankCode })
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        setBankDetails(prev => ({ ...prev, accountName: data.data.account_name }));
+                    } else {
+                        setResolveError('Could not verify account. Please check details.');
+                    }
+                } catch (error) {
+                    setResolveError('Error verifying account.');
+                } finally {
+                    setIsResolving(false);
+                }
+            }
+        };
+
+        const timer = setTimeout(resolveAccount, 500); // Debounce
+        return () => clearTimeout(timer);
+    }, [bankDetails.bankCode, bankDetails.accountNumber]);
 
     React.useEffect(() => {
         if (business?.settings) {
@@ -274,11 +322,11 @@ function StorefrontCustomizationPage() {
     const handleSaveBankDetails = async () => {
         if (!business?.id || !firestore) return;
 
-        if (!bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.accountName) {
+        if (!bankDetails.bankCode || !bankDetails.accountNumber || !bankDetails.accountName) {
             toast({
                 variant: 'destructive',
                 title: 'Missing Information',
-                description: 'Please fill in all bank details.',
+                description: 'Please ensure account details are verified.',
             });
             return;
         }
@@ -288,12 +336,33 @@ function StorefrontCustomizationPage() {
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
 
-            // 1. Save Bank Details
-            // 2. Enable Store
+            // 1. Create Paystack Subaccount
+            let subaccountCode = business?.settings?.paystackSubaccount;
+
+            if (!subaccountCode) {
+                const subRes = await fetch('/api/paystack/create-subaccount', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        business_name: business.name,
+                        bank_code: bankDetails.bankCode,
+                        account_number: bankDetails.accountNumber
+                    })
+                });
+                const subData = await subRes.json();
+                if (subData.subaccount_code) {
+                    subaccountCode = subData.subaccount_code;
+                } else {
+                    throw new Error("Could not create payment subaccount.");
+                }
+            }
+
+            // 2. Save Bank Details & Enable Store
             await updateDoc(businessDocRef, {
                 'settings.paymentBankName': bankDetails.bankName,
+                'settings.paymentBankCode': bankDetails.bankCode,
                 'settings.paymentBankAccountId': bankDetails.accountNumber,
                 'settings.paymentAccountName': bankDetails.accountName,
+                'settings.paystackSubaccount': subaccountCode,
                 'settings.publicStore.enabled': true
             });
 
@@ -648,14 +717,24 @@ function StorefrontCustomizationPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
+                        <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm border border-blue-100 mb-4">
+                            Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="bankName">Bank Name</Label>
-                            <Input
-                                id="bankName"
-                                placeholder="e.g. GTBank, Zenith Bank"
-                                value={bankDetails.bankName}
-                                onChange={(e) => setBankDetails(prev => ({ ...prev, bankName: e.target.value }))}
-                            />
+                            <Select value={bankDetails.bankCode} onValueChange={(val) => {
+                                const bank = banks.find(b => b.code === val);
+                                setBankDetails(prev => ({ ...prev, bankCode: val, bankName: bank?.name || '' }));
+                            }}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a bank" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {banks.map(bank => (
+                                        <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="accountNumber">Account Number</Label>
@@ -671,13 +750,23 @@ function StorefrontCustomizationPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="accountName">Account Name</Label>
-                            <Input
-                                id="accountName"
-                                placeholder="e.g. My Business Name"
-                                value={bankDetails.accountName}
-                                onChange={(e) => setBankDetails(prev => ({ ...prev, accountName: e.target.value }))}
-                            />
+                            <Label htmlFor="accountName">Verified Account Name</Label>
+                            <div className="relative">
+                                <Input
+                                    id="accountName"
+                                    value={bankDetails.accountName}
+                                    readOnly
+                                    className={cn("bg-muted", resolveError && "border-destructive")}
+                                    placeholder="Account name will appear here..."
+                                />
+                                {isResolving && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    </div>
+                                )}
+                            </div>
+                            {resolveError && <p className="text-xs text-destructive">{resolveError}</p>}
+                            {bankDetails.accountName && <p className="text-xs text-green-600 flex items-center gap-1"><Check className="h-3 w-3" /> Verified</p>}
                         </div>
                     </div>
                     <DialogFooter>
