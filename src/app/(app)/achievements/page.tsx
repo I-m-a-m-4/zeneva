@@ -250,10 +250,19 @@ export default function AchievementsPage() {
         if (products) {
             for (const milestone of PRODUCT_MILESTONES) {
                 if (products.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
+                    // Offset date slightly so higher milestones appear "newer" (top of list)
+                    // or "older" (bottom) depending on sort.
+                    // We want: 500 (Newest/Top), 100 (Oldest/Bottom).
+                    // So 500 should be T, 100 should be T - delta.
+                    // Value increases -> Date increases.
+                    // We can use milestone.value to add milliseconds.
+                    const date = new Date();
+                    date.setMilliseconds(date.getMilliseconds() + (milestone.value / 10)); // Higher value = later time
+
                     achieved.push({
                         id: `products-${milestone.value}`,
                         label: `Reached ${milestone.label}`,
-                        date: new Date(), // This is approximate if not tracking history
+                        date: date,
                         description: "Your catalog is growing fast. Great job!",
                         imageUrl: milestone.image,
                         details: `Catalog Size: ${products.length} Products`
@@ -265,10 +274,13 @@ export default function AchievementsPage() {
         if (customers) {
             for (const milestone of CUSTOMER_MILESTONES) {
                 if (customers.length >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
+                    const date = new Date();
+                    date.setMilliseconds(date.getMilliseconds() + (milestone.value / 10));
+
                     achieved.push({
                         id: `customers-${milestone.value}`,
                         label: `Joined by ${milestone.label}`,
-                        date: new Date(),
+                        date: date,
                         description: "Your community is expanding. Fantastic work!",
                         imageUrl: milestone.image,
                         details: `Community Size: ${customers.length} Customers`
