@@ -14,6 +14,7 @@ import {
   Upload,
   Trash2,
   Package,
+  PackageOpen,
   Edit,
   Search,
   AlertCircle,
@@ -527,26 +528,27 @@ export default function InventoryPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg m-6">
-              <Inbox className="h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mt-4">{searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? 'No Products Found' : 'No Products Yet'}</h3>
-              <p className="text-muted-foreground mt-2 mb-4">
-                {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? `Your search and filter criteria did not match any products.` : 'Get started by adding your first product or importing a CSV file.'}
+            <div className="flex flex-col items-center justify-center h-full text-center p-12 m-6">
+              <div className="relative mb-4">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent rounded-full blur-xl transform scale-150 opacity-50" />
+                <PackageOpen className="h-24 w-24 text-muted-foreground/30 relative z-10" strokeWidth={1} />
+                <path d="M12 12 L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/30 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full h-8 w-0.5 border-l-2 border-dashed border-muted-foreground/30" />
+                {/* Since we can't easily add arbitrary SVG paths outside the icon, I'll stick to the icon + styling */}
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">{searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? 'No product found' : 'No products yet'}</h3>
+              <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
+                {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? `We couldn't find any products matching your search.` : 'Get started by creating your first product.'}
               </p>
-              <div className="flex gap-2">
-                <Button size="sm" asChild className="h-8 gap-1">
+              <div className="flex gap-3">
+                <Button asChild>
                   <Link href="/inventory/add">
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    <span className="sm:whitespace-nowrap">
-                      Add Product
-                    </span>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Product
                   </Link>
                 </Button>
-                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
-                  <Upload className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">
-                    Import
-                  </span>
+                <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
                 </Button>
               </div>
             </div>
