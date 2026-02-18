@@ -389,7 +389,7 @@ export default function InventoryPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <VisualCountDialog onAddItems={handleVisualAddItems} />
+          {/* <VisualCountDialog onAddItems={handleVisualAddItems} /> */}
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
             <Download className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
