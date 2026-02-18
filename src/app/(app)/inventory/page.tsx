@@ -64,7 +64,8 @@ import {
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { useFirestore } from '@/firebase';
-import { doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import VisualCountDialog from '@/components/inventory/visual-count-dialog';
 import type { Product, UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import ImportDialog from '@/components/inventory/import-dialog';
@@ -241,6 +242,39 @@ export default function InventoryPage() {
     setSelectedProductIds([]);
   }
 
+  const handleVisualAddItems = async (items: { name: string; quantity: number }[]) => {
+    if (!business || !items.length) return;
+
+    const batch = writeBatch(firestore);
+    const productsRef = collection(firestore, 'businesses', business.id, 'products');
+
+    items.forEach(item => {
+      const newDocRef = doc(productsRef);
+      batch.set(newDocRef, {
+        name: item.name,
+        stock: item.quantity,
+        price: 0,
+        costPrice: 0,
+        category: 'Uncategorized',
+        sku: '',
+        barcode: '',
+        description: '',
+        imageUrl: '',
+        lowStockThreshold: 5,
+        trackStock: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    await batch.commit();
+    triggerRefresh();
+    toast({
+      title: "Success",
+      description: `Added ${items.length} items to inventory.`,
+    });
+  };
+
   const handleExport = () => {
     if (!allProducts) {
       toast({
@@ -355,6 +389,7 @@ export default function InventoryPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <VisualCountDialog onAddItems={handleVisualAddItems} />
           <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
             <Download className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -532,7 +567,7 @@ export default function InventoryPage() {
               <div className="relative mb-4">
                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent rounded-full blur-xl transform scale-150 opacity-50" />
                 <PackageOpen className="h-24 w-24 text-muted-foreground/30 relative z-10" strokeWidth={1} />
-                <path d="M12 12 L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/30 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full h-8 w-0.5 border-l-2 border-dashed border-muted-foreground/30" />
+                <div className="text-muted-foreground/30 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full h-8 w-0.5 border-l-2 border-dashed border-muted-foreground/30" />
                 {/* Since we can't easily add arbitrary SVG paths outside the icon, I'll stick to the icon + styling */}
               </div>
               <h3 className="text-xl font-semibold text-foreground">{searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? 'No product found' : 'No products yet'}</h3>
