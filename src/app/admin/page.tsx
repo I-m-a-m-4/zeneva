@@ -59,6 +59,9 @@ import {
     LogIn,
     AlertCircle,
     ArrowRight,
+    Search,
+    Filter,
+    ArrowUpDown,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect } from 'react';
@@ -342,10 +345,57 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [broadcastDuration, setBroadcastDuration] = useState('24'); // hours
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
+    // User Management State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'active' | 'joined' | 'name'>('active');
+    const [filterPlan, setFilterPlan] = useState<'all' | 'starter' | 'pro' | 'business' | 'lifetime'>('all');
+
     const userOptions = useMemo(() => (users || []).map(user => ({
         value: user.email,
         label: `${user.name} (${user.email})`
     })), [users]);
+
+    const processedUsers = useMemo(() => {
+        let result = users || [];
+
+        // 1. Search
+        if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            result = result.filter(u =>
+                u.name.toLowerCase().includes(lowerQuery) ||
+                u.email.toLowerCase().includes(lowerQuery) ||
+                (businesses?.find(b => b.id === u.businessId)?.name || '').toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // 2. Filter by Plan
+        if (filterPlan !== 'all') {
+            result = result.filter(u => {
+                const business = businesses?.find(b => b.id === u.businessId);
+                // If no business, assume starter/no plan unless looking for strictly starter
+                if (!business) return filterPlan === 'starter';
+
+                if (filterPlan === 'lifetime') return business.accessLevel === 'lifetime';
+                if (filterPlan === 'starter') return (!business.plan || business.plan === 'starter') && business.accessLevel !== 'lifetime';
+                return business.plan === filterPlan && business.accessLevel !== 'lifetime';
+            });
+        }
+
+        // 3. Sort
+        return [...result].sort((a, b) => {
+            if (sortBy === 'active') { // Most recent first
+                const dateA = a.lastSeen?.toDate ? a.lastSeen.toDate() : new Date(0);
+                const dateB = b.lastSeen?.toDate ? b.lastSeen.toDate() : new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            } else if (sortBy === 'joined') { // Newest first
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            } else {
+                return a.name.localeCompare(b.name);
+            }
+        });
+    }, [users, businesses, searchQuery, filterPlan, sortBy]);
 
     const platformAnalytics = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
@@ -949,6 +999,47 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     <CardDescription>List of all users on the platform.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
+                                    <div className="flex flex-col md:flex-row gap-4 mb-4">
+                                        <div className="relative flex-1">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Search users, emails, or businesses..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="pl-8"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Select value={filterPlan} onValueChange={(v: any) => setFilterPlan(v)}>
+                                                <SelectTrigger className="w-[130px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Filter className="h-4 w-4" />
+                                                        <SelectValue />
+                                                    </div>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Plans</SelectItem>
+                                                    <SelectItem value="starter">Starter</SelectItem>
+                                                    <SelectItem value="pro">Pro</SelectItem>
+                                                    <SelectItem value="business">Business</SelectItem>
+                                                    <SelectItem value="lifetime">Lifetime</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                                                <SelectTrigger className="w-[180px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <ArrowUpDown className="h-4 w-4" />
+                                                        <SelectValue />
+                                                    </div>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="active">Most Recently Active</SelectItem>
+                                                    <SelectItem value="joined">Newest Members</SelectItem>
+                                                    <SelectItem value="name">Name (A-Z)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
                                     <ScrollArea className="h-[500px]">
                                         <Table>
                                             <TableHeader>
@@ -961,7 +1052,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {analyticsData.activeUsers.map(user => {
+                                                {processedUsers.map(user => {
                                                     const business = businesses?.find(b => b.id === user.businessId);
                                                     return (
                                                         <TableRow
