@@ -34,15 +34,17 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name || !email) {
-            toast({ title: 'Missing fields', description: 'Name and email are required.', variant: 'destructive' });
+        if (!name) {
+            toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
             return;
         }
 
-        const emailExists = customers?.some(c => c.email.toLowerCase() === email.toLowerCase());
-        if (emailExists) {
-            toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
-            return;
+        if (email) {
+            const emailExists = customers?.some(c => c.email.toLowerCase() === email.toLowerCase());
+            if (emailExists) {
+                toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
+                return;
+            }
         }
 
         if (phone) {
@@ -81,11 +83,11 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="email" className="text-right">Email</label>
+                    <label htmlFor="email" className="text-right">Email (Optional)</label>
                     <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="phone" className="text-right">Phone</label>
+                    <label htmlFor="phone" className="text-right">Phone (Optional)</label>
                     <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
                 </div>
             </div>

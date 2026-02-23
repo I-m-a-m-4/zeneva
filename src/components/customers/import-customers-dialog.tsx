@@ -60,20 +60,20 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
 
         const lowerCaseHeaders = headers.map(h => h.toLowerCase().trim());
         const findHeader = (possibleNames: string[]): string | undefined => {
-            for (const name of possibleNames) {
-                const lowerName = name.toLowerCase();
-                const index = lowerCaseHeaders.indexOf(lowerName);
-                if (index !== -1) {
-                    return headers[index];
-                }
+          for (const name of possibleNames) {
+            const lowerName = name.toLowerCase();
+            const index = lowerCaseHeaders.indexOf(lowerName);
+            if (index !== -1) {
+              return headers[index];
             }
-            return undefined;
+          }
+          return undefined;
         };
-        
+
         const mappedHeaders = {
-            name: findHeader(HEADER_MAPPINGS.name),
-            email: findHeader(HEADER_MAPPINGS.email),
-            phone: findHeader(HEADER_MAPPINGS.phone),
+          name: findHeader(HEADER_MAPPINGS.name),
+          email: findHeader(HEADER_MAPPINGS.email),
+          phone: findHeader(HEADER_MAPPINGS.phone),
         };
 
         if (!mappedHeaders.name) {
@@ -81,37 +81,40 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           setIsParsing(false);
           return;
         }
-        
+
         const data: ParsedCustomer[] = results.data.map((row: any) => ({
           name: row[mappedHeaders.name!] || undefined,
           email: mappedHeaders.email ? row[mappedHeaders.email] || undefined : undefined,
           phone: mappedHeaders.phone ? String(row[mappedHeaders.phone] || '') : undefined,
         }));
-        
+
         const validData = data.filter(d => d.name);
-        
+
         const processedData = validData.map(d => {
-            if (generatePlaceholderEmail && !d.email && d.name) {
-                const sanitizedName = d.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (sanitizedName) {
-                    const uniqueSuffix = Math.random().toString(36).substring(2, 6);
-                    return {
-                        ...d,
-                        email: `${sanitizedName}${uniqueSuffix}@zeneva-import.local`,
-                    };
-                }
+          if (generatePlaceholderEmail && !d.email && d.name) {
+            const sanitizedName = d.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (sanitizedName) {
+              const uniqueSuffix = Math.random().toString(36).substring(2, 6);
+              return {
+                ...d,
+                email: `${sanitizedName}${uniqueSuffix}@zeneva-import.local`,
+              };
             }
-            return d;
-        }).filter((d): d is ParsedCustomerWithEmail => !!d.name && !!d.email);
+          }
+          return d;
+        }).filter((d): d is ParsedCustomerWithEmail => !!d.name); // Only name is strictly required
 
-        const newData = processedData.filter(d => !existingEmails.has(d.email.toLowerCase()));
+        const newData = processedData.filter(d => {
+          if (!d.email) return true;
+          return !existingEmails.has(d.email.toLowerCase());
+        });
 
-        if(newData.length !== processedData.length && newData.length < validData.length) {
-            toast({
-                variant: 'warning',
-                title: 'Duplicates Found',
-                description: `${processedData.length - newData.length} customers already exist and will be skipped.`
-            })
+        if (newData.length !== processedData.length && newData.length < validData.length) {
+          toast({
+            variant: 'warning',
+            title: 'Duplicates Found',
+            description: `${processedData.length - newData.length} customers already exist and will be skipped.`
+          })
         }
 
         setParsedData(newData);
@@ -123,7 +126,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
       }
     });
   }, [generatePlaceholderEmail, existingEmails, toast]);
-  
+
   React.useEffect(() => {
     if (file) {
       parseFile(file);
@@ -151,7 +154,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
     try {
       const batch = writeBatch(firestore);
       const customersRef = collection(firestore, 'customers');
-      
+
       parsedData.forEach(customerData => {
         const newCustomerRef = doc(customersRef);
         batch.set(newCustomerRef, {
@@ -165,7 +168,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
       });
 
       await batch.commit();
-      
+
       toast({
         variant: 'success',
         title: 'Import Successful',
@@ -209,87 +212,87 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
             Upload a CSV file to bulk-add customers. Ensure your file has columns for 'Name' and 'Email' or 'Phone'.
           </DialogDescription>
         </DialogHeader>
-        
+
         {!file ? (
-             <div className="mt-4 flex justify-center rounded-lg border-2 border-dashed border-border px-6 py-10">
-                <div className="text-center">
-                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <label
-                        htmlFor="customer-file-upload"
-                        className="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
-                    >
-                        <span>Upload a file</span>
-                        <input id="customer-file-upload" name="customer-file-upload" type="file" className="sr-only" accept=".csv" onChange={handleFileChange} />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                    <p className="text-xs leading-5 text-muted-foreground">CSV up to 5MB</p>
-                </div>
+          <div className="mt-4 flex justify-center rounded-lg border-2 border-dashed border-border px-6 py-10">
+            <div className="text-center">
+              <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+              <label
+                htmlFor="customer-file-upload"
+                className="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
+              >
+                <span>Upload a file</span>
+                <input id="customer-file-upload" name="customer-file-upload" type="file" className="sr-only" accept=".csv" onChange={handleFileChange} />
+              </label>
+              <p className="pl-1">or drag and drop</p>
+              <p className="text-xs leading-5 text-muted-foreground">CSV up to 5MB</p>
             </div>
-        ): (
-            <div className='mt-4'>
-                <div className='flex items-center gap-3 p-3 rounded-lg bg-muted border'>
-                    <FileSpreadsheet className="h-6 w-6 text-primary"/>
-                    <div className='flex-1'>
-                        <p className='text-sm font-medium'>{file.name}</p>
-                        <p className='text-xs text-muted-foreground'>
-                            {isParsing ? <Loader2 className="h-4 w-4 animate-spin inline-block mr-1"/> : <CheckCircle className="h-4 w-4 text-green-500 inline-block mr-1"/>}
-                            {isParsing ? 'Parsing...' : `${parsedData.length} new customers found.`}
-                        </p>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => setFile(null)}>Change file</Button>
-                </div>
-
-                <div className="mt-4 flex items-center space-x-2">
-                    <Checkbox
-                        id="generate-email"
-                        checked={generatePlaceholderEmail}
-                        onCheckedChange={(checked) => setGeneratePlaceholderEmail(!!checked)}
-                    />
-                    <Label htmlFor="generate-email" className="text-sm font-normal text-muted-foreground cursor-pointer">
-                        Generate placeholder emails for rows that are missing one (based on customer name). If unchecked, rows without an email will be skipped.
-                    </Label>
-                </div>
-
-                {parsedData.length > 0 && (
-                    <div className='mt-4'>
-                        <h4 className='text-sm font-medium mb-2'>Preview of new customers to import:</h4>
-                        <ScrollArea className="h-60">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Phone</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {parsedData.slice(0, 10).map((p, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell>{p.name}</TableCell>
-                                            <TableCell>{p.email}</TableCell>
-                                            <TableCell>{p.phone || 'N/A'}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                         {parsedData.length > 10 && <p className='text-xs text-muted-foreground text-center mt-2'>...and {parsedData.length - 10} more rows.</p>}
-                    </div>
-                )}
+          </div>
+        ) : (
+          <div className='mt-4'>
+            <div className='flex items-center gap-3 p-3 rounded-lg bg-muted border'>
+              <FileSpreadsheet className="h-6 w-6 text-primary" />
+              <div className='flex-1'>
+                <p className='text-sm font-medium'>{file.name}</p>
+                <p className='text-xs text-muted-foreground'>
+                  {isParsing ? <Loader2 className="h-4 w-4 animate-spin inline-block mr-1" /> : <CheckCircle className="h-4 w-4 text-green-500 inline-block mr-1" />}
+                  {isParsing ? 'Parsing...' : `${parsedData.length} new customers found.`}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setFile(null)}>Change file</Button>
             </div>
+
+            <div className="mt-4 flex items-center space-x-2">
+              <Checkbox
+                id="generate-email"
+                checked={generatePlaceholderEmail}
+                onCheckedChange={(checked) => setGeneratePlaceholderEmail(!!checked)}
+              />
+              <Label htmlFor="generate-email" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                Generate placeholder emails for rows that are missing one (based on customer name). If unchecked, rows without an email will be skipped.
+              </Label>
+            </div>
+
+            {parsedData.length > 0 && (
+              <div className='mt-4'>
+                <h4 className='text-sm font-medium mb-2'>Preview of new customers to import:</h4>
+                <ScrollArea className="h-60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {parsedData.slice(0, 10).map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{p.name}</TableCell>
+                          <TableCell>{p.email}</TableCell>
+                          <TableCell>{p.phone || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+                {parsedData.length > 10 && <p className='text-xs text-muted-foreground text-center mt-2'>...and {parsedData.length - 10} more rows.</p>}
+              </div>
+            )}
+          </div>
         )}
-        
+
         {error && (
-             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
-                <AlertTriangle className="h-5 w-5"/>
-                <p className="text-sm">{error}</p>
-             </div>
+          <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+            <AlertTriangle className="h-5 w-5" />
+            <p className="text-sm">{error}</p>
+          </div>
         )}
 
         <DialogFooter className='mt-4'>
           <Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="lg" onClick={handleImport} disabled={isParsing || isImporting || parsedData.length === 0 || !!error || !businessId}>
-            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {isImporting ? 'Importing...' : `Import ${parsedData.length} Customers`}
           </Button>
         </DialogFooter>

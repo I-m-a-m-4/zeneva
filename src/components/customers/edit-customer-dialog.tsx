@@ -18,6 +18,13 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
+import type { Customer } from '@/types';
+
+interface EditCustomerDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  customer: Customer | null;
+}
 
 export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: EditCustomerDialogProps) {
   const firestore = useFirestore();
@@ -39,8 +46,8 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
-    if (!name || !email) {
-      toast({ title: 'Missing fields', description: 'Name and email are required.', variant: 'destructive' });
+    if (!name) {
+      toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
       return;
     }
 
@@ -79,11 +86,11 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" required />
+              <Label htmlFor="email" className="text-right">Email (Optional)</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Phone</Label>
+              <Label htmlFor="phone" className="text-right">Phone (Optional)</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
             </div>
           </div>
