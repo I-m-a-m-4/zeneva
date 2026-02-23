@@ -74,6 +74,13 @@ export default function AddProductPage() {
 
   const userProfile = currentUserProfile;
 
+  React.useEffect(() => {
+    if (userProfile && userProfile.role === 'vendor_operator') {
+      toast({ variant: 'destructive', title: 'Permission Denied', description: 'Vendor operators cannot add products.' });
+      router.push('/inventory');
+    }
+  }, [userProfile, router, toast]);
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -140,6 +147,7 @@ export default function AddProductPage() {
     const canAddProduct = userProfile.role === 'admin' || userProfile.role === 'manager';
     if (!canAddProduct) {
       toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
+      router.push('/inventory');
       return;
     }
 
@@ -195,7 +203,14 @@ export default function AddProductPage() {
         stock: cleanData.stock ?? 0,
       }, imageFile);
 
-      // 3. Navigate immediately
+      // 3. Log Audit Event (Awaiting to ensure it's written before navigation)
+      await logAuditEvent(firestore, business.id, userProfile, {
+        action: 'product.create',
+        entity: { type: 'Product', id: newProductId, name: values.name },
+        details: { price: values.price, stock: values.stock || 0, sku: values.sku }
+      });
+
+      // 4. Navigate immediately
       router.push('/inventory');
 
     } catch (error: any) {

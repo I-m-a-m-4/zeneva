@@ -137,7 +137,14 @@ export default function ReviewPage() {
 
                 await batch.commit();
 
-                // Move navigation here to ensure document exists before we try to read it
+                // Log audit event BEFORE navigation to ensure it's recorded
+                await logAuditEvent(firestore, business.id, currentUserProfile, {
+                    action: 'sale.create',
+                    entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
+                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
+                });
+
+                // Move navigation at the end
                 router.push(`/receipts/${newReceiptRef.id}`);
                 resetPOS();
 
@@ -151,12 +158,6 @@ export default function ReviewPage() {
                         duration: 5000,
                     });
                 }
-
-                logAuditEvent(firestore, business.id, currentUserProfile, {
-                    action: 'sale.create',
-                    entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
-                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
-                });
 
                 // Use the memoized check from the component scope
                 const plan = business.plan;

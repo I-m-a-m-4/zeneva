@@ -399,12 +399,14 @@ export default function InventoryPage() {
               Export
             </span>
           </Button>
-          <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
-            <Upload className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              Import
-            </span>
-          </Button>
+          {canManageStock && (
+            <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
+              <Upload className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Import
+              </span>
+            </Button>
+          )}
           <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
             <Link href="/inventory/debts">
               <TrendingDown className="h-3.5 w-3.5" />
@@ -413,14 +415,16 @@ export default function InventoryPage() {
               </span>
             </Link>
           </Button>
-          <Button size="sm" asChild className="h-9 gap-1">
-            <Link href="/inventory/add">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Add Product
-              </span>
-            </Link>
-          </Button>
+          {canManageStock && (
+            <Button size="sm" asChild className="h-9 gap-1">
+              <Link href="/inventory/add">
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Add Product
+                </span>
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
       <Card className="h-full flex flex-col w-full">

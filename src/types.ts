@@ -396,6 +396,7 @@ export interface AuditLog {
     userId: string;
     userName: string;
     userEmail: string;
+    userRole?: string;
     action: string; // e.g., 'product.create', 'sale.void'
     entityType: string; // e.g., 'Product', 'Receipt'
     entityId: string;

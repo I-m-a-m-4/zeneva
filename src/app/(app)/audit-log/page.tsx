@@ -36,9 +36,9 @@ const actionIcons: { [key: string]: React.ElementType } = {
 };
 
 const severityIcons: Record<string, React.ReactElement> = {
-  High: <Flame className="h-5 w-5 text-destructive" />,
-  Medium: <ShieldAlert className="h-5 w-5 text-amber-500" />,
-  Low: <Info className="h-5 w-5 text-sky-500" />,
+    High: <Flame className="h-5 w-5 text-destructive" />,
+    Medium: <ShieldAlert className="h-5 w-5 text-amber-500" />,
+    Low: <Info className="h-5 w-5 text-sky-500" />,
 };
 
 function AuditLogRowSkeleton() {
@@ -70,9 +70,9 @@ function analyzeLogsLocally(logs: AuditLog[]): { summary: string; suspiciousActi
     if (voids.length > 0) {
         const suspiciousVoidLogIds = new Set<string>();
         for (const voidLog of voids) {
-            const createLog = sales.find(l => 
-                l.action === 'sale.create' && 
-                l.entityId === voidLog.entityId && 
+            const createLog = sales.find(l =>
+                l.action === 'sale.create' &&
+                l.entityId === voidLog.entityId &&
                 l.createdAt.toDate() < voidLog.createdAt.toDate()
             );
             if (createLog) {
@@ -92,7 +92,7 @@ function analyzeLogsLocally(logs: AuditLog[]): { summary: string; suspiciousActi
             });
         }
     }
-    
+
     // 2. Look for user deactivations, especially of other admins/managers
     const userDeactivations = logs.filter(l => l.action === 'user.update_status' && l.details?.newStatus === 'inactive');
     if (userDeactivations.length > 0) {
@@ -103,12 +103,12 @@ function analyzeLogsLocally(logs: AuditLog[]): { summary: string; suspiciousActi
             relatedLogIds: userDeactivations.map(l => l.id),
         });
     }
-    
+
     activities.sort((a, b) => {
         const severityOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
         return severityOrder[a.severity] - severityOrder[b.severity];
     });
-    
+
     const summary = activities.length > 0
         ? `Found ${activities.length} potentially suspicious pattern(s) in the ${logs.length} log entries. Please review the highlighted activities below.`
         : `Scanned ${logs.length} log entries and found no obvious signs of suspicious activity based on current rules.`;
@@ -122,31 +122,31 @@ function AnalysisResults({ analysis }: { analysis: { summary: string, suspicious
         <Card className="mt-6 bg-primary/5 border-primary/20">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <Bot className="text-primary"/> Automated Audit Summary
+                    <Bot className="text-primary" /> Automated Audit Summary
                 </CardTitle>
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground italic mb-6">"{analysis.summary}"</p>
-                
+
                 {analysis.suspiciousActivities?.length > 0 ? (
                     <Accordion type="multiple" className="w-full space-y-2">
                         {analysis.suspiciousActivities.map((activity, index) => (
-                        <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-background/50 px-4">
-                            <AccordionTrigger className="py-3 hover:no-underline">
-                            <div className="flex items-center gap-3">
-                                {severityIcons[activity.severity]}
-                                <span className="font-medium text-base text-left">{activity.title}</span>
-                            </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pb-4 text-muted-foreground prose prose-sm max-w-none">
-                                <p>{activity.description}</p>
-                                <p className="text-xs mt-2">Related Log Entries: {activity.relatedLogIds.length}</p>
-                            </AccordionContent>
-                        </AccordionItem>
+                            <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-background/50 px-4">
+                                <AccordionTrigger className="py-3 hover:no-underline">
+                                    <div className="flex items-center gap-3">
+                                        {severityIcons[activity.severity]}
+                                        <span className="font-medium text-base text-left">{activity.title}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pb-4 text-muted-foreground prose prose-sm max-w-none">
+                                    <p>{activity.description}</p>
+                                    <p className="text-xs mt-2">Related Log Entries: {activity.relatedLogIds.length}</p>
+                                </AccordionContent>
+                            </AccordionItem>
                         ))}
                     </Accordion>
                 ) : (
-                     <div className="text-center text-muted-foreground p-8">
+                    <div className="text-center text-muted-foreground p-8">
                         <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
                         <p className="mt-4 font-medium">No Suspicious Activity Detected</p>
                         <p className="text-sm">The automated scan found no unusual patterns based on our rules.</p>
@@ -163,7 +163,7 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Bot className="text-primary"/> Upgrade to Business Plan
+                        <Bot className="text-primary" /> Upgrade to Business Plan
                     </DialogTitle>
                     <DialogDescription>
                         The Automated Audit Assistant is a Business Plan feature. It scans your logs for suspicious patterns to help you detect issues like internal theft or operational mistakes.
@@ -222,7 +222,7 @@ function AuditLogPageContent() {
             try {
                 const result = analyzeLogsLocally(auditLogs);
                 setAnalysis(result);
-                 toast({ variant: 'success', title: 'Analysis Complete', description: 'Automated audit summary is ready.' });
+                toast({ variant: 'success', title: 'Analysis Complete', description: 'Automated audit summary is ready.' });
             } catch (e: any) {
                 console.error("Local audit analysis failed", e);
                 toast({ variant: 'destructive', title: 'Analysis Failed', description: e.message || 'The scan could not be completed.' });
@@ -232,145 +232,153 @@ function AuditLogPageContent() {
 
     return (
         <>
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <CardTitle className="flex items-center gap-2"><History /> Audit Log</CardTitle>
-                        <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><History /> Audit Log</CardTitle>
+                            <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
+                        </div>
+                        <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto">
+                            {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+                            {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
+                        </Button>
                     </div>
-                     <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto">
-                        {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
-                        {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent>
-                {isLoading ? (
-                    <Table>
-                        <TableHeader>
-                             <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Action</TableHead>
-                                <TableHead>Details</TableHead>
-                                <TableHead className="text-right">Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                         <TableBody>
-                            <AuditLogRowSkeleton />
-                            <AuditLogRowSkeleton />
-                            <AuditLogRowSkeleton />
-                            <AuditLogRowSkeleton />
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Action</TableHead>
-                                <TableHead>Details</TableHead>
-                                <TableHead className="text-right">Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {auditLogs && auditLogs.length > 0 ? (
-                                auditLogs.map(log => {
-                                    const entityType = log.action.split('.')[0];
-                                    const Icon = actionIcons[entityType] || History;
-                                    return (
-                                        <TableRow key={log.id} onClick={() => setSelectedLog(log)} className="cursor-pointer">
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Avatar className="h-8 w-8 hidden sm:flex">
-                                                        <AvatarFallback>{log.userName.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <div className="font-medium">{log.userName}</div>
-                                                        <div className="text-xs text-muted-foreground">{log.userEmail}</div>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="secondary" className="capitalize whitespace-nowrap">
-                                                    <Icon className="mr-1.5 h-3 w-3" />
-                                                    {log.action.replace('.', ' ')}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium truncate max-w-xs">{log.details.entityName || log.entityType}</div>
-                                                <div className="text-xs text-muted-foreground truncate max-w-xs" title={log.entityId}>
-                                                    ID: {log.entityId}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right text-muted-foreground whitespace-nowrap">
-                                                {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), {addSuffix: true}) : ''}
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })
-                            ) : (
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
-                                        No audit events recorded yet.
-                                    </TableCell>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>Details</TableHead>
+                                    <TableHead className="text-right">Date</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                )}
-            </CardContent>
-        </Card>
-        {analysis && <AnalysisResults analysis={analysis} />}
-         <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Log Event Details</DialogTitle>
-                    <DialogDescription>
-                        A detailed view of the recorded action.
-                    </DialogDescription>
-                </DialogHeader>
-                {selectedLog && (
-                    <div className="text-sm space-y-4">
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">User</p>
-                            <p className="font-medium">{selectedLog.userName} ({selectedLog.userEmail})</p>
+                            </TableHeader>
+                            <TableBody>
+                                <AuditLogRowSkeleton />
+                                <AuditLogRowSkeleton />
+                                <AuditLogRowSkeleton />
+                                <AuditLogRowSkeleton />
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>Details</TableHead>
+                                    <TableHead className="text-right">Date</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {auditLogs && auditLogs.length > 0 ? (
+                                    auditLogs.map(log => {
+                                        const entityType = log.action.split('.')[0];
+                                        const Icon = actionIcons[entityType] || History;
+                                        return (
+                                            <TableRow key={log.id} onClick={() => setSelectedLog(log)} className="cursor-pointer">
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Avatar className="h-8 w-8 hidden sm:flex">
+                                                            <AvatarFallback>{(log.userName || 'U').charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <div>
+                                                            <div className="font-medium">{log.userName || 'Unknown User'}</div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-xs text-muted-foreground">{log.userEmail}</span>
+                                                                {log.userRole && (
+                                                                    <>
+                                                                        <span className="text-[10px] text-muted-foreground/30">•</span>
+                                                                        <span className="text-[10px] uppercase tracking-wider font-semibold text-primary/70">{log.userRole.replace('_', ' ')}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="capitalize whitespace-nowrap">
+                                                        <Icon className="mr-1.5 h-3 w-3" />
+                                                        {log.action.replace('.', ' ')}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium truncate max-w-xs">{log.details.entityName || log.entityType}</div>
+                                                    <div className="text-xs text-muted-foreground truncate max-w-xs" title={log.entityId}>
+                                                        ID: {log.entityId}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right text-muted-foreground whitespace-nowrap">
+                                                    {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : ''}
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center">
+                                            No audit events recorded yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+            {analysis && <AnalysisResults analysis={analysis} />}
+            <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Log Event Details</DialogTitle>
+                        <DialogDescription>
+                            A detailed view of the recorded action.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedLog && (
+                        <div className="text-sm space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground">User</p>
+                                <p className="font-medium">{selectedLog.userName} ({selectedLog.userEmail})</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground">Action</p>
+                                <p className="font-medium capitalize">{selectedLog.action.replace('.', ' ')}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground">Date</p>
+                                <p className="font-medium">{selectedLog.createdAt ? format(selectedLog.createdAt.toDate(), 'PPP p') : 'N/A'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground">Target</p>
+                                <p className="font-medium">{selectedLog.details.entityName || selectedLog.entityType}</p>
+                                <p className="text-muted-foreground text-xs font-mono">{selectedLog.entityId}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground">Details</p>
+                                <pre className="p-3 bg-muted rounded-md text-xs whitespace-pre-wrap font-mono">
+                                    {JSON.stringify(selectedLog.details, null, 2)}
+                                </pre>
+                            </div>
                         </div>
-                         <div className="space-y-1">
-                            <p className="text-muted-foreground">Action</p>
-                            <p className="font-medium capitalize">{selectedLog.action.replace('.', ' ')}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Date</p>
-                            <p className="font-medium">{selectedLog.createdAt ? format(selectedLog.createdAt.toDate(), 'PPP p') : 'N/A'}</p>
-                        </div>
-                         <div className="space-y-1">
-                            <p className="text-muted-foreground">Target</p>
-                            <p className="font-medium">{selectedLog.details.entityName || selectedLog.entityType}</p>
-                            <p className="text-muted-foreground text-xs font-mono">{selectedLog.entityId}</p>
-                        </div>
-                         <div className="space-y-1">
-                            <p className="text-muted-foreground">Details</p>
-                            <pre className="p-3 bg-muted rounded-md text-xs whitespace-pre-wrap font-mono">
-                                {JSON.stringify(selectedLog.details, null, 2)}
-                            </pre>
-                        </div>
-                    </div>
-                )}
-            </DialogContent>
-        </Dialog>
-        <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} />
+                    )}
+                </DialogContent>
+            </Dialog>
+            <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} />
         </>
     );
 }
 
 export default function AuditLogPage() {
     const { business } = usePOS();
-    
+
     return (
         <div className="space-y-6">
             <PageTitle title="Audit Log" subtitle="Track important actions taken in your business." />
-             <FeatureGate
+            <FeatureGate
                 requiredPlan="pro"
                 currentPlan={business?.plan}
                 hasLifetimeAccess={business?.accessLevel === 'lifetime'}

@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp, type Firestore } from 'firebase/fi
 import type { UserProfile } from '@/types';
 
 type AuditAction =
-    | 'product.create' | 'product.update' | 'product.delete'
+    | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update'
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete'
     | 'user.invite' | 'user.update_status'
@@ -37,9 +37,10 @@ export const logAuditEvent = async (
 
         const logData = {
             businessId,
-            userId: user.id,
-            userName: user.name,
-            userEmail: user.email,
+            userId: user?.id || 'unknown',
+            userName: user?.name || 'Unknown User',
+            userEmail: user?.email || 'N/A',
+            userRole: user?.role || 'unknown',
             action: event.action,
             entityType: event.entity.type,
             entityId: event.entity.id,

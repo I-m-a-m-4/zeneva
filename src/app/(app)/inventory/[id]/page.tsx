@@ -6,27 +6,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  ChevronLeft,
-  Upload,
-  Loader2,
-  Barcode as BarcodeIcon
+    ChevronLeft,
+    Upload,
+    Loader2,
+    Barcode as BarcodeIcon
 } from "lucide-react";
 import BarcodeDisplay from 'react-barcode';
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
@@ -67,7 +67,7 @@ function useCurrentUserProfile() {
 function EditProductSkeleton() {
     return (
         <div className="grid flex-1 auto-rows-max gap-4">
-             <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4">
                 <Skeleton className="h-7 w-7 rounded-md" />
                 <Skeleton className="h-7 w-48" />
                 <div className="hidden items-center gap-2 md:ml-auto md:flex">
@@ -77,12 +77,12 @@ function EditProductSkeleton() {
             </div>
             <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
                 <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2"/><Skeleton className="h-4 w-48"/></CardHeader><CardContent><div className="grid gap-6"><Skeleton className="h-10 w-full"/><Skeleton className="h-20 w-full"/></div></CardContent></Card>
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2"/><Skeleton className="h-4 w-48"/></CardHeader><CardContent><div className="grid gap-6 sm:grid-cols-3"><Skeleton className="h-10 w-full"/><Skeleton className="h-10 w-full"/><Skeleton className="h-10 w-full"/></div></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><div className="grid gap-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-20 w-full" /></div></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><div className="grid gap-6 sm:grid-cols-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div></CardContent></Card>
                 </div>
                 <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
-                    <Card><CardHeader><Skeleton className="h-6 w-32"/></CardHeader><CardContent><Skeleton className="h-10 w-full"/></CardContent></Card>
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2"/><Skeleton className="h-4 w-48"/></CardHeader><CardContent><Skeleton className="aspect-square w-full"/></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><Skeleton className="h-10 w-full" /></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><Skeleton className="aspect-square w-full" /></CardContent></Card>
                 </div>
             </div>
         </div>
@@ -98,7 +98,7 @@ export default function EditProductPage() {
     const { currentUserProfile } = usePOS();
     const { business } = usePOS();
     const firestore = useFirestore();
-    
+
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
     const { data: product, isLoading: isProductLoading } = useDoc<Product>(productDocRef);
 
@@ -125,7 +125,7 @@ export default function EditProductPage() {
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-             if (file.size > MAX_FILE_SIZE) {
+            if (file.size > MAX_FILE_SIZE) {
                 toast({
                     variant: 'destructive',
                     title: 'Image Too Large',
@@ -142,7 +142,7 @@ export default function EditProductPage() {
             reader.readAsDataURL(file);
         }
     };
-    
+
     const onSubmit = async (values: ProductFormValues) => {
         if (!productDocRef || !product || !currentUserProfile || !firestore || !business) return;
 
@@ -167,11 +167,11 @@ export default function EditProductPage() {
                 updatedAt: serverTimestamp(),
             });
 
-            // Log audit event
-            logAuditEvent(firestore, business.id, currentUserProfile, {
+            // Log audit event (Awaiting to ensure it's written before navigation)
+            await logAuditEvent(firestore, business.id, currentUserProfile, {
                 action: 'product.update',
                 entity: { type: 'Product', id: product.id, name: product.name },
-                details: { changes: Object.keys(values).filter(key => values[key as keyof typeof values] !== product[key as keyof typeof product])}
+                details: { changes: Object.keys(values).filter(key => values[key as keyof typeof values] !== product[key as keyof typeof product]) }
             });
 
 
@@ -185,7 +185,7 @@ export default function EditProductPage() {
             setIsSaving(false);
         }
     };
-    
+
     const isLoading = isProductLoading;
     const canManageProduct = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
@@ -196,238 +196,238 @@ export default function EditProductPage() {
     if (!product) {
         return <div>Product not found.</div>;
     }
-    
+
     return (
         <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4">
-        <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" className="h-7 w-7" asChild>
-            <Link href="/inventory">
-                <ChevronLeft className="h-4 w-4" />
-                <span className="sr-only">Back</span>
-            </Link>
-            </Button>
-            <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
-            Edit: {product.name}
-            </h1>
-            <div className="hidden items-center gap-2 md:ml-auto md:flex">
-            <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
-                Discard
-            </Button>
-            {canManageProduct && (
-                <Button size="lg" type="submit" disabled={isSaving}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Changes
-                </Button>
-            )}
-            </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
-            <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
-            <Card>
-                <CardHeader>
-                <CardTitle>Product Details</CardTitle>
-                <CardDescription>
-                    Update the core details for your product.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                <div className="grid gap-6">
-                    <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g. Quantum HD Monitor" {...field} disabled={!canManageProduct} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="A detailed description of the product." className="min-h-32" {...field} disabled={!canManageProduct} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                <CardTitle>Stock &amp; Pricing</CardTitle>
-                <CardDescription>
-                    Manage inventory and pricing information for this product.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-4">
-                    <FormField
-                        control={form.control}
-                        name="sku"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Barcode (SKU)</FormLabel>
-                            <FormControl>
-                                <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" size="icon" className="h-7 w-7" asChild>
+                        <Link href="/inventory">
+                            <ChevronLeft className="h-4 w-4" />
+                            <span className="sr-only">Back</span>
+                        </Link>
+                    </Button>
+                    <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
+                        Edit: {product.name}
+                    </h1>
+                    <div className="hidden items-center gap-2 md:ml-auto md:flex">
+                        <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
+                            Discard
+                        </Button>
+                        {canManageProduct && (
+                            <Button size="lg" type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Changes
+                            </Button>
                         )}
-                        />
-                    <FormField
-                        control={form.control}
-                        name="stock"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Stock</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="25" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Price</FormLabel>
-                            <FormControl>
-                                <Input type="number" step="0.01" placeholder="349.99" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="costPrice"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Cost Price</FormLabel>
-                            <FormControl>
-                                <Input type="number" step="0.01" placeholder="250.00" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                             <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
-                </CardContent>
-            </Card>
-            </div>
-            <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
-            <Card>
-                <CardHeader>
-                <CardTitle>Product Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                        <FormItem>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!canManageProduct}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
-                                    business.settings.productCategories.map((cat: string) => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-center text-sm text-muted-foreground">
-                                        No categories defined.
-                                        <Button variant="link" asChild className="p-0 h-auto ml-1">
-                                            <Link href="/settings">Create one now</Link>
-                                        </Button>
-                                    </div>
-                                )}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                </CardContent>
-            </Card>
-            <Card className="overflow-hidden">
-                <CardHeader>
-                <CardTitle>Product Image</CardTitle>
-                <CardDescription>
-                    Upload an image (max 5MB) for your product.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-2">
-                        <div className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
-                            {imagePreview ? (
-                                <Image src={imagePreview} alt="Product preview" fill style={{objectFit: "cover"}} />
-                            ) : (
-                                <div className="text-center text-muted-foreground">
-                                    <Upload className="mx-auto h-8 w-8" />
-                                    <p className="mt-2 text-sm">Click to upload</p>
-                                </div>
-                            )}
-                            <Input
-                                id="file-upload"
-                                type="file"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                accept="image/png, image/jpeg, image/gif"
-                                onChange={handleImageChange}
-                                disabled={!canManageProduct}
-                            />
-                        </div>
                     </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Barcode</CardTitle>
-                    <CardDescription>
-                        This barcode is generated from the product's SKU.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {product.sku ? (
-                        <div className="flex justify-center bg-white p-2 rounded-md">
-                            <BarcodeDisplay value={product.sku} />
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center">
-                            Add an SKU to generate a barcode for this product.
-                        </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
+                    <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Product Details</CardTitle>
+                                <CardDescription>
+                                    Update the core details for your product.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-6">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Name</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. Quantum HD Monitor" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Description</FormLabel>
+                                                <FormControl>
+                                                    <Textarea placeholder="A detailed description of the product." className="min-h-32" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Stock &amp; Pricing</CardTitle>
+                                <CardDescription>
+                                    Manage inventory and pricing information for this product.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="sku"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Barcode (SKU)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="stock"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Stock</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="25" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="price"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Price</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" step="0.01" placeholder="349.99" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="costPrice"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Cost Price</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" step="0.01" placeholder="250.00" {...field} disabled={!canManageProduct} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Product Category</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <FormField
+                                    control={form.control}
+                                    name="category"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!canManageProduct}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select a category" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
+                                                        business.settings.productCategories.map((cat: string) => (
+                                                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                                        ))
+                                                    ) : (
+                                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                                            No categories defined.
+                                                            <Button variant="link" asChild className="p-0 h-auto ml-1">
+                                                                <Link href="/settings">Create one now</Link>
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </CardContent>
+                        </Card>
+                        <Card className="overflow-hidden">
+                            <CardHeader>
+                                <CardTitle>Product Image</CardTitle>
+                                <CardDescription>
+                                    Upload an image (max 5MB) for your product.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-2">
+                                    <div className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
+                                        {imagePreview ? (
+                                            <Image src={imagePreview} alt="Product preview" fill style={{ objectFit: "cover" }} />
+                                        ) : (
+                                            <div className="text-center text-muted-foreground">
+                                                <Upload className="mx-auto h-8 w-8" />
+                                                <p className="mt-2 text-sm">Click to upload</p>
+                                            </div>
+                                        )}
+                                        <Input
+                                            id="file-upload"
+                                            type="file"
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            accept="image/png, image/jpeg, image/gif"
+                                            onChange={handleImageChange}
+                                            disabled={!canManageProduct}
+                                        />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Barcode</CardTitle>
+                                <CardDescription>
+                                    This barcode is generated from the product's SKU.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {product.sku ? (
+                                    <div className="flex justify-center bg-white p-2 rounded-md">
+                                        <BarcodeDisplay value={product.sku} />
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        Add an SKU to generate a barcode for this product.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+                <div className="flex items-center justify-center gap-2 md:hidden">
+                    <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
+                        Discard
+                    </Button>
+                    {canManageProduct && (
+                        <Button size="lg" type="submit" disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                        </Button>
                     )}
-                </CardContent>
-            </Card>
-            </div>
-        </div>
-        <div className="flex items-center justify-center gap-2 md:hidden">
-            <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
-            Discard
-            </Button>
-            {canManageProduct && (
-                 <Button size="lg" type="submit" disabled={isSaving}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Changes
-                </Button>
-            )}
-        </div>
-        </form>
+                </div>
+            </form>
         </Form>
     );
 }

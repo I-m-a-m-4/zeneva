@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { logAuditEvent } from '@/lib/audit';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { Product, UserProfile } from '@/types';
 import { usePOS } from '@/context/pos-context';
@@ -24,9 +25,9 @@ interface QuickEditDialogProps {
 }
 
 const quickEditSchema = z.object({
-    price: z.coerce.number().min(0, "Price must be a positive number."),
-    costPrice: z.coerce.number().min(0, "Cost price must be positive.").optional(),
-    stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+  price: z.coerce.number().min(0, "Price must be a positive number."),
+  costPrice: z.coerce.number().min(0, "Cost price must be positive.").optional(),
+  stock: z.coerce.number().int("Stock must be a whole number.").min(0),
 });
 
 type QuickEditFormValues = z.infer<typeof quickEditSchema>;
@@ -42,9 +43,9 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
   const form = useForm<QuickEditFormValues>({
     resolver: zodResolver(quickEditSchema),
     defaultValues: {
-        price: 0,
-        costPrice: 0,
-        stock: 0,
+      price: 0,
+      costPrice: 0,
+      stock: 0,
     },
   });
 
@@ -64,35 +65,42 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
     if (!firestore || !product) return;
     setIsSubmitting(true);
     try {
-        const productRef = doc(firestore, 'products', product.id);
-        
-        const dataToUpdate: Partial<QuickEditFormValues> & { updatedAt: any } = {
-            updatedAt: serverTimestamp(),
-        };
+      const productRef = doc(firestore, 'products', product.id);
 
-        if (canManageProduct) {
-          dataToUpdate.price = values.price;
-          dataToUpdate.costPrice = values.costPrice;
-          dataToUpdate.stock = values.stock;
-        }
+      const dataToUpdate: Partial<QuickEditFormValues> & { updatedAt: any } = {
+        updatedAt: serverTimestamp(),
+      };
 
-        await updateDoc(productRef, dataToUpdate);
+      if (canManageProduct) {
+        dataToUpdate.price = values.price;
+        dataToUpdate.costPrice = values.costPrice;
+        dataToUpdate.stock = values.stock;
+      }
 
-        toast({
-            variant: 'success',
-            title: 'Product Updated',
-            description: `${product.name} has been updated.`,
-        });
-        onOpenChange(false);
-        triggerRefresh();
+      await updateDoc(productRef, dataToUpdate);
+
+      // Log audit event
+      await logAuditEvent(firestore, userProfile.businessId, userProfile, {
+        action: 'product.update',
+        entity: { type: 'Product', id: product.id, name: product.name },
+        details: { price: values.price, stock: values.stock, type: 'Quick Edit' }
+      });
+
+      toast({
+        variant: 'success',
+        title: 'Product Updated',
+        description: `${product.name} has been updated.`,
+      });
+      onOpenChange(false);
+      triggerRefresh();
     } catch (error) {
-        toast({
-            variant: 'destructive',
-            title: 'Update Failed',
-            description: 'Could not update product. Please try again.',
-        });
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: 'Could not update product. Please try again.',
+      });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
@@ -106,55 +114,55 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Price</FormLabel>
-                            <FormControl>
-                                <Input type="number" step="0.01" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="costPrice"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Cost Price</FormLabel>
-                            <FormControl>
-                                <Input type="number" step="0.01" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="stock"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Stock</FormLabel>
-                            <FormControl>
-                                <Input type="number" {...field} disabled={!canManageProduct}/>
-                            </FormControl>
-                            {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit stock.</p>}
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <DialogFooter className='mt-6'>
-                    <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button type="submit" size="lg" disabled={isSubmitting || !canManageProduct}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                        Save Changes
-                    </Button>
-                </DialogFooter>
-            </form>
+          <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Price</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" {...field} disabled={!canManageProduct} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="costPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cost Price</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" {...field} disabled={!canManageProduct} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="stock"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Stock</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} disabled={!canManageProduct} />
+                  </FormControl>
+                  {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit stock.</p>}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter className='mt-6'>
+              <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="submit" size="lg" disabled={isSubmitting || !canManageProduct}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
         </Form>
       </DialogContent>
     </Dialog>

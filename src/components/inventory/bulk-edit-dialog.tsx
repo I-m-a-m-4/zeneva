@@ -12,6 +12,8 @@ import { Loader2 } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
+import { logAuditEvent } from '@/lib/audit';
+import type { Product } from '@/types';
 
 interface BulkEditDialogProps {
   productIds: string[];
@@ -58,7 +60,15 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
   };
 
   const handleSaveChanges = async () => {
-    if (!firestore || !currentUserProfile || productsToEdit.length === 0) return;
+    if (!firestore || !currentUserProfile || !productsToEdit || productsToEdit.length === 0) return;
+
+    // Safety check
+    const canManage = currentUserProfile.role === 'admin' || currentUserProfile.role === 'manager';
+    if (!canManage) {
+      toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to bulk edit products.' });
+      return;
+    }
+
     setIsSaving(true);
     const batch = writeBatch(firestore);
 
@@ -78,6 +88,14 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
 
     try {
       await batch.commit();
+
+      // Log audit event
+      await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
+        action: 'product.bulk_update',
+        entity: { type: 'Product', id: 'multiple', name: `${productsToEdit.length} products` },
+        details: { productCount: productsToEdit.length, ids: productIds }
+      });
+
       toast({
         variant: 'success',
         title: 'Products Updated',
@@ -118,7 +136,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       <div className="relative">
-                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{currencySymbol}</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{currencySymbol}</span>
                         <Input
                           type="number"
                           value={editedProducts[product.id]?.price ?? ''}
