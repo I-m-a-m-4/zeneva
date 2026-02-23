@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc, addDoc } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
@@ -35,6 +35,7 @@ import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
 import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
@@ -132,10 +133,23 @@ export default function AuthenticatedLayout({
     isConfettiActive,
     triggerConfetti,
     setIsConfettiActive,
+    products,
+    queuedActions
   } = usePOS();
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
+  const [isNotificationsExpanded, setIsNotificationsExpanded] = React.useState(false);
+
+  // Helper: resolve a navigation link for each notification
+  const getNotificationLink = React.useCallback((notif: any): string => {
+    if (notif.link) return notif.link;
+    if (notif.type === 'inventory' || notif.body?.toLowerCase().includes('stock') || notif.body?.toLowerCase().includes('backorder')) return '/inventory';
+    if (notif.type === 'sale' || notif.body?.toLowerCase().includes('order')) return '/online-orders';
+    if (notif.type === 'sync') return '/audit-log';
+    if (notif.isGlobal) return '/support';
+    return '/';
+  }, []);
 
   const userNotificationsQuery = useMemoFirebase(
     () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
@@ -179,6 +193,34 @@ export default function AuthenticatedLayout({
     });
     await batch.commit().catch(console.error);
   }, [currentUserProfile, unreadCount, userNotifications, firestore]);
+
+  const handleDeleteNotification = React.useCallback(async (notifId: string, isGlobal: boolean) => {
+    if (!currentUserProfile || isGlobal || !firestore) return;
+    try {
+      const notifRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, notifId);
+      const batch = writeBatch(firestore);
+      batch.delete(notifRef);
+      await batch.commit();
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+  }, [currentUserProfile, firestore]);
+
+  const handleClearAll = React.useCallback(async () => {
+    if (!currentUserProfile || !userNotifications || !firestore) return;
+    try {
+      const batch = writeBatch(firestore);
+      userNotifications.forEach(notif => {
+        const notifRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, notif.id);
+        batch.delete(notifRef);
+      });
+      await batch.commit();
+      toast({ title: "Notifications cleared" });
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  }, [currentUserProfile, userNotifications, firestore, toast]);
+
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -512,24 +554,62 @@ export default function AuthenticatedLayout({
                         <PopoverContent align="end" className="w-96 p-0">
                           <div className="flex items-center justify-between p-4 border-b">
                             <p className="font-medium">Notifications</p>
-                            {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAsRead}>Mark all as read</Button>}
+                            <div className="flex items-center gap-2">
+                              {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={handleMarkAsRead}>Mark read</Button>}
+                              {allNotifications.length > 0 && <Button variant="link" size="sm" className="p-0 h-auto text-xs text-destructive hover:text-destructive/80" onClick={handleClearAll}>Clear all</Button>}
+                            </div>
                           </div>
                           <ScrollArea className="h-[300px]">
                             {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary" /></div> : allNotifications && allNotifications.length > 0 ? (
-                              allNotifications.map(notif => (
-                                <div key={notif.id} className={`p-4 border-b last:border-b-0 ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
-                                  <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
-                                    {notif.isGlobal && <Globe className="inline-block h-4 w-4 mr-2 text-muted-foreground" />}
-                                    {notif.title}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">{notif.body}</p>
-                                  <p className="text-xs text-muted-foreground/80 mt-1">
-                                    {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
-                                  </p>
-                                </div>
-                              ))
+                              <div className="flex flex-col">
+                                {allNotifications.slice(0, 5).map(notif => (
+                                   <div key={notif.id} className={`border-b last:border-b-0 group relative ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
+                                     <Link
+                                       href={getNotificationLink(notif)}
+                                       className="flex items-start gap-2 p-4 pr-10 hover:bg-muted/30 transition-colors"
+                                     >
+                                       <div className="space-y-1 flex-1">
+                                         <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
+                                           {notif.isGlobal && (
+                                             <Badge variant="outline" className="mr-2 h-4 px-1 text-[8px] uppercase tracking-tighter">System</Badge>
+                                           )}
+                                           {notif.title}
+                                         </p>
+                                         <p className="text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
+                                         <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                           {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
+                                         </p>
+                                       </div>
+                                     </Link>
+                                     {!notif.isGlobal && (
+                                       <Button
+                                         variant="ghost"
+                                         size="icon"
+                                         className="absolute top-3 right-3 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           handleDeleteNotification(notif.id, false);
+                                         }}
+                                       >
+                                         <X className="h-3.5 w-3.5" />
+                                         <span className="sr-only">Delete</span>
+                                       </Button>
+                                     )}
+                                   </div>
+                                 ))}
+                                <Button
+                                  variant="ghost"
+                                  className="w-full text-xs font-medium py-3 rounded-none border-t hover:bg-muted/50"
+                                  onClick={() => setIsNotificationsExpanded(true)}
+                                >
+                                  View all ({allNotifications.length})
+                                </Button>
+                              </div>
                             ) : (
-                              <p className="p-4 text-sm text-muted-foreground text-center">No new notifications.</p>
+                              <div className="flex flex-col items-center justify-center h-[200px] text-center p-4">
+                                <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                                <p className="text-sm text-muted-foreground">All caught up!</p>
+                              </div>
                             )}
                           </ScrollArea>
                         </PopoverContent>
@@ -595,6 +675,80 @@ export default function AuthenticatedLayout({
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
         </SidebarProvider>
       </TooltipProvider>
+
+      <Dialog open={isNotificationsExpanded} onOpenChange={setIsNotificationsExpanded}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-2xl">Notifications Center</DialogTitle>
+              <DialogDescription>
+                Stay updated with your business performance, inventory alerts, and system updates.
+              </DialogDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleMarkAsRead} disabled={unreadCount === 0}>
+                Mark all read
+              </Button>
+              <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5" onClick={handleClearAll} disabled={allNotifications.length === 0}>
+                Clear All
+              </Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              {allNotifications.length > 0 ? (
+                <div className="space-y-4">
+                  {allNotifications.map((notif) => (
+                    <Card key={notif.id} className={cn("overflow-hidden border-none shadow-sm transition-all hover:shadow-md", !notif.isGlobal && !notif.read ? 'bg-primary/5 border-l-4 border-l-primary' : 'bg-muted/10')}>
+                      <CardContent className="p-4 flex gap-4">
+                        <div className={cn("h-10 w-10 shrink-0 rounded-full flex items-center justify-center", notif.isGlobal ? 'bg-blue-500/10 text-blue-500' : 'bg-primary/10 text-primary')}>
+                          {notif.isGlobal ? <Globe className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-base">{notif.title}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {notif.body}
+                          </p>
+                          <div className="pt-2 flex items-center gap-3">
+                            <Badge variant="outline" className="text-[10px] font-mono">
+                              {notif.isGlobal ? 'SYSTEM' : 'BUSINESS'}
+                            </Badge>
+                            {!notif.isGlobal && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDeleteNotification(notif.id, false)}
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-[40vh] flex flex-col items-center justify-center text-center">
+                  <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <Bell className="h-10 w-10 text-muted-foreground/20" />
+                  </div>
+                  <h3 className="text-lg font-semibold">No notifications found</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto">
+                    When you have new inventory alerts or sales activity, they will appear here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </ThemeProvider>
   );
 }

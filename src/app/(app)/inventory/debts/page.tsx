@@ -14,7 +14,8 @@ import {
     ShoppingCart,
     Receipt,
     Search,
-    Info
+    Info,
+    RefreshCw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -51,11 +52,18 @@ import { format } from 'date-fns';
 
 export default function DebtsPage() {
     const router = useRouter();
-    const { products, receipts, onlineOrders, currencySymbol, isLoading } = usePOS();
+    const { products, receipts, onlineOrders, currencySymbol, isLoading, triggerRefresh } = usePOS();
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [selectedProductOrders, setSelectedProductOrders] = React.useState<any[] | null>(null);
     const [viewingProductName, setViewingProductName] = React.useState('');
     const [viewingProductId, setViewingProductId] = React.useState('');
+
+    const handleRefresh = React.useCallback(() => {
+        setIsRefreshing(true);
+        triggerRefresh();
+        setTimeout(() => setIsRefreshing(false), 1500);
+    }, [triggerRefresh]);
 
     const debtProducts = React.useMemo(() => {
         if (!products) return [];
@@ -130,6 +138,10 @@ export default function DebtsPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
                     <Button size="sm" variant="outline" asChild>
                         <Link href="/inventory">View All Inventory</Link>
                     </Button>
