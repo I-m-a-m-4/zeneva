@@ -589,21 +589,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const existingItem = cart.find(item => item.product.id === product.id);
 
     if (existingItem) {
-      if (existingItem.quantity >= (product.stock || 0)) {
-        toast({ title: 'Stock limit reached', description: `Cannot add more of ${product.name}.`, variant: 'destructive' }); // Changed to destructive for visibility
-        return;
-      }
       setCart(prev => prev.map(item =>
         item.product.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
-    } else {
-      if ((product.stock || 0) <= 0) {
-        toast({ title: 'Out of Stock', variant: 'destructive' });
-        return;
+
+      if (existingItem.quantity >= (product.stock || 0)) {
+        toast({
+          title: 'Backorder recorded',
+          description: `${product.name} is now being recorded as a debt/backorder.`,
+          variant: 'default'
+        });
       }
+    } else {
       setCart(prev => [...prev, { product, quantity: 1 }]);
+      if ((product.stock || 0) <= 0) {
+        toast({
+          title: 'Backorder started',
+          description: `${product.name} is out of stock. Recording this as a debt.`,
+          variant: 'default'
+        });
+      }
     }
   }, [cart, toast]);
 
@@ -614,9 +621,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!itemInCart) return;
 
     if (quantity > (itemInCart.product.stock || 0)) {
-      toast({ title: 'Stock limit reached', description: `Only ${itemInCart.product.stock} units of ${itemInCart.product.name} available.`, variant: 'destructive' });
-      setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity: itemInCart.product.stock || 0 } : item));
-      return;
+      toast({
+        title: 'Entering Backorder',
+        description: `You are requesting more than the ${itemInCart.product.stock || 0} units available. The difference will be recorded as debt.`,
+      });
     }
 
     if (quantity <= 0) {

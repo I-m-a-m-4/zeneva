@@ -72,8 +72,11 @@ export default function ReviewPage() {
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
             if (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity) {
-                toast({ variant: 'destructive', title: 'Stock Error', description: `Not enough stock for ${cartItem.product.name}. Please adjust the quantity.` });
-                return;
+                toast({
+                    variant: 'default',
+                    title: 'Backorder Sale',
+                    description: `This sale will record a debt as there is insufficient stock for ${cartItem.product.name}.`
+                });
             }
         }
 

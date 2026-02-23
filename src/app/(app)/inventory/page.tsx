@@ -23,6 +23,7 @@ import {
   Loader2,
   Download,
   Barcode as BarcodeIcon,
+  TrendingDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -178,8 +179,9 @@ export default function InventoryPage() {
         const stock = p.stock || 0;
         const lowStockThreshold = p.lowStockThreshold || 5;
         if (stockFilter === 'in-stock') return stock > 0;
-        if (stockFilter === 'out-of-stock') return stock <= 0;
+        if (stockFilter === 'out-of-stock') return stock === 0;
         if (stockFilter === 'low-stock') return stock > 0 && stock <= lowStockThreshold;
+        if (stockFilter === 'debt') return stock < 0;
         return true;
       });
     }
@@ -364,6 +366,7 @@ export default function InventoryPage() {
                     <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
@@ -401,6 +404,14 @@ export default function InventoryPage() {
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
               Import
             </span>
+          </Button>
+          <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
+            <Link href="/inventory/debts">
+              <TrendingDown className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Manage Debts
+              </span>
+            </Link>
           </Button>
           <Button size="sm" asChild className="h-9 gap-1">
             <Link href="/inventory/add">
@@ -512,8 +523,18 @@ export default function InventoryPage() {
                       <div className="text-sm text-muted-foreground">{product.sku}</div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={(product.stock || 0) > 0 ? "outline" : "destructive"} className="whitespace-nowrap">
-                        {(product.stock || 0) > 0 ? "In Stock" : "Out of Stock"}
+                      <Badge
+                        variant={
+                          (product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" :
+                            (product.stock || 0) > 0 ? "secondary" :
+                              (product.stock || 0) < 0 ? "destructive" : "destructive"
+                        }
+                        className={cn(
+                          "whitespace-nowrap",
+                          (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                        )}
+                      >
+                        {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
                       </Badge>
                     </TableCell>
                     {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}

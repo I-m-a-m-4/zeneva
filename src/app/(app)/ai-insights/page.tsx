@@ -6,7 +6,7 @@ import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportuni
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { usePOS } from "@/context/pos-context";
-import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search, ShoppingBasket } from "lucide-react";
+import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search, ShoppingBasket, TrendingDown, Info } from "lucide-react";
 import React, { useState, useTransition, useEffect, useMemo } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
@@ -541,6 +541,47 @@ function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, c
         </Dialog>
     );
 }
+
+
+const PredictiveDebtInsightCard = ({ products, currencySymbol }: { products: Product[], currencySymbol: string }) => {
+    const debtProducts = useMemo(() => products?.filter(p => (p.stock || 0) < 0) || [], [products]);
+    const totalDebtValue = useMemo(() => debtProducts.reduce((acc, p) => acc + (Math.abs(p.stock || 0) * p.price), 0), [debtProducts]);
+
+    if (debtProducts.length === 0) return null;
+
+    return (
+        <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-primary">
+                    <TrendingDown className="h-5 w-5" />
+                    Backorder Revenue Opportunity
+                </CardTitle>
+                <CardDescription className="text-primary/70">
+                    AI identified unfulfilled demand that can be converted to immediate revenue.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                        <Info className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm">
+                            You have <span className="font-bold">{debtProducts.length}</span> products with negative stock.
+                            Restocking these items would satisfy current customer "debts" and immediately realize
+                            <span className="font-bold text-lg ml-1">{currencySymbol}{totalDebtValue.toLocaleString()}</span> in revenue.
+                        </p>
+                        <div className="flex gap-2 mt-4">
+                            <Button size="sm" variant="default" asChild>
+                                <Link href="/inventory/debts">Manage Debts</Link>
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
 
 // --- New UI Card Components ---
@@ -1130,6 +1171,8 @@ function ExecutiveBriefingTab() {
                             onProductClick={(p) => setDetailProduct(p)}
                             currencySymbol={currencySymbol}
                         />
+
+                        <PredictiveDebtInsightCard products={products || []} currencySymbol={currencySymbol} />
 
                         <SmartStockRecommendationCard
                             recommendations={displayData.smartStockRecommendations || []}
