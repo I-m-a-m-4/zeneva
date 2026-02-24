@@ -34,12 +34,14 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
 
   const resetForm = () => {
     setName('');
     setEmail('');
     setPhone('');
+    setCode('');
     setIsSaving(false);
   };
 
@@ -70,12 +72,21 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
       }
     }
 
+    if (code) {
+      const codeExists = customers?.some(customer => customer.code?.toLowerCase() === code.toLowerCase());
+      if (codeExists) {
+        toast({ title: 'Duplicate Code', description: 'A customer with this unique code already exists.', variant: 'destructive' });
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await addDoc(collection(firestore, 'customers'), {
         name,
         email,
         phone,
+        code: code.trim().toUpperCase(),
         businessId,
         loyaltyPoints: 0,
         createdAt: serverTimestamp(),
@@ -100,7 +111,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
 
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add New Customer</DialogTitle>
           <DialogDescription>
@@ -114,12 +125,16 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">Email (Optional)</Label>
+              <Label htmlFor="email" className="text-right">Email <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Phone (Optional)</Label>
+              <Label htmlFor="phone" className="text-right">Phone <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CUST-001" className="col-span-3" />
             </div>
           </div>
           <DialogFooter>

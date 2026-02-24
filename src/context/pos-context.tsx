@@ -5,7 +5,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 
@@ -390,17 +390,51 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchCustomers = useCallback(async (term: string) => {
     if (!term.trim() || !businessId || !firestore) return [];
     try {
-      // Basic prefix search
-      const q = query(
+      const lowerTerm = term.toLowerCase();
+      const upperTerm = term.toUpperCase();
+
+      // Search by name prefix
+      const nameQuery = query(
         collection(firestore, 'customers'),
         where('businessId', '==', businessId),
         where('name', '>=', term),
         where('name', '<=', term + '\uf8ff'),
         limit(20)
       );
-      const snapshot = await getDocs(q);
-      const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-      return results;
+
+      // Search by code prefix
+      const codeQuery = query(
+        collection(firestore, 'customers'),
+        where('businessId', '==', businessId),
+        where('code', '>=', upperTerm),
+        where('code', '<=', upperTerm + '\uf8ff'),
+        limit(20)
+      );
+
+      // Search by email prefix
+      const emailQuery = query(
+        collection(firestore, 'customers'),
+        where('businessId', '==', businessId),
+        where('email', '>=', lowerTerm),
+        where('email', '<=', lowerTerm + '\uf8ff'),
+        limit(20)
+      );
+
+      const [nameSnap, codeSnap, emailSnap] = await Promise.all([
+        getDocs(nameQuery),
+        getDocs(codeQuery),
+        getDocs(emailQuery)
+      ]);
+
+      const nameResults = nameSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+      const codeResults = codeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+      const emailResults = emailSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+
+      // Merge and remove duplicates
+      const combined = [...nameResults, ...codeResults, ...emailResults];
+      const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
+
+      return uniqueResults.slice(0, 20);
     } catch (e) {
       console.error("Error searching customers:", e);
       return [];

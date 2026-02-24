@@ -186,7 +186,7 @@ export default function CustomersPage() {
               <div className="relative mt-2 max-w-sm">
                 <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search customers..."
+                  placeholder="Search by name, email, or unique code..."
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
@@ -224,6 +224,7 @@ export default function CustomersPage() {
                 <TableRow>
                   <TableHead className="w-12"><Checkbox disabled /></TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Code</TableHead>
                   <TableHead className="hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
                   <TableHead className="text-right">Total Spent</TableHead>
@@ -247,6 +248,7 @@ export default function CustomersPage() {
                     />
                   </TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Code</TableHead>
                   <TableHead className="hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="hidden md:table-cell">
                     <div className="flex items-center gap-1.5">
@@ -277,6 +279,11 @@ export default function CustomersPage() {
                           {customer.name}
                         </div>
                         <div className="text-sm text-muted-foreground">{customer.email}</div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {customer.code ? (
+                          <span className="font-mono text-xs font-bold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{customer.code}</span>
+                        ) : 'N/A'}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>

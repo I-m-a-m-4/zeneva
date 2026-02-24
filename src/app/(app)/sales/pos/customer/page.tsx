@@ -30,6 +30,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [phone, setPhone] = React.useState('');
+    const [code, setCode] = React.useState('');
     const [isSaving, setIsSaving] = React.useState(false);
 
     const handleSave = async (e: React.FormEvent) => {
@@ -55,12 +56,21 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             }
         }
 
+        if (code) {
+            const codeExists = customers?.some(c => c.code?.toLowerCase() === code.toLowerCase());
+            if (codeExists) {
+                toast({ title: 'Duplicate Code', description: 'A customer with this unique code already exists.', variant: 'destructive' });
+                return;
+            }
+        }
+
         setIsSaving(true);
         try {
             await addDoc(collection(firestore, 'customers'), {
                 name,
                 email,
                 phone,
+                code: code.trim().toUpperCase(),
                 businessId,
                 loyaltyPoints: 0,
                 createdAt: serverTimestamp(),
@@ -83,12 +93,16 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="email" className="text-right">Email (Optional)</label>
+                    <label htmlFor="email" className="text-right">Email <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
                     <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="phone" className="text-right">Phone (Optional)</label>
+                    <label htmlFor="phone" className="text-right">Phone <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
                     <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
+                    <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. VIP-001" className="col-span-3" />
                 </div>
             </div>
             <DialogFooter>
@@ -146,7 +160,7 @@ export default function CustomerPage() {
                             <div className="relative w-full">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search customers by name or email..."
+                                    placeholder="Search by name, email, or unique code..."
                                     className="pl-8"
                                     value={searchTerm}
                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
@@ -158,7 +172,7 @@ export default function CustomerPage() {
                                         <PlusCircle className="mr-2 h-4 w-4" /> Add New
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-[425px]">
+                                <DialogContent className="sm:max-w-[500px]">
                                     <DialogHeader>
                                         <DialogTitle>Add New Customer</DialogTitle>
                                         <DialogDescription>
@@ -183,7 +197,10 @@ export default function CustomerPage() {
                                     <Card className={selectedCustomer?.id === customer.id ? "border-primary" : ""}>
                                         <CardContent className="p-3 flex items-center justify-between">
                                             <div>
-                                                <p className="font-medium">{customer.name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium">{customer.name}</p>
+                                                    {customer.code && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono font-bold text-muted-foreground">{customer.code}</span>}
+                                                </div>
                                                 <p className="text-sm text-muted-foreground">{customer.email}</p>
                                             </div>
                                             {selectedCustomer?.id === customer.id && <UserCheck className="h-5 w-5 text-primary" />}

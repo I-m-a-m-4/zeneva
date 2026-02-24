@@ -993,7 +993,7 @@ function ExecutiveBriefingTab() {
         const productSales: Record<string, { name: string; revenue: number; unitsSold: number; salesTimestamps: Date[] }> = {};
 
         recentSales.forEach(sale => {
-            const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(s.createdAt);
+            const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
 
             sale.items.forEach(item => {
                 if (!productSales[item.productId]) {

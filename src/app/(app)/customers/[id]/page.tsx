@@ -177,7 +177,7 @@ export default function CustomerDetailPage() {
                 <Card className="md:col-span-1 flex flex-col">
                     <CardHeader className="flex flex-col items-center text-center">
                         <Avatar className="h-24 w-24 mb-4 text-3xl">
-                            <AvatarFallback>{customer.name.split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
+                            <AvatarFallback>{customer.name ? customer.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : 'U'}</AvatarFallback>
                         </Avatar>
                         <CardTitle>{customer.name}</CardTitle>
                         <CardDescription>{customer.email}</CardDescription>
@@ -269,7 +269,7 @@ export default function CustomerDetailPage() {
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> AI Summary</h3>
-                                <p className="text-muted-foreground prose prose-sm">{insights.summary}</p>
+                                <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: insights.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></div>
                             </div>
                             <Separator />
                             <div>

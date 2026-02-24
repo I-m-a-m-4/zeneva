@@ -55,6 +55,7 @@ export interface Customer {
     name: string;
     email: string;
     phone?: string;
+    code?: string;
     loyaltyPoints?: number;
     createdAt?: any;
     updatedAt?: any;

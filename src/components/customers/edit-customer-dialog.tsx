@@ -33,6 +33,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -40,6 +41,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
       setName(customer.name);
       setEmail(customer.email);
       setPhone(customer.phone || '');
+      setCode(customer.code || '');
     }
   }, [customer]);
 
@@ -58,6 +60,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
         name,
         email,
         phone,
+        code: code.trim().toUpperCase(),
         updatedAt: serverTimestamp(),
       });
       toast({ title: 'Customer Updated', description: `${name} has been updated.`, variant: 'success' });
@@ -72,7 +75,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Edit Customer</DialogTitle>
           <DialogDescription>
@@ -86,12 +89,16 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">Email (Optional)</Label>
+              <Label htmlFor="email" className="text-right">Email <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Phone (Optional)</Label>
+              <Label htmlFor="phone" className="text-right">Phone <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CUST-001" className="col-span-3" />
             </div>
           </div>
           <DialogFooter>

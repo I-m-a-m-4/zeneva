@@ -22,13 +22,14 @@ interface ImportCustomersDialogProps {
   existingCustomers: Customer[];
 }
 
-type ParsedCustomer = Partial<Pick<Customer, 'name' | 'email' | 'phone'>>;
+type ParsedCustomer = Partial<Pick<Customer, 'name' | 'email' | 'phone' | 'code'>>;
 type ParsedCustomerWithEmail = ParsedCustomer & { email: string; };
 
 const HEADER_MAPPINGS: { [key: string]: string[] } = {
   name: ['name', 'Name', 'Full Name', 'Customer Name'],
   email: ['email', 'Email', 'Email Address'],
   phone: ['phone', 'Phone', 'Phone Number', 'Mobile'],
+  code: ['code', 'Code', 'Unique Code', 'Customer Code', 'ID'],
 };
 
 export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess, businessId, existingCustomers }: ImportCustomersDialogProps) {
@@ -74,6 +75,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           name: findHeader(HEADER_MAPPINGS.name),
           email: findHeader(HEADER_MAPPINGS.email),
           phone: findHeader(HEADER_MAPPINGS.phone),
+          code: findHeader(HEADER_MAPPINGS.code),
         };
 
         if (!mappedHeaders.name) {
@@ -86,6 +88,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           name: row[mappedHeaders.name!] || undefined,
           email: mappedHeaders.email ? row[mappedHeaders.email] || undefined : undefined,
           phone: mappedHeaders.phone ? String(row[mappedHeaders.phone] || '') : undefined,
+          code: mappedHeaders.code ? String(row[mappedHeaders.code] || '').trim().toUpperCase() : undefined,
         }));
 
         const validData = data.filter(d => d.name);
@@ -161,6 +164,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           name: customerData.name,
           email: customerData.email,
           phone: customerData.phone || '',
+          code: customerData.code || '',
           businessId,
           loyaltyPoints: 0,
           createdAt: serverTimestamp(),
@@ -262,6 +266,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Code</TableHead>
                         <TableHead>Phone</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -270,6 +275,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
                         <TableRow key={i}>
                           <TableCell>{p.name}</TableCell>
                           <TableCell>{p.email}</TableCell>
+                          <TableCell>{p.code || 'N/A'}</TableCell>
                           <TableCell>{p.phone || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
