@@ -47,27 +47,32 @@ const CartContents = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {cart.map(item => (
-                        <div key={item.product.id} className="flex justify-between items-center">
-                            <div>
-                                <p className="font-medium text-sm">{item.product.name}</p>
-                                <p className="text-xs text-muted-foreground">{currencySymbol}{item.product.price.toLocaleString()}</p>
+                    {cart.map(item => {
+                        const cartItemId = item.unit ? `${item.product.id}-${item.unit}` : item.product.id;
+                        return (
+                            <div key={cartItemId} className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-medium text-sm">
+                                        {item.product.name}
+                                        {item.unit && <Badge variant="secondary" className="ml-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{currencySymbol}{item.product.price.toLocaleString()}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => updateQuantity(cartItemId, parseInt(e.target.value))}
+                                        className="w-16 h-8"
+                                        min="1"
+                                    />
+                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(cartItemId)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="number"
-                                    value={item.quantity}
-                                    onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value))}
-                                    className="w-16 h-8"
-                                    min="1"
-                                    max={item.product.stock}
-                                />
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(item.product.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     <Separator />
                     <div className="flex justify-between font-semibold">
                         <span>Subtotal</span>
@@ -206,10 +211,45 @@ export default function SelectProductsPage() {
                                         <CardTitle className="text-sm font-medium leading-snug">{product.name}</CardTitle>
                                     </CardHeader>
                                     <CardFooter className="p-2 flex justify-between items-center mt-auto">
-                                        <span className="text-sm font-semibold">{currencySymbol}{product.price.toLocaleString()}</span>
-                                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleAddToCart(product)}>
-                                            <PlusCircle className="h-4 w-4" />
-                                        </Button>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold">{currencySymbol}{product.price.toLocaleString()}</span>
+                                            {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
+                                        </div>
+
+                                        {product.uomConversions && product.uomConversions.length > 0 ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button size="icon" variant="outline" className="h-7 w-7">
+                                                        <PlusCircle className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Select Unit</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuRadioGroup onValueChange={(unit) => {
+                                                        if (unit === 'base') {
+                                                            handleAddToCart(product);
+                                                        } else {
+                                                            const uom = product.uomConversions?.find(u => u.unitName === unit);
+                                                            if (uom) {
+                                                                addToCart(product, uom.unitName, uom.multiplier, uom.price);
+                                                            }
+                                                        }
+                                                    }}>
+                                                        <DropdownMenuRadioItem value="base">1 {product.baseUnit || 'Piece'} ({currencySymbol}{product.price.toLocaleString()})</DropdownMenuRadioItem>
+                                                        {product.uomConversions.map((uom) => (
+                                                            <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
+                                                                1 {uom.unitName} ({uom.multiplier} {product.baseUnit || 'pcs'}) - {currencySymbol}{(uom.price || product.price).toLocaleString()}
+                                                            </DropdownMenuRadioItem>
+                                                        ))}
+                                                    </DropdownMenuRadioGroup>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : (
+                                            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleAddToCart(product)}>
+                                                <PlusCircle className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </CardFooter>
                                 </Card>
                             ))}

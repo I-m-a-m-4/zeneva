@@ -32,9 +32,9 @@ interface POSContextType {
 
   // POS State
   cart: CartItem[];
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => void;
+  removeFromCart: (cartItemId: string) => void;
+  updateQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
   selectedCustomer: Customer | null;
   selectCustomer: (customer: Customer | null) => void;
@@ -636,25 +636,30 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencyCode = business?.settings?.currency || 'NGN';
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
-  const addToCart = useCallback((product: Product) => {
-    const existingItem = cart.find(item => item.product.id === product.id);
+  const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
+    // Unique key for cart item: product.id + unit (if any)
+    const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
+    const existingItem = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
 
     if (existingItem) {
       setCart(prev => prev.map(item =>
-        item.product.id === product.id
+        (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
 
-      if (existingItem.quantity >= (product.stock || 0)) {
+      // Stock check logic remains same but consider multiplier
+      const totalQuantityInBaseUnit = (existingItem.quantity + 1) * (multiplier || 1);
+      if (totalQuantityInBaseUnit > (product.stock || 0)) {
         toast({
           title: 'Backorder recorded',
-          description: `${product.name} is now being recorded as a debt/backorder.`,
+          description: `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`,
           variant: 'default'
         });
       }
     } else {
-      setCart(prev => [...prev, { product, quantity: 1 }]);
+      const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
+      setCart(prev => [...prev, { product: finalProduct, quantity: 1, unit: unitName, multiplier }]);
       if ((product.stock || 0) <= 0) {
         toast({
           title: 'Backorder started',
@@ -665,23 +670,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [cart, toast]);
 
-  const removeFromCart = (productId: string) => setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (cartItemId: string) => setCart(prev => prev.filter(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) !== cartItemId));
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    const itemInCart = cart.find(item => item.product.id === productId);
+  const updateQuantity = (cartItemId: string, quantity: number) => {
+    const itemInCart = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
     if (!itemInCart) return;
 
-    if (quantity > (itemInCart.product.stock || 0)) {
+    const multiplier = itemInCart.multiplier || 1;
+    if (quantity * multiplier > (itemInCart.product.stock || 0)) {
       toast({
         title: 'Entering Backorder',
-        description: `You are requesting more than the ${itemInCart.product.stock || 0} units available. The difference will be recorded as debt.`,
+        description: `You are requesting more than the ${itemInCart.product.stock || 0} units available. This will be recorded as debt.`,
       });
     }
 
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(cartItemId);
     } else {
-      setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity } : item));
+      setCart(prev => prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity } : item));
     }
   };
 

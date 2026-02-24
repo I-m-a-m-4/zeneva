@@ -9,8 +9,16 @@ import {
     ChevronLeft,
     Upload,
     Loader2,
-    Barcode as BarcodeIcon
+    Barcode as BarcodeIcon,
+    Plus,
+    Trash,
+    Layers,
 } from "lucide-react";
+import { useFieldArray } from "react-hook-form";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { FormDescription } from "@/components/ui/form";
 import BarcodeDisplay from 'react-barcode';
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +56,19 @@ const productSchema = z.object({
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
     sku: z.string().optional(),
     category: z.string().optional(),
+
+    // Advanced Features
+    type: z.enum(['single', 'variant', 'composite']).default('single'),
+    baseUnit: z.string().optional(),
+    uomConversions: z.array(z.object({
+        unitName: z.string().min(1, "Unit name required"),
+        multiplier: z.coerce.number().min(1, "Multiplier must be at least 1"),
+        price: z.coerce.number().optional()
+    })).optional(),
+    components: z.array(z.object({
+        productId: z.string().min(1, "Product required"),
+        quantity: z.coerce.number().min(1, "Quantity required")
+    })).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -108,8 +129,33 @@ export default function EditProductPage() {
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
-        defaultValues: { name: "", description: "", price: 0, costPrice: 0, stock: 0, sku: "", category: "" },
+        defaultValues: {
+            name: "",
+            description: "",
+            price: 0,
+            costPrice: 0,
+            stock: 0,
+            sku: "",
+            category: "",
+            type: "single",
+            baseUnit: "Piece",
+            uomConversions: [],
+            components: [],
+        },
     });
+
+    const { fields: uomFields, append: appendUom, remove: removeUom } = useFieldArray({
+        control: form.control,
+        name: "uomConversions"
+    });
+
+    const { fields: componentFields, append: appendComponent, remove: removeComponent } = useFieldArray({
+        control: form.control,
+        name: "components"
+    });
+
+    const productType = form.watch("type");
+    const { products } = usePOS();
 
     React.useEffect(() => {
         if (product) {
@@ -260,6 +306,171 @@ export default function EditProductPage() {
                                         )}
                                     />
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Inventory Configuration</CardTitle>
+                                <CardDescription>Configure how this item is organized and sold.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <FormField
+                                    control={form.control}
+                                    name="type"
+                                    render={({ field }) => (
+                                        <FormItem className="space-y-3">
+                                            <FormLabel>Product Type</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                    className="flex flex-col sm:flex-row gap-4"
+                                                    disabled={!canManageProduct}
+                                                >
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                            <RadioGroupItem value="single" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">Standard Item</FormLabel>
+                                                    </FormItem>
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                            <RadioGroupItem value="composite" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">Composite (Bundle)</FormLabel>
+                                                    </FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                            <FormDescription>
+                                                {productType === 'composite' ? "This item is built from other products. Stock is automatically managed." : "Standard individual product with its own stock."}
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <Separator />
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel>Units of Measure (UoM)</FormLabel>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })} disabled={!canManageProduct}>
+                                            <Plus className="h-4 w-4 mr-2" /> Add UoM
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            control={form.control}
+                                            name="baseUnit"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-xs">Base Unit</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="e.g. Piece" {...field} disabled={!canManageProduct} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+
+                                    {uomFields.map((field, index) => (
+                                        <div key={field.id} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end p-3 border rounded-lg bg-muted/30">
+                                            <FormField
+                                                control={form.control}
+                                                name={`uomConversions.${index}.unitName`}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="text-xs">Unit Name</FormLabel>
+                                                        <FormControl><Input placeholder="e.g. Carton" {...field} disabled={!canManageProduct} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name={`uomConversions.${index}.multiplier`}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="text-xs">Contains (multiplier)</FormLabel>
+                                                        <FormControl><Input type="number" {...field} disabled={!canManageProduct} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <div className="flex gap-2">
+                                                <FormField
+                                                    control={form.control}
+                                                    name={`uomConversions.${index}.price`}
+                                                    render={({ field }) => (
+                                                        <FormItem className="flex-1">
+                                                            <FormLabel className="text-xs">Price (Opt.)</FormLabel>
+                                                            <FormControl><Input type="number" placeholder="Override" {...field} disabled={!canManageProduct} /></FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeUom(index)} className="text-destructive" disabled={!canManageProduct}><Trash className="h-4 w-4" /></Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {productType === 'composite' && (
+                                    <>
+                                        <Separator />
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <FormLabel>Composite Components</FormLabel>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => appendComponent({ productId: "", quantity: 1 })} disabled={!canManageProduct}>
+                                                    <Plus className="h-4 w-4 mr-2" /> Add Component
+                                                </Button>
+                                            </div>
+                                            <FormDescription>Select products that make up this bundle.</FormDescription>
+
+                                            {componentFields.map((field, index) => (
+                                                <div key={field.id} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end p-3 border rounded-lg bg-muted/30">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`components.${index}.productId`}
+                                                        render={({ field }) => (
+                                                            <FormItem className="sm:col-span-3">
+                                                                <FormLabel className="text-xs">Product</FormLabel>
+                                                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canManageProduct}>
+                                                                    <FormControl>
+                                                                        <SelectTrigger>
+                                                                            <SelectValue placeholder="Select component" />
+                                                                        </SelectTrigger>
+                                                                    </FormControl>
+                                                                    <SelectContent>
+                                                                        {products?.filter(p => (!p.type || p.type === 'single') && p.id !== productId).map(p => (
+                                                                            <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`components.${index}.quantity`}
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormLabel className="text-xs">Qty</FormLabel>
+                                                                <FormControl><Input type="number" {...field} disabled={!canManageProduct} /></FormControl>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeComponent(index)} className="text-destructive" disabled={!canManageProduct}><Trash className="h-4 w-4" /></Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </CardContent>
                         </Card>
                         <Card>

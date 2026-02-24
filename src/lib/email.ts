@@ -49,6 +49,7 @@ export interface ReceiptEmailParams {
     tax: string;
     discount: string;
     total: string;
+    payment_method: string;
     date: string;
 }
 

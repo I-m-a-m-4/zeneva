@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Eye, Inbox, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
+import { Eye, Inbox, MoreHorizontal, Trash2, Loader2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useFirestore } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
 import type { Receipt } from '@/types';
@@ -48,8 +49,21 @@ export default function ReceiptsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const [searchTerm, setSearchTerm] = React.useState('');
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const filteredReceiptsList = React.useMemo(() => {
+    if (!receipts) return [];
+    return receipts
+      .filter(r => r.paymentMethod !== 'Invoice')
+      .filter(r => {
+        const searchLower = searchTerm.toLowerCase();
+        const receiptId = r.id.toLowerCase();
+        const customerName = (r.customer?.name || 'walk-in').toLowerCase();
+        return receiptId.includes(searchLower) || customerName.includes(searchLower);
+      });
+  }, [receipts, searchTerm]);
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;
@@ -120,12 +134,23 @@ export default function ReceiptsPage() {
     <>
       <Card className="w-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle>Transaction History</CardTitle>
               <CardDescription>A log of all completed sales.</CardDescription>
             </div>
-            <RefreshButton />
+            <div className="flex items-center gap-4">
+              <div className="relative w-full sm:w-64 no-print">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search sales..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <RefreshButton />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -149,7 +174,7 @@ export default function ReceiptsPage() {
                 <ReceiptRowSkeleton />
               </TableBody>
             </Table>
-          ) : receipts && receipts.length > 0 ? (
+          ) : filteredReceiptsList && filteredReceiptsList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -162,7 +187,7 @@ export default function ReceiptsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {receipts.map((receipt) => (
+                {filteredReceiptsList.map((receipt) => (
                   <TableRow key={receipt.id}>
                     <TableCell className="font-medium">{receipt.id.substring(0, 8)}...</TableCell>
                     <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>

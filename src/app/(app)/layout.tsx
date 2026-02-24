@@ -69,6 +69,7 @@ const navItems = [
   { href: '/storefront', icon: Paintbrush, label: 'Storefront', roles: ['admin'] },
   { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
   { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager'] },
+  { href: '/invoices', icon: FileDigit, label: 'Invoices', roles: ['admin', 'manager'] },
   { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
   { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
   { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -134,7 +135,8 @@ export default function AuthenticatedLayout({
     triggerConfetti,
     setIsConfettiActive,
     products,
-    queuedActions
+    queuedActions,
+    isSubscriptionActive
   } = usePOS();
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
@@ -265,6 +267,7 @@ export default function AuthenticatedLayout({
       '/storefront': ['admin'],
       '/online-orders': ['admin', 'manager'],
       '/receipts': ['admin', 'manager'],
+      '/invoices': ['admin', 'manager'],
       '/reports': ['admin', 'manager'],
       '/ai-insights': ['admin', 'manager'],
       '/customers': ['admin', 'manager', 'vendor_operator'],
@@ -382,10 +385,9 @@ export default function AuthenticatedLayout({
   }
 
   // --- Subscription Guard Configuration ---
-  const { isSubscriptionActive, isLoading: isPosLoading } = usePOS();
   const restrictedRoutes = ['/sales', '/storefront', '/ai-insights', '/customers', '/inventory', '/reports', '/receipts', '/online-orders', '/audit-log'];
   const isRestrictedRoute = restrictedRoutes.some(route => pathname.startsWith(route));
-  const showSubscriptionBlock = !isSubscriptionActive && isRestrictedRoute && !isLoading && !isPosLoading;
+  const showSubscriptionBlock = !isSubscriptionActive && isRestrictedRoute && !isLoading;
   // --- End of Subscription Guard Config ---
 
   const userRole = currentUserProfile?.role;

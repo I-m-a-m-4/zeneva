@@ -58,7 +58,8 @@ export default function ReviewPage() {
         tax,
         discount,
         total,
-        paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer',
+        paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
+        status: (paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid')) as 'pending' | 'unpaid' | 'paid',
         createdAt: new Date(), // Use a real date for optimistic display
     };
 
@@ -101,14 +102,36 @@ export default function ReviewPage() {
                 const itemsForReceipt = cart.map(cartItem => {
                     const product = products.find(p => p.id === cartItem.product.id);
                     const costPrice = product?.costPrice || 0;
+                    const multiplier = cartItem.multiplier || 1;
+                    const baseQuantitySold = cartItem.quantity * multiplier;
+
                     totalCost += costPrice * cartItem.quantity;
-                    const productRef = doc(firestore, 'products', cartItem.product.id);
-                    const newStock = (product?.stock || 0) - cartItem.quantity;
-                    batch.update(productRef, { stock: newStock });
+
+                    // --- Stock Logic ---
+                    if (product?.type === 'composite' && product.components) {
+                        // For composite items, decrement EACH component's stock
+                        product.components.forEach(component => {
+                            const componentProduct = products.find(p => p.id === component.productId);
+                            if (componentProduct) {
+                                const componentRef = doc(firestore, 'products', component.productId);
+                                const decrementAmount = component.quantity * cartItem.quantity;
+                                const newCompStock = (componentProduct.stock || 0) - decrementAmount;
+                                batch.update(componentRef, { stock: newCompStock, updatedAt: serverTimestamp() });
+                            }
+                        });
+                    } else {
+                        // For single items or variants, decrement the product's own stock
+                        const productRef = doc(firestore, 'products', cartItem.product.id);
+                        const newStock = (product?.stock || 0) - baseQuantitySold;
+                        batch.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
+                    }
+
                     return {
                         productId: cartItem.product.id,
-                        name: cartItem.product.name,
+                        name: cartItem.unit ? `${cartItem.product.name} (${cartItem.unit})` : cartItem.product.name,
                         quantity: cartItem.quantity,
+                        unit: cartItem.unit || null,
+                        multiplier: multiplier,
                         price: cartItem.product.price,
                         costPrice: costPrice,
                     };
@@ -124,12 +147,15 @@ export default function ReviewPage() {
                     batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
                 }
 
+                const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
+
                 const receiptData = {
                     businessId: business.id,
                     receiptNumber: displayReceipt.receiptNumber,
                     items: itemsForReceipt,
                     customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
                     subtotal, tax, discount, total, totalCost, profit, paymentMethod,
+                    status,
                     createdAt: serverTimestamp(),
                     createdBy: user.uid,
                 };
@@ -145,7 +171,11 @@ export default function ReviewPage() {
                 });
 
                 // Move navigation at the end
-                router.push(`/receipts/${newReceiptRef.id}`);
+                if (paymentMethod === 'Invoice') {
+                    router.push(`/invoice/${newReceiptRef.id}`);
+                } else {
+                    router.push(`/receipts/${newReceiptRef.id}`);
+                }
                 resetPOS();
 
                 if (navigator.onLine) {
@@ -191,6 +221,7 @@ export default function ReviewPage() {
                         tax: numberFormat.format(tax),
                         discount: numberFormat.format(discount),
                         total: numberFormat.format(total),
+                        payment_method: paymentMethod,
                         date: new Date().toLocaleString('en-US', {
                             weekday: 'short',
                             year: 'numeric',
@@ -260,9 +291,9 @@ export default function ReviewPage() {
                     )}
 
                     <div className="flex flex-col gap-2 pt-2">
-                        <Button size="lg" className="w-full" onClick={handleCompleteSale} disabled={isCompleting}>
-                            {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isCompleting ? 'Processing...' : 'Complete Sale'}
+                        <Button size="lg" className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all" onClick={handleCompleteSale} disabled={isCompleting}>
+                            {isCompleting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                            {isCompleting ? 'Finalizing...' : (paymentMethod === 'Invoice' ? 'Issue Professional Invoice' : 'Complete Sale')}
                         </Button>
                         <Button size="lg" className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/payment">Back to Payment</Link>

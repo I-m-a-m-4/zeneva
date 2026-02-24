@@ -16,11 +16,26 @@ export interface Product {
     createdAt?: any;
     updatedAt?: any;
     expiryDate?: any;
+
+    // --- Premium Inventory Features ---
+    type?: 'single' | 'variant' | 'composite';
+    parentId?: string; // For variants, references the main template product
+    variantName?: string; // e.g., 'Size'
+    variantValue?: string; // e.g., 'Large'
+    components?: { productId: string; quantity: number }[]; // For composite items
+    baseUnit?: string; // e.g., 'Piece'
+    uomConversions?: {
+        unitName: string; // e.g., 'Carton'
+        multiplier: number; // e.g., 24
+        price?: number; // Optional override price for this UoM
+    }[];
 }
 export type InventoryItem = Product;
 export interface CartItem {
     product: Product;
     quantity: number;
+    unit?: string;
+    multiplier?: number;
 }
 
 export type TopSellingItem = Product & {
@@ -80,7 +95,8 @@ export interface Receipt {
     total: number;
     totalCost?: number;
     profit?: number;
-    paymentMethod: 'Cash' | 'Card' | 'Bank Transfer';
+    paymentMethod: 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice';
+    status?: 'paid' | 'unpaid' | 'pending';
     createdAt: any; // Can be a Date or a Firestore Timestamp
     createdBy?: string;
 }

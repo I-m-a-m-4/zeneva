@@ -24,6 +24,8 @@ import {
   Download,
   Barcode as BarcodeIcon,
   TrendingDown,
+  Layers,
+  Box,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -521,10 +523,20 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium whitespace-normal">
                       <div className="flex items-center gap-2">
-                        <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline", (product as any).isOptimistic && "pointer-events-none")}>{product.name}</Link>
+                        <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
+                          {product.name}
+                        </Link>
+                        {product.type === 'composite' && (
+                          <Badge variant="outline" className="text-[10px] h-4 bg-primary/5 text-primary border-primary/20 gap-1 px-1">
+                            <Layers className="h-2 w-2" /> Bundle
+                          </Badge>
+                        )}
                         {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">Saving...</Badge>}
                       </div>
-                      <div className="text-sm text-muted-foreground">{product.sku}</div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                        <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
+                        {product.baseUnit && <span className="text-[10px]">• Sold in {product.baseUnit}</span>}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge

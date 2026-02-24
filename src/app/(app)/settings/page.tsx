@@ -156,6 +156,7 @@ function SettingsPageContent() {
     const [paymentBankCode, setPaymentBankCode] = React.useState('');
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
     const [paymentAccountName, setPaymentAccountName] = React.useState('');
+    const [paymentInstructions, setPaymentInstructions] = React.useState('');
 
     // Loyalty state
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
@@ -187,6 +188,7 @@ function SettingsPageContent() {
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');
             setPaymentAccountName(business.settings?.paymentAccountName || '');
+            setPaymentInstructions(business.settings?.paymentInstructions || '');
 
             setLoyaltyEnabled(business.settings.loyaltyProgramEnabled || false);
             setPointsPerUnit(String(business.settings.pointsPerUnit || 1));
@@ -461,11 +463,22 @@ function SettingsPageContent() {
                                     <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account</Button>
                                 </div>
                                 {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted" /></div>}
+                                <div>
+                                    <Label htmlFor="paymentInstructions">Payment Instructions / Invoice Notes</Label>
+                                    <Textarea
+                                        id="paymentInstructions"
+                                        placeholder="e.g. Please include your Invoice ID as the payment reference. Thank you!"
+                                        value={paymentInstructions}
+                                        onChange={e => setPaymentInstructions(e.target.value)}
+                                        className="h-20"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName })} disabled={isSaving["financials"]}>
+                        <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Financials
                         </Button>
                     </CardFooter>

@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Banknote, CreditCard, Landmark, Loader2 } from "lucide-react";
+import { Banknote, CreditCard, Landmark, Loader2, FileText } from "lucide-react";
 import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
 
@@ -24,9 +24,9 @@ export default function PaymentPage() {
         setIsNavigating(true);
         router.push('/sales/pos/review');
     };
-    
+
     return (
-         <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
                 <Card>
                     <CardHeader>
@@ -34,36 +34,56 @@ export default function PaymentPage() {
                         <CardDescription>Select how the customer will pay.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid sm:grid-cols-3 gap-4">
+                        <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <Label htmlFor="cash" className="cursor-pointer">
-                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Cash' ? 'border-primary' : ''} hover:border-primary hover:bg-muted transition-colors`}>
-                                    <RadioGroupItem value="Cash" id="cash" className="sr-only"/>
+                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Cash' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
+                                    <RadioGroupItem value="Cash" id="cash" className="sr-only" />
                                     <Banknote className="h-8 w-8 mb-2" />
-                                    Cash
+                                    <span className="font-semibold text-sm">Cash</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">Direct Cash Payment</span>
                                 </Card>
                             </Label>
-                             <Label htmlFor="card" className="cursor-pointer">
-                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Card' ? 'border-primary' : ''} hover:border-primary hover:bg-muted transition-colors`}>
-                                    <RadioGroupItem value="Card" id="card" className="sr-only"/>
+                            <Label htmlFor="card" className="cursor-pointer">
+                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Card' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
+                                    <RadioGroupItem value="Card" id="card" className="sr-only" />
                                     <CreditCard className="h-8 w-8 mb-2" />
-                                    Card
+                                    <span className="font-semibold text-sm">Card</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">POS Card Payment</span>
                                 </Card>
                             </Label>
-                             <Label htmlFor="bank" className="cursor-pointer">
-                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Bank Transfer' ? 'border-primary' : ''} hover:border-primary hover:bg-muted transition-colors`}>
-                                    <RadioGroupItem value="Bank Transfer" id="bank" className="sr-only"/>
+                            <Label htmlFor="bank" className="cursor-pointer">
+                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Bank Transfer' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
+                                    <RadioGroupItem value="Bank Transfer" id="bank" className="sr-only" />
                                     <Landmark className="h-8 w-8 mb-2" />
-                                    Bank Transfer
+                                    <span className="font-semibold text-sm">Bank Transfer</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">Direct Bank Deposit</span>
+                                </Card>
+                            </Label>
+                            <Label htmlFor="invoice" className="cursor-pointer">
+                                <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Invoice' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
+                                    <RadioGroupItem value="Invoice" id="invoice" className="sr-only" />
+                                    <FileText className="h-8 w-8 mb-2" />
+                                    <span className="font-semibold text-sm">Invoice</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">Pay Later / Credit</span>
                                 </Card>
                             </Label>
                         </RadioGroup>
+                        {paymentMethod === 'Invoice' && (
+                            <Alert className="mt-4 bg-blue-50 border-blue-200">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <AlertTitle className="text-blue-800">Issue Professional Invoice</AlertTitle>
+                                <AlertDescription className="text-blue-700">
+                                    This will record the sale and deduct stock, but mark the payment as <strong>Unpaid</strong>. You can track this in the Invoices section.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         {paymentMethod === 'Bank Transfer' && (
                             <Alert className="mt-4">
                                 <Landmark className="h-4 w-4" />
                                 <AlertTitle>Bank Transfer Details</AlertTitle>
                                 <AlertDescription>
-                                    Please instruct the customer to transfer to:<br/>
-                                    <strong>Bank:</strong> {business?.settings?.paymentBankName || 'Not configured'}<br/>
+                                    Please instruct the customer to transfer to:<br />
+                                    <strong>Bank:</strong> {business?.settings?.paymentBankName || 'Not configured'}<br />
                                     <strong>Account:</strong> {business?.settings?.paymentBankAccountId || 'Not configured'}
                                 </AlertDescription>
                             </Alert>
@@ -81,14 +101,14 @@ export default function PaymentPage() {
                             <Input id="discount" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} />
                         </div>
                         <div className="space-y-2">
-                             <Label htmlFor="tax">Tax Rate (%)</Label>
-                            <Input id="tax" type="number" value={taxRate} onChange={e => setTax(Number(e.target.value))}/>
+                            <Label htmlFor="tax">Tax Rate (%)</Label>
+                            <Input id="tax" type="number" value={taxRate} onChange={e => setTax(Number(e.target.value))} />
                         </div>
                     </CardContent>
                 </Card>
             </div>
-             <div>
-                 <Card>
+            <div>
+                <Card>
                     <CardHeader>
                         <CardTitle>Order Summary</CardTitle>
                     </CardHeader>
@@ -112,9 +132,9 @@ export default function PaymentPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
-                         <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
-                           {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                           Next: Review
+                        <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
+                            {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Next: Review
                         </Button>
                         <Button className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/customer">Back</Link>

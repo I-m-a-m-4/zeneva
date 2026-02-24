@@ -150,6 +150,11 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                   <FormControl>
                     <Input type="number" {...field} disabled={!canManageProduct} />
                   </FormControl>
+                  {product?.type === 'composite' && (
+                    <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
+                      Note: This is a bundle. Stock is usually managed via its components.
+                    </p>
+                  )}
                   {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit stock.</p>}
                   <FormMessage />
                 </FormItem>

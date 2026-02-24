@@ -2,23 +2,26 @@
 import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
-import { useParams, notFound } from "next/navigation";
+import { useParams, notFound, useRouter } from "next/navigation";
+import { ArrowLeft, Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
+import * as React from "react";
 import { useRef } from "react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
+import { CheckCircle } from "lucide-react";
 import type { Receipt } from "@/types";
 import { useBusiness, CURRENCY_SYMBOLS } from "@/context/pos-context";
 import Link from 'next/link';
+import { Separator } from "@/components/ui/separator";
 
 
 export default function ReceiptPage() {
   const { toast } = useToast();
   const params = useParams();
   const receiptId = params.id as string;
-  
+
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
   const { data: receipt, isLoading } = useDoc<Receipt>(receiptRef);
@@ -26,15 +29,24 @@ export default function ReceiptPage() {
   const business = useBusiness();
   const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
+  const router = useRouter();
   const receiptContentRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Receipt...</span></div>;
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
   }
-  
+
   if (!receipt) {
     notFound();
   }
+
+  // If this is an invoice, redirect to the invoice detail page
+  if (receipt.paymentMethod === 'Invoice') {
+    router.replace(`/invoice/${receipt.id}`);
+    return null;
+  }
+
+  const isInvoice = false;
 
   const handlePrint = () => {
     window.print();
@@ -42,7 +54,13 @@ export default function ReceiptPage() {
 
   const handleDownload = async () => {
     if (receiptContentRef.current) {
-      const canvas = await html2canvas(receiptContentRef.current, { scale: 2 });
+      toast({ title: "Generating PDF...", description: "Please wait while we prepare your document." });
+      const canvas = await html2canvas(receiptContentRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'p',
@@ -50,64 +68,92 @@ export default function ReceiptPage() {
         format: [canvas.width, canvas.height]
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`receipt-${receipt.id.substring(0,8)}.pdf`);
+      const filename = isInvoice ? `invoice-${receipt.id.substring(0, 8)}.pdf` : `receipt-${receipt.id.substring(0, 8)}.pdf`;
+      pdf.save(filename);
+      toast({ title: "Download Started", description: `${isInvoice ? 'Invoice' : 'Receipt'} has been generated.`, variant: 'success' });
     }
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
-        toast({
-            title: "Link Copied",
-            description: "Receipt link has been copied to your clipboard.",
-            variant: 'success'
-        });
+      toast({
+        title: "Link Copied",
+        description: `${isInvoice ? 'Invoice' : 'Receipt'} link has been copied to your clipboard.`,
+        variant: 'success'
+      });
     }, () => {
-        toast({
-            title: "Copy Failed",
-            description: "Could not copy link to clipboard.",
-            variant: 'destructive'
-        });
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy link to clipboard.",
+        variant: 'destructive'
+      });
     });
+  };
+
+  const handleMarkPaid = async () => {
+    if (!firestore || !receipt) return;
+    try {
+      await updateDoc(doc(firestore, 'receipts', receipt.id), {
+        status: 'paid'
+      });
+      toast({ variant: 'success', title: 'Payment Recorded', description: 'The invoice has been marked as paid.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update payment status.' });
+    }
   };
 
   const handleShare = async () => {
     const shareData = {
-        title: `Receipt ${receipt.id.substring(0,8)}`,
-        text: `Here is your receipt from ${business?.name || 'our store'} for ${currencySymbol}${receipt.total.toFixed(2)}.`,
-        url: window.location.href,
+      title: `${isInvoice ? 'Invoice' : 'Receipt'} ${receipt.id.substring(0, 8)}`,
+      text: `Here is your ${isInvoice ? 'invoice' : 'receipt'} from ${business?.name || 'our store'} for ${currencySymbol}${receipt.total.toFixed(2)}.`,
+      url: window.location.href,
     };
 
     if (navigator.share) {
-        try {
-            await navigator.share(shareData);
-        } catch (error) {
-            if ((error as DOMException).name !== 'AbortError') {
-                 toast({
-                    title: "Share failed",
-                    description: "Link copied to clipboard instead.",
-                    variant: 'warning',
-                });
-                copyToClipboard();
-            }
+      try {
+        await navigator.share(shareData);
+      } catch (error) {
+        if ((error as DOMException).name !== 'AbortError') {
+          toast({
+            title: "Share failed",
+            description: "Link copied to clipboard instead.",
+            variant: 'warning',
+          });
+          copyToClipboard();
         }
+      }
     } else {
-        copyToClipboard();
+      copyToClipboard();
     }
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div ref={receiptContentRef}>
-        <ReceiptDetails receipt={receipt} business={business} currencySymbol={currencySymbol} />
+    <div className="flex flex-col items-center gap-6 py-4">
+      <div className="w-full max-w-2xl flex justify-start no-print">
+        <Button variant="ghost" asChild size="sm">
+          <Link href="/receipts">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
+          </Link>
+        </Button>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-2 no-print">
-        <Button asChild>
-            <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
+
+      <div ref={receiptContentRef} className="border rounded-lg bg-card overflow-hidden">
+        <ReceiptDetails receipt={receipt} business={business} currencySymbol={currencySymbol} isInvoice={isInvoice} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-3 no-print">
+        {receipt.status && receipt.status !== 'paid' && (
+          <Button onClick={handleMarkPaid} variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
+          </Button>
+        )}
+        <Button asChild variant="outline">
+          <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
         </Button>
         <Button onClick={handlePrint} variant="outline">
           <Printer className="mr-2 h-4 w-4" /> Print
         </Button>
-        <Button onClick={handleDownload} variant="outline">
+        <Button onClick={handleDownload} variant="default">
           <Download className="mr-2 h-4 w-4" /> Download PDF
         </Button>
         <Button onClick={handleShare} variant="outline">
