@@ -73,6 +73,9 @@ interface POSContextType {
   impersonateUser: (userId: string) => void;
   stopImpersonation: () => void;
   isImpersonating: boolean;
+
+  // Subscription State
+  isSubscriptionActive: boolean;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -362,6 +365,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addToQueue = useCallback((action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => {
+    // Subscription Safeguard
+    const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) : true;
+
+    if (!isSubscriptionActive) {
+      toast({
+        variant: 'destructive',
+        title: 'Action Blocked',
+        description: 'Your trial or subscription has expired. Please subscribe to continue performing actions.'
+      });
+      return null;
+    }
+
     const newAction: QueuedAction = {
       ...action,
       description,
@@ -376,7 +391,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
     setQueuedActions(prev => [...prev, newAction]);
     return newAction.id;
-  }, [processQueue, toast]);
+  }, [business, toast]);
 
   const updateQueuedAction = useCallback((id: string, updates: Partial<QueuedAction>) => {
     setQueuedActions(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
@@ -688,7 +703,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers,
+
+    isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) : true
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
