@@ -36,6 +36,80 @@ function ProductCardSkeleton() {
     );
 }
 
+const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart }: {
+    product: Product,
+    currencySymbol: string,
+    handleAddToCart: (product: Product) => void,
+    addToCart: any
+}) => {
+    return (
+        <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border border-gray-200 rounded-xl">
+            <CardContent className="p-4 relative aspect-square w-full bg-white flex items-center justify-center">
+                {product.imageUrl ? (
+                    <div className="relative w-full h-full">
+                        <Image
+                            src={product.imageUrl}
+                            alt={product.name}
+                            fill
+                            className="object-contain"
+                        />
+                    </div>
+                ) : (
+                    <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground/40">
+                        <Package size={48} />
+                    </div>
+                )}
+            </CardContent>
+            <CardHeader className="px-4 py-1 flex-grow">
+                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem]">{product.name}</CardTitle>
+            </CardHeader>
+            <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
+                <div className="flex flex-col">
+                    <span className="text-lg font-bold text-black">{currencySymbol}{product.price.toLocaleString()}</span>
+                    {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
+                </div>
+
+                {product.uomConversions && product.uomConversions.length > 0 ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-gray-200 hover:bg-gray-50 flex items-center justify-center">
+                                <PlusCircle className="h-6 w-6 text-black" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Select Unit</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuRadioGroup onValueChange={(unit) => {
+                                if (unit === 'base') {
+                                    handleAddToCart(product);
+                                } else {
+                                    const uom = product.uomConversions?.find(u => u.unitName === unit);
+                                    if (uom) {
+                                        addToCart(product, uom.unitName, uom.multiplier, uom.price);
+                                    }
+                                }
+                            }}>
+                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || 'Piece'} ({currencySymbol}{product.price.toLocaleString()})</DropdownMenuRadioItem>
+                                {product.uomConversions.map((uom) => (
+                                    <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
+                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || 'pcs'}) - {currencySymbol}{(uom.price || product.price).toLocaleString()}
+                                    </DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-gray-200 hover:bg-gray-50 flex items-center justify-center" onClick={() => handleAddToCart(product)}>
+                        <PlusCircle className="h-6 w-6 text-black" />
+                    </Button>
+                )}
+            </CardFooter>
+        </Card>
+    );
+});
+
+ProductItem.displayName = 'ProductItem';
+
 const CartContents = () => {
     const { cart, removeFromCart, updateQuantity, subtotal, currencySymbol } = usePOS();
     return (
@@ -130,9 +204,9 @@ export default function SelectProductsPage() {
         return filtered;
     }, [products, searchTerm, categoryFilter]);
 
-    const handleAddToCart = (product: Product) => {
+    const handleAddToCart = React.useCallback((product: Product) => {
         addToCart(product);
-    };
+    }, [addToCart]);
 
     const handleNext = () => {
         setIsNavigating(true);
@@ -191,67 +265,13 @@ export default function SelectProductsPage() {
                     ) : filteredProducts && filteredProducts.length > 0 ? (
                         <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
                             {filteredProducts.map(product => (
-                                <Card key={product.id} className="overflow-hidden flex flex-col">
-                                    <CardContent className="p-0 relative aspect-square w-full">
-                                        {product.imageUrl ? (
-                                            <Image
-                                                src={product.imageUrl}
-                                                alt={product.name}
-                                                fill
-                                                className="object-cover"
-                                                data-ai-hint={product.imageHint}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-                                                <Package size={48} />
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                    <CardHeader className="p-2 flex-grow flex justify-center">
-                                        <CardTitle className="text-sm font-medium leading-snug">{product.name}</CardTitle>
-                                    </CardHeader>
-                                    <CardFooter className="p-2 flex justify-between items-center mt-auto">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-semibold">{currencySymbol}{product.price.toLocaleString()}</span>
-                                            {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
-                                        </div>
-
-                                        {product.uomConversions && product.uomConversions.length > 0 ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button size="icon" variant="outline" className="h-7 w-7">
-                                                        <PlusCircle className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Select Unit</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuRadioGroup onValueChange={(unit) => {
-                                                        if (unit === 'base') {
-                                                            handleAddToCart(product);
-                                                        } else {
-                                                            const uom = product.uomConversions?.find(u => u.unitName === unit);
-                                                            if (uom) {
-                                                                addToCart(product, uom.unitName, uom.multiplier, uom.price);
-                                                            }
-                                                        }
-                                                    }}>
-                                                        <DropdownMenuRadioItem value="base">1 {product.baseUnit || 'Piece'} ({currencySymbol}{product.price.toLocaleString()})</DropdownMenuRadioItem>
-                                                        {product.uomConversions.map((uom) => (
-                                                            <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
-                                                                1 {uom.unitName} ({uom.multiplier} {product.baseUnit || 'pcs'}) - {currencySymbol}{(uom.price || product.price).toLocaleString()}
-                                                            </DropdownMenuRadioItem>
-                                                        ))}
-                                                    </DropdownMenuRadioGroup>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        ) : (
-                                            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleAddToCart(product)}>
-                                                <PlusCircle className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </CardFooter>
-                                </Card>
+                                <ProductItem
+                                    key={product.id}
+                                    product={product}
+                                    currencySymbol={currencySymbol}
+                                    handleAddToCart={handleAddToCart}
+                                    addToCart={addToCart}
+                                />
                             ))}
                         </div>
                     ) : (

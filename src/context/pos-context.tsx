@@ -97,6 +97,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  // Track the last user ID to prevent unnecessary POS resets
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+
   const impersonateUser = useCallback((userId: string) => {
     setImpersonatedUserId(userId);
     sessionStorage.setItem('zeneva_impersonated_user_id', userId);
@@ -621,10 +624,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setImpersonatedUserId(null);
         sessionStorage.removeItem('zeneva_impersonated_user_id');
+        resetPOS();
+        setLastUserId(null);
+      } else {
+        // If user changed, reset POS
+        if (lastUserId && user.uid !== lastUserId) {
+          resetPOS();
+        }
+        setLastUserId(user.uid);
       }
-      resetPOS();
     }
-  }, [user, isUserLoading, resetPOS, setImpersonatedUserId]);
+  }, [user, isUserLoading, resetPOS, setImpersonatedUserId, lastUserId]);
 
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {
@@ -632,43 +642,47 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [business]);
 
-  const CURRENCY_SYMBOLS: Record<string, string> = { 'NGN': '₦', 'USD': '$' };
   const currencyCode = business?.settings?.currency || 'NGN';
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     // Unique key for cart item: product.id + unit (if any)
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
-    const existingItem = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
 
-    if (existingItem) {
-      setCart(prev => prev.map(item =>
-        (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
+    setCart(prev => {
+      const existingItem = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
 
-      // Stock check logic remains same but consider multiplier
-      const totalQuantityInBaseUnit = (existingItem.quantity + 1) * (multiplier || 1);
-      if (totalQuantityInBaseUnit > (product.stock || 0)) {
-        toast({
-          title: 'Backorder recorded',
-          description: `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`,
-          variant: 'default'
-        });
+      if (existingItem) {
+        // Stock check logic
+        const totalQuantityInBaseUnit = (existingItem.quantity + 1) * (multiplier || 1);
+        if (totalQuantityInBaseUnit > (product.stock || 0)) {
+          toast({
+            title: 'Backorder recorded',
+            description: `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`,
+            variant: 'backorder' as any
+          });
+        }
+
+        return prev.map(item =>
+          (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
+
+        if ((product.stock || 0) <= 0) {
+          toast({
+            title: 'Backorder started',
+            description: `${product.name} is out of stock. Recording this as a debt.`,
+            variant: 'backorder' as any
+          });
+        }
+
+        return [...prev, { product: finalProduct, quantity: 1, unit: unitName, multiplier }];
       }
-    } else {
-      const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
-      setCart(prev => [...prev, { product: finalProduct, quantity: 1, unit: unitName, multiplier }]);
-      if ((product.stock || 0) <= 0) {
-        toast({
-          title: 'Backorder started',
-          description: `${product.name} is out of stock. Recording this as a debt.`,
-          variant: 'default'
-        });
-      }
-    }
-  }, [cart, toast]);
+    });
+  }, [toast]);
 
   const removeFromCart = (cartItemId: string) => setCart(prev => prev.filter(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) !== cartItemId));
 
@@ -681,6 +695,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       toast({
         title: 'Entering Backorder',
         description: `You are requesting more than the ${itemInCart.product.stock || 0} units available. This will be recorded as debt.`,
+        variant: 'backorder' as any
       });
     }
 

@@ -34,6 +34,7 @@ const toastVariants = cva(
           "destructive group bg-destructive text-destructive-foreground",
         success: "success group bg-green-500 text-white",
         warning: "warning group bg-amber-500 text-white",
+        backorder: "backorder group bg-indigo-600 text-white",
       },
     },
     defaultVariants: {
@@ -45,7 +46,7 @@ const toastVariants = cva(
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
-    VariantProps<typeof toastVariants>
+  VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
@@ -68,6 +69,7 @@ const ToastAction = React.forwardRef<
       "group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive",
       "group-[.success]:border-muted/40 group-[.success]:hover:border-green-600/30 group-[.success]:hover:bg-green-600 group-[.success]:hover:text-white group-[.success]:focus:ring-green-600",
       "group-[.warning]:border-muted/40 group-[.warning]:hover:border-amber-600/30 group-[.warning]:hover:bg-amber-600 group-[.warning]:hover:text-white group-[.warning]:focus:ring-amber-600",
+      "group-[.backorder]:border-muted/40 group-[.backorder]:hover:border-indigo-500/30 group-[.backorder]:hover:bg-indigo-500 group-[.backorder]:hover:text-white group-[.backorder]:focus:ring-indigo-500",
       className
     )}
     {...props}
@@ -86,6 +88,7 @@ const ToastClose = React.forwardRef<
       "group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600",
       "group-[.success]:text-green-300 group-[.success]:hover:text-green-50 group-[.success]:focus:ring-green-400 group-[.success]:focus:ring-offset-green-600",
       "group-[.warning]:text-amber-300 group-[.warning]:hover:text-amber-50 group-[.warning]:focus:ring-amber-400 group-[.warning]:focus:ring-offset-amber-600",
+      "group-[.backorder]:text-indigo-200 group-[.backorder]:hover:text-indigo-50 group-[.backorder]:focus:ring-indigo-400 group-[.backorder]:focus:ring-offset-indigo-600",
       className
     )}
     toast-close=""
