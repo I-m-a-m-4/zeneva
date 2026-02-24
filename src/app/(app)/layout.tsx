@@ -381,59 +381,12 @@ export default function AuthenticatedLayout({
     return <main className="p-4 sm:p-6">{children}</main>;
   }
 
-  // --- Subscription Guard ---
-  // We use the status from POS context which handles loading and impersonation logic
-  const { isSubscriptionActive } = usePOS();
-
-  const publicRoutes = ['/billing', '/settings', '/support', '/achievements', '/onboarding', '/dashboard'];
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
-
-  // Custom logic: user specifically asked to block POS, Storefront, Zen AI, and Customers
+  // --- Subscription Guard Configuration ---
+  const { isSubscriptionActive, isLoading: isPosLoading } = usePOS();
   const restrictedRoutes = ['/sales', '/storefront', '/ai-insights', '/customers', '/inventory', '/reports', '/receipts', '/online-orders', '/audit-log'];
   const isRestrictedRoute = restrictedRoutes.some(route => pathname.startsWith(route));
-
-  if (!isSubscriptionActive && isRestrictedRoute && !isLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
-        <Card className="w-full max-w-md text-center shadow-lg border-2 border-destructive animate-in fade-in zoom-in duration-300">
-          <CardHeader>
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 mb-6">
-              <ShieldAlert className="h-12 w-12 text-destructive" />
-            </div>
-            <CardTitle className="text-3xl font-bold text-destructive">Trial Expired</CardTitle>
-            <CardDescription className="text-base mt-2">
-              Your trial period or subscription has ended. To continue using <strong>{businessInstance?.name}</strong>, please subscribe to a plan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 text-left border border-orange-200 dark:border-orange-900">
-              <p className="text-sm font-semibold text-orange-800 dark:text-orange-400 mb-2">Restricted Features:</p>
-              <ul className="text-xs space-y-2 text-orange-700 dark:text-orange-300">
-                <li className="flex items-center gap-2">• Point of Sale (POS) & Sales</li>
-                <li className="flex items-center gap-2">• Public Storefront Access</li>
-                <li className="flex items-center gap-2">• Zen AI Insights & Analytics</li>
-                <li className="flex items-center gap-2">• Customer Management (CRM)</li>
-                <li className="flex items-center gap-2">• Advanced Reports & Audit Logs</li>
-              </ul>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-3">
-            <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg font-bold">
-              <Link href="/billing">
-                <CreditCard className="mr-2 h-5 w-5" />
-                Subscribe Now
-              </Link>
-            </Button>
-            <Button variant="ghost" onClick={handleLogout} className="w-full">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-  // --- End of Subscription Guard ---
+  const showSubscriptionBlock = !isSubscriptionActive && isRestrictedRoute && !isLoading && !isPosLoading;
+  // --- End of Subscription Guard Config ---
 
   const userRole = currentUserProfile?.role;
   const plan = businessInstance?.plan || 'starter';
@@ -715,7 +668,52 @@ export default function AuthenticatedLayout({
                 </div>
               </header>
               <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
-                {children}
+                {showSubscriptionBlock ? (
+                  <div className="flex h-full min-h-[400px] w-full items-center justify-center p-4">
+                    <Card className="w-full max-w-lg border-none shadow-xl bg-gradient-to-br from-background to-muted/50 overflow-hidden animate-in fade-in zoom-in duration-500">
+                      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600"></div>
+                      <CardHeader className="pt-10 pb-6 text-center">
+                        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-2xl bg-orange-500/10 mb-6 rotate-3 hover:rotate-0 transition-transform duration-300">
+                          <ShieldAlert className="h-12 w-12 text-orange-600" />
+                        </div>
+                        <CardTitle className="text-4xl font-extrabold tracking-tight text-foreground">
+                          Trial Expired
+                        </CardTitle>
+                        <CardDescription className="text-lg mt-3 px-4">
+                          Your trial period or subscription has ended. To continue using <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span>, please subscribe to a plan.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="px-8 pb-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="p-4 rounded-xl bg-background/50 border border-border/50 shadow-sm backdrop-blur-sm">
+                            <h4 className="text-sm font-bold text-primary mb-3 uppercase tracking-wider">Restricted Features</h4>
+                            <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> POS & Sales</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Storefront</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Zen AI</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Customers</li>
+                            </ul>
+                          </div>
+                          <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 flex flex-col justify-center">
+                            <p className="text-xs text-muted-foreground mb-4">Choose a plan that fits your business needs and keep growing with Zeneva.</p>
+                            <Button asChild className="w-full shadow-lg shadow-orange-500/20 hover:scale-[1.02] transition-transform">
+                              <Link href="/billing">
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Review Plans
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="bg-muted/30 border-t p-4 flex justify-center">
+                        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign out
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </div>
+                ) : children}
               </main>
               {currentUserProfile && currentUserProfile.id !== user?.uid && (
                 <div className="bg-destructive/10 border-t border-destructive/20 p-2 text-center text-sm text-destructive font-medium flex items-center justify-center gap-4">
