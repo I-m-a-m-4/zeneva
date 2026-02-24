@@ -366,7 +366,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const addToQueue = useCallback((action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => {
     // Subscription Safeguard
-    const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) : true;
+    const isSubscriptionActive = business
+      ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
+      : (isLoading ? true : false);
 
     if (!isSubscriptionActive) {
       toast({
@@ -705,7 +707,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers,
 
-    isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) : true
+    isSubscriptionActive: business
+      ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
+      : (isLoading ? true : false)
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,

@@ -382,8 +382,10 @@ export default function AuthenticatedLayout({
   }
 
   // --- Subscription Guard ---
-  const isSubscriptionActive = businessInstance ? (businessInstance.accessLevel === 'lifetime' || (businessInstance.trialExpiresAt && businessInstance.trialExpiresAt.toDate() > new Date())) : true;
-  const publicRoutes = ['/billing', '/settings', '/support', '/achievements', '/onboarding', '/dashboard']; // Allowing dashboard for now, but blocking actions
+  // We use the status from POS context which handles loading and impersonation logic
+  const { isSubscriptionActive } = usePOS();
+
+  const publicRoutes = ['/billing', '/settings', '/support', '/achievements', '/onboarding', '/dashboard'];
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
 
   // Custom logic: user specifically asked to block POS, Storefront, Zen AI, and Customers
