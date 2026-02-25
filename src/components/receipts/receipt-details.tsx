@@ -126,55 +126,55 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
             );
         }
 
-        // Default Receipt View (Classic)
+        // Default Receipt View (Classic) - Optimized for Thermal Printers
         return (
-            <div ref={ref}>
-                <Card className="w-full max-w-md mx-auto relative overflow-hidden print-receipt">
+            <div ref={ref} className="flex justify-center">
+                <Card className="w-full max-w-[300px] mx-auto relative overflow-hidden print-receipt shadow-none border-dashed border-2 bg-white text-black">
                     <Watermark businessName={businessName} />
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-2xl font-headline">{businessName}</CardTitle>
-                        {businessAddress && <CardDescription>{businessAddress}</CardDescription>}
+                    <CardHeader className="text-center pb-2 pt-4 px-4">
+                        <CardTitle className="text-xl font-bold uppercase tracking-wider">{businessName}</CardTitle>
+                        {businessAddress && <CardDescription className="text-xs">{businessAddress}</CardDescription>}
                     </CardHeader>
-                    <CardContent className="text-sm">
-                        <div className="flex justify-between mb-2">
-                            <span>Receipt ID:</span>
-                            <span>{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</span>
+                    <CardContent className="text-[12px] px-4 pb-4">
+                        <div className="flex justify-between mb-1">
+                            <span className="text-gray-500">Receipt ID:</span>
+                            <span className="font-mono">{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</span>
                         </div>
-                        <div className="flex justify-between mb-4">
-                            <span>Date:</span>
-                            <span>{receipt.createdAt ? format(receipt.createdAt instanceof Date ? receipt.createdAt : (receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt)), 'PPp') : 'N/A'}</span>
+                        <div className="flex justify-between mb-3">
+                            <span className="text-gray-500">Date:</span>
+                            <span className="font-mono">{receipt.createdAt ? format(receipt.createdAt instanceof Date ? receipt.createdAt : (receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt)), 'dd/MM/yy HH:mm') : 'N/A'}</span>
                         </div>
 
                         {receipt.customer && (
                             <>
-                                <Separator className="my-2" />
+                                <Separator className="my-2 border-dashed border-gray-300" />
                                 <div className="mb-2">
-                                    <h3 className="font-semibold">Billed To:</h3>
-                                    <p>{receipt.customer.name}</p>
-                                    <p>{receipt.customer.email}</p>
+                                    <h3 className="font-semibold text-gray-500 uppercase text-[10px]">Billed To:</h3>
+                                    <p className="font-medium text-sm">{receipt.customer.name}</p>
+                                    <p className="text-gray-500 text-xs">{receipt.customer.email}</p>
                                 </div>
                             </>
                         )}
 
-                        <Separator className="my-4" />
+                        <Separator className="my-3 border-dashed border-gray-300" />
 
-                        <div>
+                        <div className="space-y-2">
                             {receipt.items.map((item, index) => (
-                                <div key={item.productId + index} className="flex justify-between items-center mb-1">
-                                    <div>
-                                        <p className="font-medium">{item.name}</p>
-                                        <p className="text-muted-foreground">
+                                <div key={item.productId + index} className="flex justify-between items-start mb-1 text-[13px]">
+                                    <div className="flex-1 pr-2">
+                                        <p className="font-medium leading-tight">{item.name}</p>
+                                        <p className="text-gray-500 text-[11px] mt-0.5">
                                             {item.quantity} x {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
-                                    <p>{currencySymbol}{(item.quantity * item.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    <p className="font-medium pt-0.5">{currencySymbol}{(item.quantity * item.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                 </div>
                             ))}
                         </div>
 
-                        <Separator className="my-4" />
+                        <Separator className="my-3 border-dashed border-gray-300" />
 
-                        <div className="space-y-1">
+                        <div className="space-y-1.5 text-[13px] font-medium text-gray-600">
                             <div className="flex justify-between">
                                 <span>Subtotal</span>
                                 <span>{currencySymbol}{receipt.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -186,23 +186,23 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
                             {receipt.discount > 0 && (
                                 <div className="flex justify-between">
                                     <span>Discount</span>
-                                    <span className="text-destructive">-{currencySymbol}{receipt.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-red-500 font-bold">-{currencySymbol}{receipt.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             )}
                         </div>
 
-                        <Separator className="my-4" />
+                        <Separator className="my-3 border-dashed border-gray-300" />
 
-                        <div className="flex justify-between font-bold text-lg">
+                        <div className="flex justify-between font-bold text-lg pt-1">
                             <span>Total</span>
                             <span>{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
                     </CardContent>
-                    <CardFooter className="flex flex-col items-center text-center text-xs text-muted-foreground">
-                        <p>Thank you for your business!</p>
-                        <p>Payment Method: {receipt.paymentMethod}</p>
-                    </CardFooter>
+                    <div className="bg-gray-50/50 p-4 pt-2 text-center text-[11px] border-t border-dashed border-gray-200">
+                        <p className="font-medium text-gray-600 mb-1">Thank you for your business!</p>
+                        <p className="text-gray-500">Method: <span className="font-semibold uppercase">{receipt.paymentMethod}</span></p>
+                    </div>
                 </Card>
             </div>
         );

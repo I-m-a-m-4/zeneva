@@ -90,17 +90,7 @@ export default function ReceiptPage() {
     });
   };
 
-  const handleMarkPaid = async () => {
-    if (!firestore || !receipt) return;
-    try {
-      await updateDoc(doc(firestore, 'receipts', receipt.id), {
-        status: 'paid'
-      });
-      toast({ variant: 'success', title: 'Payment Recorded', description: 'The invoice has been marked as paid.' });
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update payment status.' });
-    }
-  };
+
 
   const handleShare = async () => {
     const shareData = {
@@ -142,11 +132,7 @@ export default function ReceiptPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 no-print">
-        {receipt.status && receipt.status !== 'paid' && (
-          <Button onClick={handleMarkPaid} variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
-          </Button>
-        )}
+
         <Button asChild variant="outline">
           <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
         </Button>
