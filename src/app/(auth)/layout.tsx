@@ -26,7 +26,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       // to avoid interrupting the signup flow.
       const isSignupPage = pathname === '/signup' || pathname.startsWith('/signup?');
       if (!isSignupPage) {
-        router.replace('/dashboard');
+        router.replace('/sales/pos/select-products');
       }
     }
 
@@ -39,7 +39,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   if (isUserLoading) {
     return <FullScreenLoader text="Authenticating..." />;
   }
-  
+
   // If a user is logged in, they are about to be redirected by the useEffect.
   // Showing a loader here provides a better UX than a flash of the login/signup page.
   // We exclude the signup page from this logic as it handles its own post-signup redirect.

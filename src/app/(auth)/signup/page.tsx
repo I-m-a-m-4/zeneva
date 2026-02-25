@@ -48,7 +48,7 @@ export default function SignupPage() {
     defaultValues: { email: '', password: '', name: '', phone: '' },
   });
 
-   useEffect(() => {
+  useEffect(() => {
     if (invitationCode && firestore) {
       const fetchInvitation = async () => {
         setIsLoadingInvitation(true);
@@ -66,26 +66,26 @@ export default function SignupPage() {
               });
               form.setValue('email', invData.email);
             } else {
-                 throw new Error("Associated business not found.");
+              throw new Error("Associated business not found.");
             }
           } else {
             toast({ variant: "destructive", title: "Invalid Invitation", description: "This invitation link is either invalid or has already been used." });
             router.replace('/signup');
           }
         } catch (error) {
-           toast({ variant: "destructive", title: "Error", description: "Could not retrieve invitation details." });
-           router.replace('/signup');
+          toast({ variant: "destructive", title: "Error", description: "Could not retrieve invitation details." });
+          router.replace('/signup');
         } finally {
-            setIsLoadingInvitation(false);
+          setIsLoadingInvitation(false);
         }
       };
       fetchInvitation();
     } else {
-        setIsLoadingInvitation(false);
-        const emailFromQuery = searchParams.get('email');
-        if (emailFromQuery) {
-          form.setValue('email', emailFromQuery);
-        }
+      setIsLoadingInvitation(false);
+      const emailFromQuery = searchParams.get('email');
+      if (emailFromQuery) {
+        form.setValue('email', emailFromQuery);
+      }
     }
   }, [invitationCode, firestore, router, form, toast]);
 
@@ -101,16 +101,15 @@ export default function SignupPage() {
       await waitForUserProfile(firestore, userCredential.user.uid);
 
       triggerRefresh();
-      
       await new Promise(resolve => setTimeout(resolve, 1500));
-      router.push(invitationCode ? '/dashboard' : '/onboarding');
+      router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
 
     } catch (error: any) {
       let description = "Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         description = "This email is already registered. Please log in instead.";
       } else {
-          description = error.message;
+        description = error.message;
       }
       toast({ variant: "destructive", title: "Signup Failed", description });
       setIsLoading(false);
@@ -139,19 +138,19 @@ export default function SignupPage() {
             </p>
           </div>
 
-            {isLoadingInvitation ? (
-                <div className="flex justify-center items-center h-24"><Loader className="animate-spin" /></div>
-            ) : invitationDetails ? (
-                <div className="p-4 rounded-lg border bg-primary/5 text-center">
-                    <div className="flex items-center justify-center gap-3">
-                        <Building className="h-5 w-5 text-primary" />
-                        <UserCheck className="h-5 w-5 text-primary" />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        You are joining <strong className="text-primary">{invitationDetails.businessName}</strong> as a <strong className="capitalize text-primary">{invitationDetails.role}</strong>.
-                    </p>
-                </div>
-            ) : null}
+          {isLoadingInvitation ? (
+            <div className="flex justify-center items-center h-24"><Loader className="animate-spin" /></div>
+          ) : invitationDetails ? (
+            <div className="p-4 rounded-lg border bg-primary/5 text-center">
+              <div className="flex items-center justify-center gap-3">
+                <Building className="h-5 w-5 text-primary" />
+                <UserCheck className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                You are joining <strong className="text-primary">{invitationDetails.businessName}</strong> as a <strong className="capitalize text-primary">{invitationDetails.role}</strong>.
+              </p>
+            </div>
+          ) : null}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">

@@ -289,13 +289,13 @@ export default function AuthenticatedLayout({
     if (protectedRoute) {
       const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
       if (!allowedRoles.includes(userRole)) {
-        console.warn(`Access denied to ${pathname} for role ${userRole}. Redirecting to dashboard.`);
+        console.warn(`Access denied to ${pathname} for role ${userRole}. Redirecting to app.`);
         toast({
           variant: "destructive",
           title: "Access Denied",
           description: "You do not have permission to view this page.",
         });
-        router.replace('/dashboard');
+        router.replace('/sales/pos/select-products');
       }
     }
   }, [pathname, currentUserProfile, isLoading, router, toast]);
