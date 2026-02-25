@@ -68,7 +68,7 @@ const navItems = [
   { href: '/sales/pos/select-products', icon: ShoppingCart, label: 'POS', roles: ['admin', 'manager', 'vendor_operator'] },
   { href: '/storefront', icon: Paintbrush, label: 'Storefront', roles: ['admin'] },
   { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
-  { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager'] },
+  { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager', 'vendor_operator'] },
   { href: '/invoices', icon: FileDigit, label: 'Invoices', roles: ['admin', 'manager'] },
   { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'manager'] },
   { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
@@ -266,7 +266,7 @@ export default function AuthenticatedLayout({
       '/sales': ['admin', 'manager', 'vendor_operator'], // Covers POS
       '/storefront': ['admin'],
       '/online-orders': ['admin', 'manager'],
-      '/receipts': ['admin', 'manager'],
+      '/receipts': ['admin', 'manager', 'vendor_operator'],
       '/invoices': ['admin', 'manager'],
       '/reports': ['admin', 'manager'],
       '/ai-insights': ['admin', 'manager'],
