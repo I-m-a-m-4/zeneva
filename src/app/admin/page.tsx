@@ -70,6 +70,7 @@ import {
     PartyPopper,
     Store,
     Trophy,
+    CheckCircle,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect, useRef } from 'react';
