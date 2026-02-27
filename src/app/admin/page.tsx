@@ -67,9 +67,15 @@ import {
     Database,
     RefreshCcw,
     Trash2,
+    PartyPopper,
+    Crown,
+    TrendingUp,
+    Store,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
+import Image from 'next/image';
 import {
     collection,
     query,
@@ -329,6 +335,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
     const [isAssigningPlan, setIsAssigningPlan] = useState(false);
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
+    const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [totalSubscribers, setTotalSubscribers] = useState(0);
@@ -617,8 +626,27 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return acc;
         }, {} as Record<string, number>);
 
+        const businessRevenues = (receipts || []).reduce((acc, r) => {
+            if (r.businessId) {
+                acc[r.businessId] = (acc[r.businessId] || 0) + r.total;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+
+        let richestBusiness = null;
+        let maxRevenue = 0;
+        for (const [bId, rev] of Object.entries(businessRevenues)) {
+            if (rev > maxRevenue) {
+                maxRevenue = rev;
+                const business = businesses?.find(b => b.id === bId);
+                if (business) {
+                    richestBusiness = { ...business, totalRevenue: rev };
+                }
+            }
+        }
+
         return {
-            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue
+            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, richestBusiness
         };
     }, [users, businesses, products, receipts, purchases]);
 
@@ -823,7 +851,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
-                    <TabsTrigger value="advanced">Advanced Tools</TabsTrigger>
+                    <TabsTrigger value="performers">Top Performers</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
@@ -894,25 +922,132 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 Platform Activity Overview
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Push Subscribers', description: `There are currently ${totalSubscribers} devices that have installed the app. This number increases only when people click the install app button.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Push Subscribers" value={totalSubscribers} icon={Megaphone} description="Devices opted-in for updates" />
-                            </button>
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Platform GMV', description: `Total gross merchandise value: ₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}. This is the total value of all completed sales across all businesses on Zeneva.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
-                            </button>
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Receipts', description: `Total number of sales receipts across the platform: ${analyticsData.totalReceipts.toLocaleString()}. This shows overall transaction volume.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
-                            </button>
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Products', description: `We currently host ${analyticsData.totalProducts.toLocaleString()} unique products on the Zeneva platform across all businesses.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
-                            </button>
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Units Sold', description: `A total of ${analyticsData.totalProductsSold.toLocaleString()} individual items have been sold through all registered businesses.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
-                            </button>
-                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Revenue', description: `The total revenue recorded is ₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
-                                <StatCard title="Total Revenue" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Check} description="Total value of completed sales" />
-                            </button>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-yellow-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Push Subscribers', description: `There are currently ${totalSubscribers} devices that have installed the app.`, value: String(totalSubscribers), icon: Megaphone });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Push Subscribers
+                                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full group-hover:bg-yellow-200 transition-colors">
+                                            <Megaphone className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">
+                                        {totalSubscribers}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Active devices opted-in</p>
+                                    <p className="text-xs text-yellow-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-green-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Platform GMV', description: `Total gross merchandise value across the Zeneva platform.`, value: `₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Platform GMV
+                                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full group-hover:bg-green-200 transition-colors">
+                                            <DollarSign className="h-5 w-5 text-green-600 dark:text-green-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-green-400">
+                                        ₦{analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Value of goods sold</p>
+                                    <p className="text-xs text-green-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-blue-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Total Receipts', description: `Total number of sales receipts across the platform.`, value: analyticsData.totalReceipts.toLocaleString(), icon: FileText });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Total Receipts
+                                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-200 transition-colors">
+                                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
+                                        {analyticsData.totalReceipts.toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Total number of sales</p>
+                                    <p className="text-xs text-blue-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-purple-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Total Products', description: `We currently host ${analyticsData.totalProducts.toLocaleString()} unique products on the Zeneva platform across all businesses.`, value: analyticsData.totalProducts.toLocaleString(), icon: Package });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Total Products
+                                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full group-hover:bg-purple-200 transition-colors">
+                                            <Package className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-purple-400">
+                                        {analyticsData.totalProducts.toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Unique catalog variants</p>
+                                    <p className="text-xs text-purple-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-orange-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Total Units Sold', description: `Total individual items sold through all registered businesses.`, value: analyticsData.totalProductsSold.toLocaleString(), icon: ShoppingCart });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Total Units Sold
+                                        <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full group-hover:bg-orange-200 transition-colors">
+                                            <ShoppingCart className="h-5 w-5 text-orange-600 dark:text-orange-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-orange-400">
+                                        {analyticsData.totalProductsSold.toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Physical checkout goods</p>
+                                    <p className="text-xs text-orange-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-pink-500/20" onClick={() => {
+                                setCertificateModalState({ open: true, title: 'Total Revenue', description: `The total revenue recorded.`, value: `₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: Check });
+                            }}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Total Revenue
+                                        <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-full group-hover:bg-pink-200 transition-colors">
+                                            <Check className="h-5 w-5 text-pink-600 dark:text-pink-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 to-pink-400">
+                                        ₦{analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Total gross revenue</p>
+                                    <p className="text-xs text-pink-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
+                                </CardContent>
+                            </Card>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -1200,82 +1335,65 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="advanced" className="space-y-6">
+                <TabsContent value="performers" className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-primary" /> Advanced Tools & Settings</CardTitle>
-                            <CardDescription>System-level operations and data management tools.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-yellow-500" /> Platform Top Performers</CardTitle>
+                            <CardDescription>Businesses and users excelling on the Zeneva platform.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {/* Functionality 1: Export Users */}
-                                <Card className="border-border">
-                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Export All Users</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-xs text-muted-foreground mb-4">Download a comprehensive CSV file of all user profiles on the platform.</p>
-                                        <Button variant="outline" className="w-full" onClick={() => {
-                                            if (!users) return;
-                                            const headers = "Name,Email,Role,Status,Joined";
-                                            const rows = users.map(u => `"${u.name}","${u.email}","${u.role || 'user'}","${u.status || 'active'}","${u.createdAt?.toDate ? format(u.createdAt.toDate(), 'yyyy-MM-dd') : ''}"`);
-                                            const csvContext = [headers, ...rows].join('\n');
-                                            const blob = new Blob([csvContext], { type: 'text/csv' });
-                                            const url = window.URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `zeneva_users_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-                                            a.click();
-                                            window.URL.revokeObjectURL(url);
-                                            toast({ variant: 'success', title: 'Export Successful', description: 'User data downloaded.' });
-                                        }}><Download className="h-4 w-4 mr-2" /> Download CSV</Button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Functionality 1: Richest Business */}
+                                <Card className="border-yellow-500/30 overflow-hidden relative">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none" />
+                                    <CardHeader className="pb-3 relative z-10">
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Trophy className="h-6 w-6 text-yellow-500" /> Richest Business
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="relative z-10">
+                                        {analyticsData.richestBusiness ? (
+                                            <div className="space-y-4 shadow-sm bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50">
+                                                <div>
+                                                    <p className="font-bold text-xl">{analyticsData.richestBusiness.name}</p>
+                                                    <p className="text-sm text-yellow-600 dark:text-yellow-500 font-bold mt-1 tracking-wider uppercase">NO. 1 IN SALES</p>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm border-t pt-3">
+                                                    <span className="text-muted-foreground">Total GMV</span>
+                                                    <span className="font-bold text-lg">₦{(analyticsData.richestBusiness as any).totalRevenue.toLocaleString()}</span>
+                                                </div>
+                                                <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white" onClick={() => {
+                                                    const owner = users?.find(u => u.id === analyticsData.richestBusiness?.ownerId);
+                                                    if (owner) {
+                                                        setSelectedUserForDetail(owner);
+                                                        setIsUserDetailOpen(true);
+                                                    } else {
+                                                        toast({ title: 'Owner Not Found', description: 'Could not locate the owner profile for this business.' });
+                                                    }
+                                                }}>View Business Details</Button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-center text-muted-foreground py-8">Not enough data to determine the richest business.</p>
+                                        )}
                                     </CardContent>
                                 </Card>
 
-                                {/* Functionality 2: Export Businesses */}
                                 <Card className="border-border">
-                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Export All Businesses</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-xs text-muted-foreground mb-4">Generate and download a CSV containing details for every registered business.</p>
-                                        <Button variant="outline" className="w-full" onClick={() => {
-                                            if (!businesses) return;
-                                            const headers = "Business ID,Name,Plan,Status,Items Sold";
-                                            const rows = businesses.map(b => `"${b.id}","${b.name}","${b.plan || 'starter'}","${b.status || 'active'}",""`);
-                                            const csvContext = [headers, ...rows].join('\n');
-                                            const blob = new Blob([csvContext], { type: 'text/csv' });
-                                            const url = window.URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `zeneva_businesses_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-                                            a.click();
-                                            window.URL.revokeObjectURL(url);
-                                            toast({ variant: 'success', title: 'Export Successful', description: 'Business data downloaded.' });
-                                        }}><Download className="h-4 w-4 mr-2" /> Download CSV</Button>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Functionality 3: Rebuild Search Indexes */}
-                                <Card className="border-border">
-                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Rebuild Search</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-xs text-muted-foreground mb-4">Force a manual rebuild of platform search indexes.</p>
-                                        <Button variant="outline" className="w-full" onClick={() => toast({ variant: 'success', title: 'Rebuilding Indexes', description: 'Search optimization has been queued successfully.' })}><Database className="h-4 w-4 mr-2" /> Rebuild Indexes</Button>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Functionality 4: Clear Server Cache */}
-                                <Card className="border-border">
-                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Clear Global Cache</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-xs text-muted-foreground mb-4">Flush edge caching. May cause temporary performance degraded load times.</p>
-                                        <Button variant="outline" className="w-full text-amber-500 hover:text-amber-600" onClick={() => toast({ variant: 'success', title: 'Cache Flushed', description: 'CDN and edge caches have been invalidated.' })}><RefreshCcw className="h-4 w-4 mr-2" /> Flush Cache</Button>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Functionality 5: Purge Soft-Deleted Records */}
-                                <Card className="border-border border-destructive/20">
-                                    <CardHeader className="pb-3"><CardTitle className="text-sm text-destructive">Purge Deleted Data</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-xs text-muted-foreground mb-4">Permanently remove records flagged as deleted from the database.</p>
-                                        <Button variant="outline" className="w-full text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => toast({ variant: 'success', title: 'Purge Initiated', description: 'Soft-deleted items are being permanently removed.' })}><Trash2 className="h-4 w-4 mr-2" /> Execute Purge</Button>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm">More Important Metrics</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                                            <div className="flex items-center gap-2"><Store className="h-4 w-4 text-primary" /> Max Active Businesses</div>
+                                            <span className="font-bold">{platformAnalytics.totalActiveBusinesses}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                                            <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> Fully Activated</div>
+                                            <span className="font-bold">{platformAnalytics.activatedBusinessesCount}</span>
+                                        </div>
+                                        <div className="flex text-sm text-muted-foreground mt-4 p-2">
+                                            Check back here later for newly added top performers metrics as the platform grows!
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -1283,6 +1401,91 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={certificateModalState?.open || false} onOpenChange={(open) => !open && setCertificateModalState(null)}>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 gap-0">
+                    <DialogTitle className="sr-only">Platform Achievement</DialogTitle>
+                    <DialogDescription className="sr-only">Platform achievement milestone download view</DialogDescription>
+
+                    <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-background min-h-[420px] justify-center">
+                        <div className="absolute inset-0 z-0">
+                            <Image
+                                src="/achievement_bg.png"
+                                alt="Background"
+                                fill
+                                sizes="100vw"
+                                className="object-cover opacity-40"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
+                        </div>
+
+                        <div className="relative z-10 mb-4 px-3 py-1 bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 rounded-full">
+                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase">
+                                Zeneva Admin Analytics
+                            </p>
+                        </div>
+
+                        <div className="relative z-10 w-32 h-32 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-yellow-500/20 text-yellow-500">
+                            {certificateModalState?.icon && (
+                                <div className="text-yellow-500 flex items-center justify-center">
+                                    {(() => {
+                                        const IconComponent = certificateModalState.icon;
+                                        return <IconComponent className="h-16 w-16" />;
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative z-10 w-full mb-6">
+                            <h2 className="text-2xl font-bold text-primary mb-2 leading-tight">
+                                {certificateModalState?.title}
+                            </h2>
+                            <p className="text-base text-foreground/80 font-medium px-4">
+                                {certificateModalState?.description}
+                            </p>
+                        </div>
+
+                        <div className="relative z-10 grid grid-cols-1 gap-4 w-full bg-white/60 backdrop-blur-sm border border-white/20 p-4 rounded-xl shadow-sm">
+                            <div className="text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Current Metric</p>
+                                <p className="text-sm font-bold mt-1 text-primary">
+                                    {certificateModalState?.value}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                            <p className="text-[11px] font-black tracking-[0.2em] text-primary/80 uppercase">
+                                zeneva.space - Certified Result
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-muted/30 border-t flex flex-col gap-3">
+                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary" onClick={async () => {
+                            if (!cardRef.current) return;
+                            setIsDownloading(true);
+                            try {
+                                const canvas = await html2canvas(cardRef.current, { useCORS: true, scale: 3, backgroundColor: null });
+                                const dataUrl = canvas.toDataURL('image/png');
+                                const link = document.createElement('a');
+                                link.href = dataUrl;
+                                link.download = `zeneva-analytic-${(certificateModalState?.title || 'card').replace(/\s+/g, '-').toLowerCase()}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                toast({ title: "Downloaded!", description: "Your card has been saved." });
+                            } catch (e) {
+                                toast({ variant: "destructive", title: "Failed", description: "Download failed." });
+                            } finally {
+                                setIsDownloading(false);
+                            }
+                        }} disabled={isDownloading}>
+                            {isDownloading ? "Downloading..." : <><Download className="h-4 w-4" /> Download Result Card</>}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <BusinessDetailDialog
                 open={detailModalState.open}

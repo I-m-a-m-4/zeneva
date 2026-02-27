@@ -1,13 +1,20 @@
 'use client';
 
+import * as React from 'react';
 import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { Trophy, Star, CheckCircle, Zap, Loader } from 'lucide-react';
-import type { Receipt, Product, BusinessInstance, UserProfile } from '@/types';
+import { Trophy, Star, CheckCircle, Zap, Loader, PartyPopper, Download } from 'lucide-react';
+import type { Receipt, Product, BusinessInstance } from '@/types';
 import { cn } from '@/lib/utils';
+import { usePOS } from '@/context/pos-context';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import html2canvas from 'html2canvas';
 
 interface Milestone {
     id: string;
@@ -22,6 +29,12 @@ interface Milestone {
 
 export default function AchievementsPage() {
     const firestore = useFirestore();
+    const { triggerConfetti } = usePOS();
+    const { toast } = useToast();
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [isDownloading, setIsDownloading] = React.useState(false);
+
+    const [selectedMilestone, setSelectedMilestone] = React.useState<Milestone | null>(null);
 
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
@@ -45,7 +58,7 @@ export default function AchievementsPage() {
             {
                 id: 'sales_100',
                 title: 'Century of Sales',
-                description: 'Complete 100 sales across the platform.',
+                description: 'We have successfully completed 100 sales across the entire platform.',
                 target: 100,
                 current: totalSales,
                 icon: Trophy,
@@ -54,7 +67,7 @@ export default function AchievementsPage() {
             {
                 id: 'sales_1000',
                 title: 'Sales Master',
-                description: 'Complete 1,000 sales across the platform.',
+                description: 'We have breached 1,000 sales across the platform! Incredible momentum.',
                 target: 1000,
                 current: totalSales,
                 icon: Star,
@@ -63,7 +76,7 @@ export default function AchievementsPage() {
             {
                 id: 'gmv_1m',
                 title: 'The First Million',
-                description: 'Process ₦1,000,000 in total GMV.',
+                description: 'The platform successfully processed ₦1,000,000 in total GMV.',
                 target: 1000000,
                 current: totalGMV,
                 icon: Zap,
@@ -73,7 +86,7 @@ export default function AchievementsPage() {
             {
                 id: 'gmv_10m',
                 title: 'Ten Million Milestone',
-                description: 'Process ₦10,000,000 in total GMV.',
+                description: 'Phenomenal growth! We processed ₦10,000,000 in total GMV.',
                 target: 10000000,
                 current: totalGMV,
                 icon: CheckCircle,
@@ -83,7 +96,7 @@ export default function AchievementsPage() {
             {
                 id: 'products_500',
                 title: 'Inventory Builder',
-                description: 'Host 500 unique products on the platform.',
+                description: 'We officially host over 500 unique products on the platform.',
                 target: 500,
                 current: totalProducts,
                 icon: CheckCircle,
@@ -92,7 +105,7 @@ export default function AchievementsPage() {
             {
                 id: 'businesses_100',
                 title: 'A Growing Community',
-                description: 'Reach 100 active businesses on the platform.',
+                description: 'We successfully reached 100 active businesses running on Zeneva.',
                 target: 100,
                 current: activeBusinesses,
                 icon: Trophy,
@@ -100,6 +113,31 @@ export default function AchievementsPage() {
             }
         ];
     }, [businesses, products, receipts]);
+
+    const handleDownload = async () => {
+        if (!cardRef.current) return;
+        setIsDownloading(true);
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                useCORS: true,
+                scale: 3,
+                backgroundColor: null,
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `zeneva-platform-achievement-${selectedMilestone?.id}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({ title: "Downloaded!", description: "Your platform achievement card has been saved." });
+        } catch (error) {
+            console.error("Download failed", error);
+            toast({ variant: "destructive", title: "Download Failed", description: "Could not save the image. Please try again." });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -128,7 +166,16 @@ export default function AchievementsPage() {
                     const progressValue = Math.min((milestone.current / milestone.target) * 100, 100);
 
                     return (
-                        <Card key={milestone.id} className={cn("transition-all", isCompleted ? "border-green-500/50 shadow-sm shadow-green-500/20" : "")}>
+                        <Card
+                            key={milestone.id}
+                            onClick={() => {
+                                if (isCompleted) {
+                                    setSelectedMilestone(milestone);
+                                    triggerConfetti();
+                                }
+                            }}
+                            className={cn("transition-all", isCompleted ? "border-green-500/50 shadow-sm shadow-green-500/20 cursor-pointer hover:shadow-green-500/40 hover:-translate-y-1" : "")}
+                        >
                             <CardHeader className="flex flex-row items-center gap-4 pb-2">
                                 <div className={cn("p-3 rounded-full bg-muted", milestone.color, isCompleted ? "bg-green-100 dark:bg-green-900/30" : "")}>
                                     <milestone.icon className="h-6 w-6" />
@@ -150,8 +197,8 @@ export default function AchievementsPage() {
                                 </div>
                                 {isCompleted && (
                                     <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
-                                        <Trophy className="h-4 w-4" />
-                                        Achievement Unlocked
+                                        <PartyPopper className="h-4 w-4" />
+                                        Achievement Unlocked - Click to view!
                                     </div>
                                 )}
                             </CardContent>
@@ -159,6 +206,77 @@ export default function AchievementsPage() {
                     );
                 })}
             </div>
+
+            <Dialog open={!!selectedMilestone} onOpenChange={(open) => !open && setSelectedMilestone(null)}>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 gap-0">
+                    <DialogTitle className="sr-only">Platform Achievement</DialogTitle>
+                    <DialogDescription className="sr-only">Platform achievement milestone download view</DialogDescription>
+
+                    <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-background min-h-[420px] justify-center">
+                        <div className="absolute inset-0 z-0">
+                            <Image
+                                src="/achievement_bg.png"
+                                alt="Background"
+                                fill
+                                sizes="100vw"
+                                className="object-cover opacity-40"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
+                        </div>
+
+                        <div className="relative z-10 mb-4 px-3 py-1 bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 rounded-full">
+                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase">
+                                Super Admin Milestone
+                            </p>
+                        </div>
+
+                        <div className="relative z-10 w-32 h-32 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-yellow-500/20 text-yellow-500">
+                            {selectedMilestone && <selectedMilestone.icon className="h-16 w-16" />}
+                        </div>
+
+                        <div className="relative z-10 w-full mb-6">
+                            <h2 className="text-2xl font-bold text-primary mb-2 leading-tight">
+                                {selectedMilestone?.title}
+                            </h2>
+                            <p className="text-base text-foreground/80 font-medium px-4">
+                                {selectedMilestone?.description}
+                            </p>
+                        </div>
+
+                        <div className="relative z-10 grid grid-cols-1 gap-4 w-full bg-white/60 backdrop-blur-sm border border-white/20 p-4 rounded-xl shadow-sm">
+                            <div className="text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Platform Wide Goal Reached</p>
+                                <p className="text-sm font-bold mt-1 text-primary">
+                                    {selectedMilestone?.format ? selectedMilestone.format(selectedMilestone.target) : selectedMilestone?.target.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                            <p className="text-[11px] font-black tracking-[0.2em] text-primary/80 uppercase">
+                                zeneva.space
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-muted/30 border-t flex flex-col gap-3">
+                        <Button className="w-full gap-2 text-base h-11 shadow-md hover:shadow-lg transition-all" onClick={() => triggerConfetti()}>
+                            <PartyPopper className="h-4 w-4" />
+                            Celebrate Again!
+                        </Button>
+                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary" onClick={handleDownload} disabled={isDownloading}>
+                            {isDownloading ? (
+                                <>Downloading...</>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4" />
+                                    Download Certificate
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
