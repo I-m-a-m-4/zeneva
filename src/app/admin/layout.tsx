@@ -9,6 +9,8 @@ import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown 
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
+import Confetti from '@/components/shared/confetti';
+import { usePOS } from '@/context/pos-context';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
@@ -22,6 +24,7 @@ const navLinks = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
+  const { isConfettiActive, setIsConfettiActive } = usePOS();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -77,8 +80,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Render layout for an authorized admin
   if (user && user.email === ADMIN_EMAIL) {
     return (
-      <div className="flex min-h-screen w-full flex-col">
-        <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+      <div className="flex min-h-screen w-full flex-col relative">
+        <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
+        <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-10">
           <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
             <Link href="/admin-imamshaffy" className="flex items-center gap-2 text-lg font-semibold md:text-base whitespace-nowrap">
               <span>Zeneva Admin</span>

@@ -241,49 +241,70 @@ export default function AchievementsPage() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {milestones.map(milestone => {
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
+                {milestones.map((milestone, index) => {
                     const isCompleted = milestone.current >= milestone.target;
                     const progressValue = Math.min((milestone.current / milestone.target) * 100, 100);
 
+                    // Determine if we need a connector line to the next card
+                    const showConnector = index < milestones.length - 1;
+
                     return (
-                        <Card
-                            key={milestone.id}
-                            onClick={() => {
-                                if (isCompleted) {
-                                    setSelectedMilestone(milestone);
-                                    triggerConfetti();
-                                }
-                            }}
-                            className={cn("transition-all", isCompleted ? "border-green-500/50 shadow-sm shadow-green-500/20 cursor-pointer hover:shadow-green-500/40 hover:-translate-y-1" : "")}
-                        >
-                            <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                                <div className={cn("p-3 rounded-full bg-muted", milestone.color, isCompleted ? "bg-green-100 dark:bg-green-900/30" : "")}>
-                                    <milestone.icon className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <CardTitle className="text-lg">{milestone.title}</CardTitle>
-                                    <CardDescription>{milestone.description}</CardDescription>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <div className="flex justify-between text-sm mb-1 font-medium">
-                                        <span>Progress</span>
-                                        <span className={isCompleted ? "text-green-600 dark:text-green-400 font-bold" : "text-muted-foreground"}>
-                                            {milestone.format ? milestone.format(milestone.current) : milestone.current.toLocaleString()} / {milestone.format ? milestone.format(milestone.target) : milestone.target.toLocaleString()}
-                                        </span>
-                                    </div>
-                                    <Progress value={progressValue} className={cn("h-2", isCompleted ? "[&>div]:bg-green-500" : "")} />
-                                </div>
-                                {isCompleted && (
-                                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
-                                        <PartyPopper className="h-4 w-4" />
-                                        Achievement Unlocked - Click to view!
-                                    </div>
+                        <div key={milestone.id} className="relative group">
+                            {showConnector && (
+                                <div className="hidden lg:block absolute top-[50%] -right-[24px] w-[24px] border-t-2 border-dashed border-primary/30 z-0 animate-pulse" />
+                            )}
+                            <Card
+                                onClick={() => {
+                                    if (isCompleted) {
+                                        setSelectedMilestone(milestone);
+                                        triggerConfetti();
+                                    }
+                                }}
+                                className={cn(
+                                    "relative overflow-hidden transition-all duration-300 animate-in fade-in zoom-in",
+                                    isCompleted ? "cursor-pointer hover:-translate-y-1 shadow-md hover:shadow-xl ring-1 ring-primary/20 hover:ring-primary/50" : "opacity-80 grayscale-[30%]"
                                 )}
-                            </CardContent>
-                        </Card>
+                            >
+                                <div className="absolute inset-0 z-0 pointer-events-none">
+                                    <Image
+                                        src="/achievement_bg.png"
+                                        alt="Card Background"
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                        className="object-cover opacity-10 mix-blend-multiply dark:mix-blend-lighten"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-transparent" />
+                                </div>
+
+                                <CardHeader className="relative z-10 flex flex-row items-center gap-4 pb-2">
+                                    <div className={cn("p-3 rounded-xl bg-background/80 backdrop-blur-sm border shadow-sm", milestone.color, isCompleted ? "bg-primary/10 border-primary/20 text-primary" : "text-muted-foreground")}>
+                                        <milestone.icon className="h-7 w-7" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-lg font-bold">{milestone.title}</CardTitle>
+                                        <CardDescription className="text-xs font-medium">{milestone.description}</CardDescription>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="relative z-10 space-y-4 pt-2">
+                                    <div>
+                                        <div className="flex justify-between text-sm mb-1.5 font-semibold">
+                                            <span>Progress</span>
+                                            <span className={isCompleted ? "text-primary font-bold" : "text-muted-foreground font-medium"}>
+                                                {milestone.format ? milestone.format(milestone.current) : milestone.current.toLocaleString()} / {milestone.format ? milestone.format(milestone.target) : milestone.target.toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <Progress value={progressValue} className={cn("h-2.5 bg-muted/50 overflow-hidden", isCompleted ? "[&>div]:bg-primary shadow-inner" : "")} />
+                                    </div>
+                                    {isCompleted && (
+                                        <div className="flex items-center gap-2 text-xs text-primary font-bold bg-primary/10 p-2 rounded-lg border border-primary/20">
+                                            <PartyPopper className="h-4 w-4 animate-bounce" />
+                                            Achievement Unlocked - Click to view!
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
                     );
                 })}
             </div>
@@ -306,8 +327,8 @@ export default function AchievementsPage() {
                         </div>
 
                         <div className="relative z-10 mb-4 px-3 py-1 bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 rounded-full">
-                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase">
-                                Super Admin Milestone
+                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase flex items-center gap-2">
+                                <Trophy className="h-3 w-3" /> Zeneva Honors
                             </p>
                         </div>
 

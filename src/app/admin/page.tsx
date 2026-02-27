@@ -69,6 +69,7 @@ import {
     Trash2,
     PartyPopper,
     Store,
+    Trophy,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect, useRef } from 'react';
