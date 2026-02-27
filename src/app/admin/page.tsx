@@ -68,8 +68,6 @@ import {
     RefreshCcw,
     Trash2,
     PartyPopper,
-    Crown,
-    TrendingUp,
     Store,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';

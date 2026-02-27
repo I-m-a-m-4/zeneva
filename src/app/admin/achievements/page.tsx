@@ -55,6 +55,16 @@ export default function AchievementsPage() {
         const totalGMV = receipts.reduce((sum, r) => sum + r.total, 0);
 
         return [
+            // Sales Achievements
+            {
+                id: 'sales_10',
+                title: 'First 10 Sales',
+                description: 'The platform successfully facilitated its first 10 sales.',
+                target: 10,
+                current: totalSales,
+                icon: CheckCircle,
+                color: 'text-zinc-500',
+            },
             {
                 id: 'sales_100',
                 title: 'Century of Sales',
@@ -73,6 +83,17 @@ export default function AchievementsPage() {
                 icon: Star,
                 color: 'text-purple-500',
             },
+            {
+                id: 'sales_10000',
+                title: 'Ten Thousand Transactions',
+                description: 'We successfully completed 10,000 sales platform-wide. Unstoppable.',
+                target: 10000,
+                current: totalSales,
+                icon: Zap,
+                color: 'text-red-500',
+            },
+
+            // GMV Achievements
             {
                 id: 'gmv_1m',
                 title: 'The First Million',
@@ -94,6 +115,37 @@ export default function AchievementsPage() {
                 format: (val) => `₦${val.toLocaleString()}`
             },
             {
+                id: 'gmv_100m',
+                title: 'One Hundred Million',
+                description: 'A colossal achievement. We processed ₦100,000,000 in total GMV.',
+                target: 100000000,
+                current: totalGMV,
+                icon: Trophy,
+                color: 'text-orange-500',
+                format: (val) => `₦${val.toLocaleString()}`
+            },
+            {
+                id: 'gmv_1b',
+                title: 'The Billionaire Club',
+                description: 'Legendary status. The platform has officially moved ₦1,000,000,000 in GMV.',
+                target: 1000000000,
+                current: totalGMV,
+                icon: Star,
+                color: 'text-yellow-400',
+                format: (val) => `₦${val.toLocaleString()}`
+            },
+
+            // Product Achievements
+            {
+                id: 'products_50',
+                title: 'Catalog Starter',
+                description: 'We reached 50 unique products listed on Zeneva.',
+                target: 50,
+                current: totalProducts,
+                icon: CheckCircle,
+                color: 'text-indigo-400',
+            },
+            {
                 id: 'products_500',
                 title: 'Inventory Builder',
                 description: 'We officially host over 500 unique products on the platform.',
@@ -103,6 +155,26 @@ export default function AchievementsPage() {
                 color: 'text-orange-500',
             },
             {
+                id: 'products_5000',
+                title: 'Massive Marketplace',
+                description: '5,000 unique products are now available through businesses on Zeneva.',
+                target: 5000,
+                current: totalProducts,
+                icon: Zap,
+                color: 'text-pink-500',
+            },
+
+            // Business Achievements
+            {
+                id: 'businesses_10',
+                title: 'Pioneers',
+                description: 'Our first 10 active businesses trust Zeneva.',
+                target: 10,
+                current: activeBusinesses,
+                icon: Trophy,
+                color: 'text-cyan-500',
+            },
+            {
                 id: 'businesses_100',
                 title: 'A Growing Community',
                 description: 'We successfully reached 100 active businesses running on Zeneva.',
@@ -110,6 +182,15 @@ export default function AchievementsPage() {
                 current: activeBusinesses,
                 icon: Trophy,
                 color: 'text-indigo-500',
+            },
+            {
+                id: 'businesses_500',
+                title: 'Enterprise Scale',
+                description: 'An army of 500 active businesses now operate via Zeneva.',
+                target: 500,
+                current: activeBusinesses,
+                icon: Star,
+                color: 'text-fuchsia-500',
             }
         ];
     }, [businesses, products, receipts]);
