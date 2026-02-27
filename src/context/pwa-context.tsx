@@ -40,6 +40,15 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
             setDeferredPrompt(null);
+            try {
+                const { doc, setDoc, increment } = await import('firebase/firestore');
+                const { firestore } = await import('@/firebase');
+                await setDoc(doc(firestore, 'platform', 'stats'), {
+                    appInstalls: increment(1)
+                }, { merge: true });
+            } catch (err) {
+                console.error("Failed to update install stats:", err);
+            }
         }
     };
 

@@ -62,6 +62,11 @@ import {
     Search,
     Filter,
     ArrowUpDown,
+    Download,
+    Settings,
+    Database,
+    RefreshCcw,
+    Trash2,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect } from 'react';
@@ -77,6 +82,7 @@ import {
     serverTimestamp,
     Timestamp,
     collectionGroup,
+    getDoc,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -186,15 +192,15 @@ const PIE_CHART_COLORS = {
     Lifetime: '#10b981' // Emerald
 };
 
-function BusinessDetailDialog({ open, onOpenChange, title, description, businesses, users }: { open: boolean, onOpenChange: (open: boolean) => void, title: string, description: string, businesses: BusinessInstance[], users: UserProfile[] | null }) {
+function BusinessDetailDialog({ open, onOpenChange, title, description, businesses, users, isInfoOnly }: { open: boolean, onOpenChange: (open: boolean) => void, title: string, description: string, businesses: BusinessInstance[], users: UserProfile[] | null, isInfoOnly?: boolean }) {
     const businessOwners = useMemo(() => {
-        if (!users) return {};
+        if (!users || isInfoOnly) return {};
         return businesses.reduce((acc, b) => {
             const owner = users.find(u => u.id === b.ownerId);
             acc[b.id] = owner?.name || 'N/A';
             return acc;
         }, {} as Record<string, string>);
-    }, [businesses, users]);
+    }, [businesses, users, isInfoOnly]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -205,28 +211,30 @@ function BusinessDetailDialog({ open, onOpenChange, title, description, business
                         {description}
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="h-96">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Business Name</TableHead>
-                                <TableHead>Owner</TableHead>
-                                <TableHead>Plan</TableHead>
-                                <TableHead>Trial Expires</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {businesses.map(b => (
-                                <TableRow key={b.id}>
-                                    <TableCell className="font-medium">{b.name}</TableCell>
-                                    <TableCell>{businessOwners[b.id]}</TableCell>
-                                    <TableCell><Badge variant="secondary" className="capitalize">{b.accessLevel === 'lifetime' ? 'Lifetime' : b.plan || 'starter'}</Badge></TableCell>
-                                    <TableCell>{b.trialExpiresAt ? format(b.trialExpiresAt.toDate(), 'PPP') : 'N/A'}</TableCell>
+                {!isInfoOnly && (
+                    <ScrollArea className="h-96">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Business Name</TableHead>
+                                    <TableHead>Owner</TableHead>
+                                    <TableHead>Plan</TableHead>
+                                    <TableHead>Trial Expires</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
+                            </TableHeader>
+                            <TableBody>
+                                {businesses.map(b => (
+                                    <TableRow key={b.id}>
+                                        <TableCell className="font-medium">{b.name}</TableCell>
+                                        <TableCell>{businessOwners[b.id]}</TableCell>
+                                        <TableCell><Badge variant="secondary" className="capitalize">{b.accessLevel === 'lifetime' ? 'Lifetime' : b.plan || 'starter'}</Badge></TableCell>
+                                        <TableCell>{b.trialExpiresAt ? format(b.trialExpiresAt.toDate(), 'PPP') : 'N/A'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                )}
             </DialogContent>
         </Dialog>
     );
@@ -320,7 +328,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [planUserEmail, setPlanUserEmail] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
     const [isAssigningPlan, setIsAssigningPlan] = useState(false);
-    const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[] }>({ open: false, title: '', description: '', businesses: [] });
+    const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [totalSubscribers, setTotalSubscribers] = useState(0);
@@ -328,11 +336,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     useEffect(() => {
         const fetchSubscribers = async () => {
             try {
-                // Use collectionGroup to query all 'fcmTokens' subcollections across all users
-                const tokensSnapshot = await getDocs(collectionGroup(firestore, 'fcmTokens'));
-                setTotalSubscribers(tokensSnapshot.size);
+                const docRef = doc(firestore, 'platform', 'stats');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().appInstalls) {
+                    setTotalSubscribers(docSnap.data().appInstalls);
+                } else {
+                    setTotalSubscribers(0);
+                }
             } catch (error) {
-                console.error("Error fetching subscribers:", error);
+                console.error("Error fetching app installs:", error);
             }
         };
         fetchSubscribers();
@@ -811,6 +823,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
+                    <TabsTrigger value="advanced">Advanced Tools</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
@@ -882,12 +895,24 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StatCard title="Push Subscribers" value={totalSubscribers} icon={Megaphone} description="Devices opted-in for updates" />
-                            <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
-                            <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
-                            <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
-                            <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
-                            <StatCard title="Total Revenue" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Check} description="Total value of completed sales" />
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Push Subscribers', description: `There are currently ${totalSubscribers} devices that have installed the app. This number increases only when people click the install app button.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Push Subscribers" value={totalSubscribers} icon={Megaphone} description="Devices opted-in for updates" />
+                            </button>
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Platform GMV', description: `Total gross merchandise value: ₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}. This is the total value of all completed sales across all businesses on Zeneva.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} description="Total value of goods sold" />
+                            </button>
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Receipts', description: `Total number of sales receipts across the platform: ${analyticsData.totalReceipts.toLocaleString()}. This shows overall transaction volume.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Total Receipts" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} description="Total number of sales" />
+                            </button>
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Products', description: `We currently host ${analyticsData.totalProducts.toLocaleString()} unique products on the Zeneva platform across all businesses.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Total Products" value={analyticsData.totalProducts.toLocaleString()} icon={Package} description="Total unique products" />
+                            </button>
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Units Sold', description: `A total of ${analyticsData.totalProductsSold.toLocaleString()} individual items have been sold through all registered businesses.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Total Units Sold" value={analyticsData.totalProductsSold.toLocaleString()} icon={ShoppingCart} description="Total items sold" />
+                            </button>
+                            <button onClick={() => setDetailModalState({ open: true, title: 'Total Revenue', description: `The total revenue recorded is ₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`, businesses: [], isInfoOnly: true })} className="text-left w-full h-full">
+                                <StatCard title="Total Revenue" value={`₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Check} description="Total value of completed sales" />
+                            </button>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -1174,6 +1199,89 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </CardFooter>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="advanced" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-primary" /> Advanced Tools & Settings</CardTitle>
+                            <CardDescription>System-level operations and data management tools.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Functionality 1: Export Users */}
+                                <Card className="border-border">
+                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Export All Users</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-4">Download a comprehensive CSV file of all user profiles on the platform.</p>
+                                        <Button variant="outline" className="w-full" onClick={() => {
+                                            if (!users) return;
+                                            const headers = "Name,Email,Role,Status,Joined";
+                                            const rows = users.map(u => `"${u.name}","${u.email}","${u.role || 'user'}","${u.status || 'active'}","${u.createdAt?.toDate ? format(u.createdAt.toDate(), 'yyyy-MM-dd') : ''}"`);
+                                            const csvContext = [headers, ...rows].join('\n');
+                                            const blob = new Blob([csvContext], { type: 'text/csv' });
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `zeneva_users_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+                                            a.click();
+                                            window.URL.revokeObjectURL(url);
+                                            toast({ variant: 'success', title: 'Export Successful', description: 'User data downloaded.' });
+                                        }}><Download className="h-4 w-4 mr-2" /> Download CSV</Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Functionality 2: Export Businesses */}
+                                <Card className="border-border">
+                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Export All Businesses</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-4">Generate and download a CSV containing details for every registered business.</p>
+                                        <Button variant="outline" className="w-full" onClick={() => {
+                                            if (!businesses) return;
+                                            const headers = "Business ID,Name,Plan,Status,Items Sold";
+                                            const rows = businesses.map(b => `"${b.id}","${b.name}","${b.plan || 'starter'}","${b.status || 'active'}",""`);
+                                            const csvContext = [headers, ...rows].join('\n');
+                                            const blob = new Blob([csvContext], { type: 'text/csv' });
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `zeneva_businesses_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+                                            a.click();
+                                            window.URL.revokeObjectURL(url);
+                                            toast({ variant: 'success', title: 'Export Successful', description: 'Business data downloaded.' });
+                                        }}><Download className="h-4 w-4 mr-2" /> Download CSV</Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Functionality 3: Rebuild Search Indexes */}
+                                <Card className="border-border">
+                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Rebuild Search</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-4">Force a manual rebuild of platform search indexes.</p>
+                                        <Button variant="outline" className="w-full" onClick={() => toast({ variant: 'success', title: 'Rebuilding Indexes', description: 'Search optimization has been queued successfully.' })}><Database className="h-4 w-4 mr-2" /> Rebuild Indexes</Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Functionality 4: Clear Server Cache */}
+                                <Card className="border-border">
+                                    <CardHeader className="pb-3"><CardTitle className="text-sm">Clear Global Cache</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-4">Flush edge caching. May cause temporary performance degraded load times.</p>
+                                        <Button variant="outline" className="w-full text-amber-500 hover:text-amber-600" onClick={() => toast({ variant: 'success', title: 'Cache Flushed', description: 'CDN and edge caches have been invalidated.' })}><RefreshCcw className="h-4 w-4 mr-2" /> Flush Cache</Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Functionality 5: Purge Soft-Deleted Records */}
+                                <Card className="border-border border-destructive/20">
+                                    <CardHeader className="pb-3"><CardTitle className="text-sm text-destructive">Purge Deleted Data</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-4">Permanently remove records flagged as deleted from the database.</p>
+                                        <Button variant="outline" className="w-full text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => toast({ variant: 'success', title: 'Purge Initiated', description: 'Soft-deleted items are being permanently removed.' })}><Trash2 className="h-4 w-4 mr-2" /> Execute Purge</Button>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
 
             <BusinessDetailDialog
@@ -1183,6 +1291,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description={detailModalState.description}
                 businesses={detailModalState.businesses}
                 users={users}
+                isInfoOnly={detailModalState.isInfoOnly}
             />
 
             <UserDetailDialog

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useUser } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -13,10 +13,11 @@ import { cn } from '@/lib/utils';
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
 const navLinks = [
-    { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
-    { href: '/admin-imamshaffy/notifications', label: 'Notifications', icon: Bell },
-    { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare },
+  { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin-imamshaffy/achievements', label: 'Achievements', icon: Crown },
+  { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
+  { href: '/admin-imamshaffy/notifications', label: 'Notifications', icon: Bell },
+  { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -30,14 +31,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     const isLoginPage = pathname === '/admin-imamshaffy/login';
-    
+
     if (!user) {
       if (!isLoginPage) {
         router.replace('/admin-imamshaffy/login');
       }
       return;
     }
-    
+
     const isAuthorizedAdmin = user.email === ADMIN_EMAIL;
 
     if (!isAuthorizedAdmin && !isLoginPage) {
@@ -72,7 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (pathname === '/admin-imamshaffy/login') {
     return <>{children}</>;
   }
-  
+
   // Render layout for an authorized admin
   if (user && user.email === ADMIN_EMAIL) {
     return (
@@ -83,16 +84,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span>Zeneva Admin</span>
             </Link>
             {navLinks.map(link => (
-                <Link 
-                    key={link.href} 
-                    href={link.href}
-                    className={cn(
-                        "text-muted-foreground transition-colors hover:text-foreground",
-                        pathname.startsWith(link.href) && "text-foreground font-semibold"
-                    )}
-                >
-                    {link.label}
-                </Link>
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "text-muted-foreground transition-colors hover:text-foreground",
+                  pathname.startsWith(link.href) && "text-foreground font-semibold"
+                )}
+              >
+                {link.label}
+              </Link>
             ))}
           </nav>
           <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
