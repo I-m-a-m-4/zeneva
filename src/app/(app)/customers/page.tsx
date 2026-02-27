@@ -86,19 +86,26 @@ export default function CustomersPage() {
   }, [customers]);
 
   React.useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm.trim()) {
-        setIsSearching(true);
-        const results = await searchCustomers(searchTerm);
-        setDisplayedCustomers(results);
-        setIsSearching(false);
-      } else {
-        setDisplayedCustomers(customers);
-      }
-    }, 500);
+    if (!customers) {
+      setDisplayedCustomers(null);
+      return;
+    }
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, customers, searchCustomers]);
+    if (searchTerm.trim()) {
+      const lowerTerm = searchTerm.toLowerCase();
+      const filtered = customers.filter(customer => {
+        return (
+          (customer.name && customer.name.toLowerCase().includes(lowerTerm)) ||
+          (customer.email && customer.email.toLowerCase().includes(lowerTerm)) ||
+          (customer.code && customer.code.toLowerCase().includes(lowerTerm)) ||
+          (customer.phone && customer.phone.toLowerCase().includes(lowerTerm))
+        );
+      });
+      setDisplayedCustomers(filtered);
+    } else {
+      setDisplayedCustomers(customers);
+    }
+  }, [searchTerm, customers]);
 
   const customerTotals = React.useMemo(() => {
     const totals: Record<string, { total: number }> = {};
