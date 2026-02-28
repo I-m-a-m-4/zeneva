@@ -16,6 +16,7 @@ import { sendReceiptEmail } from '@/lib/email';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import { logAuditEvent } from '@/lib/audit';
 
 
@@ -28,6 +29,8 @@ export default function ReviewPage() {
     const { user } = useUser();
     const [isCompleting, setIsCompleting] = React.useState(false);
     const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
+    const [backdate, setBackdate] = React.useState('');
+    const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id || currentUserProfile?.role === 'owner';
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
 
     if (cart.length === 0 && !isCompleting) {
@@ -60,7 +63,7 @@ export default function ReviewPage() {
         total,
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
         status: (paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid')) as 'pending' | 'unpaid' | 'paid',
-        createdAt: new Date(), // Use a real date for optimistic display
+        createdAt: backdate ? new Date(backdate) : new Date(), // Use a real date for optimistic display
     };
 
 
@@ -156,7 +159,7 @@ export default function ReviewPage() {
                     customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
                     subtotal, tax, discount, total, totalCost, profit, paymentMethod,
                     status,
-                    createdAt: serverTimestamp(),
+                    createdAt: backdate ? new Date(backdate) : serverTimestamp(),
                     createdBy: user.uid,
                 };
                 batch.set(newReceiptRef, receiptData);
@@ -167,7 +170,7 @@ export default function ReviewPage() {
                 await logAuditEvent(firestore, business.id, currentUserProfile, {
                     action: 'sale.create',
                     entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
-                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in' }
+                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in', isBackdated: !!backdate, backdatedDate: backdate || null }
                 });
 
                 // Move navigation at the end
@@ -270,6 +273,27 @@ export default function ReviewPage() {
                     <p className="text-sm text-muted-foreground">
                         This will finalize the sale, generate a receipt, and update your inventory. This action works offline.
                     </p>
+
+                    {isAdmin && (
+                        <>
+                            <Separator />
+                            <div className="flex flex-col gap-2 py-2">
+                                <Label htmlFor="backdate" className="text-sm font-semibold flex flex-col gap-1 cursor-pointer">
+                                    <span>Backdate Sale (Admin/Owner Only)</span>
+                                    <span className="font-normal text-muted-foreground text-xs">
+                                        Record a missed sale from a previous date. This action will be flagged in the audit log.
+                                    </span>
+                                </Label>
+                                <Input
+                                    id="backdate"
+                                    type="datetime-local"
+                                    className="w-full mt-1"
+                                    value={backdate}
+                                    onChange={(e) => setBackdate(e.target.value)}
+                                />
+                            </div>
+                        </>
+                    )}
 
                     {selectedCustomer?.email && canSendEmail && (
                         <>

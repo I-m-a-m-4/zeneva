@@ -232,6 +232,7 @@ function AuditLogPageContent() {
 
     return (
         <>
+            {analysis && <AnalysisResults analysis={analysis} />}
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -329,7 +330,6 @@ function AuditLogPageContent() {
                     )}
                 </CardContent>
             </Card>
-            {analysis && <AnalysisResults analysis={analysis} />}
             <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
                 <DialogContent>
                     <DialogHeader>
