@@ -308,6 +308,53 @@ export const blogPosts: StaticBlogPost[] = [
       ]
     }
   },
+  {
+    slug: 'backorder-and-backdating-in-retail',
+    title: 'Managing Gracefully: How Backorders and Backdating Keep Your Business Honest',
+    excerpt: 'Run out of stock? Or forgot to record a sale yesterday? Zeneva’s backorder and backdating features help you manage the realities of retail seamlessly.',
+    imageUrl: 'https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?q=80&w=1780&auto=format&fit=crop',
+    category: 'Features',
+    directAnswer: "Zeneva supports handling complex retail realities: Backorders let you record a sale and debt even if an item is out of stock, while Backdating allows admins to record missed sales from previous days retroactively, keeping your revenue reports completely accurate.",
+    faq: [
+      { question: "Is backdating secure?", answer: "Yes. Backdating is restricted to admins and owners, and any backdated sale is flagged heavily in the Audit Log to prevent abuse." },
+      { question: "What happens when I backorder an item?", answer: "The system registers the sale but shows a negative inventory (or creates a debt note), alerting you immediately that stock needs replenishing while the customer gets their receipt." }
+    ]
+  },
+  {
+    slug: 'unlimited-sales-recording-for-high-volume-business',
+    title: 'Scaling With Confidence: Unlimited Sales Recording on Zeneva',
+    excerpt: 'Whether you sell 10 items a day or 10,000, your software should never slow you down. Here is how Zeneva processes infinite sales smoothly.',
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Productivity',
+    directAnswer: "Zeneva's infrastructure is built for high-scale environments. It supports recording an unlimited number of sales transactions without lag, meaning as your retail business scales into a franchise, your POS continues to run blisteringly fast.",
+    faq: [
+      { question: "Is there a cap on how many sales I can ring up per month?", answer: "Absolutely not. Zeneva supports infinite sales limits across all plans, including the Free plan." }
+    ]
+  },
+  {
+    slug: 'professional-invoicing-made-simple',
+    title: 'From POS to Professional Invoices in One Click',
+    excerpt: 'Retail is not just cash-and-carry. Discover how to create, send, and track professional invoices directly from your Zeneva dashboard.',
+    imageUrl: '/maximize.png',
+    category: 'Features',
+    directAnswer: "Zeneva enables seamless B2B transactions by allowing you to generate professional invoices directly from the Point of Sale. You can issue an invoice for unpaid orders, email it out, and track outstanding debts all in one place.",
+    faq: [
+      { question: "Can I add business logos to my invoices?", answer: "Yes, invoices grab your business logo and details directly from your settings." },
+      { question: "Do invoices deduct from inventory immediately?", answer: "Yes, the moment an invoice is generated, the stock is deducted to secure the items for the buyer." }
+    ]
+  },
+  {
+    slug: 'audit-log-theft-detection',
+    title: 'Audit Log & AI: The Ultimate Weapon Against Internal Theft',
+    excerpt: 'Internal theft is a silent killer in retail. Here is how Zeneva’s Audit Log uses an AI assistant to detect suspicious patterns automatically.',
+    imageUrl: '/loglytics.svg',
+    category: 'Security',
+    directAnswer: "The Zeneva Audit Log tracks every action in your store chronologicaly. The integrated AI scanner looks for subtle signs of theft—like rapid sale voids (stealing cash) or suspicious user deactivations—and alerts the business owner instantly.",
+    faq: [
+      { question: "Who can access the audit log?", answer: "For security, only the business Owner or designated high-level Admins can read the audit log." },
+      { question: "What kind of theft does it catch?", answer: "It catches digital manipulation, such as voiding sales to pocket cash while balancing inventory, or unauthorized changes to user permissions." }
+    ]
+  }
 ];
 
 // --- Programmatic SEO Data ---

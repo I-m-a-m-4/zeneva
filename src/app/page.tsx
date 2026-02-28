@@ -64,6 +64,9 @@ import {
     Store,
     DollarSign,
     Trophy,
+    History,
+    FileText,
+    Clock,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -606,6 +609,30 @@ export default function Home() {
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
+                                        icon: Clock,
+                                        title: "Backorders & Backdating",
+                                        description: "Effortlessly record sales for items that are out of stock. Backdate missed sales to keep your records perfectly accurate.",
+                                        bgColor: "bg-rose-100",
+                                        iconColor: "text-rose-600",
+                                        hoverBg: "bg-[#FFF1F2]" // Light Rose
+                                    },
+                                    {
+                                        icon: InfinityIcon,
+                                        title: "Unlimited Sales Recording",
+                                        description: "Record an infinite amount of sales transactions. The system scales effortlessly with your business volume without slowing down.",
+                                        bgColor: "bg-cyan-100",
+                                        iconColor: "text-cyan-600",
+                                        hoverBg: "bg-[#ECFEFF]" // Light Cyan
+                                    },
+                                    {
+                                        icon: FileText,
+                                        title: "Process Invoicing",
+                                        description: "Generate professional invoices instantly for B2B clients or unpaid orders. Track unpaid balances efficiently.",
+                                        bgColor: "bg-fuchsia-100",
+                                        iconColor: "text-fuchsia-600",
+                                        hoverBg: "bg-[#FDF4FF]" // Light Fuchsia
+                                    },
+                                    {
                                         icon: ShieldCheck,
                                         title: "Security & Audit Log",
                                         description: "Enhance security with a detailed record of all critical events, complete with automated issue scanning.",
@@ -990,8 +1017,9 @@ export default function Home() {
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 500 products</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 2 Staff Accounts</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS (Unlimited Sales)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Receipts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> <b>Free Online Storefront</b></li>
                                     </ul>
                                     <div className="mt-auto pt-6">
@@ -1014,6 +1042,8 @@ export default function Home() {
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 10 Staff Accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Audit Log</li>
