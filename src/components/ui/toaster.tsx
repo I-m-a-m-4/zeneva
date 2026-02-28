@@ -31,22 +31,22 @@ export function Toaster() {
           <Toast key={id} variant={variant} {...props} className="p-3">
             <div className="flex w-full items-center gap-3">
               {icon && <div className="shrink-0">{icon}</div>}
-              
+
               <div className="grid flex-1 gap-1">
                 {title && <ToastTitle className="text-sm">{title}</ToastTitle>}
                 {description && <ToastDescription className="text-xs">{description}</ToastDescription>}
               </div>
 
               <div className="flex items-center">
-                 {action}
-                 <div className={cn("ml-4 h-full w-px self-stretch bg-white/20", !action && "hidden")}></div>
-                 <ToastClose className="relative right-0 top-0 translate-x-0 translate-y-0" />
+                {action}
+                <div className={cn("ml-4 h-full w-px self-stretch bg-white/20", !action && "hidden")}></div>
+                <ToastClose className="relative right-0 top-0 translate-x-0 translate-y-0" />
               </div>
             </div>
           </Toast>
         );
       })}
-      <ToastViewport />
+      <ToastViewport className="print:hidden" />
     </ToastProvider>
   );
 }
