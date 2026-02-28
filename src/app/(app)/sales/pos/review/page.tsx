@@ -29,6 +29,7 @@ export default function ReviewPage() {
     const { user } = useUser();
     const [isCompleting, setIsCompleting] = React.useState(false);
     const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
+    const [autoPrint, setAutoPrint] = React.useState(true);
     const [backdate, setBackdate] = React.useState('');
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id || currentUserProfile?.role === 'owner';
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
@@ -174,12 +175,16 @@ export default function ReviewPage() {
                 });
 
                 // Move navigation at the end
-                if (paymentMethod === 'Invoice') {
-                    router.push(`/invoice/${newReceiptRef.id}`);
+                if (autoPrint) {
+                    setTimeout(() => {
+                        window.print();
+                        router.push('/sales/pos/select-products');
+                        resetPOS();
+                    }, 500);
                 } else {
-                    router.push(`/receipts/${newReceiptRef.id}`);
+                    router.push('/sales/pos/select-products');
+                    resetPOS();
                 }
-                resetPOS();
 
                 if (navigator.onLine) {
                     toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
@@ -313,6 +318,20 @@ export default function ReviewPage() {
                             </div>
                         </>
                     )}
+
+                    <Separator />
+                    <div className="flex items-center justify-between py-2">
+                        <Label htmlFor="auto-print" className="cursor-pointer font-medium text-sm">
+                            Print Receipt
+                        </Label>
+                        <input
+                            type="checkbox"
+                            id="auto-print"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={autoPrint}
+                            onChange={(e) => setAutoPrint(e.target.checked)}
+                        />
+                    </div>
 
                     <div className="flex flex-col gap-2 pt-2">
                         <Button size="lg" className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all" onClick={handleCompleteSale} disabled={isCompleting}>
