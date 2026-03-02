@@ -17,7 +17,7 @@ export default function POSLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <nav aria-label="Progress" className="mb-8 print:hidden">
+      <nav aria-label="Progress" className="mb-8 no-print">
         <ol role="list" className="flex items-center">
           {steps.map((step, stepIdx) => (
             <li

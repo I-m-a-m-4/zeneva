@@ -46,7 +46,7 @@ export function Toaster() {
           </Toast>
         );
       })}
-      <ToastViewport className="print:hidden" />
+      <ToastViewport className="no-print" />
     </ToastProvider>
   );
 }

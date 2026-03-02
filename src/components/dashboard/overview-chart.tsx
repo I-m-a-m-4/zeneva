@@ -18,8 +18,8 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 interface OverviewChartProps {
-    receipts: Receipt[];
-    currencySymbol: string;
+  receipts: Receipt[];
+  currencySymbol: string;
 }
 
 export default function OverviewChart({ receipts, currencySymbol }: OverviewChartProps) {
@@ -31,8 +31,8 @@ export default function OverviewChart({ receipts, currencySymbol }: OverviewChar
     receipts.forEach(receipt => {
       const date = receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
       const year = date.getFullYear();
-      
-      if (year === currentYear) { 
+
+      if (year === currentYear) {
         const monthName = monthNames[date.getMonth()];
         monthlySales[monthName] = (monthlySales[monthName] || 0) + receipt.total;
       }
@@ -57,30 +57,36 @@ export default function OverviewChart({ receipts, currencySymbol }: OverviewChar
           <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground p-4">
             <TrendingUp className="h-16 w-16 opacity-50 mb-4" />
             <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
-                <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
-                <p>This chart will track your revenue over time once you complete your first sale through the POS.</p>
+              <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary" /> Zen AI</p>
+              <p>This chart will track your revenue over time once you complete your first sale through the POS.</p>
             </div>
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="month" 
-                  tickLine={false} 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
                   tickMargin={8}
                 />
-                <YAxis 
-                  tickLine={false} 
-                  axisLine={false} 
-                  tickMargin={8} 
-                  tickFormatter={(value) => `${currencySymbol}${(Number(value) / 1000).toLocaleString()}k`}
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={60}
+                  tickFormatter={(value) => {
+                    const val = Number(value);
+                    if (val >= 1000000) return `${currencySymbol}${(val / 1000000).toFixed(val >= 10000000 ? 0 : 1)}M`;
+                    if (val >= 1000) return `${currencySymbol}${(val / 1000).toLocaleString()}k`;
+                    return `${currencySymbol}${val}`;
+                  }}
                 />
                 <ChartTooltip
                   cursor={false}
-                  content={<ChartTooltipContent indicator="dot" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`} />}
+                  content={<ChartTooltipContent indicator="dot" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} />}
                 />
                 <Bar dataKey="totalSales" fill="var(--color-totalSales)" radius={4} />
               </BarChart>
