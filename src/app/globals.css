@@ -199,15 +199,22 @@
       print-color-adjust: exact;
     }
 
+    @page {
+      margin: 0;
+      size: auto;
+    }
+
     .print-receipt {
       display: block !important;
       position: static !important;
       box-shadow: none !important;
       border: none !important;
-      width: 100% !important;
-      max-width: 100% !important;
+      width: 300px !important;
+      max-width: 80mm !important;
       margin: 0 !important;
+      padding: 4mm !important;
       color: black !important;
+      page-break-after: avoid;
     }
 
     .print-receipt * {

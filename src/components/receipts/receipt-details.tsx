@@ -129,7 +129,7 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
         // Default Receipt View (Classic) - Optimized for Thermal Printers
         return (
             <div ref={ref} className="w-full bg-white sm:py-4 print:py-0">
-                <Card className="w-full max-w-[300px] mx-auto relative overflow-hidden print-receipt shadow-none border-dashed border-2 border-gray-200 bg-white text-black print:border-none print:max-w-full print:shadow-none print:p-0">
+                <Card className="w-full max-w-[300px] mx-auto relative overflow-hidden print-receipt shadow-none border-dashed border-2 border-gray-200 bg-white text-black print:border-none print:shadow-none">
                     <Watermark businessName={businessName} />
                     <CardHeader className="text-center pb-2 pt-4 px-4">
                         <CardTitle className="text-xl font-bold uppercase tracking-wider">{businessName}</CardTitle>
