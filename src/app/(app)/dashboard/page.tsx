@@ -345,6 +345,13 @@ export default function DashboardPage() {
                 </div>
                 <PackageSearch className="h-8 w-8 text-primary" />
               </div>
+              <div className="pt-2">
+                <Button variant="outline" size="sm" asChild className="w-full">
+                  <Link href="/inventory?sortBy=stock-desc">
+                    View Highest Stock Products <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

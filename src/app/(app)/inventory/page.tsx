@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import NProgress from 'nprogress';
 import {
   File,
@@ -129,8 +129,19 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
+  const searchParams = useSearchParams();
+  const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
+
   const [stockFilter, setStockFilter] = React.useState('all');
   const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
+
+  React.useEffect(() => {
+    const s = searchParams.get('sortBy');
+    if (s === 'stock-desc' || s === 'stock-asc' || s === 'name') {
+      setSortBy(s);
+    }
+  }, [searchParams]);
 
   React.useEffect(() => {
     if (business) {
@@ -193,8 +204,16 @@ export default function InventoryPage() {
       filtered = filtered.filter(p => p.category === categoryFilter);
     }
 
-    return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [allProducts, optimisticProducts, searchTerm, stockFilter, categoryFilter]);
+    return filtered.sort((a, b) => {
+      if (sortBy === 'stock-desc') {
+        return (b.stock || 0) - (a.stock || 0);
+      }
+      if (sortBy === 'stock-asc') {
+        return (a.stock || 0) - (b.stock || 0);
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [allProducts, optimisticProducts, searchTerm, stockFilter, categoryFilter, sortBy]);
 
   const pageCount = Math.ceil(filteredAndSortedProducts.length / PRODUCTS_PER_PAGE);
 
@@ -205,7 +224,7 @@ export default function InventoryPage() {
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, stockFilter, categoryFilter]);
+  }, [searchTerm, stockFilter, categoryFilter, sortBy]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -314,7 +333,7 @@ export default function InventoryPage() {
     });
   };
 
-  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0);
+  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
 
   return (
     <div className="flex flex-col h-full w-full pb-16 md:pb-0">
@@ -383,10 +402,20 @@ export default function InventoryPage() {
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                    <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="stock-desc">Highest Stock First</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="stock-asc">Lowest Stock First</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               {activeFilterCount > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('name'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                     Clear Filters
                   </DropdownMenuItem>
                 </>
