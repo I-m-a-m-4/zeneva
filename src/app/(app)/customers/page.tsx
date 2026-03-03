@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft } from "lucide-react";
 import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
@@ -73,6 +74,8 @@ function CustomerRowSkeleton() {
   )
 }
 
+const CUSTOMERS_PER_PAGE = 10;
+
 export default function CustomersPage() {
   const { customers, receipts, isLoading: isPosLoading, business, currentUserProfile: currentUser, triggerRefresh, searchCustomers } = usePOS();
   const firestore = useFirestore();
@@ -86,6 +89,7 @@ export default function CustomersPage() {
 
   const [displayedCustomers, setDisplayedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
 
@@ -146,7 +150,16 @@ export default function CustomersPage() {
     });
 
     setDisplayedCustomers(filtered);
+    setCurrentPage(1);
   }, [searchTerm, customers, sortBy, customerTotals]);
+
+  const paginatedCustomers = React.useMemo(() => {
+    if (!displayedCustomers) return [];
+    const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
+    return displayedCustomers.slice(startIndex, startIndex + CUSTOMERS_PER_PAGE);
+  }, [displayedCustomers, currentPage]);
+
+  const pageCount = Math.ceil((displayedCustomers?.length || 0) / CUSTOMERS_PER_PAGE);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -304,7 +317,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayedCustomers.map((customer) => {
+                {paginatedCustomers.map((customer) => {
                   const totalSpent = customerTotals[customer.id]?.total ?? 0;
                   return (
                     <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
@@ -357,6 +370,33 @@ export default function CustomersPage() {
             </div>
           )}
         </CardContent>
+        {displayedCustomers && displayedCustomers.length > 0 && (
+          <CardFooter className="flex items-center justify-between border-t py-4">
+            <div className="text-sm text-muted-foreground">
+              Showing <strong>{(currentPage - 1) * CUSTOMERS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * CUSTOMERS_PER_PAGE, displayedCustomers.length)}</strong> of <strong>{displayedCustomers.length}</strong> customers
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= pageCount}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
