@@ -30,14 +30,14 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
                     <Card className="w-full max-w-2xl mx-auto relative overflow-hidden print-receipt p-6">
                         <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h1 className="text-3xl font-bold text-primary">{businessName}</h1>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{businessAddress}</p>
-                                {business?.settings?.phone && <p className="text-sm">Tel: {business.settings.phone}</p>}
+                                <h1 className="text-xl font-bold text-primary">{businessName}</h1>
+                                <p className="text-muted-foreground whitespace-pre-wrap text-[11px]">{businessAddress}</p>
+                                {business?.settings?.phone && <p className="text-[10px]">Tel: {business.settings.phone}</p>}
                             </div>
                             <div className="text-right">
-                                <h2 className="text-2xl font-bold uppercase text-primary">Invoice</h2>
-                                <p className="font-medium">#{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</p>
-                                <p className="text-sm text-muted-foreground">
+                                <h2 className="text-lg font-bold uppercase text-primary">Invoice</h2>
+                                <p className="font-medium text-sm">#{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</p>
+                                <p className="text-[10px] text-muted-foreground">
                                     {receipt.createdAt ? format(receipt.createdAt instanceof Date ? receipt.createdAt : (receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt)), 'PPP') : 'N/A'}
                                 </p>
                             </div>
@@ -47,18 +47,18 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         <div className="grid grid-cols-2 gap-8 mb-8">
                             <div>
-                                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Billed To:</h3>
-                                <p className="font-semibold">{receipt.customer?.name || 'Walk-in Customer'}</p>
-                                <p className="text-sm text-muted-foreground">{receipt.customer?.email || ''}</p>
+                                <h3 className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Billed To:</h3>
+                                <p className="font-semibold text-sm">{receipt.customer?.name || 'Walk-in Customer'}</p>
+                                <p className="text-[11px] text-muted-foreground">{receipt.customer?.email || ''}</p>
                             </div>
                             <div className="text-right">
-                                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Payment Status:</h3>
-                                <p className="font-semibold capitalize">{receipt.status || (receipt.paymentMethod === 'Bank Transfer' ? 'pending' : 'paid')}</p>
-                                <p className="text-sm text-muted-foreground">Via {receipt.paymentMethod}</p>
+                                <h3 className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Payment Status:</h3>
+                                <p className="font-semibold capitalize text-sm">{receipt.status || (receipt.paymentMethod === 'Bank Transfer' ? 'pending' : 'paid')}</p>
+                                <p className="text-[11px] text-muted-foreground">Via {receipt.paymentMethod}</p>
                             </div>
                         </div>
 
-                        <table className="w-full mb-8 text-sm">
+                        <table className="w-full mb-8 text-[11px]">
                             <thead className="border-b">
                                 <tr className="text-left">
                                     <th className="py-2">Item</th>
@@ -81,22 +81,22 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         <div className="flex justify-end mb-8">
                             <div className="w-64 space-y-2">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-[11px]">
                                     <span>Subtotal</span>
                                     <span>{currencySymbol}{receipt.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-[11px]">
                                     <span>Tax</span>
                                     <span>{currencySymbol}{receipt.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 </div>
                                 {receipt.discount > 0 && (
-                                    <div className="flex justify-between text-sm text-destructive font-medium">
+                                    <div className="flex justify-between text-[11px] text-destructive font-medium">
                                         <span>Discount</span>
                                         <span>-{currencySymbol}{receipt.discount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 <Separator />
-                                <div className="flex justify-between text-lg font-bold">
+                                <div className="flex justify-between text-sm font-bold">
                                     <span>Total</span>
                                     <span>{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 </div>
@@ -105,8 +105,8 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         {(business?.settings?.paymentBankName || business?.settings?.paymentInstructions) && (
                             <div className="mt-8 pt-6 border-t border-dashed">
-                                <h3 className="text-sm font-bold mb-2">Payment Details</h3>
-                                <div className="text-sm text-muted-foreground">
+                                <h3 className="text-[11px] font-bold mb-2">Payment Details</h3>
+                                <div className="text-[10px] text-muted-foreground">
                                     {business.settings.paymentBankName && (
                                         <p>{business.settings.paymentBankName} | {business.settings.paymentAccountName} | {business.settings.paymentBankAccountId}</p>
                                     )}
@@ -117,7 +117,7 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
                             </div>
                         )}
 
-                        <div className="mt-12 text-center text-xs text-muted-foreground border-t pt-4">
+                        <div className="mt-8 text-center text-[9px] text-muted-foreground border-t pt-2">
                             <p>Thank you for your business!</p>
                             <p>Generated by Zeneva POS</p>
                         </div>
@@ -132,10 +132,10 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
                 <Card className="w-full max-w-[300px] mx-auto relative overflow-hidden print-receipt shadow-none border-dashed border-2 border-gray-200 bg-white text-black print:border-none print:shadow-none">
                     <Watermark businessName={businessName} />
                     <CardHeader className="text-center pb-2 pt-4 px-4">
-                        <CardTitle className="text-xl font-bold uppercase tracking-wider">{businessName}</CardTitle>
-                        {businessAddress && <CardDescription className="text-xs">{businessAddress}</CardDescription>}
+                        <CardTitle className="text-sm font-bold uppercase tracking-wider">{businessName}</CardTitle>
+                        {businessAddress && <CardDescription className="text-[9px]">{businessAddress}</CardDescription>}
                     </CardHeader>
-                    <CardContent className="text-[12px] px-4 pb-4">
+                    <CardContent className="text-[10px] px-4 pb-4">
                         <div className="flex justify-between mb-1">
                             <span className="text-gray-500">Receipt ID:</span>
                             <span className="font-mono">{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</span>
@@ -149,9 +149,9 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
                             <>
                                 <Separator className="my-2 border-dashed border-gray-300" />
                                 <div className="mb-2">
-                                    <h3 className="font-semibold text-gray-500 uppercase text-[10px]">Billed To:</h3>
-                                    <p className="font-medium text-sm">{receipt.customer.name}</p>
-                                    <p className="text-gray-500 text-xs">{receipt.customer.email}</p>
+                                    <h3 className="font-semibold text-gray-500 uppercase text-[9px]">Billed To:</h3>
+                                    <p className="font-medium text-[11px]">{receipt.customer.name}</p>
+                                    <p className="text-gray-500 text-[9px]">{receipt.customer.email}</p>
                                 </div>
                             </>
                         )}
@@ -160,10 +160,10 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         <div className="space-y-2">
                             {receipt.items.map((item, index) => (
-                                <div key={item.productId + index} className="flex justify-between items-start mb-1 text-[13px]">
+                                <div key={item.productId + index} className="flex justify-between items-start mb-1 text-[10px]">
                                     <div className="flex-1 pr-2">
                                         <p className="font-medium leading-tight">{item.name}</p>
-                                        <p className="text-gray-500 text-[11px] mt-0.5">
+                                        <p className="text-gray-500 text-[9px] mt-0.5">
                                             {item.quantity} x {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
@@ -174,7 +174,7 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         <Separator className="my-3 border-dashed border-gray-300" />
 
-                        <div className="space-y-1.5 text-[13px] font-medium text-gray-600">
+                        <div className="space-y-1.5 text-[10px] font-medium text-gray-600">
                             <div className="flex justify-between">
                                 <span>Subtotal</span>
                                 <span>{currencySymbol}{receipt.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -193,13 +193,13 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
 
                         <Separator className="my-3 border-dashed border-gray-300" />
 
-                        <div className="flex justify-between font-bold text-lg pt-1">
+                        <div className="flex justify-between font-bold text-sm pt-1">
                             <span>Total</span>
                             <span>{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
                     </CardContent>
-                    <div className="bg-gray-50/50 p-4 pt-2 text-center text-[11px] border-t border-dashed border-gray-200">
+                    <div className="bg-gray-50/50 p-4 pt-2 text-center text-[9px] border-t border-dashed border-gray-200">
                         <p className="font-medium text-gray-600 mb-1">Thank you for your business!</p>
                         <p className="text-gray-500">Method: <span className="font-semibold uppercase">{receipt.paymentMethod}</span></p>
                     </div>
