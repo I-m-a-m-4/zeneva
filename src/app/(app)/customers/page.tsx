@@ -33,6 +33,13 @@ import { useRouter } from 'next/navigation';
 import NProgress from 'nprogress';
 import { logAuditEvent } from '@/lib/audit';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function CustomerRowSkeleton() {
   return (
@@ -46,6 +53,9 @@ function CustomerRowSkeleton() {
             <Skeleton className="h-4 w-full" />
           </div>
         </div>
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
+        <Skeleton className="h-5 w-full" />
       </TableCell>
       <TableCell className="hidden sm:table-cell">
         <Skeleton className="h-5 w-full" />
@@ -77,35 +87,9 @@ export default function CustomersPage() {
   const [displayedCustomers, setDisplayedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
 
   const isLoading = isPosLoading || isSearching;
-
-  React.useEffect(() => {
-    if (!customers) return;
-    setDisplayedCustomers(customers);
-  }, [customers]);
-
-  React.useEffect(() => {
-    if (!customers) {
-      setDisplayedCustomers(null);
-      return;
-    }
-
-    if (searchTerm.trim()) {
-      const lowerTerm = searchTerm.toLowerCase();
-      const filtered = customers.filter(customer => {
-        return (
-          (customer.name && customer.name.toLowerCase().includes(lowerTerm)) ||
-          (customer.email && customer.email.toLowerCase().includes(lowerTerm)) ||
-          (customer.code && customer.code.toLowerCase().includes(lowerTerm)) ||
-          (customer.phone && customer.phone.toLowerCase().includes(lowerTerm))
-        );
-      });
-      setDisplayedCustomers(filtered);
-    } else {
-      setDisplayedCustomers(customers);
-    }
-  }, [searchTerm, customers]);
 
   const customerTotals = React.useMemo(() => {
     const totals: Record<string, { total: number }> = {};
@@ -121,6 +105,48 @@ export default function CustomersPage() {
     }
     return totals;
   }, [receipts]);
+
+  React.useEffect(() => {
+    if (!customers) {
+      setDisplayedCustomers(null);
+      return;
+    }
+
+    let filtered = [...customers];
+
+    if (searchTerm.trim()) {
+      const lowerTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(customer => {
+        return (
+          (customer.name && customer.name.toLowerCase().includes(lowerTerm)) ||
+          (customer.email && customer.email.toLowerCase().includes(lowerTerm)) ||
+          (customer.code && customer.code.toLowerCase().includes(lowerTerm)) ||
+          (customer.phone && customer.phone.toLowerCase().includes(lowerTerm))
+        );
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      if (sortBy === 'spent') {
+        const spentA = customerTotals[a.id]?.total ?? 0;
+        const spentB = customerTotals[b.id]?.total ?? 0;
+        return spentB - spentA;
+      }
+      if (sortBy === 'loyalty') {
+        return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
+      }
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      // default: recent (createdAt)
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return Number(dateB) - Number(dateA);
+    });
+
+    setDisplayedCustomers(filtered);
+  }, [searchTerm, customers, sortBy, customerTotals]);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -187,17 +213,27 @@ export default function CustomersPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Customers</CardTitle>
-              <CardDescription>
-                Manage your customers and view their purchase history.
-              </CardDescription>
-              <div className="relative mt-2 max-w-sm">
-                <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email, or unique code..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
+                <div className="relative w-full max-w-sm">
+                  <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, or unique code..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spent">Biggest Spender</SelectItem>
+                    <SelectItem value="loyalty">Top Loyalty</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="recent">Most Recent</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex items-center gap-2">

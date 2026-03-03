@@ -209,6 +209,9 @@ export default function DashboardPage() {
 
   const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits } = dashboardData;
 
+  const { currentUserProfile } = usePOS();
+  const isOperator = currentUserProfile?.role === 'vendor_operator';
+
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
@@ -221,13 +224,15 @@ export default function DashboardPage() {
       </PageTitle>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
-        <SummaryCard
-          title="Total Revenue"
-          value={`${currencySymbol}${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon={DollarSign}
-          description={`${totalReceipts + totalOnlineOrdersCount} total transactions`}
-          href="/reports"
-        />
+        {!isOperator && (
+          <SummaryCard
+            title="Total Revenue"
+            value={`${currencySymbol}${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={DollarSign}
+            description={`${totalReceipts + totalOnlineOrdersCount} total transactions`}
+            href="/reports"
+          />
+        )}
         <SummaryCard
           title="Units Sold"
           value={totalUnitsSold.toLocaleString()}
@@ -242,20 +247,24 @@ export default function DashboardPage() {
           description="Signed up in this period"
           href="/customers"
         />
-        <SummaryCard
-          title="POS Sales"
-          value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon={ShoppingCart}
-          description={`${totalReceipts} transactions`}
-          href="/receipts"
-        />
-        <SummaryCard
-          title="Online Sales"
-          value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon={Globe}
-          description={`${totalOnlineOrdersCount} online orders`}
-          href="/online-orders"
-        />
+        {!isOperator && (
+          <SummaryCard
+            title="POS Sales"
+            value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={ShoppingCart}
+            description={`${totalReceipts} transactions`}
+            href="/receipts"
+          />
+        )}
+        {!isOperator && (
+          <SummaryCard
+            title="Online Sales"
+            value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={Globe}
+            description={`${totalOnlineOrdersCount} online orders`}
+            href="/online-orders"
+          />
+        )}
         <SummaryCard
           title="Low Stock Alerts"
           value={lowStockItems}
@@ -274,15 +283,17 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
+      {!isOperator && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
+          </div>
+          <CategoryPieChart products={products || []} />
         </div>
-        <CategoryPieChart products={products || []} />
-      </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2 shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+        <Card className={cn("shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer", isOperator ? "md:col-span-3" : "md:col-span-2")}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
@@ -310,31 +321,33 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-primary" />
-              Inventory Summary
-            </CardTitle>
-            <CardDescription>Quick look at your stock status.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="text-sm text-muted-foreground">Quantity in Hand</p>
-                <p className="text-2xl font-bold">{totalStock.toLocaleString()}</p>
+        {!isOperator && (
+          <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" />
+                Inventory Summary
+              </CardTitle>
+              <CardDescription>Quick look at your stock status.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
+                <div>
+                  <p className="text-sm text-muted-foreground">Quantity in Hand</p>
+                  <p className="text-2xl font-bold">{totalStock.toLocaleString()}</p>
+                </div>
+                <Archive className="h-8 w-8 text-primary" />
               </div>
-              <Archive className="h-8 w-8 text-primary" />
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="text-sm text-muted-foreground">Quantity to be Received</p>
-                <p className="text-2xl font-bold">0</p>
+              <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
+                <div>
+                  <p className="text-sm text-muted-foreground">Quantity to be Received</p>
+                  <p className="text-2xl font-bold">0</p>
+                </div>
+                <PackageSearch className="h-8 w-8 text-primary" />
               </div>
-              <PackageSearch className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
