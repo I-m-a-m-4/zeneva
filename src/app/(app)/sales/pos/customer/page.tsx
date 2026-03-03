@@ -124,13 +124,33 @@ export default function CustomerPage() {
     const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
     const [isNavigating, setIsNavigating] = React.useState(false);
 
-    const filteredCustomers = searchedCustomers || customers || [];
-    const isLoading = isPosLoading || isSearching;
+    const filteredCustomers = React.useMemo(() => {
+        if (!searchTerm.trim()) return customers || [];
+
+        const lowerTerm = searchTerm.toLowerCase();
+        const localResults = customers?.filter(customer => {
+            return (
+                (customer.name && customer.name.toLowerCase().includes(lowerTerm)) ||
+                (customer.email && customer.email.toLowerCase().includes(lowerTerm)) ||
+                (customer.code && customer.code.toLowerCase().includes(lowerTerm)) ||
+                (customer.phone && customer.phone.toLowerCase().includes(lowerTerm))
+            );
+        }) || [];
+
+        // Combine with results from Firestore search for cases where customer might not be in the initial batch
+        const combined = [...localResults, ...(searchedCustomers || [])];
+        const uniqueItems = Array.from(new Map(combined.map(item => [item.id, item])).values());
+
+        return uniqueItems;
+    }, [searchTerm, customers, searchedCustomers]);
+
+    const isLoading = isPosLoading || (searchTerm.trim() && isSearching && (!filteredCustomers || filteredCustomers.length === 0));
 
     React.useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (searchTerm.trim()) {
                 setIsSearching(true);
+                // We still call searchCustomers to hit the DB for potential customers outside the initial 10k batch
                 const results = await searchCustomers(searchTerm);
                 setSearchedCustomers(results);
                 setIsSearching(false);
