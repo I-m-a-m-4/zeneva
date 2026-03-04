@@ -228,17 +228,23 @@ export default function SignupPage() {
           </div>
         </div>
       </div>
-      <div className="hidden bg-muted lg:block relative">
+      <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
-          src="/maxima.png"
-          alt="A modern business management software interface on a laptop."
+          src="/zeneva-signup.png"
+          alt="A breathtaking premium 3D visualization of a digital network representing business growth."
           width="1920"
           height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          quality={100}
+          priority
+          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
         />
-        <div className="absolute bottom-8 left-8 right-8 p-6 bg-black/50 backdrop-blur-md rounded-lg">
-          <h2 className="text-white text-3xl font-bold font-headline">The Operating System for Business</h2>
-          <p className="text-white/80 mt-2 text-lg">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one powerful platform.</p>
+        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">
+          <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">Scale Your <br /><span className="text-primary italic">Business Galaxy</span></h2>
+          <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">Join a network of thriving businesses and unlock premium tools designed for exponential growth.</p>
+          <div className="mt-6 flex items-center gap-3">
+            <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
+            <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.3em] drop-shadow-sm">Growth Ecosystem v1</span>
+          </div>
         </div>
       </div>
     </div>

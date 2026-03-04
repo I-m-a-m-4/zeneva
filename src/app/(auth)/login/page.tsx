@@ -23,11 +23,11 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
-        toast({
-            title: "Authentication service not available.",
-            variant: "destructive"
-        });
-        return;
+      toast({
+        title: "Authentication service not available.",
+        variant: "destructive"
+      });
+      return;
     }
     setIsLoading(true);
     signInWithEmailAndPassword(auth, email, password)
@@ -37,11 +37,11 @@ export default function LoginPage() {
         // any flashes of content or layout shifts.
       })
       .catch((error) => {
-         let description = "Invalid email or password. Please try again.";
-          if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-              description = "Invalid email or password. Please check your credentials and try again.";
-          }
-         toast({
+        let description = "Invalid email or password. Please try again.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          description = "Invalid email or password. Please check your credentials and try again.";
+        }
+        toast({
           variant: 'destructive',
           title: 'Login Failed',
           description: description,
@@ -54,17 +54,17 @@ export default function LoginPage() {
     <div className="w-full min-h-screen flex lg:grid lg:grid-cols-2">
       <div className="flex items-center justify-center relative w-full">
         <div className="absolute top-8 left-4 sm:left-8">
-            <Button variant="ghost" asChild>
-                <Link href="/">
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Back to Home
-                </Link>
-            </Button>
+          <Button variant="ghost" asChild>
+            <Link href="/">
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Link>
+          </Button>
         </div>
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
+              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
             <h1 className="text-3xl font-bold">Login</h1>
             <p className="text-balance text-muted-foreground">
@@ -101,13 +101,13 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                 <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"
-                      onClick={() => setShowPassword(!showPassword)}
-                  >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
             <Button type="submit" className="w-full button-glow" disabled={isLoading}>
@@ -123,17 +123,23 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-       <div className="hidden bg-muted lg:block relative">
+      <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
-          src="/unify.png"
-          alt="A modern business management software interface on a laptop."
+          src="/zeneva-login.png"
+          alt="A premium 3D visualization of a business intelligence dashboard on a glass screen."
           width="1920"
           height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          quality={100}
+          priority
+          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
         />
-        <div className="absolute bottom-8 left-8 right-8 p-6 bg-black/50 backdrop-blur-md rounded-lg">
-            <h2 className="text-white text-3xl font-bold font-headline">The Operating System for Business</h2>
-            <p className="text-white/80 mt-2 text-lg">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one powerful platform.</p>
+        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">
+          <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">The Operating System <br /><span className="text-primary italic">for Business</span></h2>
+          <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one secure platform.</p>
+          <div className="mt-6 flex items-center gap-3">
+            <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
+            <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.3em] drop-shadow-sm">Business Intelligence v2</span>
+          </div>
         </div>
       </div>
     </div>
