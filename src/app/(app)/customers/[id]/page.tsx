@@ -14,8 +14,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
+import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { Separator } from '@/components/ui/separator';
 import {
     AlertDialog,
@@ -49,6 +50,7 @@ export default function CustomerDetailPage() {
     const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(customer?.aiInsights || null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
     const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
+    const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     React.useEffect(() => {
@@ -195,13 +197,16 @@ export default function CustomerDetailPage() {
                             </div>
                         </div>
                     </CardContent>
-                    {canDelete && (
-                        <CardFooter>
+                    <CardFooter className="flex flex-col gap-2">
+                        <Button variant="outline" className="w-full" onClick={() => setCustomerToEdit(customer)}>
+                            <Pencil className="mr-2 h-4 w-4" /> Edit Profile
+                        </Button>
+                        {canDelete && (
                             <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(customer)} disabled={isDeleting}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
                             </Button>
-                        </CardFooter>
-                    )}
+                        )}
+                    </CardFooter>
                 </Card>
 
                 <Card className="md:col-span-2">
@@ -360,6 +365,12 @@ export default function CustomerDetailPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <EditCustomerDialog
+                isOpen={!!customerToEdit}
+                onOpenChange={(open) => !open && setCustomerToEdit(null)}
+                customer={customerToEdit}
+            />
         </div>
     );
 }

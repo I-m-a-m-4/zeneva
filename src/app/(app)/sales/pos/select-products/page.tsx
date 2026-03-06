@@ -111,7 +111,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 ProductItem.displayName = 'ProductItem';
 
 const CartContents = () => {
-    const { cart, removeFromCart, updateQuantity, subtotal, currencySymbol } = usePOS();
+    const { cart, removeFromCart, updateQuantity, subtotal, currencySymbol, clearCart } = usePOS();
     return (
         <>
             {cart.length === 0 ? (
@@ -121,12 +121,23 @@ const CartContents = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearCart}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1.5 px-2 text-xs font-medium"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Clear Cart
+                        </Button>
+                    </div>
                     {cart.map(item => {
                         const cartItemId = item.unit ? `${item.product.id}-${item.unit}` : item.product.id;
                         return (
                             <div key={cartItemId} className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-medium text-sm">
+                                <div className="flex-1 mr-4">
+                                    <p className="font-medium text-sm line-clamp-1">
                                         {item.product.name}
                                         {item.unit && <Badge variant="secondary" className="ml-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
                                     </p>
@@ -137,7 +148,7 @@ const CartContents = () => {
                                         type="number"
                                         value={item.quantity}
                                         onChange={(e) => updateQuantity(cartItemId, parseInt(e.target.value))}
-                                        className="w-16 h-8"
+                                        className="w-16 h-8 text-center"
                                         min="1"
                                     />
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(cartItemId)}>

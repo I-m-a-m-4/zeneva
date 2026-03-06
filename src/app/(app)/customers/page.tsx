@@ -20,12 +20,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil } from "lucide-react";
 import { useFirestore } from '@/firebase';
 import { doc, writeBatch } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
+import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -86,6 +87,7 @@ export default function CustomersPage() {
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
 
   const [displayedCustomers, setDisplayedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
@@ -345,9 +347,14 @@ export default function CustomersPage() {
                       <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
                       <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -434,6 +441,11 @@ export default function CustomersPage() {
           }}
         />
       )}
+      <EditCustomerDialog
+        isOpen={!!customerToEdit}
+        onOpenChange={(open) => !open && setCustomerToEdit(null)}
+        customer={customerToEdit}
+      />
     </>
   );
 }
