@@ -317,10 +317,11 @@ export default function AuthenticatedLayout({
     return <AppLoader text="Logging out..." />;
   }
 
-  // Show full-screen loader ONLY on initial auth load or if profile is missing
-  if (isUserLoading || !user || (user && !currentUserProfile)) {
-    return <AppLoader text="Loading your workspace..." />;
-  }
+  // If loading is complete and no user, we redirect (handled by useEffect).
+  // While loading, we now show the shell instead of a full-screen loader to improve perceived speed.
+  // We only show the loader if we are explicitly not logged in AND not loading (which shouldn't happen due to redirect)
+  // or if we want to provide a tiny bit of buffer.
+  const isInitialAuthCheck = isUserLoading && !user;
 
   // --- Start of Checks for Active/Valid Accounts ---
 
@@ -670,7 +671,14 @@ export default function AuthenticatedLayout({
                 </div>
               </header>
               <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
-                {showSubscriptionBlock ? (
+                {(isUserLoading || !currentUserProfile || isLoading) && !showSubscriptionBlock ? (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <Loader className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground animate-pulse">Loading workspace...</p>
+                    </div>
+                  </div>
+                ) : showSubscriptionBlock ? (
                   <div className="flex h-full min-h-[400px] w-full items-center justify-center p-4">
                     <Card className="w-full max-w-lg border-none shadow-xl bg-gradient-to-br from-background to-muted/50 overflow-hidden animate-in fade-in zoom-in duration-500">
                       <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600"></div>

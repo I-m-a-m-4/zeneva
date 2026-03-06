@@ -31,7 +31,7 @@ export default function ReviewPage() {
     const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
     const [autoPrint, setAutoPrint] = React.useState(true);
     const [backdate, setBackdate] = React.useState('');
-    const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id || currentUserProfile?.role === 'owner';
+    const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
 
     if (cart.length === 0 && !isCompleting) {
@@ -153,6 +153,34 @@ export default function ReviewPage() {
 
                 const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
 
+                // Operating Hours Check
+                const operatingHours = business.settings?.operatingHours;
+                let isOutsideHours = false;
+                if (operatingHours?.enabled) {
+                    const saleDate = backdate ? new Date(backdate) : new Date();
+                    const [openH, openM] = operatingHours.openTime.split(':').map(Number);
+                    const [closeH, closeM] = operatingHours.closeTime.split(':').map(Number);
+                    const nowMinutes = saleDate.getHours() * 60 + saleDate.getMinutes();
+                    const openMinutes = openH * 60 + openM;
+                    const closeMinutes = closeH * 60 + closeM;
+
+                    if (closeMinutes < openMinutes) {
+                        isOutsideHours = !(nowMinutes >= openMinutes || nowMinutes <= closeMinutes);
+                    } else {
+                        isOutsideHours = nowMinutes < openMinutes || nowMinutes > closeMinutes;
+                    }
+
+                    if (isOutsideHours && operatingHours.preventSalesOutsideHours && !isAdmin) {
+                        toast({
+                            variant: 'destructive',
+                            title: 'Operating Hours Violation',
+                            description: `Sales are not allowed outside of operating hours (${operatingHours.openTime} - ${operatingHours.closeTime}).`
+                        });
+                        setIsCompleting(false);
+                        return;
+                    }
+                }
+
                 const receiptData = {
                     businessId: business.id,
                     receiptNumber: displayReceipt.receiptNumber,
@@ -162,6 +190,7 @@ export default function ReviewPage() {
                     status,
                     createdAt: backdate ? new Date(backdate) : serverTimestamp(),
                     createdBy: user.uid,
+                    flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
                 };
                 batch.set(newReceiptRef, receiptData);
 
@@ -171,7 +200,14 @@ export default function ReviewPage() {
                 await logAuditEvent(firestore, business.id, currentUserProfile, {
                     action: 'sale.create',
                     entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
-                    details: { total, itemCount: cart.length, customer: selectedCustomer?.name || 'Walk-in', isBackdated: !!backdate, backdatedDate: backdate || null }
+                    details: {
+                        total,
+                        itemCount: cart.length,
+                        customer: selectedCustomer?.name || 'Walk-in',
+                        isBackdated: !!backdate,
+                        backdatedDate: backdate || null,
+                        outsideOperatingHours: isOutsideHours
+                    }
                 });
 
                 // Move navigation at the end

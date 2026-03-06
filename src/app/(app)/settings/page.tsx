@@ -1,6 +1,6 @@
 'use client';
 
-import *as React from 'react';
+import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import PageTitle from '@/components/shared/page-title';
@@ -115,7 +115,6 @@ function SettingsPageSkeleton() {
     )
 }
 
-// ... imports
 import { usePWA } from '@/context/pwa-context';
 import { useFCM } from '@/hooks/use-fcm';
 
@@ -127,16 +126,6 @@ function SettingsPageContent() {
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
-    // ... (rest of component)
-    // In the JSX:
-    <Button
-        onClick={fcmToken ? unsubscribe : requestPermission}
-        disabled={isFcmLoading}
-        variant={fcmToken ? "destructive" : "default"}
-    >
-        {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        {fcmToken ? "Disable" : "Enable"}
-    </Button>
 
     // General state
     const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
@@ -173,6 +162,12 @@ function SettingsPageContent() {
     const [productCategories, setProductCategories] = React.useState<string[]>([]);
     const [newCategory, setNewCategory] = React.useState('');
 
+    // Operating Hours state
+    const [operatingHoursEnabled, setOperatingHoursEnabled] = React.useState(false);
+    const [openTime, setOpenTime] = React.useState('08:00');
+    const [closeTime, setCloseTime] = React.useState('18:00');
+    const [preventSalesOutsideHours, setPreventSalesOutsideHours] = React.useState(false);
+
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
         if (business?.settings) {
@@ -199,6 +194,12 @@ function SettingsPageContent() {
             setFiscalYearStart(business.settings?.fiscalYearStart || 'January');
             setShippingOptions(business.settings?.publicStore?.shippingOptions || []);
             setProductCategories(business.settings?.productCategories || []);
+
+            // Operating Hours
+            setOperatingHoursEnabled(business.settings?.operatingHours?.enabled || false);
+            setOpenTime(business.settings?.operatingHours?.openTime || '08:00');
+            setCloseTime(business.settings?.operatingHours?.closeTime || '18:00');
+            setPreventSalesOutsideHours(business.settings?.operatingHours?.preventSalesOutsideHours || false);
         }
     }, [business]);
 
@@ -279,10 +280,6 @@ function SettingsPageContent() {
             }
         }
 
-        // ... existing image upload logic ...
-
-        // ... existing Paystack subaccount logic ...
-
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, finalData);
@@ -339,7 +336,6 @@ function SettingsPageContent() {
                         <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Business Profile</CardTitle>
                         <CardDescription>Manage your store's fundamental information and branding.</CardDescription>
                     </CardHeader>
-                    {/* ... rest of Business Profile card content ... */}
 
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -588,6 +584,73 @@ function SettingsPageContent() {
 
                 <Card>
                     <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />Operating Hours</CardTitle>
+                        <CardDescription>Set your business opening and closing hours to track or prevent sales outside these times.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label className="text-base text-stone-900">Enable Working Hours Tracking</Label>
+                                <p className="text-sm text-muted-foreground">Monitor or restrict sales recorded outside of business hours.</p>
+                            </div>
+                            <Switch checked={operatingHoursEnabled} onCheckedChange={setOperatingHoursEnabled} />
+                        </div>
+
+                        {operatingHoursEnabled && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="openTime">Opening Time</Label>
+                                        <Input
+                                            id="openTime"
+                                            type="time"
+                                            value={openTime}
+                                            onChange={e => setOpenTime(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="closeTime">Closing Time</Label>
+                                        <Input
+                                            id="closeTime"
+                                            type="time"
+                                            value={closeTime}
+                                            onChange={e => setCloseTime(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between rounded-lg border p-4 bg-orange-50/50 border-orange-100">
+                                    <div className="space-y-0.5 pr-8">
+                                        <Label className="text-base text-orange-900">Enforce Strict Hours</Label>
+                                        <p className="text-sm text-orange-700/70">
+                                            If enabled, operators will be blocked from completing sales outside these hours. Otherwise, sales will just be flagged in the logs.
+                                        </p>
+                                    </div>
+                                    <Switch checked={preventSalesOutsideHours} onCheckedChange={setPreventSalesOutsideHours} />
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                    <CardFooter>
+                        <Button
+                            type="button"
+                            onClick={() => handleSettingsSubmit('operating-hours', {
+                                'settings.operatingHours': {
+                                    enabled: operatingHoursEnabled,
+                                    openTime,
+                                    closeTime,
+                                    preventSalesOutsideHours
+                                }
+                            })}
+                            disabled={isSaving["operating-hours"]}
+                        >
+                            {isSaving["operating-hours"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Working Hours
+                        </Button>
+                    </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
                         <CardDescription>Customize the look and feel of your dashboard.</CardDescription>
                     </CardHeader>
@@ -604,7 +667,7 @@ function SettingsPageContent() {
                     )}
                 </Card>
             </div>
-        </div >
+        </div>
     );
 }
 

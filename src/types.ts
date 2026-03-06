@@ -99,6 +99,11 @@ export interface Receipt {
     status?: 'paid' | 'unpaid' | 'pending';
     createdAt: any; // Can be a Date or a Firestore Timestamp
     createdBy?: string;
+    flagged?: {
+        reason: string;
+        openTime?: string;
+        closeTime?: string;
+    } | null;
 }
 
 export interface OnlineOrder {
@@ -301,6 +306,12 @@ export interface BusinessInstance {
         fiscalYearStart?: string;
         state?: string;
         country?: string;
+        operatingHours?: {
+            enabled: boolean;
+            openTime: string; // HH:mm
+            closeTime: string; // HH:mm
+            preventSalesOutsideHours: boolean;
+        };
     };
 }
 
