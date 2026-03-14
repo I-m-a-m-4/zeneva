@@ -2,11 +2,11 @@
 "use client";
 
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
-import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance, IrresistibleOffer } from "@/types";
+import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance, IrresistibleOffer, BlogHeadline, ContentPlanner } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { usePOS } from "@/context/pos-context";
-import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search, ShoppingBasket, TrendingDown, Info } from "lucide-react";
+import { Lightbulb, Loader2, Package, TrendingUp, ShoppingCart, AlertTriangle, Users, Bot, Layers, DollarSign, Send, Edit, Copy, Mail, Search, ShoppingBasket, TrendingDown, Info, PenTool } from "lucide-react";
 import React, { useState, useTransition, useEffect, useMemo } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
@@ -926,6 +926,89 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
     )
 };
 
+const ContentPlannerCard = ({ planner }: { planner: ContentPlanner }) => (
+    <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-primary">
+                <PenTool className="h-5 w-5" />
+                SEO Content Strategy
+            </CardTitle>
+            <CardDescription className="text-primary/70">
+                Zen AI identified high-potential blog topics to drive organic traffic to your store.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="space-y-6">
+                <div>
+                    <h4 className="text-xs font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                        <Layers className="h-3.5 w-3.5" />
+                        Main Blog Focus
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                        {planner.blogFocus.split(',').map((focus, i) => (
+                            <Badge key={i} variant="outline" className="bg-background/50 border-primary/20 text-primary hover:bg-primary/5 transition-colors">
+                                {focus.trim()}
+                            </Badge>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <h4 className="text-xs font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        Proposed Headlines
+                    </h4>
+                    <div className="grid gap-3">
+                        {planner.headlines.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-background border border-primary/10 group hover:border-primary/40 transition-all duration-300 shadow-sm hover:shadow-md">
+                                <div className="space-y-2 flex-1 mr-4">
+                                    <p className="text-sm font-semibold group-hover:text-primary transition-colors leading-tight">{item.headline}</p>
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="secondary" className={cn(
+                                            "text-[10px] h-5 px-2 font-medium",
+                                            item.difficulty === 'low' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                                item.difficulty === 'med' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                                                    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                                        )}>
+                                            {item.difficulty} difficulty
+                                        </Badge>
+                                        <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1.5">
+                                            <Search className="h-3 w-3" />
+                                            {item.searchVolume} volume
+                                        </span>
+                                    </div>
+                                </div>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/5 shrink-0" onClick={() => {
+                                                navigator.clipboard.writeText(item.headline);
+                                            }}>
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Copy Headline</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </CardContent>
+        <CardFooter className="pt-2 border-t mt-4">
+            <Button variant="link" size="sm" className="text-primary p-0 h-auto font-semibold hover:no-underline group" asChild>
+                <Link href="/admin/blog/create">
+                    Start writing this content
+                    <Edit className="ml-1.5 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+            </Button>
+        </CardFooter>
+    </Card>
+);
+
 
 // --- Main Page Component ---
 
@@ -1198,6 +1281,10 @@ function ExecutiveBriefingTab() {
                             onPricingClick={setPricingDetail}
                             onOfferClick={setOfferDetail}
                         />
+
+                        {displayData.contentPlanner && (
+                            <ContentPlannerCard planner={displayData.contentPlanner} />
+                        )}
                     </div>
                 )}
 

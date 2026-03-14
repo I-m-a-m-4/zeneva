@@ -232,6 +232,17 @@ export interface CustomerSegment {
 }
 
 
+export interface BlogHeadline {
+    headline: string;
+    difficulty: 'low' | 'med' | 'high';
+    searchVolume: string;
+}
+
+export interface ContentPlanner {
+    blogFocus: string;
+    headlines: BlogHeadline[];
+}
+
 export interface BusinessAnalysisOutput {
     smartStockRecommendations?: SmartStockRecommendation[];
     demandHeatmap?: DemandHeatmap;
@@ -242,6 +253,7 @@ export interface BusinessAnalysisOutput {
     businessHealth?: BusinessHealth;
     customerSegments?: CustomerSegment[];
     pricingRecommendations?: PricingRecommendation[];
+    contentPlanner?: ContentPlanner;
     createdAt?: any;
 }
 

@@ -82,6 +82,14 @@ Analyze the provided business data to generate a structured JSON object strictly
     *   Calculate the exact \`savings\` for the customer.
     *   Write a short, powerful \`marketingPitch\` that sells the benefit of the bundle.
 
+8.  **SEO & Content Strategy:**
+    *   Analyze the business's industry, location (if known), and performance to suggest a tailored content strategy.
+    *   **Blog Focus:** Provide a concise comma-separated list of 3-5 high-level topics the business should write about (e.g., 'Inventory management, Retail trends, Local shopping').
+    *   **Headlines:** Generate 5-10 specific, catchy, and SEO-optimized blog headlines.
+    *   For each headline, assign a \`difficulty\` ('low', 'med', 'high') based on how competitive the topic likely is.
+    *   Assign a \`searchVolume\` estimation (e.g., '450', '1.2k', '800') to represent the relative popularity of the topic in the business's niche.
+    *   Example Headline: "10 Ways to Improve Cash Flow in Small [Industry] Businesses in [Location]".
+
 Your entire response MUST be a single, valid JSON object that strictly follows the output schema. Be thorough and strategic.
 `,
 });

@@ -354,6 +354,97 @@ export const blogPosts: StaticBlogPost[] = [
       { question: "Who can access the audit log?", answer: "For security, only the business Owner or designated high-level Admins can read the audit log." },
       { question: "What kind of theft does it catch?", answer: "It catches digital manipulation, such as voiding sales to pocket cash while balancing inventory, or unauthorized changes to user permissions." }
     ]
+  },
+  {
+    slug: '10-ways-to-improve-cash-flow-in-small-retail-business',
+    title: '10 Proven Ways to Improve Cash Flow in Your Small Retail Business',
+    excerpt: 'Cash flow is the lifeblood of retail. Learn 10 actionable strategies to optimize your inventory, speed up payments, and keep your business liquid and growing.',
+    imageUrl: 'https://images.unsplash.com/photo-1554224155-12d21a1b209d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Finance',
+    directAnswer: "Improving cash flow in retail requires a mix of aggressive inventory management, faster payment collections, and strategic expense control. Key methods include liquidating slow-moving stock, negotiating better vendor terms, and using automated POS systems to track daily margins.",
+    faq: [
+      { question: "What is the fastest way to increase cash flow?", answer: "Run a clearance sale for inventory that hasn't moved in 90 days. This converts 'dead' assets back into liquid cash immediately." },
+      { question: "How does a POS help with cash flow?", answer: "It provides real-time data on which products are profitable, allowing you to stop spending money on items that don't sell." }
+    ],
+    tableData: {
+      title: "Quick Cash Flow Wins",
+      headers: ["Action", "Impact", "Time to Implement"],
+      rows: [
+        ["Liquidate Dead Stock", "High - Immediate Cash", "24 Hours"],
+        ["Early Payment Discounts", "Medium - Lower Costs", "Next Billing Cycle"],
+        ["Automate Reorders", "High - Prevents Overstock", "1 Hour Setup"],
+        ["Batch Transfers", "Medium - Reduces Fees", "Weekly"]
+      ]
+    }
+  },
+  {
+    slug: 'complete-guide-to-setting-up-pos-system-in-nigeria',
+    title: 'The Complete Guide to Setting Up a POS System in Nigeria (2026)',
+    excerpt: 'Everything you need to know about hardware, software, and payment regulations to launch a modern Point of Sale system in any Nigerian city.',
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Guides',
+    directAnswer: "Setting up a POS in Nigeria involves three phases: choosing hardware (Android/PC), selecting software with offline capabilities like Zeneva, and integrating local payment gateways like Paystack or Moniepoint. Compliance with CBN regulations on digital receipts is also mandatory.",
+    faq: [
+      { question: "Do I need a business registration for a POS?", answer: "To accept card payments via official gateways, you typically need a registered business (CAC) and a corporate bank account." },
+      { question: "What if the internet goes down?", answer: "Always choose a 'Local-First' system like Zeneva that allows you to ring up sales offline and sync later." }
+    ],
+    tableData: {
+      title: "POS Setup Checklist",
+      headers: ["Component", "Requirement", "Estimated Cost"],
+      rows: [
+        ["Hardware", "Android Smartphone or Tablet", "₦40,000 - ₦150,000"],
+        ["Software", "Zeneva Pro/Business Plan", "₦4,500/mo"],
+        ["Payments", "Paystack or OPay Terminal", "₦0 - ₦25,000 setup"],
+        ["Internet", "4G Router/Mobile Data", "₦5,000/mo"]
+      ]
+    }
+  },
+  {
+    slug: 'pos-system-vs-excel-inventory-management',
+    title: 'POS System vs Excel: Which is Better for Inventory Management?',
+    excerpt: 'Is your spreadsheet holding you back? We compare manual tracking in Excel with automated POS systems to see which yields higher profits for small retailers.',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2015&auto=format&fit=crop',
+    category: 'Business Strategy',
+    directAnswer: "While Excel is free, it fails at real-time syncing and leads to 'human error fatigue' in retail. A POS system like Zeneva is superior because it automates stock adjustments, calculates profit margins per sale, and prevents overselling across online and physical channels.",
+    faq: [
+      { question: "Is Excel ever enough?", answer: "Excel can work for businesses with fewer than 20 unique items and very low daily volume. Beyond that, the time spent updating it costs more than a software subscription." },
+      { question: "How hard is it to move from Excel to Zeneva?", answer: "Zeneva allows you to import your entire Excel/CSV file in one click, mapping your columns automatically." }
+    ],
+    tableData: {
+      title: "Comparison: Excel vs. Modern POS",
+      headers: ["Feature", "Excel / Google Sheets", "Zeneva POS"],
+      rows: [
+        ["Real-time Sync", "❌ No (Manual)", "✅ Yes (Instant)"],
+        ["Offline Sales", "❌ Hard to Manage", "✅ Native Support"],
+        ["Customer Loyalty", "❌ None", "✅ Automated Points"],
+        ["Theft Detection", "❌ None", "✅ Audit Logs & AI"],
+        ["Ease of Use", "🟡 Low (Formulas)", "🟢 High (No-code)"]
+      ]
+    }
+  },
+  {
+    slug: 'how-to-forecast-product-demand-for-your-store',
+    title: 'How to Forecast Product Demand For Your Store Like a Pro',
+    excerpt: 'Stop guessing what will sell. Learn how to use historical sales data and market trends to predict exactly what your customers will buy next month.',
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bbdac8a28a1e?q=80&w=2070&auto=format&fit=crop',
+    category: 'AI Features',
+    directAnswer: "Product demand forecasting involves analyzing past sales cycles (weekly/monthly), identifying seasonal peaks, and monitoring external factors like local holidays. Tools like Zen AI automate this by calculating sales velocity and suggesting restock levels based on predictive algorithms.",
+    faq: [
+      { question: "How much data do I need to forecast?", answer: "At least 30-90 days of consistent sales data is required to start seeing reliable patterns in Zeneva's AI dashboard." },
+      { question: "What is sales velocity?", answer: "It's the speed at which you sell a specific item per day/week. If you sell 7 units a week, your velocity is 1 unit/day." }
+    ]
+  },
+  {
+    slug: '7-signs-you-need-a-better-inventory-management-system',
+    title: '7 Warning Signs You Need a Better Inventory Management System',
+    excerpt: 'Are you losing money to mystery shrinkage or missed sales? If you recognize these 7 signs, it’s time to upgrade your business tech.',
+    imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Productivity',
+    directAnswer: "The most critical signs you've outgrown your current system are frequent stockouts of bestsellers, inability to tell your exact daily profit, 'mystery' inventory disappearances, and a growing disconnect between your in-store and online stock levels.",
+    faq: [
+      { question: "What is 'Shrinkage'?", answer: "Shrinkage is the loss of inventory due to theft, damage, or administrative errors. If your software can't track it, you can't stop it." },
+      { question: "Does Zeneva help with theft?", answer: "Yes, our Audit Log tracks every sale void and price change, making it easy to spot suspicious employee behavior." }
+    ]
   }
 ];
 
