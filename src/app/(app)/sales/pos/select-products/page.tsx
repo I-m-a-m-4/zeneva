@@ -45,8 +45,8 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     addToCart: any
 }) => {
     return (
-        <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border border-gray-200 rounded-xl">
-            <CardContent className="p-4 relative aspect-square w-full bg-white flex items-center justify-center">
+        <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
+            <CardContent className="p-4 relative aspect-square w-full bg-muted/20 flex items-center justify-center">
                 {product.imageUrl ? (
                     <div className="relative w-full h-full">
                         <Image
@@ -63,19 +63,19 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                 )}
             </CardContent>
             <CardHeader className="px-4 py-1 flex-grow">
-                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem]">{product.name}</CardTitle>
+                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground">{product.name}</CardTitle>
             </CardHeader>
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">
-                    <span className="text-lg font-bold text-black">{currencySymbol}{product.price.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-foreground dark:text-white">{currencySymbol}{product.price.toLocaleString()}</span>
                     {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
                 </div>
 
                 {product.uomConversions && product.uomConversions.length > 0 ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-gray-200 hover:bg-gray-50 flex items-center justify-center">
-                                <PlusCircle className="h-6 w-6 text-black" />
+                            <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center">
+                                <PlusCircle className="h-6 w-6 text-foreground dark:text-white" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -101,8 +101,8 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : (
-                    <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-gray-200 hover:bg-gray-50 flex items-center justify-center" onClick={() => handleAddToCart(product)}>
-                        <PlusCircle className="h-6 w-6 text-black" />
+                    <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center" onClick={() => handleAddToCart(product)}>
+                        <PlusCircle className="h-6 w-6 text-foreground dark:text-white" />
                     </Button>
                 )}
             </CardFooter>

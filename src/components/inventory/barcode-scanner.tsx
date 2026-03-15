@@ -65,7 +65,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                     cameraId,
                     {
                         fps: 10,
-                        qrbox: { width: 250, height: 150 },
+                        qrbox: { width: 280, height: 160 },
                         aspectRatio: 1.0,
                     },
                     (decodedText) => {
@@ -155,18 +155,18 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                     {/* Custom Overlay */}
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                         {/* Scanning Area Frame */}
-                        <div className="relative w-[280px] h-[180px]">
+                        <div className="relative w-[280px] h-[160px]">
                             {/* Corners */}
-                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-lg" />
-                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-lg" />
-                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-lg" />
-                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-lg" />
+                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-lg" />
+                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-lg" />
+                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-lg" />
+                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-lg" />
 
                             {/* Scanning Line */}
                             <motion.div
                                 animate={{ top: ['10%', '90%'] }}
                                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                className="absolute left-2 right-2 h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10"
+                                className="absolute left-2 right-2 h-0.5 bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)] z-10"
                             />
                         </div>
 
@@ -206,7 +206,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                                 exit={{ opacity: 0 }}
                                 className="absolute inset-0 bg-black flex flex-col items-center justify-center z-30"
                             >
-                                <Camera className="h-10 w-10 text-emerald-500 animate-pulse mb-4" />
+                                <Camera className="h-10 w-10 text-orange-500 animate-pulse mb-4" />
                                 <p className="text-white/70 text-sm font-medium">Initializing camera...</p>
                             </motion.div>
                         )}
