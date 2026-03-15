@@ -748,18 +748,20 @@ export default function InventoryPage() {
           }
         }}
       />
-      <BarcodeScanner
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScan={(sku) => {
-          setSearchTerm(sku);
-          setIsScannerOpen(false);
-          toast({
-            title: "Barcode Scanned",
-            description: `Searching for SKU: ${sku}`,
-          });
-        }}
-      />
+      {isScannerOpen && (
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={(sku) => {
+            setSearchTerm(sku);
+            setIsScannerOpen(false);
+            toast({
+              title: "Barcode Scanned",
+              description: `Searching for SKU: ${sku}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -14,11 +14,12 @@ interface BarcodeScannerProps {
 }
 
 export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps) {
-    const [scanner, setScanner] = useState<Html5Qrcode | null>(null);
     const [isTorchOn, setIsTorchOn] = useState(false);
     const [hasCamera, setHasCamera] = useState<boolean | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isStarting, setIsStarting] = useState(false);
+
+    const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
     const lastScannedRef = useRef<string | null>(null);
     const lastScannedTimeRef = useRef<number>(0);
@@ -30,10 +31,10 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
         sessionScannedRef.current = false; // Reset session guard when dialog state changes
 
         const initScanner = async () => {
-            // Small delay to ensure Dialog and its DOM content are fully mounted
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for Dialog to be fully mounted
+            await new Promise(resolve => setTimeout(resolve, 600));
 
-            if (isOpen && isInstanceActive && !scanner) {
+            if (isOpen && isInstanceActive && !scannerInstanceRef.current) {
                 try {
                     const newScanner = new Html5Qrcode("barcode-reader", {
                         formatsToSupport: [
@@ -47,11 +48,11 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         ],
                         verbose: false
                     });
-                    setScanner(newScanner);
-                    startScanning(newScanner);
+                    scannerInstanceRef.current = newScanner;
+                    await startScanning(newScanner);
                 } catch (err) {
                     console.error("Scanner init error", err);
-                    setCameraError("Failed to initialize scanner. Please try again.");
+                    if (isInstanceActive) setCameraError("Failed to initialize scanner. Please try again.");
                 }
             }
         };
@@ -62,8 +63,10 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
 
         return () => {
             isInstanceActive = false;
-            if (scanner) {
-                scanner.stop().catch(err => console.error("Cleanup stop error", err));
+            if (scannerInstanceRef.current) {
+                const s = scannerInstanceRef.current;
+                s.stop().catch(e => console.error("Cleanup stop error", e));
+                scannerInstanceRef.current = null;
             }
         };
     }, [isOpen]);
@@ -139,8 +142,8 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                             window.navigator.vibrate(200);
                         }
 
-                        // 5. NOTIFY PARENT LAST
-                        onScan(decodedText);
+                        // 5. NOTIFY PARENT LAST - with delay to ensure UI is ready
+                        setTimeout(() => onScan(decodedText), 100);
                     },
                     (errorMessage) => {
                         // Error is noisy, ignore
@@ -159,10 +162,10 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
     };
 
     const toggleTorch = async () => {
-        if (scanner && scanner.getState() === 2) { // 2 is SCANNING
+        if (scannerInstanceRef.current && scannerInstanceRef.current.getState() === 2) { // 2 is SCANNING
             try {
                 const newState = !isTorchOn;
-                await scanner.applyVideoConstraints({
+                await scannerInstanceRef.current.applyVideoConstraints({
                     // @ts-ignore
                     advanced: [{ torch: newState }]
                 });
@@ -180,17 +183,18 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
         setIsStarting(false);
         setCameraError(null);
 
-        if (scanner) {
+        if (scannerInstanceRef.current) {
             try {
-                if (scanner.getState() === 2) { // SCANNING
-                    await scanner.stop();
+                if (scannerInstanceRef.current.getState() === 2) { // SCANNING
+                    await scannerInstanceRef.current.stop();
                 }
             } catch (e) {
                 console.error("Stop error during close", e);
+            } finally {
+                scannerInstanceRef.current = null;
             }
         }
 
-        setScanner(null);
         isStoppingRef.current = false;
         onClose();
     };
@@ -246,7 +250,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => scanner && startScanning(scanner)}
+                            onClick={() => scannerInstanceRef.current && startScanning(scannerInstanceRef.current)}
                             className="bg-zinc-900/80 border-white/10 text-white rounded-full h-14 w-14 backdrop-blur-md hover:bg-zinc-800"
                         >
                             <RefreshCcw className="h-6 w-6" />
@@ -279,7 +283,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                                 </div>
                                 <h3 className="text-white font-semibold mb-2">Camera Access Error</h3>
                                 <p className="text-white/60 text-sm mb-6 max-w-[250px]">{cameraError}</p>
-                                <Button onClick={() => scanner && startScanning(scanner)} variant="secondary" className="rounded-full">
+                                <Button onClick={() => scannerInstanceRef.current && startScanning(scannerInstanceRef.current)} variant="secondary" className="rounded-full">
                                     Try Again
                                 </Button>
                             </motion.div>

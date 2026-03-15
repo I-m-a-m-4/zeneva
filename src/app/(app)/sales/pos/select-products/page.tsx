@@ -406,11 +406,13 @@ export default function SelectProductsPage() {
                 </Sheet>
             </div>
 
-            <BarcodeScanner
-                isOpen={isScannerOpen}
-                onClose={() => setIsScannerOpen(false)}
-                onScan={handleScan}
-            />
+            {isScannerOpen && (
+                <BarcodeScanner
+                    isOpen={isScannerOpen}
+                    onClose={() => setIsScannerOpen(false)}
+                    onScan={handleScan}
+                />
+            )}
         </div>
     )
 }
