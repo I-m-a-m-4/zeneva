@@ -23,9 +23,11 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
     const lastScannedRef = useRef<string | null>(null);
     const lastScannedTimeRef = useRef<number>(0);
     const isStoppingRef = useRef(false);
+    const sessionScannedRef = useRef(false);
 
     useEffect(() => {
         let isInstanceActive = true;
+        sessionScannedRef.current = false; // Reset session guard when dialog state changes
 
         const initScanner = async () => {
             // Small delay to ensure Dialog and its DOM content are fully mounted
@@ -95,46 +97,50 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         aspectRatio: 1.0,
                     },
                     (decodedText) => {
-                        // Prevent multiple rapid scans of the same item
+                        // 1. SESSION GUARD - The most important check
+                        if (sessionScannedRef.current) return;
+                        sessionScannedRef.current = true;
+
+                        // 2. COOLDOWN GUARD (for same item)
                         const now = Date.now();
                         if (decodedText === lastScannedRef.current && (now - lastScannedTimeRef.current) < 2000) {
+                            sessionScannedRef.current = false; // allow it to try again if it was too fast
                             return;
                         }
 
                         lastScannedRef.current = decodedText;
                         lastScannedTimeRef.current = now;
 
-                        // Stop the scanner IMMEDIATELY to prevent multiple additions
+                        // 3. STOP IMMEDIATELY
                         handleClose();
 
-                        // Success - notify parent
-                        onScan(decodedText);
-
-                        // Professional beep sound using Web Audio API
+                        // 4. BEEP & FEEDBACK
                         try {
                             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                            const oscillator = audioCtx.createOscillator();
-                            const gainNode = audioCtx.createGain();
+                            if (audioCtx) {
+                                const oscillator = audioCtx.createOscillator();
+                                const gainNode = audioCtx.createGain();
 
-                            oscillator.type = 'sine';
-                            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-                            oscillator.connect(gainNode);
-                            gainNode.connect(audioCtx.destination);
+                                oscillator.type = 'sine';
+                                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                                oscillator.connect(gainNode);
+                                gainNode.connect(audioCtx.destination);
 
-                            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-                            gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
-                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                                gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+                                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
 
-                            oscillator.start(audioCtx.currentTime);
-                            oscillator.stop(audioCtx.currentTime + 0.2);
-                        } catch (e) {
-                            console.error("Audio error", e);
-                        }
+                                oscillator.start(audioCtx.currentTime);
+                                oscillator.stop(audioCtx.currentTime + 0.2);
+                            }
+                        } catch (e) { }
 
-                        // Play haptic feedback
                         if (window.navigator.vibrate) {
                             window.navigator.vibrate(200);
                         }
+
+                        // 5. NOTIFY PARENT LAST
+                        onScan(decodedText);
                     },
                     (errorMessage) => {
                         // Error is noisy, ignore
