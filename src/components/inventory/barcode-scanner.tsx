@@ -20,6 +20,9 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isStarting, setIsStarting] = useState(false);
     const scannerRef = useRef<HTMLDivElement>(null);
+    const lastScannedRef = useRef<string | null>(null);
+    const lastScannedTimeRef = useRef<number>(0);
+    const isStoppingRef = useRef(false);
 
     useEffect(() => {
         let isInstanceActive = true;
@@ -57,8 +60,13 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
 
         return () => {
             isInstanceActive = false;
+            if (scanner) {
+                scanner.stop().catch(err => console.error("Cleanup stop error", err));
+            }
         };
     }, [isOpen]);
+    // Note: 'scanner' is excluded from deps to prevent infinite loops, 
+    // we use the local variable inside the effect or handleClose.
 
     const startScanning = async (scannerInstance: Html5Qrcode) => {
         setIsStarting(true);
@@ -87,6 +95,15 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         aspectRatio: 1.0,
                     },
                     (decodedText) => {
+                        // Prevent multiple rapid scans of the same item
+                        const now = Date.now();
+                        if (decodedText === lastScannedRef.current && (now - lastScannedTimeRef.current) < 2000) {
+                            return;
+                        }
+
+                        lastScannedRef.current = decodedText;
+                        lastScannedTimeRef.current = now;
+
                         // Success
                         onScan(decodedText);
 
@@ -148,12 +165,24 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
     };
 
     const handleClose = async () => {
+        if (isStoppingRef.current) return;
+        isStoppingRef.current = true;
+
+        setIsStarting(false);
+        setCameraError(null);
+
         if (scanner) {
             try {
-                await scanner.stop();
-            } catch (e) { }
+                if (scanner.getState() === 2) { // SCANNING
+                    await scanner.stop();
+                }
+            } catch (e) {
+                console.error("Stop error during close", e);
+            }
         }
+
         setScanner(null);
+        isStoppingRef.current = false;
         onClose();
     };
 
