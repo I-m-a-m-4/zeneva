@@ -22,28 +22,41 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
     const scannerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (isOpen && scannerRef.current && !scanner) {
-            const newScanner = new Html5Qrcode("barcode-reader", {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ],
-                verbose: false
-            });
-            setScanner(newScanner);
-            startScanning(newScanner);
+        let isInstanceActive = true;
+
+        const initScanner = async () => {
+            // Small delay to ensure Dialog and its DOM content are fully mounted
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (isOpen && isInstanceActive && !scanner) {
+                try {
+                    const newScanner = new Html5Qrcode("barcode-reader", {
+                        formatsToSupport: [
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.EAN_8,
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.UPC_A,
+                            Html5QrcodeSupportedFormats.UPC_E,
+                            Html5QrcodeSupportedFormats.QR_CODE
+                        ],
+                        verbose: false
+                    });
+                    setScanner(newScanner);
+                    startScanning(newScanner);
+                } catch (err) {
+                    console.error("Scanner init error", err);
+                    setCameraError("Failed to initialize scanner. Please try again.");
+                }
+            }
+        };
+
+        if (isOpen) {
+            initScanner();
         }
 
         return () => {
-            if (scanner) {
-                scanner.stop().catch(err => console.error("Error stopping scanner", err));
-                setScanner(null);
-            }
+            isInstanceActive = false;
         };
     }, [isOpen]);
 
@@ -64,8 +77,13 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                 await scannerInstance.start(
                     cameraId,
                     {
-                        fps: 10,
-                        qrbox: { width: 280, height: 160 },
+                        fps: 15, // Increase FPS for faster scanning
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            // Responsive rectangular qrbox
+                            const width = Math.min(viewfinderWidth * 0.8, 300);
+                            const height = Math.min(viewfinderHeight * 0.4, 180);
+                            return { width, height };
+                        },
                         aspectRatio: 1.0,
                     },
                     (decodedText) => {
@@ -149,7 +167,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                     </Button>
                 </DialogHeader>
 
-                <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden mt-14 sm:mt-0">
+                <div ref={scannerRef} className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden sm:mt-0 z-0">
                     <div id="barcode-reader" className="w-full h-full [&>video]:object-cover" />
 
                     {/* Custom Overlay */}
