@@ -104,7 +104,10 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         lastScannedRef.current = decodedText;
                         lastScannedTimeRef.current = now;
 
-                        // Success
+                        // Stop the scanner IMMEDIATELY to prevent multiple additions
+                        handleClose();
+
+                        // Success - notify parent
                         onScan(decodedText);
 
                         // Professional beep sound using Web Audio API
