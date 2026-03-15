@@ -1,0 +1,240 @@
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Button } from '@/components/ui/button';
+import { X, Camera, Zap, ZapOff, RefreshCcw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface BarcodeScannerProps {
+    onScan: (decodedText: string) => void;
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps) {
+    const [scanner, setScanner] = useState<Html5Qrcode | null>(null);
+    const [isTorchOn, setIsTorchOn] = useState(false);
+    const [hasCamera, setHasCamera] = useState<boolean | null>(null);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [isStarting, setIsStarting] = useState(false);
+    const scannerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isOpen && scannerRef.current && !scanner) {
+            const newScanner = new Html5Qrcode("barcode-reader", {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ],
+                verbose: false
+            });
+            setScanner(newScanner);
+            startScanning(newScanner);
+        }
+
+        return () => {
+            if (scanner) {
+                scanner.stop().catch(err => console.error("Error stopping scanner", err));
+                setScanner(null);
+            }
+        };
+    }, [isOpen]);
+
+    const startScanning = async (scannerInstance: Html5Qrcode) => {
+        setIsStarting(true);
+        setCameraError(null);
+        try {
+            const devices = await Html5Qrcode.getCameras();
+            if (devices && devices.length > 0) {
+                setHasCamera(true);
+                // Prefer back camera
+                const backCamera = devices.find(device =>
+                    device.label.toLowerCase().includes('back') ||
+                    device.label.toLowerCase().includes('rear')
+                );
+                const cameraId = backCamera ? backCamera.id : devices[0].id;
+
+                await scannerInstance.start(
+                    cameraId,
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 150 },
+                        aspectRatio: 1.0,
+                    },
+                    (decodedText) => {
+                        // Success
+                        onScan(decodedText);
+
+                        // Professional beep sound using Web Audio API
+                        try {
+                            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                            const oscillator = audioCtx.createOscillator();
+                            const gainNode = audioCtx.createGain();
+
+                            oscillator.type = 'sine';
+                            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioCtx.destination);
+
+                            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                            gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+
+                            oscillator.start(audioCtx.currentTime);
+                            oscillator.stop(audioCtx.currentTime + 0.2);
+                        } catch (e) {
+                            console.error("Audio error", e);
+                        }
+
+                        // Play haptic feedback
+                        if (window.navigator.vibrate) {
+                            window.navigator.vibrate(200);
+                        }
+                    },
+                    (errorMessage) => {
+                        // Error is noisy, ignore
+                    }
+                );
+            } else {
+                setHasCamera(false);
+                setCameraError("No camera found on this device.");
+            }
+        } catch (err) {
+            console.error("Error starting camera", err);
+            setCameraError("Could not access camera. Please check permissions.");
+        } finally {
+            setIsStarting(false);
+        }
+    };
+
+    const toggleTorch = async () => {
+        if (scanner && scanner.getState() === 2) { // 2 is SCANNING
+            try {
+                const newState = !isTorchOn;
+                await scanner.applyVideoConstraints({
+                    // @ts-ignore
+                    advanced: [{ torch: newState }]
+                });
+                setIsTorchOn(newState);
+            } catch (err) {
+                console.error("Error toggling torch", err);
+            }
+        }
+    };
+
+    const handleClose = async () => {
+        if (scanner) {
+            try {
+                await scanner.stop();
+            } catch (e) { }
+        }
+        setScanner(null);
+        onClose();
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+            <DialogContent className="p-0 overflow-hidden bg-black border-none h-full sm:h-[80vh] sm:max-w-xl max-w-none w-full gap-0">
+                <DialogHeader className="p-4 bg-zinc-900/60 backdrop-blur-md absolute top-0 left-0 right-0 z-50 flex flex-row items-center justify-between text-white border-b border-white/10 space-y-0">
+                    <DialogTitle className="text-lg font-medium">Scan Barcode</DialogTitle>
+                    <Button variant="ghost" size="icon" onClick={handleClose} className="text-white hover:bg-white/10 rounded-full h-8 w-8">
+                        <X className="h-5 w-5" />
+                    </Button>
+                </DialogHeader>
+
+                <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden mt-14 sm:mt-0">
+                    <div id="barcode-reader" className="w-full h-full [&>video]:object-cover" />
+
+                    {/* Custom Overlay */}
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        {/* Scanning Area Frame */}
+                        <div className="relative w-[280px] h-[180px]">
+                            {/* Corners */}
+                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-lg" />
+                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-lg" />
+                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-lg" />
+                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-lg" />
+
+                            {/* Scanning Line */}
+                            <motion.div
+                                animate={{ top: ['10%', '90%'] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                className="absolute left-2 right-2 h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10"
+                            />
+                        </div>
+
+                        {/* Darkened area outside the scanner box */}
+                        <div className="absolute inset-0 bg-black/40" style={{
+                            clipPath: 'polygon(0% 0%, 0% 100%, 5% 100%, 5% 5%, 95% 5%, 95% 95%, 5% 95%, 5% 100%, 100% 100%, 100% 0%)'
+                        }} />
+                    </div>
+
+                    {/* Camera Controls */}
+                    <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-6 z-20">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={toggleTorch}
+                            className="bg-zinc-900/80 border-white/10 text-white rounded-full h-14 w-14 backdrop-blur-md hover:bg-zinc-800"
+                        >
+                            {isTorchOn ? <ZapOff className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => scanner && startScanning(scanner)}
+                            className="bg-zinc-900/80 border-white/10 text-white rounded-full h-14 w-14 backdrop-blur-md hover:bg-zinc-800"
+                        >
+                            <RefreshCcw className="h-6 w-6" />
+                        </Button>
+                    </div>
+
+                    {/* Loading / Error States */}
+                    <AnimatePresence>
+                        {isStarting && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black flex flex-col items-center justify-center z-30"
+                            >
+                                <Camera className="h-10 w-10 text-emerald-500 animate-pulse mb-4" />
+                                <p className="text-white/70 text-sm font-medium">Initializing camera...</p>
+                            </motion.div>
+                        )}
+
+                        {cameraError && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center z-40 p-6 text-center"
+                            >
+                                <div className="bg-red-500/10 p-4 rounded-full mb-4">
+                                    <Camera className="h-8 w-8 text-red-500" />
+                                </div>
+                                <h3 className="text-white font-semibold mb-2">Camera Access Error</h3>
+                                <p className="text-white/60 text-sm mb-6 max-w-[250px]">{cameraError}</p>
+                                <Button onClick={() => scanner && startScanning(scanner)} variant="secondary" className="rounded-full">
+                                    Try Again
+                                </Button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                <div className="p-6 bg-zinc-950 text-center">
+                    <p className="text-white/40 text-xs uppercase tracking-widest font-bold">Align barcode within the frame to scan</p>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}

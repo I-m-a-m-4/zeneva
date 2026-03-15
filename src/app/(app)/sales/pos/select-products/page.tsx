@@ -18,6 +18,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
+import { QrCode } from "lucide-react";
 
 function ProductCardSkeleton() {
     return (
@@ -178,6 +180,7 @@ export default function SelectProductsPage() {
     const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
+    const [isScannerOpen, setIsScannerOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (business) {
@@ -219,6 +222,24 @@ export default function SelectProductsPage() {
         addToCart(product);
     }, [addToCart]);
 
+    const handleScan = (sku: string) => {
+        const product = products?.find(p => p.sku === sku);
+        if (product) {
+            addToCart(product);
+            toast({
+                title: "Product Added",
+                description: `${product.name} has been added to the cart.`,
+            });
+            setIsScannerOpen(false);
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Product Not Found",
+                description: `No product found with SKU: ${sku}`,
+            });
+        }
+    };
+
     const handleNext = () => {
         setIsNavigating(true);
         router.push('/sales/pos/customer');
@@ -235,8 +256,32 @@ export default function SelectProductsPage() {
                             className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const exactMatch = products?.find(p =>
+                                        p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
+                                        p.name.toLowerCase() === searchTerm.toLowerCase()
+                                    );
+                                    if (exactMatch) {
+                                        handleAddToCart(exactMatch);
+                                        setSearchTerm('');
+                                        toast({
+                                            title: "Product Added",
+                                            description: `${exactMatch.name} has been added to the cart.`,
+                                        });
+                                    }
+                                }
+                            }}
                         />
                     </div>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 md:hidden shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+                        onClick={() => setIsScannerOpen(true)}
+                    >
+                        <QrCode className="h-5 w-5" />
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className="h-10 gap-1.5">
@@ -360,6 +405,12 @@ export default function SelectProductsPage() {
                     </SheetContent>
                 </Sheet>
             </div>
+
+            <BarcodeScanner
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={handleScan}
+            />
         </div>
     )
 }

@@ -83,6 +83,8 @@ import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
 import BarcodeDialog from '@/components/inventory/barcode-dialog';
+import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
+import { QrCode } from 'lucide-react';
 
 function ProductRowSkeleton() {
   return (
@@ -129,6 +131,7 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
 
@@ -346,8 +349,22 @@ export default function InventoryPage() {
             className="w-full rounded-lg bg-background pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                // If there's an exact match, maybe we want to highlight it or do something
+                // For inventory page, just leave it as is since it filters the list
+              }
+            }}
           />
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+          onClick={() => setIsScannerOpen(true)}
+        >
+          <QrCode className="h-5 w-5" />
+        </Button>
         <div className="flex items-center gap-2">
           {selectedProductIds.length > 0 && (
             <>
@@ -729,6 +746,18 @@ export default function InventoryPage() {
           if (!open) {
             setBarcodeProduct(null);
           }
+        }}
+      />
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={(sku) => {
+          setSearchTerm(sku);
+          setIsScannerOpen(false);
+          toast({
+            title: "Barcode Scanned",
+            description: `Searching for SKU: ${sku}`,
+          });
         }}
       />
     </div>
