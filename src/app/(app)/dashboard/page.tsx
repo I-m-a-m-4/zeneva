@@ -448,8 +448,8 @@ export default function DashboardPage() {
                 </ul>
                 <div className="pt-4">
                   <Button variant="outline" size="sm" asChild className="w-full">
-                    <Link href="/reports/abc-analysis">
-                      View All Best Selling Products <ArrowRight className="ml-2 h-4 w-4" />
+                    <Link href="/reports">
+                      View Deep Sales Analysis <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </div>
