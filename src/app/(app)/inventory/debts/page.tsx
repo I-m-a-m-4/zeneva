@@ -68,7 +68,7 @@ export default function DebtsPage() {
     const debtProducts = React.useMemo(() => {
         if (!products) return [];
         return products
-            .filter(p => (p.stock || 0) < 0)
+            .filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0)
             .filter(p =>
                 p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))

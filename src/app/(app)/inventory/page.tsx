@@ -26,6 +26,7 @@ import {
   TrendingDown,
   Layers,
   Box,
+  Activity,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -121,7 +122,7 @@ export default function InventoryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { products: allProducts, optimisticProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh, removeFromQueue, addToQueue } = usePOS();
+  const { products: allProducts, receipts, onlineOrders, optimisticProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh, removeFromQueue, addToQueue } = usePOS();
 
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -183,15 +184,49 @@ export default function InventoryPage() {
     // Filter out products queued for deletion
     const validProducts = combinedProducts.filter(p => !queuedDeletionIds.includes(p.id));
 
-    let filtered = validProducts
+    const filtered = validProducts
       .filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
       );
 
-    // Stock filter
+    // Augmented products with Sales Data
+    const productsWithStats = filtered.map(p => {
+      let totalSoldFromReceipts = 0;
+      receipts?.forEach(r => {
+        r.items.forEach(i => {
+          if (i.productId === p.id) {
+            totalSoldFromReceipts += i.quantity;
+          }
+        });
+      });
+
+      let totalSoldFromOnline = 0;
+      onlineOrders?.forEach(o => {
+        o.items.forEach(i => {
+          if (i.productId === p.id) {
+            totalSoldFromOnline += i.quantity;
+          }
+        });
+      });
+
+      return {
+        ...p,
+        totalSoldAcrossAll: totalSoldFromReceipts + totalSoldFromOnline
+      };
+    });
+
+    let finalFiltered = productsWithStats;
+
+    // Stock filter (Only if user is filtering by stock, we might want to skip services)
     if (stockFilter !== 'all') {
-      filtered = filtered.filter(p => {
+      finalFiltered = finalFiltered.filter(p => {
+        if (p.categoryType === 'service') {
+          // You decide: should services show in "In Stock"? Maybe yes (as they are always available).
+          // But usually they don't have stock, so if I filter by "Out of Stock", a service shouldn't appear.
+          if (stockFilter === 'in-stock') return true;
+          return false; // Services don't go low-stock or debt or out-of-stock
+        }
         const stock = p.stock || 0;
         const lowStockThreshold = p.lowStockThreshold || 5;
         if (stockFilter === 'in-stock') return stock > 0;
@@ -204,10 +239,10 @@ export default function InventoryPage() {
 
     // Category filter
     if (categoryFilter !== 'all') {
-      filtered = filtered.filter(p => p.category === categoryFilter);
+      finalFiltered = finalFiltered.filter(p => p.category === categoryFilter);
     }
 
-    return filtered.sort((a, b) => {
+    return finalFiltered.sort((a, b) => {
       if (sortBy === 'stock-desc') {
         return (b.stock || 0) - (a.stock || 0);
       }
@@ -586,7 +621,9 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell>
                       {product.categoryType === 'service' ? (
-                        <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/50">Service</Badge>
+                        <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/50 flex items-center gap-1 w-fit">
+                          <Activity className="h-3 w-3" /> Service Only
+                        </Badge>
                       ) : (
                         <Badge
                           variant={
@@ -604,7 +641,18 @@ export default function InventoryPage() {
                       )}
                     </TableCell>
                     {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                    {canManageStock && <TableCell className="hidden md:table-cell">{product.categoryType === 'service' ? '-' : (product.stock || 0)}</TableCell>}
+                    {canManageStock && (
+                      <TableCell className="hidden md:table-cell">
+                        {product.categoryType === 'service' ? (
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-primary">{(product as any).totalSoldAcrossAll || 0} Sold</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight">Revenue Service</span>
+                          </div>
+                        ) : (
+                          product.stock || 0
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
