@@ -53,7 +53,7 @@ const productSchema = z.object({
     description: z.string().optional(),
     price: z.coerce.number().min(0, "Price must be a positive number."),
     costPrice: z.coerce.number().min(0, "Cost price must be a positive number.").optional(),
-    stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+    stock: z.coerce.number().int("Stock must be a whole number."),
     sku: z.string().optional(),
     category: z.string().optional(),
     categoryType: z.enum(['product', 'service']).default('product'),
@@ -620,16 +620,16 @@ export default function EditProductPage() {
                         </Card>
                         <Card className="overflow-hidden">
                             <CardHeader>
-                                <CardTitle>Product Image</CardTitle>
+                                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Image</CardTitle>
                                 <CardDescription>
-                                    Upload an image (max 5MB) for your product.
+                                    Upload an image (max 5MB) for your {categoryType === 'service' ? 'service' : 'product'}.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid gap-2">
                                     <div className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
                                         {imagePreview ? (
-                                            <Image src={imagePreview} alt="Product preview" fill style={{ objectFit: "cover" }} />
+                                            <Image src={imagePreview} alt={categoryType === 'service' ? 'Service preview' : 'Product preview'} fill style={{ objectFit: "cover" }} />
                                         ) : (
                                             <div className="text-center text-muted-foreground">
                                                 <Upload className="mx-auto h-8 w-8" />

@@ -124,9 +124,9 @@ export default function DashboardPage() {
     const filteredOnlineOrders = allOnlineOrders.filter(filterByDate);
     const newCustomers = allCustomers.filter(filterByDate);
 
-    const totalStock = inventoryItems.reduce((sum, item) => sum + (item.stock || 0), 0);
-    const uniqueSkus = inventoryItems.length;
-    const lowStockItems = inventoryItems.filter(item => (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
+    const totalStock = inventoryItems.filter(item => item.categoryType !== 'service').reduce((sum, item) => sum + (item.stock || 0), 0);
+    const uniqueSkus = inventoryItems.filter(item => item.categoryType !== 'service').length;
+    const lowStockItems = inventoryItems.filter(item => item.categoryType !== 'service' && (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
 
     const totalSalesValue = filteredReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
     const totalReceiptsCount = filteredReceipts.length;
@@ -141,11 +141,33 @@ export default function DashboardPage() {
     const totalUnitsSold = posUnitsSold + onlineUnitsSold;
 
     const itemSalesCount: Record<string, number> = {};
+    let serviceUnitsSold = 0;
+    let productUnitsSold = 0;
+
     filteredReceipts.forEach(receipt => {
       receipt.items.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
         if (product) {
           itemSalesCount[product.name] = (itemSalesCount[product.name] || 0) + item.quantity;
+          if (product.categoryType === 'service') {
+            serviceUnitsSold += item.quantity;
+          } else {
+            productUnitsSold += item.quantity;
+          }
+        }
+      });
+    });
+
+    filteredOnlineOrders.forEach(order => {
+      order.items.forEach(item => {
+        const product = inventoryItems.find(p => p.id === item.productId);
+        if (product) {
+          itemSalesCount[product.name] = (itemSalesCount[product.name] || 0) + item.quantity;
+          if (product.categoryType === 'service') {
+            serviceUnitsSold += item.quantity;
+          } else {
+            productUnitsSold += item.quantity;
+          }
         }
       });
     });
@@ -177,8 +199,10 @@ export default function DashboardPage() {
       totalUnitsSold,
       topSellingItems,
       topLoyaltyCustomers,
-      debtItemsCount: inventoryItems.filter(p => (p.stock || 0) < 0).length,
-      totalDebtUnits: inventoryItems.filter(p => (p.stock || 0) < 0).reduce((acc, p) => acc + Math.abs(p.stock || 0), 0)
+      debtItemsCount: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).length,
+      totalDebtUnits: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).reduce((acc, p) => acc + Math.abs(p.stock || 0), 0),
+      serviceUnitsSold,
+      productUnitsSold
     };
   }, [products, receipts, customers, onlineOrders, date]);
 
@@ -207,7 +231,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits } = dashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = dashboardData;
 
   const { currentUserProfile } = usePOS();
   const isOperator = currentUserProfile?.role === 'vendor_operator';
@@ -237,7 +261,7 @@ export default function DashboardPage() {
           title="Units Sold"
           value={totalUnitsSold.toLocaleString()}
           icon={ShoppingBag}
-          description="Across all sales channels"
+          description={`${productUnitsSold.toLocaleString()} products, ${serviceUnitsSold.toLocaleString()} services`}
           href="/reports"
         />
         <SummaryCard
@@ -406,16 +430,30 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {topSellingItems.length > 0 ? (
-              <ul className="space-y-3">
-                {topSellingItems.map(item => (
-                  <li key={item.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 text-sm">
-                    <Link href={`/inventory/${item.id}`} className="hover:underline text-primary font-medium" title={item.name}>
-                      {item.name}
+              <>
+                <ul className="space-y-3">
+                  {topSellingItems.map(item => (
+                    <li key={item.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 text-sm">
+                      <Link href={`/inventory/${item.id}`} className="hover:underline text-primary font-medium" title={item.name}>
+                        {item.name}
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] h-4">
+                          {item.categoryType === 'service' ? 'Service' : 'Product'}
+                        </Badge>
+                        <span className="text-muted-foreground">{item.quantitySold} sold</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="pt-4">
+                  <Button variant="outline" size="sm" asChild className="w-full">
+                    <Link href="/reports/abc-analysis">
+                      View All Best Selling Products <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
-                    <span className="text-muted-foreground ml-2">{item.quantitySold} sold</span>
-                  </li>
-                ))}
-              </ul>
+                  </Button>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="mx-auto h-12 w-12 opacity-50 mb-3" />

@@ -646,9 +646,9 @@ export default function AddProductPage() {
             </Card>
             <Card className="overflow-hidden">
               <CardHeader>
-                <CardTitle>Product Image</CardTitle>
+                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Image</CardTitle>
                 <CardDescription>
-                  Upload an image (max 5MB) for your product.
+                  Upload an image (max 5MB) for your {categoryType === 'service' ? 'service' : 'product'}.
                 </CardDescription>
               </CardHeader>
               <CardContent>

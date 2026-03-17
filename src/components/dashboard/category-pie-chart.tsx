@@ -15,42 +15,43 @@ interface CategoryPieChartProps {
 }
 
 export default function CategoryPieChart({ products }: CategoryPieChartProps) {
-    const chartDataResult = React.useMemo(() => {
+  const chartDataResult = React.useMemo(() => {
     if (!products) return { data: [], config: {} };
 
     const categoryCounts: Record<string, number> = {};
     products.forEach(product => {
+      if (product.categoryType === 'service') return;
       const categoryKey = product.category || 'Uncategorized';
-      categoryCounts[categoryKey] = (categoryCounts[categoryKey] || 0) + (product.stock || 0);
+      categoryCounts[categoryKey] = (categoryCounts[categoryKey] || 0) + Math.max(0, product.stock || 0);
     });
-    
+
     const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--accent))"];
-    
+
     const sortedData = Object.entries(categoryCounts)
-        .sort(([, a], [, b]) => b - a)
-        .map(([name, items], index) => ({
-            name,
-            items,
-            fill: chartColors[index % chartColors.length],
-        }));
-    
+      .sort(([, a], [, b]) => b - a)
+      .map(([name, items], index) => ({
+        name,
+        items,
+        fill: chartColors[index % chartColors.length],
+      }));
+
     const newConfig: ChartConfig = {};
     sortedData.forEach(item => {
-        newConfig[item.name] = {
-            label: item.name,
-            color: item.fill,
-        }
+      newConfig[item.name] = {
+        label: item.name,
+        color: item.fill,
+      }
     });
-    
+
     return { data: sortedData, config: newConfig };
   }, [products]);
 
   const { data: chartData, config: chartConfig } = chartDataResult;
 
   const totalItems = React.useMemo(() => {
-    return products.reduce((acc, curr) => acc + (curr.stock || 0), 0);
+    return products.filter(p => p.categoryType !== 'service').reduce((acc, curr) => acc + Math.max(0, curr.stock || 0), 0);
   }, [products]);
-  
+
   const noData = chartData.length === 0;
 
   return (
@@ -64,8 +65,8 @@ export default function CategoryPieChart({ products }: CategoryPieChartProps) {
           <div className="h-[250px] flex flex-col items-center justify-center text-center text-muted-foreground">
             <PieChartIcon className="h-16 w-16 opacity-50 mb-4" />
             <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
-                <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
-                <p>Add products with categories to see your stock distribution here.</p>
+              <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary" /> Zen AI</p>
+              <p>Add products with categories to see your stock distribution here.</p>
             </div>
           </div>
         ) : (
@@ -83,16 +84,16 @@ export default function CategoryPieChart({ products }: CategoryPieChartProps) {
                   innerRadius={60}
                   strokeWidth={5}
                 >
-                    {chartData.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.fill} />
-                    ))}
+                  {chartData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                  ))}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
           </ChartContainer>
         )}
       </CardContent>
-       <CardFooter className="flex-col gap-2 text-sm">
+      <CardFooter className="flex-col gap-2 text-sm">
         <div className="flex items-center gap-2 font-medium leading-none">
           Total Items: {totalItems.toLocaleString()}
         </div>
