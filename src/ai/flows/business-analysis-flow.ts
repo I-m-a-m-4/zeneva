@@ -35,6 +35,8 @@ Analyze the provided business data to generate a structured JSON object strictly
 - **Daily Performance Summary:** {{json dailySummaries}}
 - **Category Summary:** {{json categorySummaries}}
 - **ABC Analysis Classification:** {{json abcAnalysis}}
+- **Long-term Trends:** {{json trends}}
+- **Statistical Anomalies:** {{json anomalies}}
 - **Customers:** {{json customers}}
 - **Currency:** {{currencySymbol}}
 

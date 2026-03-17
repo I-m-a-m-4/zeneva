@@ -1352,7 +1352,50 @@ function ExecutiveBriefingTab() {
                 name, totalRevenue: data.revenue, unitsSold: data.units, uniqueCustomers: data.customers.size
             }));
 
-            // 5. Optimized Product Data (Top items + ABC context)
+            // 5. MATH LOGIC: Trend Analysis & Anomaly Detection
+            const revenueHistory = Object.values(dailyMap).map(d => d.revenue);
+            const avgDailyRev = revenueHistory.length > 0 ? revenueHistory.reduce((a, b) => a + b) / revenueHistory.length : 0;
+            const variance = revenueHistory.length > 0 ? revenueHistory.map(x => Math.pow(x - avgDailyRev, 2)).reduce((a, b) => a + b) / revenueHistory.length : 0;
+            const stdDev = Math.sqrt(variance);
+
+            const anomalies = Object.entries(dailyMap).map(([date, data]) => {
+                if (stdDev === 0) return null;
+                const dev = (data.revenue - avgDailyRev) / stdDev;
+                if (Math.abs(dev) > 1.5) { // 1.5 StdDev threshold for anomaly
+                    return { date, revenue: data.revenue, deviation: Number(dev.toFixed(2)), type: dev > 0 ? 'spike' : 'drop' };
+                }
+                return null;
+            }).filter(Boolean);
+
+            const last30DaysSales = recentSales.filter(s => {
+                const date = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+                return date >= subDays(new Date(), 30);
+            });
+            const prev30DaysSales = recentSales.filter(s => {
+                const date = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+                return date >= subDays(new Date(), 60) && date < subDays(new Date(), 30);
+            });
+
+            const rev30 = last30DaysSales.reduce((s, r) => s + (r.total || 0), 0);
+            const revPrev = prev30DaysSales.reduce((s, r) => s + (r.total || 0), 0);
+            const growthMoM = revPrev > 0 ? ((rev30 - revPrev) / revPrev) * 100 : 0;
+            const avgOrderValue = last30DaysSales.length > 0 ? rev30 / last30DaysSales.length : 0;
+
+            const churnRiskCount = (customers || []).filter(c => {
+                const cId = c.id;
+                const lastOrder = allSales.find(s => 'customer' in s && s.customer?.id === cId);
+                if (!lastOrder) return false;
+                const lastOrderDate = lastOrder.createdAt?.toDate ? lastOrder.createdAt.toDate() : new Date(lastOrder.createdAt);
+                return lastOrderDate < subDays(new Date(), 30); // Risk if no order in 30 days
+            }).length;
+
+            const trends = {
+                revenueGrowthMoM: Number(growthMoM.toFixed(2)),
+                avgOrderValue: Number(avgOrderValue.toFixed(2)),
+                churnRiskCount
+            };
+
+            // 6. Optimized Product Data (Top items + ABC context)
             const productInput = products.map(p => {
                 const stats = productSummaryMap[p.id] || { revenue: 0, units: 0, orders: 0 };
                 return {
@@ -1392,6 +1435,8 @@ function ExecutiveBriefingTab() {
                     dailySummaries,
                     categorySummaries,
                     abcAnalysis,
+                    trends,
+                    anomalies: anomalies as any,
                     customers: customerInput,
                     currencySymbol
                 });

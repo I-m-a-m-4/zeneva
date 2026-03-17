@@ -31,11 +31,26 @@ const ABCAnalysisSchema = z.object({
   tierC: z.array(z.string()).describe("Bottom 50% products generating ~10% revenue."),
 });
 
+const TrendAnalysisSchema = z.object({
+  revenueGrowthMoM: z.number().describe("Percentage growth in revenue month-over-month."),
+  avgOrderValue: z.number().describe("Average value per transaction."),
+  churnRiskCount: z.number().describe("Number of previously active customers who haven't ordered in 30 days."),
+});
+
+const AnomalySchema = z.object({
+  date: z.string(),
+  revenue: z.number(),
+  deviation: z.number().describe("Standard deviations from the mean revenue."),
+  type: z.enum(['spike', 'drop']),
+});
+
 export const BusinessAnalysisInputSchema = z.object({
   products: z.array(ProductInputSchema).describe("Key product data including performance metrics."),
   dailySummaries: z.array(DaySummarySchema).describe("Aggregated sales data grouped by day to reduce token usage."),
   categorySummaries: z.array(CategorySummarySchema).describe("Performance breakdown by category."),
   abcAnalysis: ABCAnalysisSchema.describe("Classification of products based on revenue contribution."),
+  trends: TrendAnalysisSchema.optional(),
+  anomalies: z.array(AnomalySchema).optional().describe("Statistical outliers in sales data."),
   customers: z.array(CustomerInputSchema).describe("Sample list of key/typical customers across segments."),
   currencySymbol: z.string().default('₦').describe("The currency symbol for formatting."),
 });
