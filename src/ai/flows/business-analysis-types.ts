@@ -8,36 +8,35 @@ const ProductInputSchema = z.object({
   costPrice: z.number().optional().default(0),
   stock: z.number().optional().default(0),
   category: z.string().optional(),
+  orderCount: z.number().optional().describe("Number of unique orders this product appeared in over the last 90 days."),
 });
 
-const ReceiptItemInputSchema = z.object({
-  productId: z.string(),
-  name: z.string(),
-  quantity: z.number(),
-  price: z.number(),
-  costPrice: z.number().optional().default(0),
-});
-
-const ReceiptInputSchema = z.object({
-  id: z.string(),
-  createdAt: z.any().describe('The sale timestamp (Date object or Firestore Timestamp). The AI should use this for time-based analysis.'),
-  items: z.array(ReceiptItemInputSchema),
-  total: z.number(),
-});
-
-const CustomerInputSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().optional(),
+const DaySummarySchema = z.object({
+  date: z.string(),
+  totalRevenue: z.number(),
   orderCount: z.number(),
-  totalSpent: z.number(),
+  topCategory: z.string().optional(),
 });
 
+const CategorySummarySchema = z.object({
+  name: z.string(),
+  totalRevenue: z.number(),
+  unitsSold: z.number(),
+  uniqueCustomers: z.number(),
+});
+
+const ABCAnalysisSchema = z.object({
+  tierA: z.array(z.string()).describe("Top 20% products generating ~70% revenue."),
+  tierB: z.array(z.string()).describe("Next 30% products generating ~20% revenue."),
+  tierC: z.array(z.string()).describe("Bottom 50% products generating ~10% revenue."),
+});
 
 export const BusinessAnalysisInputSchema = z.object({
-  products: z.array(ProductInputSchema).describe("List of all products."),
-  receipts: z.array(ReceiptInputSchema).describe("Sale transactions. The timestamp is crucial for time-based demand analysis."),
-  customers: z.array(CustomerInputSchema).describe("List of all customers with their lifetime order count and spend."),
+  products: z.array(ProductInputSchema).describe("Key product data including performance metrics."),
+  dailySummaries: z.array(DaySummarySchema).describe("Aggregated sales data grouped by day to reduce token usage."),
+  categorySummaries: z.array(CategorySummarySchema).describe("Performance breakdown by category."),
+  abcAnalysis: ABCAnalysisSchema.describe("Classification of products based on revenue contribution."),
+  customers: z.array(CustomerInputSchema).describe("Sample list of key/typical customers across segments."),
   currencySymbol: z.string().default('₦').describe("The currency symbol for formatting."),
 });
 

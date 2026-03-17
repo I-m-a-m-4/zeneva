@@ -11,7 +11,7 @@ import React, { useState, useTransition, useEffect, useMemo } from "react";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow, subDays } from "date-fns";
+import { formatDistanceToNow, subDays, format } from "date-fns";
 import PageTitle from "@/components/shared/page-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
@@ -81,6 +81,7 @@ export interface TopPerformingProduct {
     name: string;
     unitsSold: number;
     revenue: number;
+    orderCount: number;
     peakDay: string;
     peakTime: string;
     insight: string;
@@ -108,6 +109,10 @@ function ProductDetailModal({ product, isOpen, onOpenChange, currencySymbol }: {
                         <div className="p-3 bg-muted/50 rounded-lg">
                             <p className="text-xs text-muted-foreground">Units Sold</p>
                             <p className="text-lg font-bold">{product.unitsSold}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Order Count</p>
+                            <p className="text-lg font-bold">{product.orderCount}</p>
                         </div>
                         <div className="p-3 bg-muted/50 rounded-lg">
                             <p className="text-xs text-muted-foreground">Peak Day</p>
@@ -613,7 +618,7 @@ const TopPerformingProductsCard = ({ products, onProductClick, currencySymbol }:
                                 <div className="p-3 flex-grow flex flex-col">
                                     <h4 className="text-sm font-semibold line-clamp-2">{p.name}</h4>
                                     <p className="text-lg font-bold text-primary mt-1">{currencySymbol}{p.revenue.toLocaleString()}</p>
-                                    <p className="text-xs text-muted-foreground">{p.unitsSold} units sold</p>
+                                    <p className="text-xs text-muted-foreground">{p.unitsSold} units · {p.orderCount} orders</p>
                                     <Badge variant="secondary" className="mt-2 text-xs w-full text-center block whitespace-normal h-auto line-clamp-2">{p.insight}</Badge>
                                 </div>
                             </Card>
@@ -628,6 +633,119 @@ const TopPerformingProductsCard = ({ products, onProductClick, currencySymbol }:
         </CardContent>
     </Card>
 );
+
+const ProductPerformanceCard = ({ products, analysis, searchTerm, onSearchChange, onProductClick, currencySymbol }: { products: TopPerformingProduct[], analysis: BusinessAnalysisOutput | null, searchTerm: string, onSearchChange: (val: string) => void, onProductClick: (p: TopPerformingProduct) => void, currencySymbol: string }) => {
+    const filteredProducts = useMemo(() => {
+        if (!searchTerm) return products.slice(0, 10);
+        return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [products, searchTerm]);
+
+    const hasAiInsight = (productId: string) => {
+        if (!analysis) return false;
+        const inStockRec = analysis.smartStockRecommendations?.some(r => r.productId === productId);
+        const inRevenueOpp = analysis.revenueOpportunities?.some(r => r.productId === productId);
+        const inSlowMoving = analysis.slowMovingInventory?.some(r => r.productId === productId);
+        const inPricing = analysis.pricingRecommendations?.some(r => r.productId === productId);
+        return inStockRec || inRevenueOpp || inSlowMoving || inPricing;
+    };
+
+    return (
+        <Card className="relative overflow-hidden border-primary/10 shadow-lg">
+            <div className="absolute top-0 right-0 p-4 opacity-5">
+                <Search className="h-24 w-24" />
+            </div>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl font-bold text-primary">
+                    <Search className="h-5 w-5" />
+                    Product Performance Search
+                </CardTitle>
+                <CardDescription>Search for any product to see its stats and AI-driven insights.</CardDescription>
+                <div className="relative pt-2">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+                    <Input
+                        placeholder="Search for a product..."
+                        value={searchTerm}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        className="pl-9 bg-muted/20 border-primary/10 focus-visible:ring-primary/30"
+                    />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="border rounded-lg overflow-hidden bg-background">
+                    <Table>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow>
+                                <TableHead className="w-[300px]">Product</TableHead>
+                                <TableHead className="text-center">Orders</TableHead>
+                                <TableHead className="text-center">Units Sold</TableHead>
+                                <TableHead className="text-right">Revenue</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredProducts.length > 0 ? (
+                                filteredProducts.map((p) => {
+                                    const aiBadge = hasAiInsight(p.productId);
+                                    return (
+                                        <TableRow
+                                            key={p.productId}
+                                            className="cursor-pointer hover:bg-primary/5 transition-colors group"
+                                            onClick={() => onProductClick(p)}
+                                        >
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded bg-muted overflow-hidden relative flex-shrink-0 border border-primary/5">
+                                                        {p.imageUrl ? (
+                                                            <Image src={p.imageUrl} alt={p.name} fill className="object-cover group-hover:scale-110 transition-transform duration-300" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+                                                                <Package className="h-5 w-5" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="truncate max-w-[200px] group-hover:text-primary transition-colors">{p.name}</span>
+                                                        {aiBadge && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-primary font-semibold mt-0.5 animate-pulse">
+                                                                <Bot className="h-3 w-3" />
+                                                                AI Insight Available
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className="font-mono text-primary border-primary/20 bg-primary/5">
+                                                    {p.orderCount}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center font-medium">{p.unitsSold}</TableCell>
+                                            <TableCell className="text-right font-bold text-lg">
+                                                <span className="text-muted-foreground text-xs font-normal mr-1">{currencySymbol}</span>
+                                                {p.revenue.toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Package className="h-8 w-8 opacity-20" />
+                                            <p>No products found matching "{searchTerm}"</p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                {!searchTerm && products.length > 10 && (
+                    <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-wider font-semibold opacity-50">Showing top 10 products · Search to find any catalog item</p>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
 
 const SmartStockRecommendationCard = ({ recommendations, allProducts, searchTerm, onSearchChange, onRowClick }: { recommendations: SmartStockRecommendation[], allProducts: Product[], searchTerm: string, onSearchChange: (term: string) => void, onRowClick: (rec: SmartStockRecommendation) => void }) => {
     const filteredRecommendations = useMemo(() => {
@@ -1029,6 +1147,7 @@ function ExecutiveBriefingTab() {
     const [progress, setProgress] = React.useState(0);
     const [statusText, setStatusText] = React.useState('Initializing...');
     const [stockSearchTerm, setStockSearchTerm] = React.useState('');
+    const [productPerformanceSearchTerm, setProductPerformanceSearchTerm] = React.useState('');
 
     useEffect(() => {
         if (business?.settings?.businessAnalysis) {
@@ -1061,8 +1180,8 @@ function ExecutiveBriefingTab() {
         };
     }, [isPending]);
 
-    const topPerformingProducts = useMemo(() => {
-        if (!receipts && !onlineOrders) return [];
+    const allProductPerformance = useMemo(() => {
+        if (!receipts && !onlineOrders && !products) return [];
 
         const allSales = [...(receipts || []), ...(onlineOrders || [])];
         const thirtyDaysAgo = subDays(new Date(), 30);
@@ -1073,18 +1192,27 @@ function ExecutiveBriefingTab() {
 
         const totalRevenueLast30Days = recentSales.reduce((sum, s) => sum + s.total, 0);
 
-        const productSales: Record<string, { name: string; revenue: number; unitsSold: number; salesTimestamps: Date[] }> = {};
+        const productSales: Record<string, { name: string; revenue: number; unitsSold: number; orderCount: number; salesTimestamps: Date[] }> = {};
 
         recentSales.forEach(sale => {
             const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
 
+            // Use a Set to count unique orders per product
             sale.items.forEach(item => {
                 if (!productSales[item.productId]) {
-                    productSales[item.productId] = { name: item.name, revenue: 0, unitsSold: 0, salesTimestamps: [] };
+                    productSales[item.productId] = { name: item.name, revenue: 0, unitsSold: 0, orderCount: 0, salesTimestamps: [] };
                 }
                 productSales[item.productId].revenue += item.price * item.quantity;
                 productSales[item.productId].unitsSold += item.quantity;
                 productSales[item.productId].salesTimestamps.push(saleDate);
+            });
+
+            // Increment order count once per receipt for each unique product
+            const uniqueProductIdsInSale = new Set(sale.items.map(i => i.productId));
+            uniqueProductIdsInSale.forEach(pid => {
+                if (productSales[pid]) {
+                    productSales[pid].orderCount += 1;
+                }
             });
         });
 
@@ -1116,29 +1244,26 @@ function ExecutiveBriefingTab() {
             return { peakDay, peakTime };
         };
 
-        const sortedProducts: TopPerformingProduct[] = Object.entries(productSales)
-            .map(([productId, data]) => {
-                const productInfo = products?.find(p => p.id === productId);
-                let insight = "A top performing product.";
-                if (totalRevenueLast30Days > 0 && data.revenue > 0) {
-                    insight = `Accounts for ${((data.revenue / totalRevenueLast30Days) * 100).toFixed(0)}% of recent revenue.`;
-                }
-                if (recentSales.length <= 1 && productSales[productId]) {
-                    insight = "This product represents the entirety of the sales data provided. Further sales data is required to identify true top performers and patterns.";
-                }
-                return {
-                    productId,
-                    ...data,
-                    ...getPeakTimes(data.salesTimestamps),
-                    insight,
-                    imageUrl: productInfo?.imageUrl,
-                }
-            })
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 5);
+        const allStats: TopPerformingProduct[] = (products || []).map(p => {
+            const data = productSales[p.id] || { name: p.name, revenue: 0, unitsSold: 0, orderCount: 0, salesTimestamps: [] };
+            let insight = "A product in your catalog.";
+            if (data.revenue > 0 && totalRevenueLast30Days > 0) {
+                insight = `Accounts for ${((data.revenue / totalRevenueLast30Days) * 100).toFixed(0)}% of recent revenue.`;
+            }
 
-        return sortedProducts;
+            return {
+                productId: p.id,
+                ...data,
+                ...getPeakTimes(data.salesTimestamps),
+                insight,
+                imageUrl: p.imageUrl,
+            };
+        });
+
+        return allStats.sort((a, b) => b.revenue - a.revenue);
     }, [receipts, onlineOrders, products]);
+
+    const topPerformingProducts = useMemo(() => allProductPerformance.slice(0, 5), [allProductPerformance]);
 
 
     const handleGenerateAnalysis = () => {
@@ -1151,61 +1276,125 @@ function ExecutiveBriefingTab() {
             return;
         }
         startTransition(async () => {
-            const serializeDate = (date: any): string | null => {
-                if (!date) return null;
-                if (date instanceof Date) return date.toISOString();
-                if (date.toDate) return date.toDate().toISOString(); // Handle firestore timestamps
-                const seconds = date.seconds || (date._seconds);
-                if (seconds) {
-                    return new Date(seconds * 1000).toISOString();
-                }
-                return date.toString();
-            };
-
-            // --- DATA OPTIMIZATION ---
-            const ninetyDaysAgo = subDays(new Date(), 90);
+            // --- ADVANCED DATA ABSTRACTION & AGGREGATION ---
+            const sixtyDaysAgo = subDays(new Date(), 60);
             const allSales = [...(receipts || []), ...(onlineOrders || [])];
             const recentSales = allSales.filter(s => {
                 const saleDate = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
-                return saleDate >= ninetyDaysAgo;
+                return saleDate >= sixtyDaysAgo;
+            }).sort((a, b) => { // Sort descending by date
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                return dateB.getTime() - dateA.getTime();
             });
 
-            const productInput = products.map(p => ({
-                id: p.id, name: p.name, price: p.price,
-                costPrice: p.costPrice || 0, stock: p.stock || 0, category: p.category,
-            }));
-
-            const salesInput = recentSales.map(r => ({
-                id: r.id, createdAt: serializeDate(r.createdAt),
-                items: r.items.map(item => ({ ...item, costPrice: products.find(p => p.id === item.productId)?.costPrice || 0 })),
-                total: r.total,
-            }));
-
-            const recentCustomerIds = new Set(recentSales.map(sale => 'customer' in sale && sale.customer ? sale.customer.id : null).filter(Boolean));
-
-            const customerSpend: Record<string, { orderCount: number, totalSpent: number }> = {};
+            // 1. Calculate Per-Product Metrics
+            const productSummaryMap: Record<string, { revenue: number, units: number, orders: number }> = {};
             recentSales.forEach(sale => {
-                const customerId = 'customer' in sale && sale.customer ? sale.customer.id : null;
-                if (customerId && customers?.find(c => c.id === customerId)) {
-                    if (!customerSpend[customerId]) customerSpend[customerId] = { orderCount: 0, totalSpent: 0 };
-                    customerSpend[customerId].orderCount += 1;
-                    customerSpend[customerId].totalSpent += sale.total;
+                const uniqueInSale = new Set(sale.items.map(i => i.productId));
+                uniqueInSale.forEach(pid => {
+                    if (!productSummaryMap[pid]) productSummaryMap[pid] = { revenue: 0, units: 0, orders: 0 };
+                    productSummaryMap[pid].orders++;
+                });
+                sale.items.forEach(item => {
+                    if (!productSummaryMap[item.productId]) productSummaryMap[item.productId] = { revenue: 0, units: 0, orders: 0 };
+                    productSummaryMap[item.productId].revenue += (item.price || 0) * (item.quantity || 0);
+                    productSummaryMap[item.productId].units += (item.quantity || 0);
+                });
+            });
+
+            // 2. ABC Analysis Classification (70-20-10 Rule)
+            const sortedForABC = Object.entries(productSummaryMap)
+                .sort(([, a], [, b]) => b.revenue - a.revenue);
+            const totalRevenue = sortedForABC.reduce((sum, [, d]) => sum + d.revenue, 0);
+            let runningRevenue = 0;
+            const abcAnalysis: { tierA: string[], tierB: string[], tierC: string[] } = { tierA: [], tierB: [], tierC: [] };
+            sortedForABC.forEach(([pid, data]) => {
+                runningRevenue += data.revenue;
+                const pName = products?.find(p => p.id === pid)?.name || pid;
+                const revenueShare = totalRevenue > 0 ? runningRevenue / totalRevenue : 0;
+                if (revenueShare <= 0.7) abcAnalysis.tierA.push(pName);
+                else if (revenueShare <= 0.9) abcAnalysis.tierB.push(pName);
+                else abcAnalysis.tierC.push(pName);
+            });
+
+            // 3. Daily Aggregates (Top 30 Days)
+            const dailyMap: Record<string, { revenue: number, orders: number, cats: Record<string, number> }> = {};
+            recentSales.forEach(sale => {
+                const d = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
+                const dStr = format(d, 'yyyy-MM-dd');
+                if (!dailyMap[dStr]) dailyMap[dStr] = { revenue: 0, orders: 0, cats: {} };
+                dailyMap[dStr].revenue += (sale.total || 0);
+                dailyMap[dStr].orders++;
+                sale.items.forEach(item => {
+                    const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
+                    dailyMap[dStr].cats[cat] = (dailyMap[dStr].cats[cat] || 0) + ((item.price || 0) * (item.quantity || 0));
+                });
+            });
+            const dailySummaries = Object.entries(dailyMap).map(([date, data]) => ({
+                date, totalRevenue: data.revenue, orderCount: data.orders,
+                topCategory: Object.entries(data.cats).sort(([, a], [, b]) => b - a)[0]?.[0]
+            })).slice(0, 30);
+
+            // 4. Category Performance Breakdown
+            const categoryMap: Record<string, { revenue: number, units: number, customers: Set<string> }> = {};
+            recentSales.forEach(sale => {
+                const cId = 'customer' in sale && sale.customer ? sale.customer.id : 'Guest';
+                sale.items.forEach(item => {
+                    const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
+                    if (!categoryMap[cat]) categoryMap[cat] = { revenue: 0, units: 0, customers: new Set() };
+                    categoryMap[cat].revenue += ((item.price || 0) * (item.quantity || 0));
+                    categoryMap[cat].units += (item.quantity || 0);
+                    categoryMap[cat].customers.add(cId);
+                });
+            });
+            const categorySummaries = Object.entries(categoryMap).map(([name, data]) => ({
+                name, totalRevenue: data.revenue, unitsSold: data.units, uniqueCustomers: data.customers.size
+            }));
+
+            // 5. Optimized Product Data (Top items + ABC context)
+            const productInput = products.map(p => {
+                const stats = productSummaryMap[p.id] || { revenue: 0, units: 0, orders: 0 };
+                return {
+                    id: p.id, name: p.name, price: p.price, costPrice: p.costPrice || 0,
+                    stock: p.stock || 0, category: p.category, orderCount: stats.orders,
+                };
+            }).sort((a, b) => (productSummaryMap[b.id]?.revenue || 0) - (productSummaryMap[a.id]?.revenue || 0))
+                .slice(0, 100); // Only send top 100 products to avoid context bloat
+
+            // 6. Optimized Customer Sampling
+            const recentCustomerIds = new Set(recentSales.map(sale => 'customer' in sale && sale.customer ? sale.customer.id : null).filter(Boolean));
+            const customerStatsMap: Record<string, { total: number, orders: number }> = {};
+            recentSales.forEach(sale => {
+                const cId = 'customer' in sale && sale.customer ? sale.customer.id : null;
+                if (cId) {
+                    if (!customerStatsMap[cId]) customerStatsMap[cId] = { total: 0, orders: 0 };
+                    customerStatsMap[cId].total += (sale.total || 0);
+                    customerStatsMap[cId].orders++;
                 }
             });
 
             const customerInput = (customers || [])
                 .filter(c => recentCustomerIds.has(c.id))
+                .sort((a, b) => (customerStatsMap[b.id]?.total || 0) - (customerStatsMap[a.id]?.total || 0))
+                .slice(0, 20)
                 .map(c => ({
                     id: c.id,
                     name: c.name,
-                    email: c.email,
-                    orderCount: customerSpend[c.id]?.orderCount || 0,
-                    totalSpent: customerSpend[c.id]?.totalSpent || 0,
+                    email: c.email || '',
+                    orderCount: customerStatsMap[c.id]?.orders || 0,
+                    totalSpent: customerStatsMap[c.id]?.total || 0,
                 }));
-            // --- END DATA OPTIMIZATION ---
 
             try {
-                const result = await businessAnalysis({ products: productInput, receipts: salesInput, customers: customerInput, currencySymbol });
+                const result = await businessAnalysis({
+                    products: productInput,
+                    dailySummaries,
+                    categorySummaries,
+                    abcAnalysis,
+                    customers: customerInput,
+                    currencySymbol
+                });
                 const dataToSave: BusinessAnalysisOutput = { ...result, createdAt: new Date() };
 
                 const businessDocRef = doc(firestore, 'businessInstances', business.id);
@@ -1251,6 +1440,15 @@ function ExecutiveBriefingTab() {
                     <div className="space-y-6">
                         <TopPerformingProductsCard
                             products={topPerformingProducts}
+                            onProductClick={(p) => setDetailProduct(p)}
+                            currencySymbol={currencySymbol}
+                        />
+
+                        <ProductPerformanceCard
+                            products={allProductPerformance}
+                            analysis={analysis}
+                            searchTerm={productPerformanceSearchTerm}
+                            onSearchChange={setProductPerformanceSearchTerm}
                             onProductClick={(p) => setDetailProduct(p)}
                             currencySymbol={currencySymbol}
                         />

@@ -32,7 +32,9 @@ Analyze the provided business data to generate a structured JSON object strictly
 
 **DATASETS:**
 - **Products:** {{json products}}
-- **Receipts (Sales History):** {{json receipts}}
+- **Daily Performance Summary:** {{json dailySummaries}}
+- **Category Summary:** {{json categorySummaries}}
+- **ABC Analysis Classification:** {{json abcAnalysis}}
 - **Customers:** {{json customers}}
 - **Currency:** {{currencySymbol}}
 
@@ -44,9 +46,9 @@ Analyze the provided business data to generate a structured JSON object strictly
 
 2.  **Smart Stock Recommendation (Provide at least 20 recommendations if data allows):**
     *   This is predictive forecasting, not a simple low-stock alert.
-    *   Analyze sales velocity, paying close attention to **time-based patterns (day of week, time of day)**.
+    *   Analyze sales velocity, paying close attention to **time-based patterns (day of week, time of day)** and the **orderCount (frequency of purchase)**.
     *   **PREDICT** the optimal stock level for the *next* sales cycle (e.g., "for the upcoming week").
-    *   Example Reason: "Demand spikes on Fridays. Recommend increasing stock to 50 units to capture weekend sales and prevent stockouts."
+    *   Example Reason: "This product was present in 45 unique orders (+12% vs last month). Recommend increasing stock to 50 units for the weekend."
     *   Provide a confidence score for your prediction. The more data, the higher the confidence.
 
 3.  **Smart Merchandising (Bundling):**
@@ -55,10 +57,10 @@ Analyze the provided business data to generate a structured JSON object strictly
     *   Provide a clear insight and a compelling recommendation for each bundle.
 
 4.  **Slow-Moving Inventory Recovery (Capital Recovery):**
-    *   Identify products that haven't sold in a significant time (e.g., 60-90 days).
+    *   Identify products that haven't sold or had very low **orderCount** in the specified period (e.g., 60-90 days).
     *   Calculate the total capital locked in this dead stock (quantity * cost price).
     *   Suggest a concrete recovery strategy. **Prioritize bundling with a fast-selling, complementary product.** Also consider targeted discounts or promotions. **Use Markdown for emphasis**, e.g., 'Apply a **25% flash sale**'.
-    *   Example Recommendation: "Bundle 'Slow-Moving Item X' with the popular 'Fast-Seller Y' as a free gift to clear stock and attract customers."
+    *   Example Recommendation: "Product X has only been in 1 order in 90 days. Bundle it with the popular 'Fast-Seller Y' to clear stock."
 
 5.  **Pricing Strategy Recommendations:**
     *   Analyze products and suggest specific pricing strategies to increase purchase likelihood or profit. Focus only on 'Psychological' and 'Penetration' pricing. Do NOT suggest 'Prestige' pricing.
