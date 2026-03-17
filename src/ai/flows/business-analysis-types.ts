@@ -115,7 +115,7 @@ const BusinessHealthSchema = z.object({
 
 const SegmentCustomerSchema = z.object({
   name: z.string().describe("The customer's full name."),
-  email: z.string().email().describe("The customer's email address."),
+  email: z.string().optional().describe("The customer's email address if available."),
 });
 
 const CustomerSegmentSchema = z.object({

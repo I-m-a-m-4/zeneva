@@ -18,7 +18,18 @@ import {
 export async function businessAnalysis(
   input: BusinessAnalysisInput
 ): Promise<BusinessAnalysisOutput> {
-  return businessAnalysisFlow(input);
+  try {
+    console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
+    const result = await businessAnalysisFlow(input);
+    console.log("Business Analysis AI Flow completed successfully.");
+    return result;
+  } catch (error: any) {
+    console.error("CRITICAL ERROR in Business Analysis AI Flow:", error);
+    if (error.message?.includes('token')) {
+      throw new Error("The dataset is too large for the AI to process. We are working on further optimizing the data summaries.");
+    }
+    throw new Error("Zen AI is currently over-leveraged or encountered a processing error. Please try again in a few seconds.");
+  }
 }
 
 const prompt = ai.definePrompt({
