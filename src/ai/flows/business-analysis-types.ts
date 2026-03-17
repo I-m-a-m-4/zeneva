@@ -8,6 +8,7 @@ const ProductInputSchema = z.object({
   costPrice: z.number().optional().default(0),
   stock: z.number().optional().default(0),
   category: z.string().optional(),
+  categoryType: z.enum(['product', 'service']).optional().describe("Whether this is a physical product or a service."),
   orderCount: z.number().optional().describe("Number of unique orders this product appeared in over the last 90 days."),
 });
 

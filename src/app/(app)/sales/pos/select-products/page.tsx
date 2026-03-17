@@ -63,7 +63,10 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                 )}
             </CardContent>
             <CardHeader className="px-4 py-1 flex-grow">
-                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground">{product.name}</CardTitle>
+                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground flex items-center gap-1.5 flex-wrap">
+                    {product.name}
+                    {product.categoryType === 'service' && <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">Service</Badge>}
+                </CardTitle>
             </CardHeader>
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">

@@ -16,6 +16,7 @@ export interface Product {
     createdAt?: any;
     updatedAt?: any;
     expiryDate?: any;
+    categoryType?: 'product' | 'service';
 
     // --- Premium Inventory Features ---
     type?: 'single' | 'variant' | 'composite';
@@ -222,7 +223,7 @@ export interface CustomerSegment {
     description: string;
     customers: {
         name: string;
-        email: string;
+        email?: string;
     }[];
     suggestedCampaign: {
         title: string;

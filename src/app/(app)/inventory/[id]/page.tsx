@@ -56,6 +56,7 @@ const productSchema = z.object({
     stock: z.coerce.number().int("Stock must be a whole number.").min(0),
     sku: z.string().optional(),
     category: z.string().optional(),
+    categoryType: z.enum(['product', 'service']).default('product'),
 
     // Advanced Features
     type: z.enum(['single', 'variant', 'composite']).default('single'),
@@ -137,6 +138,7 @@ export default function EditProductPage() {
             stock: 0,
             sku: "",
             category: "",
+            categoryType: "product",
             type: "single",
             baseUnit: "Piece",
             uomConversions: [],
@@ -155,6 +157,7 @@ export default function EditProductPage() {
     });
 
     const productType = form.watch("type");
+    const categoryType = form.watch("categoryType");
     const { products } = usePOS();
 
     React.useEffect(() => {
@@ -200,7 +203,7 @@ export default function EditProductPage() {
                 const formData = new FormData();
                 formData.append('image', imageFile);
                 const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
-                if (!apiKey || apiKey === "your_api_key_here") throw new Error("ImgBB API key is not configured.");
+                if (!apiKey) throw new Error("ImgBB API key is not configured.");
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (!result.success) throw new Error(result.error?.message || 'Image upload failed.');
@@ -254,7 +257,7 @@ export default function EditProductPage() {
                         </Link>
                     </Button>
                     <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
-                        Edit: {product.name}
+                        Edit {categoryType === 'service' ? 'Service' : 'Product'}: {product.name}
                     </h1>
                     <div className="hidden items-center gap-2 md:ml-auto md:flex">
                         <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
@@ -495,19 +498,21 @@ export default function EditProductPage() {
                                             </FormItem>
                                         )}
                                     />
-                                    <FormField
-                                        control={form.control}
-                                        name="stock"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Stock</FormLabel>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="25" {...field} disabled={!canManageProduct} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    {categoryType === 'product' && (
+                                        <FormField
+                                            control={form.control}
+                                            name="stock"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Stock</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" placeholder="25" {...field} disabled={!canManageProduct} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
                                     <FormField
                                         control={form.control}
                                         name="price"
@@ -541,7 +546,40 @@ export default function EditProductPage() {
                     <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Product Category</CardTitle>
+                                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                                <div className="mt-4 space-y-4 px-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="categoryType"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-1">
+                                                <FormLabel className="text-xs">Type</FormLabel>
+                                                <FormControl>
+                                                    <RadioGroup
+                                                        onValueChange={field.onChange}
+                                                        value={field.value}
+                                                        className="flex gap-4"
+                                                        disabled={!canManageProduct}
+                                                    >
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="product" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal text-xs">Product</FormLabel>
+                                                        </FormItem>
+                                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                                            <FormControl>
+                                                                <RadioGroupItem value="service" />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal text-xs">Service</FormLabel>
+                                                        </FormItem>
+                                                    </RadioGroup>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <FormField

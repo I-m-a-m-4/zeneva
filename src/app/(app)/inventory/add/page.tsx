@@ -55,6 +55,7 @@ const productSchema = z.object({
   sku: z.string().optional(),
   category: z.string().optional(),
   expiryDate: z.date().optional(),
+  categoryType: z.enum(['product', 'service']).default('product'),
 
   // Advanced Features
   type: z.enum(['single', 'variant', 'composite']).default('single'),
@@ -110,6 +111,7 @@ export default function AddProductPage() {
       sku: "",
       category: "",
       expiryDate: undefined,
+      categoryType: "product",
       type: "single",
       baseUnit: "Piece",
       uomConversions: [],
@@ -128,6 +130,7 @@ export default function AddProductPage() {
   });
 
   const productType = form.watch("type");
+  const categoryType = form.watch("categoryType");
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -265,7 +268,7 @@ export default function AddProductPage() {
             </Link>
           </Button>
           <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
-            Add New Product
+            Add New {categoryType === 'service' ? 'Service' : 'Product'}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
             <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
@@ -506,19 +509,21 @@ export default function AddProductPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="stock"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Stock</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="25" {...field} value={field.value ?? ''} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {categoryType === 'product' && (
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="25" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="price"
@@ -566,7 +571,39 @@ export default function AddProductPage() {
           <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
             <Card>
               <CardHeader>
-                <CardTitle>Product Category</CardTitle>
+                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                <div className="mt-4 space-y-4 px-2">
+                  <FormField
+                    control={form.control}
+                    name="categoryType"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs">Type</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex gap-4"
+                          >
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="product" />
+                              </FormControl>
+                              <FormLabel className="font-normal text-xs">Product</FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="service" />
+                              </FormControl>
+                              <FormLabel className="font-normal text-xs">Service</FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <FormField

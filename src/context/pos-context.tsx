@@ -653,9 +653,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const existingItem = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
 
       if (existingItem) {
-        // Stock check logic
+        // Stock check logic - only for non-services
+        const isService = product.categoryType === 'service';
         const totalQuantityInBaseUnit = (existingItem.quantity + 1) * (multiplier || 1);
-        if (totalQuantityInBaseUnit > (product.stock || 0)) {
+        if (!isService && totalQuantityInBaseUnit > (product.stock || 0)) {
           toast({
             title: 'Backorder recorded',
             description: `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`,
@@ -671,7 +672,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       } else {
         const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
 
-        if ((product.stock || 0) <= 0) {
+        const isService = product.categoryType === 'service';
+        if (!isService && (product.stock || 0) <= 0) {
           toast({
             title: 'Backorder started',
             description: `${product.name} is out of stock. Recording this as a debt.`,
@@ -690,8 +692,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const itemInCart = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
     if (!itemInCart) return;
 
+    const isService = itemInCart.product.categoryType === 'service';
     const multiplier = itemInCart.multiplier || 1;
-    if (quantity * multiplier > (itemInCart.product.stock || 0)) {
+    if (!isService && (quantity * multiplier > (itemInCart.product.stock || 0))) {
       toast({
         title: 'Entering Backorder',
         description: `You are requesting more than the ${itemInCart.product.stock || 0} units available. This will be recorded as debt.`,

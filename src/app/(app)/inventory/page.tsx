@@ -585,22 +585,26 @@ export default function InventoryPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          (product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" :
-                            (product.stock || 0) > 0 ? "secondary" :
-                              (product.stock || 0) < 0 ? "destructive" : "destructive"
-                        }
-                        className={cn(
-                          "whitespace-nowrap",
-                          (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
-                        )}
-                      >
-                        {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
-                      </Badge>
+                      {product.categoryType === 'service' ? (
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/50">Service</Badge>
+                      ) : (
+                        <Badge
+                          variant={
+                            (product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" :
+                              (product.stock || 0) > 0 ? "secondary" :
+                                (product.stock || 0) < 0 ? "destructive" : "destructive"
+                          }
+                          className={cn(
+                            "whitespace-nowrap",
+                            (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                          )}
+                        >
+                          {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
+                        </Badge>
+                      )}
                     </TableCell>
                     {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                    {canManageStock && <TableCell className="hidden md:table-cell">{product.stock || 0}</TableCell>}
+                    {canManageStock && <TableCell className="hidden md:table-cell">{product.categoryType === 'service' ? '-' : (product.stock || 0)}</TableCell>}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

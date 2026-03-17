@@ -56,7 +56,7 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
         const totalRevenue = Object.values(productRevenue).reduce((sum, { revenue }) => sum + revenue, 0);
 
         if (totalRevenue === 0) {
-            return { classA: [], classB: [], classC: [], allSearched: [] };
+            return { all: [], classA: [], classB: [], classC: [] };
         }
 
         const sortedProducts = Object.entries(productRevenue)
@@ -83,15 +83,15 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
         });
 
         return {
-            classA: classifiedProducts.filter(p => p.class === 'A'),
-            classB: classifiedProducts.filter(p => p.class === 'B'),
-            classC: classifiedProducts.filter(p => p.class === 'C'),
-            allSearched: classifiedProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())),
+            all: classifiedProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())),
+            classA: classifiedProducts.filter(p => p.class === 'A' && p.name.toLowerCase().includes(searchQuery.toLowerCase())),
+            classB: classifiedProducts.filter(p => p.class === 'B' && p.name.toLowerCase().includes(searchQuery.toLowerCase())),
+            classC: classifiedProducts.filter(p => p.class === 'C' && p.name.toLowerCase().includes(searchQuery.toLowerCase())),
         };
 
     }, [receipts, products, searchQuery]);
 
-    const { classA, classB, classC, allSearched } = analysisData;
+    const { all, classA, classB, classC } = analysisData;
     const hasData = classA.length > 0 || classB.length > 0 || classC.length > 0;
 
     return (
@@ -107,7 +107,7 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
                         <Input
-                            placeholder="Search product class..."
+                            placeholder="Search products..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-9 h-9"
@@ -117,15 +117,15 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
             </CardHeader>
             <CardContent>
                 {hasData ? (
-                    <Tabs defaultValue={searchQuery ? "search" : "classA"}>
+                    <Tabs defaultValue="all">
                         <TabsList className="grid w-full grid-cols-4 mb-4">
-                            <TabsTrigger value="search" disabled={!searchQuery}>Search {searchQuery && `(${allSearched.length})`}</TabsTrigger>
+                            <TabsTrigger value="all">All Products ({all.length})</TabsTrigger>
                             <TabsTrigger value="classA">Class A ({classA.length})</TabsTrigger>
                             <TabsTrigger value="classB">Class B ({classB.length})</TabsTrigger>
                             <TabsTrigger value="classC">Class C ({classC.length})</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="search">
-                            <CategoryTable products={allSearched} currencySymbol={currencySymbol} onRowClick={setSelectedProduct} />
+                        <TabsContent value="all">
+                            <CategoryTable products={all} currencySymbol={currencySymbol} onRowClick={setSelectedProduct} />
                         </TabsContent>
                         <TabsContent value="classA">
                             <CategoryTable products={classA} currencySymbol={currencySymbol} onRowClick={setSelectedProduct} />

@@ -76,7 +76,8 @@ export default function ReviewPage() {
 
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
-            if (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity) {
+            const isService = productFromCache?.categoryType === 'service';
+            if (!isService && (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity)) {
                 toast({
                     variant: 'backorder' as any,
                     title: 'Backorder Sale',
@@ -112,22 +113,25 @@ export default function ReviewPage() {
                     totalCost += costPrice * cartItem.quantity;
 
                     // --- Stock Logic ---
-                    if (product?.type === 'composite' && product.components) {
-                        // For composite items, decrement EACH component's stock
-                        product.components.forEach(component => {
-                            const componentProduct = products.find(p => p.id === component.productId);
-                            if (componentProduct) {
-                                const componentRef = doc(firestore, 'products', component.productId);
-                                const decrementAmount = component.quantity * cartItem.quantity;
-                                const newCompStock = (componentProduct.stock || 0) - decrementAmount;
-                                batch.update(componentRef, { stock: newCompStock, updatedAt: serverTimestamp() });
-                            }
-                        });
-                    } else {
-                        // For single items or variants, decrement the product's own stock
-                        const productRef = doc(firestore, 'products', cartItem.product.id);
-                        const newStock = (product?.stock || 0) - baseQuantitySold;
-                        batch.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
+                    const isService = product?.categoryType === 'service';
+                    if (!isService) {
+                        if (product?.type === 'composite' && product.components) {
+                            // For composite items, decrement EACH component's stock
+                            product.components.forEach(component => {
+                                const componentProduct = products.find(p => p.id === component.productId);
+                                if (componentProduct) {
+                                    const componentRef = doc(firestore, 'products', component.productId);
+                                    const decrementAmount = component.quantity * cartItem.quantity;
+                                    const newCompStock = (componentProduct.stock || 0) - decrementAmount;
+                                    batch.update(componentRef, { stock: newCompStock, updatedAt: serverTimestamp() });
+                                }
+                            });
+                        } else {
+                            // For single items or variants, decrement the product's own stock
+                            const productRef = doc(firestore, 'products', cartItem.product.id);
+                            const newStock = (product?.stock || 0) - baseQuantitySold;
+                            batch.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
+                        }
                     }
 
                     return {
