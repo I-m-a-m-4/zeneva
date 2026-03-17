@@ -1313,9 +1313,13 @@ function ExecutiveBriefingTab() {
                 runningRevenue += data.revenue;
                 const pName = products?.find(p => p.id === pid)?.name || pid;
                 const revenueShare = totalRevenue > 0 ? runningRevenue / totalRevenue : 0;
-                if (revenueShare <= 0.7) abcAnalysis.tierA.push(pName);
-                else if (revenueShare <= 0.9) abcAnalysis.tierB.push(pName);
-                else abcAnalysis.tierC.push(pName);
+                if (revenueShare <= 0.7) {
+                    if (abcAnalysis.tierA.length < 20) abcAnalysis.tierA.push(pName);
+                } else if (revenueShare <= 0.9) {
+                    if (abcAnalysis.tierB.length < 20) abcAnalysis.tierB.push(pName);
+                } else {
+                    if (abcAnalysis.tierC.length < 20) abcAnalysis.tierC.push(pName);
+                }
             });
 
             // 3. Daily Aggregates (Top 30 Days)
