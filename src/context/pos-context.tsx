@@ -206,7 +206,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
           }
           case 'update-product': {
             const productRef = doc(firestore, 'products', action.payload.productId);
-            batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
+            const cleanValues = Object.fromEntries(Object.entries(action.payload.values).filter(([_, v]) => v !== undefined));
+            batch.update(productRef, { ...cleanValues, updatedAt: serverTimestamp() });
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.update',
               entity: { type: 'Product', id: action.payload.productId, name: 'Product' }, // Name might be unknown without fetch, generic fallback
@@ -258,7 +259,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             const { id, ...productData } = action.payload;
 
             batch.set(newProductRef, {
-              ...productData,
+              ...Object.fromEntries(Object.entries(productData).filter(([_, v]) => v !== undefined)),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             });

@@ -211,8 +211,12 @@ export default function EditProductPage() {
             }
 
             const updatedValues = { ...values, imageUrl };
+            const cleanData = Object.fromEntries(
+                Object.entries(updatedValues).filter(([_, v]) => v !== undefined)
+            );
+
             await updateDoc(productDocRef, {
-                ...updatedValues,
+                ...cleanData,
                 updatedAt: serverTimestamp(),
             });
 
