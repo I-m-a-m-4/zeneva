@@ -8,7 +8,8 @@ import * as z from "zod";
 import {
   ChevronLeft,
   Upload,
-  CalendarIcon
+  CalendarIcon,
+  QrCode
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 
 const productSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -90,6 +92,7 @@ export default function AddProductPage() {
 
   // Type helper for date string input
   const [expiryDateInput, setExpiryDateInput] = React.useState("");
+  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
 
   const userProfile = currentUserProfile;
 
@@ -502,9 +505,20 @@ export default function AddProductPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Barcode (SKU)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="QHDM-001" {...field} />
-                          </FormControl>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input placeholder="QHDM-001" {...field} />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setIsScannerOpen(true)}
+                              className="shrink-0"
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                          </div>
                           <FormDescription>
                             This unique code generates the barcode. <Link href="/support#how-barcodes-work" className="text-primary underline">Learn more</Link>.
                           </FormDescription>
@@ -685,6 +699,18 @@ export default function AddProductPage() {
           </Button>
         </div>
       </form>
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={(code) => {
+          form.setValue('sku', code);
+          setIsScannerOpen(false);
+          toast({
+            title: "Barcode Scanned",
+            description: `SKU set to: ${code}`,
+          });
+        }}
+      />
     </Form>
   );
 }

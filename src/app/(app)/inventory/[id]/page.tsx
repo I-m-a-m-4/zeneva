@@ -13,6 +13,7 @@ import {
     Plus,
     Trash,
     Layers,
+    QrCode
 } from "lucide-react";
 import { useFieldArray } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -47,6 +48,7 @@ import type { UserProfile, Product } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
+import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -127,6 +129,7 @@ export default function EditProductPage() {
     const [isSaving, setIsSaving] = React.useState(false);
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+    const [isScannerOpen, setIsScannerOpen] = React.useState(false);
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
@@ -498,9 +501,22 @@ export default function EditProductPage() {
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>Barcode (SKU)</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct} />
-                                                    </FormControl>
+                                                    <div className="flex gap-2">
+                                                        <FormControl>
+                                                            <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct} />
+                                                        </FormControl>
+                                                        {canManageProduct && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => setIsScannerOpen(true)}
+                                                                className="shrink-0"
+                                                            >
+                                                                <QrCode className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
@@ -687,6 +703,18 @@ export default function EditProductPage() {
                     )}
                 </div>
             </form>
+            <BarcodeScanner
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={(code) => {
+                    form.setValue('sku', code);
+                    setIsScannerOpen(false);
+                    toast({
+                        title: "Barcode Scanned",
+                        description: `SKU updated to: ${code}`,
+                    });
+                }}
+            />
         </Form>
     );
 }
