@@ -45,6 +45,14 @@ const AnomalySchema = z.object({
   type: z.enum(['spike', 'drop']),
 });
 
+const CustomerInputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().optional(),
+  orderCount: z.number().optional(),
+  totalSpent: z.number().optional(),
+});
+
 export const BusinessAnalysisInputSchema = z.object({
   products: z.array(ProductInputSchema).describe("Key product data including performance metrics."),
   dailySummaries: z.array(DaySummarySchema).describe("Aggregated sales data grouped by day to reduce token usage."),
