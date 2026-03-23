@@ -4,7 +4,9 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,22 +24,81 @@ export default function AdminLoginPage() {
   const auth = useAuth();
   const { toast } = useToast();
 
+  const firestore = useFirestore();
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) return;
+
     setIsProcessing(true);
     setError(null);
 
+    const lockRef = doc(firestore, 'admin_locks', email.toLowerCase());
+
     try {
+      // 1. Check for existing lockout
+      const lockSnap = await getDoc(lockRef);
+      if (lockSnap.exists()) {
+        const data = lockSnap.data();
+        if (data.lockoutUntil) {
+          const lockoutDate = data.lockoutUntil.toDate();
+          if (lockoutDate > new Date()) {
+            const timeRemaining = formatDistanceToNow(lockoutDate);
+            const message = `Too many failed attempts. This account is locked for ${timeRemaining}. Please try again tomorrow.`;
+            setError(message);
+            toast({ title: 'Account Locked', description: message, variant: 'destructive' });
+            setIsProcessing(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Attempt Login
       await signInWithEmailAndPassword(auth, email, password);
+      
+      // 3. Success: Reset lockout attempts
+      await deleteDoc(lockRef);
+      
       toast({ title: 'Login Successful', description: 'Redirecting to admin dashboard...' });
       router.push('/admin-imamshaffy');
     } catch (err: any) {
       let message = 'An unexpected error occurred. Please try again.';
+      
+      // Handle Firebase Auth errors
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         message = 'Invalid credentials. Please check your email and password.';
+        
+        // 4. Failure: Increment attempts
+        try {
+          const lockSnap = await getDoc(lockRef);
+          const currentData = lockSnap.exists() ? lockSnap.data() : { attempts: 0 };
+          const newAttempts = (currentData.attempts || 0) + 1;
+          
+          if (newAttempts >= 5) {
+            // Lock for 24 hours
+            const lockoutUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            await setDoc(lockRef, {
+              attempts: newAttempts,
+              lockoutUntil: Timestamp.fromDate(lockoutUntil),
+              lastAttempt: serverTimestamp()
+            });
+            message = 'Too many failed attempts. This account has been locked until tomorrow.';
+          } else {
+            await setDoc(lockRef, {
+              attempts: newAttempts,
+              lastAttempt: serverTimestamp()
+            }, { merge: true });
+            message = `Invalid credentials. ${5 - newAttempts} attempts remaining before lockout.`;
+          }
+        } catch (lockErr) {
+          console.error("Error updating lockout status:", lockErr);
+        }
       } else if (err.code === 'auth/invalid-email') {
         message = 'The email address is not valid.';
+      } else if (err.code === 'auth/too-many-requests') {
+        message = 'Too many requests. Please try again later or tomorrow.';
       }
+
       setError(message);
       toast({
         title: 'Login Failed',
