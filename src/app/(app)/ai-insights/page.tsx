@@ -1118,7 +1118,7 @@ const ContentPlannerCard = ({ planner }: { planner: ContentPlanner }) => (
         </CardContent>
         <CardFooter className="pt-2 border-t mt-4">
             <Button variant="link" size="sm" className="text-primary p-0 h-auto font-semibold hover:no-underline group" asChild>
-                <Link href="/admin/blog/create">
+                <Link href="/admin-imamshaffy/blog/create">
                     Start writing this content
                     <Edit className="ml-1.5 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </Link>

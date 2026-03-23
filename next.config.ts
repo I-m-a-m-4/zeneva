@@ -99,13 +99,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
+  async redirects() {
     return [
       {
-        source: '/admin-imamshaffy/:path*',
-        destination: '/admin/:path*',
+        source: '/admin/:path*',
+        destination: '/',
+        permanent: true,
       },
-    ]
+    ];
   },
 };
 

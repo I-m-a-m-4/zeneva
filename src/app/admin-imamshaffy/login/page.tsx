@@ -68,6 +68,7 @@ export default function AdminLoginPage() {
                 required
                 disabled={isProcessing}
                 placeholder="admin@zeneva.com"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2 focus-within-glow rounded-md">
@@ -81,6 +82,7 @@ export default function AdminLoginPage() {
                   required
                   disabled={isProcessing}
                   placeholder="Enter your password"
+                  autoComplete="off"
                 />
                 <Button
                   type="button"

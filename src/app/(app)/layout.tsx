@@ -728,7 +728,7 @@ export default function AuthenticatedLayout({
               {currentUserProfile && currentUserProfile.id !== user?.uid && (
                 <div className="bg-destructive/10 border-t border-destructive/20 p-2 text-center text-sm text-destructive font-medium flex items-center justify-center gap-4">
                   <span>You are viewing {currentUserProfile.name}'s account.</span>
-                  <Button size="sm" variant="destructive" onClick={() => window.location.href = '/admin'}>Exit View</Button>
+                  <Button size="sm" variant="destructive" onClick={() => window.location.href = '/admin-imamshaffy'}>Exit View</Button>
                 </div>
               )}
             </div>
