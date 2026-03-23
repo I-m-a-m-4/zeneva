@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell } from 'lucide-react';
+import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp } from "firebase/firestore";
+import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, LogOut } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -19,7 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow } from 'date-fns';
 import { BusinessInstance, UserProfile } from '@/types';
 import {
     AlertDialog,
@@ -202,6 +205,68 @@ function SettingsPageContent() {
             setPreventSalesOutsideHours(business.settings?.operatingHours?.preventSalesOutsideHours || false);
         }
     }, [business]);
+
+    // Sessions state
+    const [sessions, setSessions] = React.useState<any[]>([]);
+    const [isRevoking, setIsRevoking] = React.useState<Record<string, boolean>>({});
+
+    React.useEffect(() => {
+        if (!currentUserProfile?.id || !firestore) return;
+
+        const sessionsRef = collection(firestore, 'users', currentUserProfile.id, 'sessions');
+        const q = query(sessionsRef, orderBy('lastSeen', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const sessionsData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setSessions(sessionsData);
+        }, (error) => {
+            console.error("Error listening to sessions:", error);
+        });
+
+        return () => unsubscribe();
+    }, [currentUserProfile?.id, firestore]);
+
+    const handleRevokeSession = async (sessionId: string) => {
+        if (!currentUserProfile?.id) return;
+        setIsRevoking(prev => ({ ...prev, [sessionId]: true }));
+        try {
+            const sessionRef = doc(firestore, 'users', currentUserProfile.id, 'sessions', sessionId);
+            await updateDoc(sessionRef, { revoked: true });
+            toast({
+                variant: 'success',
+                title: 'Access Revoked',
+                description: 'The device has been successfully logged out.'
+            });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Revoke Failed',
+                description: 'Could not revoke session access.'
+            });
+        } finally {
+            setIsRevoking(prev => ({ ...prev, [sessionId]: false }));
+        }
+    };
+
+    const getDeviceIcon = (userAgent: string) => {
+        const ua = userAgent.toLowerCase();
+        if (ua.includes('mobi')) return <Smartphone className="h-4 w-4" />;
+        if (ua.includes('tablet') || ua.includes('ipad')) return <Tablet className="h-4 w-4" />;
+        return <Monitor className="h-4 w-4" />;
+    };
+
+    const formatUA = (userAgent: string) => {
+        // Simple UA parser (can be improved)
+        if (userAgent.includes('Windows')) return 'Windows PC';
+        if (userAgent.includes('Mac OS')) return 'MacBook / MacOS';
+        if (userAgent.includes('iPhone')) return 'iPhone';
+        if (userAgent.includes('Android')) return 'Android Device';
+        if (userAgent.includes('Linux')) return 'Linux PC';
+        return 'Unknown Device';
+    };
 
     React.useEffect(() => {
         setPaymentAccountName('');
@@ -578,6 +643,67 @@ function SettingsPageContent() {
                                 {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                 {fcmToken ? "Disable" : "Enable"}
                             </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Security & Devices</CardTitle>
+                        <CardDescription>Manage your active login sessions and registered devices.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-4">
+                            {sessions.length === 0 ? (
+                                <div className="text-center py-6 text-muted-foreground">
+                                    No active sessions found.
+                                </div>
+                            ) : (
+                                sessions.map((session) => {
+                                    const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
+                                    const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
+                                    const isCurrent = session.id === currentSessionId;
+
+                                    return (
+                                        <div key={session.id} className={cn(
+                                            "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                                            session.revoked ? "opacity-50 grayscale" : "bg-card",
+                                            isCurrent && "border-primary ring-1 ring-primary/20 shadow-sm"
+                                        )}>
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn(
+                                                    "p-2 rounded-full",
+                                                    isCurrent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                                )}>
+                                                    {getDeviceIcon(session.userAgent || '')}
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">{formatUA(session.userAgent || 'Unknown')}</span>
+                                                        {isCurrent && <Badge variant="default" className="text-[10px] h-4 px-1">This Device</Badge>}
+                                                        {session.revoked && <Badge variant="destructive" className="text-[10px] h-4 px-1">Revoked</Badge>}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                                                        <span>{session.deviceInfo?.platform || 'Unknown OS'}</span>
+                                                        <span className="hidden sm:inline opacity-30">•</span>
+                                                        <span>Last active: {session.lastSeen instanceof Timestamp ? formatDistanceToNow(session.lastSeen.toDate(), { addSuffix: true }) : 'Just now'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {!session.revoked && !isCurrent && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="text-muted-foreground hover:text-destructive"
+                                                    disabled={isRevoking[session.id]}
+                                                    onClick={() => handleRevokeSession(session.id)}
+                                                >
+                                                    {isRevoking[session.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </CardContent>
                 </Card>
