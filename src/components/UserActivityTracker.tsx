@@ -37,22 +37,27 @@ export function UserActivityTracker() {
                     // 2. Update session and user activity
                     const lastUpdate = sessionStorage.getItem('last_user_activity_update');
                     const now = Date.now();
+                    const sessionExists = sessionSnap.exists();
 
-                    if (!lastUpdate || now - parseInt(lastUpdate) > 5 * 60 * 1000) {
+                    // Update if:
+                    // - Never updated this session storage wise
+                    // - It's been > 5 minutes
+                    // - The session document doesn't actually exist in Firestore yet
+                    if (!lastUpdate || now - parseInt(lastUpdate) > 5 * 60 * 1000 || !sessionExists) {
                         const batch = writeBatch(firestore);
                         
-                        // Update User Doc
-                        batch.update(userRef, {
+                        // Upsert User Doc (using set with merge to be safer than update)
+                        batch.set(userRef, {
                             lastSeen: serverTimestamp(),
                             status: 'active'
-                        });
+                        }, { merge: true });
 
                         // Upsert Session Doc
                         batch.set(sessionRef, {
                             sessionId,
                             userAgent: navigator.userAgent,
                             lastSeen: serverTimestamp(),
-                            createdAt: sessionSnap.exists() ? sessionSnap.data().createdAt : serverTimestamp(),
+                            createdAt: sessionExists ? sessionSnap.data().createdAt : serverTimestamp(),
                             revoked: false,
                             deviceInfo: {
                                 platform: navigator.platform,
@@ -63,11 +68,9 @@ export function UserActivityTracker() {
 
                         await batch.commit();
                         sessionStorage.setItem('last_user_activity_update', now.toString());
+                        console.log("User session updated successfully");
                     }
                 } catch (error: any) {
-                    if (error.code === 'not-found' || error.message?.includes('No document to update')) {
-                        return;
-                    }
                     console.error("Error updating user activity/session:", error);
                 }
             }
