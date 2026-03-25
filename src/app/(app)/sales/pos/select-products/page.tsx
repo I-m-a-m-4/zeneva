@@ -146,7 +146,7 @@ const CartContents = () => {
                                         {item.product.name}
                                         {item.unit && <Badge variant="secondary" className="ml-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{currencySymbol}{item.product.price.toLocaleString()}</p>
+                                    <p className="text-xs text-muted-foreground">{currencySymbol}{(item.product.price * item.quantity).toLocaleString()}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Input
