@@ -31,6 +31,8 @@ export const metadata: Metadata = {
         url: 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png',
         width: 1200,
         height: 630,
+        type: 'image/png',
+        alt: 'Zeneva - Inventory Management and POS',
       },
     ],
     locale: 'en_US',
@@ -91,7 +93,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="QGYrHkSlC71065ymk6dZc6DFesm14JeSPw-myjzZVso" />
         <link rel="icon" href="data:image/svg+xml,%3csvg width='400' height='400' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3e%3crect x='10' y='10' width='180' height='180' rx='24' ry='24' fill='%23F97316' /%3e%3cg transform='translate(-30, -30) scale(1.3)'%3e%3cpath d='M 100 55 A 35 35 0 1 0 100 125 A 35 35 0 1 0 100 55 Z M 100 63 A 27 27 0 1 1 100 117 A 27 27 0 1 1 100 63 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='6' /%3e%3cpath d='M 60 127 Q 100 154 140 127 Q 100 142 60 127 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='6' /%3e%3c/g%3e%3c/svg%3e" type="image/svg+xml" />

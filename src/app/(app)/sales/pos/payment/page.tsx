@@ -15,14 +15,18 @@ import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
 
 export default function PaymentPage() {
-    const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, currencySymbol } = usePOS();
+    const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, currencySymbol, autoPrint, setAutoPrint } = usePOS();
     const business = useBusiness();
     const router = useRouter();
     const [isNavigating, setIsNavigating] = React.useState(false);
 
     const handleNext = () => {
         setIsNavigating(true);
-        router.push('/sales/pos/review');
+        if (autoPrint) {
+            router.push('/sales/pos/review?auto=true');
+        } else {
+            router.push('/sales/pos/review');
+        }
     };
 
     return (
@@ -130,11 +134,25 @@ export default function PaymentPage() {
                             <span>Total</span>
                             <span>{currencySymbol}{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
+
+                        <Separator />
+                        <div className="flex items-center justify-between py-2">
+                            <Label htmlFor="auto-print" className="cursor-pointer font-medium text-sm">
+                                Print Receipt
+                            </Label>
+                            <input
+                                type="checkbox"
+                                id="auto-print"
+                                className="w-4 h-4 cursor-pointer"
+                                checked={autoPrint}
+                                onChange={(e) => setAutoPrint(e.target.checked)}
+                            />
+                        </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
-                        <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
-                            {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Next: Review
+                        <Button className="w-full h-12 text-lg" onClick={handleNext} disabled={isNavigating}>
+                            {isNavigating && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                            {autoPrint ? 'Finalize & Print' : 'Review & Complete'}
                         </Button>
                         <Button className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/customer">Back</Link>

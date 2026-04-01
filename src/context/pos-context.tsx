@@ -15,6 +15,7 @@ const POS_CUSTOMER_KEY = 'zeneva-pos-customer';
 const POS_TAX_RATE_KEY = 'zeneva-pos-tax-rate';
 const POS_DISCOUNT_KEY = 'zeneva-pos-discount';
 const POS_PAYMENT_METHOD_KEY = 'zeneva-pos-payment-method';
+const POS_AUTO_PRINT_KEY = 'zeneva-pos-auto-print';
 const QUEUED_ACTIONS_KEY = 'zeneva-queued-actions';
 
 interface POSContextType {
@@ -47,6 +48,8 @@ interface POSContextType {
   setDiscount: (discountAmount: number) => void;
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
+  autoPrint: boolean;
+  setAutoPrint: (autoPrint: boolean) => void;
   resetPOS: () => void;
   currencySymbol: string;
   currencyCode: string;
@@ -598,11 +601,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch { return 'Cash'; }
   });
 
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem(POS_AUTO_PRINT_KEY);
+      return saved === null ? true : saved === 'true';
+    } catch { return true; }
+  });
+
   useEffect(() => { try { localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); } catch { } }, [cart]);
   useEffect(() => { try { localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); } catch { } }, [selectedCustomer]);
   useEffect(() => { try { localStorage.setItem(POS_TAX_RATE_KEY, String(taxRate)); } catch { } }, [taxRate]);
   useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch { } }, [discount]);
   useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch { } }, [paymentMethod]);
+  useEffect(() => { try { localStorage.setItem(POS_AUTO_PRINT_KEY, String(autoPrint)); } catch { } }, [autoPrint]);
 
   const resetPOS = useCallback(() => {
     setCart([]);
@@ -723,6 +735,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     selectedCustomer, selectCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
     paymentMethod, setPaymentMethod,
+    autoPrint, setAutoPrint,
     resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
@@ -737,10 +750,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       : (isLoading ? true : false)
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
-    cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, currencySymbol, currencyCode, triggerRefresh,
+    cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, autoPrint, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
-    addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, resetPOS,
+    addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, setAutoPrint, resetPOS,
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers
   ]);
 

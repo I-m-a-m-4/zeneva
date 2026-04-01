@@ -8,10 +8,33 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const businessId = params.businessId;
 
-    // Default metadata
+    const rootOgImageUrl = 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png';
+
+    // Default metadata used if business is not found or adminSDK fails
     const defaultMetadata: Metadata = {
-        title: 'Zeneva Store',
-        description: 'Check out this store on Zeneva.',
+        title: 'Shop on Zeneva',
+        description: 'Discover and shop from amazing local businesses on the Zeneva platform.',
+        openGraph: {
+            title: 'Zeneva Store',
+            description: 'Capture every opportunity and maximize every sale with Zeneva.',
+            images: [
+                {
+                    url: rootOgImageUrl,
+                    width: 1200,
+                    height: 630,
+                    type: 'image/png',
+                    alt: 'Zeneva Store',
+                },
+            ],
+            type: 'website',
+            siteName: 'Zeneva',
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: 'Zeneva Store',
+            description: 'Capture every opportunity and maximize every sale with Zeneva.',
+            images: [rootOgImageUrl],
+        },
     };
 
     if (!adminFirestore) {
@@ -44,7 +67,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
             const title = publicStore.headline || businessData.name || 'Zeneva Store';
             const description = publicStore.description || `Check out products from ${businessData.name} on Zeneva.`;
-            const imageUrl = settings.logoUrl || publicStore.bannerImageUrl || 'https://zeneva.space/og-image.jpg'; // Fallback image
+            // Use root image as fallback instead of missing og-image.jpg
+            const rootOgImageUrl = 'https://i.ibb.co/Z69q8yJD/20260215-0958-Image-Generation-remix-01khg89f7jf59sbf395x7pw9k0.png';
+            const imageUrl = settings.logoUrl || publicStore.bannerImageUrl || rootOgImageUrl;
 
             return {
                 title: `${title} | Zeneva Store`,
@@ -57,6 +82,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                             url: imageUrl,
                             width: 1200,
                             height: 630,
+                            type: 'image/png',
                             alt: title,
                         },
                     ],

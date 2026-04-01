@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useBusiness } from '@/context/pos-context';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, doc, writeBatch, serverTimestamp, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
@@ -23,13 +23,14 @@ import { logAuditEvent } from '@/lib/audit';
 export default function ReviewPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
     const [isCompleting, setIsCompleting] = React.useState(false);
     const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
-    const [autoPrint, setAutoPrint] = React.useState(true);
+    const searchParams = useSearchParams();
+    const isAutoPrompted = searchParams.get('auto') === 'true';
     const [backdate, setBackdate] = React.useState('');
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
@@ -68,9 +69,10 @@ export default function ReviewPage() {
     };
 
 
-    const handleCompleteSale = () => {
+    const handleCompleteSale = React.useCallback(() => {
         if (!firestore || !business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
+            setIsCompleting(false);
             return;
         }
 
@@ -294,7 +296,14 @@ export default function ReviewPage() {
                 setIsCompleting(false); // Re-enable button on failure
             }
         })();
-    }
+    }, [firestore, business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, customers, shouldSendEmail, toast]);
+
+    // **Auto-Submit Logic**
+    React.useEffect(() => {
+        if (isAutoPrompted && !isCompleting && cart.length > 0 && products) {
+            handleCompleteSale();
+        }
+    }, [isAutoPrompted, isCompleting, cart.length, products, handleCompleteSale]);
 
     // FIX: Check plan status but also allow if it's not strictly 'business' for now to debug, 
     // or at least log why it's failing. 

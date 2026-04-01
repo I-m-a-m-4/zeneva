@@ -200,19 +200,23 @@
     }
 
     @page {
-      margin: 0;
-      size: auto;
+      margin: 0 !important;
+      padding: 0 !important;
+      size: auto; /* Allow the browser to determine height, but we'll constrain width */
     }
 
     .print-receipt {
       display: block !important;
-      position: static !important;
-      box-shadow: none !important;
-      border: none !important;
-      width: 300px !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
       max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4mm !important;
+      padding: 2mm 4mm !important;
+      box-shadow: none !important;
+      border: none !important;
+      background: white !important;
       color: black !important;
       page-break-after: avoid;
     }
