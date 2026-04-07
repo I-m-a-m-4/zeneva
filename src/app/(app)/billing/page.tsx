@@ -15,6 +15,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, History, ShieldCheck } from 'lucide-react';
 import TrialCountdown from '@/components/settings/trial-countdown';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const SubscriptionSection = dynamic(
     () => import('@/components/settings/subscription-section'),
@@ -73,8 +75,12 @@ const LifetimeAccessStatus = () => (
 );
 
 
+import RefreshButton from '@/components/shared/refresh-button';
+import { usePOS } from '@/context/pos-context';
+
 function BillingPage() {
   const { user, isUserLoading } = useUser();
+  const { triggerRefresh } = usePOS();
   const firestore = useFirestore();
 
   const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
@@ -101,20 +107,42 @@ function BillingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle title="Billing & Subscriptions" subtitle="Manage your plan, view payment history, and upgrade your account." />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <PageTitle title="Billing & Subscriptions" subtitle="Manage your plan, view payment history, and upgrade your account." />
+        <RefreshButton />
+      </div>
 
-      <Card>
+      <Card className="overflow-hidden border-none shadow-lg bg-gradient-to-br from-background to-muted/20">
+        <div className="h-1.5 w-full bg-gradient-to-r from-primary/50 via-primary to-primary/50" />
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Subscription & Billing</CardTitle>
-          <CardDescription>Manage your subscription plan and view billing history.</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Subscription & Billing</CardTitle>
+              <CardDescription>Manage your subscription plan and view billing history.</CardDescription>
+            </div>
+            {currentBusiness.accessLevel === 'lifetime' && (
+              <Badge className="bg-green-600 hover:bg-green-700 text-white animate-pulse">LIFETIME ACTIVE</Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
-            <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
-                <p className="text-sm text-muted-foreground">Current Status</p>
+            <div className={cn(
+                "p-6 border-2 rounded-xl transition-all duration-300",
+                currentBusiness.accessLevel === 'lifetime' 
+                    ? "border-green-500/50 bg-green-500/5 shadow-inner" 
+                    : "border-border/50 bg-muted/30"
+            )}>
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Current Subscription Status</p>
                 {currentBusiness.accessLevel === 'lifetime' ? (
                     <LifetimeAccessStatus />
                 ) : (
                     <TrialCountdown expiryDate={currentBusiness.trialExpiresAt?.toDate() || null} />
+                )}
+                
+                {currentBusiness.accessLevel !== 'lifetime' && (
+                    <p className="text-xs text-muted-foreground mt-4 italic">
+                        If you've recently been granted lifetime access and don't see it yet, please use the <span className="font-bold text-primary">Refresh</span> button above.
+                    </p>
                 )}
             </div>
             <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />

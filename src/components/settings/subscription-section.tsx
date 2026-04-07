@@ -210,6 +210,45 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
         setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
     };
 
+    if (businessInstance.accessLevel === 'lifetime') {
+        return (
+            <Card className="mt-6 border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                            <ShieldCheck className="h-6 w-6 text-green-600 dark:text-green-500" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-green-700 dark:text-green-400">Lifetime Access Active</CardTitle>
+                            <CardDescription className="text-green-600/80 dark:text-green-500/80">
+                                You have full, permanent access to all Zeneva Premium features. No further subscriptions are required.
+                            </CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 border rounded-lg bg-background/50">
+                            <h4 className="font-semibold mb-2">Included Features:</h4>
+                            <ul className="space-y-2 text-sm">
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500"/> Unlimited products & users</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500"/> Advanced AI Business Insights</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500"/> Priority Support</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500"/> Full Storefront Customization</li>
+                            </ul>
+                        </div>
+                        <div className="flex items-center justify-center p-6">
+                            <div className="text-center">
+                                <Badge className="mb-2 bg-green-600 hover:bg-green-700 text-white px-4 py-1 text-sm">LIFETIME STATUS</Badge>
+                                <p className="text-xs text-muted-foreground">Certified by Zeneva Administration</p>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
             {plans.map((plan) => {
