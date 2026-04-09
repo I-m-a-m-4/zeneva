@@ -396,9 +396,15 @@ export default function InventoryPage() {
           variant="outline"
           size="icon"
           className="h-10 w-10 shrink-0 border-primary/20 text-primary hover:bg-primary/5"
-          onClick={() => setIsScannerOpen(true)}
+          onClick={() => {
+            // Manual search trigger if needed, though it's already real-time
+            toast({
+              title: "Search Active",
+              description: `Showing results for "${searchTerm || 'all products'}"`,
+            });
+          }}
         >
-          <QrCode className="h-5 w-5" />
+          <Search className="h-5 w-5" />
         </Button>
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2">
@@ -430,7 +436,11 @@ export default function InventoryPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                <DropdownMenuLabel>Actions & Filters</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
+                  <QrCode className="mr-2 h-4 w-4" /> Search by Barcode
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
@@ -533,6 +543,12 @@ export default function InventoryPage() {
                 <DropdownMenuLabel>Inventory Options</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 
+                <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
+                  <QrCode className="mr-2 h-4 w-4" /> Scan Barcode
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+
                 {/* Mobile Filter Group */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
