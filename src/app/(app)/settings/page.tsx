@@ -349,7 +349,6 @@ function SettingsPageContent() {
         try {
             const businessDocRef = doc(firestore, 'businessInstances', business.id);
             await updateDoc(businessDocRef, finalData);
-            triggerRefresh();
             toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
