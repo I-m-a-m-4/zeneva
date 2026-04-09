@@ -12,9 +12,21 @@ import {
     Barcode as BarcodeIcon,
     Plus,
     Trash,
+    Trash2,
     Layers,
-    QrCode
+    QrCode,
+    AlertCircle
 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useFieldArray } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
@@ -130,6 +142,8 @@ export default function EditProductPage() {
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+    const { addToQueue } = usePOS();
 
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
@@ -240,6 +254,18 @@ export default function EditProductPage() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleDelete = async () => {
+        if (!productId || !business || !currentUserProfile) return;
+
+        addToQueue({
+            type: 'delete-product',
+            payload: { productIds: [productId] }
+        }, `Deleting product ${product?.name}`);
+
+        toast({ variant: 'default', title: 'Deletion Queued', description: `${product?.name} will be deleted.` });
+        router.push('/inventory');
     };
 
     const isLoading = isProductLoading;
@@ -689,6 +715,30 @@ export default function EditProductPage() {
                                 </CardContent>
                             </Card>
                         )}
+
+                        <Card className="border-destructive/20 bg-destructive/5">
+                            <CardHeader>
+                                <CardTitle className="text-destructive flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5" />
+                                    Danger Zone
+                                </CardTitle>
+                                <CardDescription>
+                                    Irreversible actions for this {categoryType === 'service' ? 'service' : 'product'}.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-300"
+                                    onClick={() => setIsDeleteDialogOpen(true)}
+                                    disabled={!canManageProduct || isSaving}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete {categoryType === 'service' ? 'Service' : 'Product'}
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 md:hidden">
@@ -715,6 +765,22 @@ export default function EditProductPage() {
                     });
                 }}
             />
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete <strong>{product.name}</strong>. This action cannot be undone and will remove all associated data.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                            Delete Product
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Form>
     );
 }

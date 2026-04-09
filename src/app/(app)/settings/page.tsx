@@ -710,11 +710,15 @@ function SettingsPageContent() {
                                     
                                     {sessions.length > 3 && (
                                         <Button 
-                                            variant="ghost" 
-                                            className="w-full mt-2 text-primary hover:bg-primary/5"
+                                            variant="outline" 
+                                            className="w-full mt-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200"
                                             onClick={() => setShowAllSessions(!showAllSessions)}
                                         >
-                                            {showAllSessions ? 'Show Less' : `Show More (${sessions.length - 3} more)`}
+                                            {showAllSessions ? (
+                                                <>Show Less</>
+                                            ) : (
+                                                <>Show More ({sessions.length - 3} more)</>
+                                            )}
                                         </Button>
                                     )}
                                 </>

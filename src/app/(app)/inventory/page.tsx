@@ -116,7 +116,7 @@ function ProductRowSkeleton() {
   )
 }
 
-const PRODUCTS_PER_PAGE = 10;
+const PRODUCTS_PER_PAGE = 60;
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -400,115 +400,214 @@ export default function InventoryPage() {
         >
           <QrCode className="h-5 w-5" />
         </Button>
-        <div className="flex items-center gap-2">
-          {selectedProductIds.length > 0 && (
-            <>
-              <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
-                <Edit className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Bulk Edit ({selectedProductIds.length})
-                </span>
-              </Button>
-              <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Delete ({selectedProductIds.length})
-                </span>
-              </Button>
-            </>
-          )}
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-2">
+            {selectedProductIds.length > 0 && (
+              <>
+                <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
+                  <Edit className="h-3.5 w-3.5" />
+                  <span className="sm:whitespace-nowrap">
+                    Bulk Edit ({selectedProductIds.length})
+                  </span>
+                </Button>
+                <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="sm:whitespace-nowrap">
+                    Delete ({selectedProductIds.length})
+                  </span>
+                </Button>
+              </>
+            )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only">Filter</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1">
+                  <ListFilter className="h-3.5 w-3.5" />
+                  <span>Filter</span>
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">{activeFilterCount}</Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
+                      <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                      {business?.settings?.productCategories?.map((cat: string) => (
+                        <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                      <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="stock-desc">Highest Stock First</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="stock-asc">Lowest Stock First</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 {activeFilterCount > 0 && (
-                  <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">{activeFilterCount}</Badge>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('name'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                      Clear Filters
+                    </DropdownMenuItem>
+                  </>
                 )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
-                    <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
-                    {business?.settings?.productCategories?.map((cat: string) => (
-                      <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                    <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="stock-desc">Highest Stock First</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="stock-asc">Lowest Stock First</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              {activeFilterCount > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('name'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                    Clear Filters
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* <VisualCountDialog onAddItems={handleVisualAddItems} /> */}
-          <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
-            <Download className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              Export
-            </span>
-          </Button>
-          {canManageStock && (
-            <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
-              <Upload className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Import
-              </span>
+            <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
+              <Download className="h-3.5 w-3.5" />
+              <span className="sm:whitespace-nowrap">Export</span>
             </Button>
-          )}
-          <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
-            <Link href="/inventory/debts">
-              <TrendingDown className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Manage Debts
-              </span>
-            </Link>
-          </Button>
-          {canManageStock && (
-            <Button size="sm" asChild className="h-9 gap-1">
-              <Link href="/inventory/add">
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Add Product
-                </span>
+            {canManageStock && (
+              <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5" />
+                <span className="sm:whitespace-nowrap">Import</span>
+              </Button>
+            )}
+            <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
+              <Link href="/inventory/debts">
+                <TrendingDown className="h-3.5 w-3.5" />
+                <span className="sm:whitespace-nowrap">Manage Debts</span>
               </Link>
             </Button>
-          )}
-        </div>
+            {canManageStock && (
+              <Button size="sm" asChild className="h-9 gap-1">
+                <Link href="/inventory/add">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="sm:whitespace-nowrap">Add Product</span>
+                </Link>
+              </Button>
+            )}
+          </div>
+
+          {/* Mobile Actions Modal/Menu */}
+          <div className="flex md:hidden items-center gap-2">
+            {selectedProductIds.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="default" size="sm" className="h-9 px-3 gap-2">
+                    <Activity className="h-4 w-4" />
+                    <span>{selectedProductIds.length} Selected</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsBulkEditDialogOpen(true)}>
+                    <Edit className="mr-2 h-4 w-4" /> Bulk Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete selected
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Inventory Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                {/* Mobile Filter Group */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <ListFilter className="mr-2 h-4 w-4" />
+                    Filter & Sort {activeFilterCount > 0 && `(${activeFilterCount})`}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
+                          <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
+                          <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                          {business?.settings?.productCategories?.map((cat: string) => (
+                            <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                          <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="stock-desc">Highest Stock</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="stock-asc">Lowest Stock</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem onClick={() => handleExport()}>
+                  <Download className="mr-2 h-4 w-4" /> Export CSV
+                </DropdownMenuItem>
+                
+                {canManageStock && (
+                  <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4" /> Import CSV
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem asChild>
+                  <Link href="/inventory/debts">
+                    <TrendingDown className="mr-2 h-4 w-4" /> Manage Debts
+                  </Link>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+                
+                {canManageStock && (
+                  <DropdownMenuItem asChild className="bg-primary text-primary-foreground focus:bg-primary/90">
+                    <Link href="/inventory/add">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
       </div>
       <Card className="h-full flex flex-col w-full">
         <CardHeader>
@@ -685,10 +784,6 @@ export default function InventoryPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setBarcodeProduct(product); }} disabled={!product.sku}>
                             <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setIsDeleteDialogOpen(true); setSelectedProductIds([product.id]); }} disabled={!canManageStock}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
