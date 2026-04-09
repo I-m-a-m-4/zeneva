@@ -507,12 +507,16 @@ export default function AuthenticatedLayout({
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                       <div className="flex items-center gap-2 w-full">
-                        <Avatar className="h-8 w-8">
-                          {!isUserLoading && user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
-                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                            {isUserLoading ? <Skeleton className="h-full w-full rounded-full" /> : fallbackInitials}
-                          </AvatarFallback>
-                        </Avatar>
+                        {isUserLoading ? (
+                          <Skeleton className="h-8 w-8 rounded-full" />
+                        ) : (
+                          <Avatar className="h-8 w-8">
+                            {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
+                            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                              {fallbackInitials}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                         <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
                           {isUserLoading ? (
                             <>
@@ -645,12 +649,16 @@ export default function AuthenticatedLayout({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
-                        <Avatar className="h-8 w-8">
-                          {!isUserLoading && user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
-                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                            {isUserLoading ? <Skeleton className="h-full w-full rounded-full" /> : fallbackInitials}
-                          </AvatarFallback>
-                        </Avatar>
+                        {isUserLoading ? (
+                          <Skeleton className="h-8 w-8 rounded-full" />
+                        ) : (
+                          <Avatar className="h-8 w-8">
+                            {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
+                            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                              {fallbackInitials}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -685,7 +693,7 @@ export default function AuthenticatedLayout({
                 </div>
               </header>
               <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
-                {(isUserLoading || !currentUserProfile || isLoading) && !showSubscriptionBlock ? (
+                {(!currentUserProfile && isLoading) && !showSubscriptionBlock ? (
                   <div className="flex h-full w-full items-center justify-center">
                     <div className="flex flex-col items-center gap-4">
                       <Loader className="h-8 w-8 animate-spin text-primary" />
