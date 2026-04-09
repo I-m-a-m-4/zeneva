@@ -133,6 +133,8 @@ export default function InventoryPage() {
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [isManualSearching, setIsManualSearching] = React.useState(false);
+  const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
 
@@ -395,16 +397,17 @@ export default function InventoryPage() {
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10 shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:bg-muted transition-all duration-200"
           onClick={() => {
-            // Manual search trigger if needed, though it's already real-time
-            toast({
-              title: "Search Active",
-              description: `Showing results for "${searchTerm || 'all products'}"`,
-            });
+            setIsManualSearching(true);
+            setTimeout(() => setIsManualSearching(false), 600);
           }}
         >
-          <Search className="h-5 w-5" />
+          {isManualSearching ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Search className="h-5 w-5" />
+          )}
         </Button>
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2">
@@ -769,7 +772,10 @@ export default function InventoryPage() {
                       </TableCell>
                     )}
                     <TableCell>
-                      <DropdownMenu>
+                      <DropdownMenu 
+                        open={openMenuId === product.id} 
+                        onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
+                      >
                         <DropdownMenuTrigger asChild>
                           <Button
                             aria-haspopup="true"
