@@ -397,7 +397,7 @@ export default function InventoryPage() {
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:bg-muted transition-all duration-200"
+          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
           onClick={() => {
             setIsManualSearching(true);
             setTimeout(() => setIsManualSearching(false), 600);

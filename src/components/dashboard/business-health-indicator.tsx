@@ -12,9 +12,14 @@ import {
 import { Bot, HeartPulse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
+import { Skeleton } from '../ui/skeleton';
 
 export default function BusinessHealthIndicator() {
-  const { business } = usePOS();
+  const { business, isLoading } = usePOS();
+
+  if (isLoading) {
+    return <Skeleton className="h-10 w-48 rounded-lg" />;
+  }
 
   const healthData = business?.settings?.businessAnalysis?.businessHealth;
 

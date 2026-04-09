@@ -43,6 +43,7 @@ import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import { ThemeProvider } from '@/components/theme-provider';
 import QueueStatus from '@/components/layout/queue-status';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -507,12 +508,23 @@ export default function AuthenticatedLayout({
                     <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                       <div className="flex items-center gap-2 w-full">
                         <Avatar className="h-8 w-8">
-                          {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
-                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{fallbackInitials}</AvatarFallback>
+                          {!isUserLoading && user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
+                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                            {isUserLoading ? <Skeleton className="h-full w-full rounded-full" /> : fallbackInitials}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
-                          <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
-                          {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
+                          {isUserLoading ? (
+                            <>
+                              <Skeleton className="h-4 w-24 mb-1" />
+                              <Skeleton className="h-3 w-12" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
+                              {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
+                            </>
+                          )}
                         </div>
                       </div>
                     </Button>
@@ -634,8 +646,10 @@ export default function AuthenticatedLayout({
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-8 w-8 rounded-full md:flex">
                         <Avatar className="h-8 w-8">
-                          {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
-                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{fallbackInitials}</AvatarFallback>
+                          {!isUserLoading && user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
+                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                            {isUserLoading ? <Skeleton className="h-full w-full rounded-full" /> : fallbackInitials}
+                          </AvatarFallback>
                         </Avatar>
                       </Button>
                     </DropdownMenuTrigger>
