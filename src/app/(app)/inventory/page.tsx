@@ -145,6 +145,7 @@ export default function InventoryPage() {
 
   // Server-side state
   const [pagedProducts, setPagedProducts] = React.useState<Product[]>([]);
+  const [currentSnapshots, setCurrentSnapshots] = React.useState<QueryDocumentSnapshot<DocumentData>[]>([]);
   const [lastDoc, setLastDoc] = React.useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [prevDocs, setPrevDocs] = React.useState<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -258,11 +259,8 @@ export default function InventoryPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
       setPagedProducts(items);
+      setCurrentSnapshots(snapshot.docs);
       setIsPageLoading(false);
-      
-      // Update the boundary doc for next/prev
-      // Note: This simple pagination logic assumes we only move forward or stay.
-      // For a more robust solution, we'd track snapshots in prevDocs.
     });
 
     // Get Total Count (Silent)
@@ -275,11 +273,10 @@ export default function InventoryPage() {
   }, [business?.id, firestore, debouncedSearchTerm, sortBy, categoryFilter, currentPage, lastDoc]); // Uses debouncedSearchTerm
 
   const handleNextPage = () => {
-    if (!pagedProducts.length) return;
-    const lastDocOfCurrent = pagedProducts[pagedProducts.length - 1];
-    // Find doc in firestore to use as cursor
-    // This is a bit tricky with onSnapshot, but for this simple version:
+    if (!currentSnapshots.length) return;
+    const lastDocOfCurrent = currentSnapshots[currentSnapshots.length - 1];
     setPrevDocs(prev => [...prev, lastDoc]);
+    setLastDoc(lastDocOfCurrent);
     setCurrentPage(prev => prev + 1);
   };
 
