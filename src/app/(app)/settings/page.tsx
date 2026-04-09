@@ -209,6 +209,7 @@ function SettingsPageContent() {
     // Sessions state
     const [sessions, setSessions] = React.useState<any[]>([]);
     const [isRevoking, setIsRevoking] = React.useState<Record<string, boolean>>({});
+    const [showAllSessions, setShowAllSessions] = React.useState(false);
 
     React.useEffect(() => {
         if (!currentUserProfile?.id || !firestore) return;
@@ -658,51 +659,65 @@ function SettingsPageContent() {
                                     No active sessions found.
                                 </div>
                             ) : (
-                                sessions.map((session) => {
-                                    const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
-                                    const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
-                                    const isCurrent = session.id === currentSessionId;
+                                <>
+                                    <div className="grid gap-4">
+                                        {(showAllSessions ? sessions : sessions.slice(0, 3)).map((session) => {
+                                            const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
+                                            const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
+                                            const isCurrent = session.id === currentSessionId;
 
-                                    return (
-                                        <div key={session.id} className={cn(
-                                            "flex items-center justify-between p-4 rounded-lg border transition-colors",
-                                            session.revoked ? "opacity-50 grayscale" : "bg-card",
-                                            isCurrent && "border-primary ring-1 ring-primary/20 shadow-sm"
-                                        )}>
-                                            <div className="flex items-center gap-4">
-                                                <div className={cn(
-                                                    "p-2 rounded-full",
-                                                    isCurrent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                            return (
+                                                <div key={session.id} className={cn(
+                                                    "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                                                    session.revoked ? "opacity-50 grayscale" : "bg-card",
+                                                    isCurrent && "border-primary ring-1 ring-primary/20 shadow-sm"
                                                 )}>
-                                                    {getDeviceIcon(session.userAgent || '')}
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium">{formatUA(session.userAgent || 'Unknown')}</span>
-                                                        {isCurrent && <Badge variant="default" className="text-[10px] h-4 px-1">This Device</Badge>}
-                                                        {session.revoked && <Badge variant="destructive" className="text-[10px] h-4 px-1">Revoked</Badge>}
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={cn(
+                                                            "p-2 rounded-full",
+                                                            isCurrent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                                        )}>
+                                                            {getDeviceIcon(session.userAgent || '')}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">{formatUA(session.userAgent || 'Unknown')}</span>
+                                                                {isCurrent && <Badge variant="default" className="text-[10px] h-4 px-1">This Device</Badge>}
+                                                                {session.revoked && <Badge variant="destructive" className="text-[10px] h-4 px-1">Revoked</Badge>}
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                                                                <span>{session.deviceInfo?.platform || 'Unknown OS'}</span>
+                                                                <span className="hidden sm:inline opacity-30">•</span>
+                                                                <span>Last active: {session.lastSeen instanceof Timestamp ? formatDistanceToNow(session.lastSeen.toDate(), { addSuffix: true }) : 'Just now'}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center sm:gap-2">
-                                                        <span>{session.deviceInfo?.platform || 'Unknown OS'}</span>
-                                                        <span className="hidden sm:inline opacity-30">•</span>
-                                                        <span>Last active: {session.lastSeen instanceof Timestamp ? formatDistanceToNow(session.lastSeen.toDate(), { addSuffix: true }) : 'Just now'}</span>
-                                                    </div>
+                                                    {!session.revoked && !isCurrent && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-muted-foreground hover:text-destructive"
+                                                            disabled={isRevoking[session.id]}
+                                                            onClick={() => handleRevokeSession(session.id)}
+                                                        >
+                                                            {isRevoking[session.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                            </div>
-                                            {!session.revoked && !isCurrent && (
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                    disabled={isRevoking[session.id]}
-                                                    onClick={() => handleRevokeSession(session.id)}
-                                                >
-                                                    {isRevoking[session.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    );
-                                })
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    {sessions.length > 3 && (
+                                        <Button 
+                                            variant="ghost" 
+                                            className="w-full mt-2 text-primary hover:bg-primary/5"
+                                            onClick={() => setShowAllSessions(!showAllSessions)}
+                                        >
+                                            {showAllSessions ? 'Show Less' : `Show More (${sessions.length - 3} more)`}
+                                        </Button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </CardContent>

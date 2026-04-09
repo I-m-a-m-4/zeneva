@@ -73,7 +73,7 @@ export const createUserProfileDocument = async (
       surveyCompleted = false;
       const trialEndDate = add(new Date(), { days: 30 });
       const newBusiness: Omit<BusinessInstance, 'id'> = {
-        name: `${displayName}'s Business`,
+        name: displayName,
         createdAt: serverTimestamp(),
         ownerId: user.uid,
         plan: 'starter',

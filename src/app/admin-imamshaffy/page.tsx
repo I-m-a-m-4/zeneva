@@ -708,7 +708,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     currency: 'NGN',
                     timestamp: serverTimestamp()
                 });
-                toast({ variant: 'success', title: 'Lifetime Access Granted!', description: `${userData.name}'s business now has lifetime access.` });
+                toast({ variant: 'success', title: 'Lifetime Access Granted!', description: `${userData.name} now has lifetime access.` });
             } else if (grantDate) {
                 await updateDoc(businessDocRef, { trialExpiresAt: grantDate });
                 await addDoc(historyColRef, {
@@ -785,7 +785,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 accessLevel: null, // Ensure plan takes precedence over lifetime
             });
 
-            toast({ variant: 'success', title: 'Plan Assigned', description: `${userData.name}'s business is now on the ${selectedPlan} plan.` });
+            toast({ variant: 'success', title: 'Plan Assigned', description: `${userData.name} is now on the ${selectedPlan} plan.` });
             setPlanUserEmail('');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Plan Assignment Failed', description: error.message || 'An unexpected error occurred.' });
