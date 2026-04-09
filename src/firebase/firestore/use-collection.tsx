@@ -3,7 +3,7 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import {
   Query,
-  getDocs, // Changed from onSnapshot
+  onSnapshot,
   DocumentData,
   FirestoreError,
   QuerySnapshot,
@@ -65,7 +65,7 @@ export function useCollection<T = any>(
   useEffect(() => {
     let isMounted = true;
 
-    const fetchData = async () => {
+    const fetchData = () => {
       if (!memoizedTargetRefOrQuery) {
         if (isMounted) {
           setData(null);
@@ -75,22 +75,21 @@ export function useCollection<T = any>(
         return;
       }
 
-      if (isMounted) {
+      if (isMounted && !data) {
         setIsLoading(true);
-        setData(null);
-        setError(null);
       }
+      setError(null);
 
-      try {
-        const snapshot = await getDocs(memoizedTargetRefOrQuery);
+      const unsubscribe = onSnapshot(memoizedTargetRefOrQuery, (snapshot) => {
         if (isMounted) {
           const results: WithId<T>[] = snapshot.docs.map((doc) => ({
             ...(doc.data() as T),
             id: doc.id,
           }));
           setData(results);
+          setIsLoading(false);
         }
-      } catch (error: any) {
+      }, (error: any) => {
         if (!isMounted) return;
 
         if (error.code === 'permission-denied') {
@@ -105,14 +104,13 @@ export function useCollection<T = any>(
           setError(error);
         }
         setData(null);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+        setIsLoading(false);
+      });
+
+      return unsubscribe;
     };
 
-    fetchData();
+    const unsubscribe = fetchData();
 
     return () => {
       isMounted = false;
