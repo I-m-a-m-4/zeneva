@@ -116,6 +116,36 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
+  workboxOptions: {
+    runtimeCaching: [
+      {
+        urlPattern: /^https?:\/\/.*\/_vercel\/insights\/.*$/,
+        handler: 'NetworkOnly',
+      },
+      {
+        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'images',
+          expiration: {
+            maxEntries: 50,
+            maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+          },
+        },
+      },
+      {
+        urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'google-fonts',
+          expiration: {
+            maxEntries: 4,
+            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 Year
+          },
+        },
+      },
+    ],
+  },
 });
 
 export default withPWA(nextConfig);
