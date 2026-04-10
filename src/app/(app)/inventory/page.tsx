@@ -118,7 +118,7 @@ function ProductRowSkeleton() {
 
 const PRODUCTS_PER_PAGE = 60;
 
-export default function InventoryPage() {
+function InventoryPageContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -967,5 +967,17 @@ export default function InventoryPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-full w-full items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <InventoryPageContent />
+    </React.Suspense>
   );
 }

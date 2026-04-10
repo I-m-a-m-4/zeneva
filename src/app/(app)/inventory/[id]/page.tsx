@@ -723,7 +723,7 @@ export default function EditProductPage() {
                                 type="button" 
                                 variant="ghost" 
                                 size="sm" 
-                                className="text-muted-foreground hover:text-destructive w-full justify-between"
+                                className="text-muted-foreground hover:bg-muted hover:text-foreground w-full justify-between"
                                 onClick={() => setIsDangerZoneVisible(!isDangerZoneVisible)}
                             >
                                 <span className="text-xs font-medium uppercase tracking-wider">Advanced Options</span>
