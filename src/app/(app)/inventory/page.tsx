@@ -143,13 +143,9 @@ function InventoryPageContent() {
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
 
-  // Server-side state
-  const [pagedProducts, setPagedProducts] = React.useState<Product[]>([]);
-  const [currentSnapshots, setCurrentSnapshots] = React.useState<QueryDocumentSnapshot<DocumentData>[]>([]);
-  const [lastDoc, setLastDoc] = React.useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [prevDocs, setPrevDocs] = React.useState<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
-  const [totalCount, setTotalCount] = React.useState(0);
-  const [isPageLoading, setIsPageLoading] = React.useState(true);
+  // Server-side state (Removed Firestore-specific pagination in favor of local memoized filtering)
+  // Total count for pagination is now based on local filtered list
+  const isPageLoading = isLoading;
 
   React.useEffect(() => {
     const s = searchParams.get('sortBy');
@@ -195,11 +191,58 @@ function InventoryPageContent() {
   }, [queuedActions]);
 
   const filteredProducts = React.useMemo(() => {
-    // We still filter for optimistic deletions and additions locally on top of the paged data
-    const combined = [...(optimisticProducts || []), ...pagedProducts];
-    const valid = combined.filter(p => !queuedDeletionIds.includes(p.id));
+    if (!allProducts) return [];
 
-    // Augment with stats for the current view
+    // 1. Combine with optimistic products
+    let combined = [...(optimisticProducts || []), ...allProducts];
+    
+    // 2. Filter out queued deletions
+    let valid = combined.filter(p => !queuedDeletionIds.includes(p.id));
+
+    // 3. Apply Filters locally
+    
+    // Search
+    if (debouncedSearchTerm.trim()) {
+      const term = debouncedSearchTerm.toLowerCase().trim();
+      valid = valid.filter(p => 
+        p.name.toLowerCase().includes(term) || 
+        (p.sku && p.sku.toLowerCase().includes(term))
+      );
+    }
+
+    // Category
+    if (categoryFilter !== 'all') {
+      valid = valid.filter(p => p.category === categoryFilter);
+    }
+
+    // Stock Status
+    if (stockFilter === 'out-of-stock') {
+      valid = valid.filter(p => (p.stock || 0) === 0);
+    } else if (stockFilter === 'debt') {
+      valid = valid.filter(p => (p.stock || 0) < 0);
+    } else if (stockFilter === 'in-stock') {
+      valid = valid.filter(p => (p.stock || 0) > 0);
+    } else if (stockFilter === 'low-stock') {
+      valid = valid.filter(p => (p.stock || 0) <= (p.lowStockThreshold || 10));
+    }
+
+    // 4. Apply Sorting
+    valid.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'stock-desc') {
+        const stockDiff = (b.stock || 0) - (a.stock || 0);
+        if (stockDiff !== 0) return stockDiff;
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'stock-asc') {
+        const stockDiff = (a.stock || 0) - (b.stock || 0);
+        if (stockDiff !== 0) return stockDiff;
+        return a.name.localeCompare(b.name);
+      }
+      return 0;
+    });
+
+    // 5. Augment with stats (pre-existing logic)
     return valid.map(p => {
       let totalSoldFromReceipts = 0;
       receipts?.forEach(r => {
@@ -220,93 +263,32 @@ function InventoryPageContent() {
         totalSoldAcrossAll: totalSoldFromReceipts + totalSoldFromOnline
       };
     });
-  }, [pagedProducts, optimisticProducts, queuedDeletionIds, receipts, onlineOrders]);
+  }, [allProducts, optimisticProducts, queuedDeletionIds, receipts, onlineOrders, debouncedSearchTerm, categoryFilter, stockFilter, sortBy]);
 
-  // Main Fetch Effect
-  React.useEffect(() => {
-    if (!business?.id) return;
+  // Handle Pagination Locally
+  const totalCount = filteredProducts.length;
+  const pagedProducts = React.useMemo(() => {
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
 
-    setIsPageLoading(true);
-    let q = query(collection(firestore, 'products'), where('businessId', '==', business.id));
-
-    // Handle Search
-    if (debouncedSearchTerm.trim()) {
-      const term = debouncedSearchTerm.trim();
-      q = query(q, where('name', '>=', term), where('name', '<=', term + '\uf8ff'));
-    }
-
-    // Handle Category
-    if (categoryFilter !== 'all') {
-      q = query(q, where('category', '==', categoryFilter));
-    }
-
-    // Handle Filtering (Stock)
-    const isSearching = debouncedSearchTerm.trim() !== '';
-    if (stockFilter === 'out-of-stock') {
-      // Equality works with other inequalities
-      q = query(q, where('stock', '==', 0));
-    } else if (!isSearching) {
-      // Range filters only work if name is NOT used for range search (inequality)
-      if (stockFilter === 'debt') {
-        q = query(q, where('stock', '<', 0));
-      } else if (stockFilter === 'in-stock') {
-        q = query(q, where('stock', '>', 0));
-      } else if (stockFilter === 'low-stock') {
-        q = query(q, where('stock', '<=', 10));
-      }
-    }
-
-    // Handle Sorting
-    if (sortBy === 'name') q = query(q, orderBy('name', 'asc'));
-    else if (sortBy === 'stock-desc') q = query(q, orderBy('stock', 'desc'), orderBy('name', 'asc'));
-    else if (sortBy === 'stock-asc') q = query(q, orderBy('stock', 'asc'), orderBy('name', 'asc'));
-
-    // Handle Pagination Start
-    if (currentPage > 1 && lastDoc) {
-      q = query(q, startAfter(lastDoc));
-    }
-
-    q = query(q, limit(PRODUCTS_PER_PAGE));
-
-    // Real-time listener
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
-      setPagedProducts(items);
-      setCurrentSnapshots(snapshot.docs);
-      setIsPageLoading(false);
-    });
-
-    // Get Total Count (Silent)
-    const countQuery = query(collection(firestore, 'products'), where('businessId', '==', business.id));
-    getAggregateFromServer(countQuery, { total: count() }).then(snap => {
-      setTotalCount(snap.data().total);
-    });
-
-    return () => unsubscribe();
-  }, [business?.id, firestore, debouncedSearchTerm, sortBy, categoryFilter, stockFilter, currentPage, lastDoc]); // Added stockFilter
-
+  // Simplified Pagination Handlers
   const handleNextPage = () => {
-    if (!currentSnapshots.length) return;
-    const lastDocOfCurrent = currentSnapshots[currentSnapshots.length - 1];
-    setPrevDocs(prev => [...prev, lastDoc]);
-    setLastDoc(lastDocOfCurrent);
-    setCurrentPage(prev => prev + 1);
+    if (currentPage < pageCount) {
+      setCurrentPage(prev => prev + 1);
+    }
   };
 
   const handlePrevPage = () => {
-    if (currentPage <= 1) return;
-    const prev = prevDocs[prevDocs.length - 1];
-    setPrevDocs(prevDocs.slice(0, -1));
-    setLastDoc(prev);
-    setCurrentPage(prev => prev - 1);
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
   };
 
   const pageCount = Math.ceil(totalCount / PRODUCTS_PER_PAGE);
 
   React.useEffect(() => {
     setCurrentPage(1);
-    setLastDoc(null);
-    setPrevDocs([]);
   }, [debouncedSearchTerm, stockFilter, categoryFilter, sortBy]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
@@ -732,7 +714,7 @@ function InventoryPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {pagedProducts.map((product) => (
                   <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
                     <TableCell>
                       <Checkbox
