@@ -240,9 +240,22 @@ function InventoryPageContent() {
       q = query(q, where('category', '==', categoryFilter));
     }
 
-    // Handle Filtering (Stock) - Firestore doesn't support complex range+filter on low stock easily without indices
-    // For now, we simple order. Advanced filtering by Stock might require a different approach or indices.
-    
+    // Handle Filtering (Stock)
+    const isSearching = debouncedSearchTerm.trim() !== '';
+    if (stockFilter === 'out-of-stock') {
+      // Equality works with other inequalities
+      q = query(q, where('stock', '==', 0));
+    } else if (!isSearching) {
+      // Range filters only work if name is NOT used for range search (inequality)
+      if (stockFilter === 'debt') {
+        q = query(q, where('stock', '<', 0));
+      } else if (stockFilter === 'in-stock') {
+        q = query(q, where('stock', '>', 0));
+      } else if (stockFilter === 'low-stock') {
+        q = query(q, where('stock', '<=', 10));
+      }
+    }
+
     // Handle Sorting
     if (sortBy === 'name') q = query(q, orderBy('name', 'asc'));
     else if (sortBy === 'stock-desc') q = query(q, orderBy('stock', 'desc'), orderBy('name', 'asc'));
@@ -270,7 +283,7 @@ function InventoryPageContent() {
     });
 
     return () => unsubscribe();
-  }, [business?.id, firestore, debouncedSearchTerm, sortBy, categoryFilter, currentPage, lastDoc]); // Uses debouncedSearchTerm
+  }, [business?.id, firestore, debouncedSearchTerm, sortBy, categoryFilter, stockFilter, currentPage, lastDoc]); // Added stockFilter
 
   const handleNextPage = () => {
     if (!currentSnapshots.length) return;

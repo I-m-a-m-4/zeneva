@@ -744,7 +744,7 @@ export default function EditProductPage() {
                                         <Button
                                             type="button"
                                             variant="ghost"
-                                            className="w-full text-destructive hover:bg-destructive/10 text-xs h-8"
+                                            className="w-full text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs h-8"
                                             onClick={() => setIsDeleteDialogOpen(true)}
                                             disabled={!canManageProduct || isSaving}
                                         >
