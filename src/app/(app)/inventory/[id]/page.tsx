@@ -61,6 +61,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
+import { cn } from '@/lib/utils';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -143,6 +144,7 @@ export default function EditProductPage() {
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+    const [isDangerZoneVisible, setIsDangerZoneVisible] = React.useState(false);
     const { addToQueue } = usePOS();
 
     const form = useForm<ProductFormValues>({
@@ -716,29 +718,43 @@ export default function EditProductPage() {
                             </Card>
                         )}
 
-                        <Card className="border-destructive/20 bg-destructive/5">
-                            <CardHeader>
-                                <CardTitle className="text-destructive flex items-center gap-2">
-                                    <AlertCircle className="h-5 w-5" />
-                                    Danger Zone
-                                </CardTitle>
-                                <CardDescription>
-                                    Irreversible actions for this {categoryType === 'service' ? 'service' : 'product'}.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-300"
-                                    onClick={() => setIsDeleteDialogOpen(true)}
-                                    disabled={!canManageProduct || isSaving}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete {categoryType === 'service' ? 'Service' : 'Product'}
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <div className="pt-4 mt-4 border-t border-muted">
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-muted-foreground hover:text-destructive w-full justify-between"
+                                onClick={() => setIsDangerZoneVisible(!isDangerZoneVisible)}
+                            >
+                                <span className="text-xs font-medium uppercase tracking-wider">Advanced Options</span>
+                                <AlertCircle className={cn("h-4 w-4 transition-transform duration-200", isDangerZoneVisible && "rotate-180")} />
+                            </Button>
+                            
+                            {isDangerZoneVisible && (
+                                <Card className="mt-4 border-destructive/10 bg-muted/30 shadow-none">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                            Danger Zone
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">
+                                            Irreversible actions. Be careful.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full text-destructive hover:bg-destructive/10 text-xs h-8"
+                                            onClick={() => setIsDeleteDialogOpen(true)}
+                                            disabled={!canManageProduct || isSaving}
+                                        >
+                                            <Trash2 className="mr-2 h-3 w-3" />
+                                            Delete {categoryType === 'service' ? 'Service' : 'Product'}
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 md:hidden">
