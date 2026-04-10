@@ -468,20 +468,32 @@ export default function AuthenticatedLayout({
               <SidebarContent className="flex-1 p-2">
                 <ScrollArea className="h-full">
                   <SidebarMenu>
-                    {visibleNavItems.map((link) => (
-                      <SidebarMenuItem key={link.href}>
-                        <SidebarMenuButton
-                          asChild
-                          tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
-                          isActive={isLinkActive(link.href, pathname)}
-                        >
-                          <Link href={link.href}>
-                            <link.icon className="h-5 w-5" />
-                            <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
+                    {isUserLoading ? (
+                      // Show skeletons for the top 5 nav items while loading
+                      Array.from({ length: 6 }).map((_, i) => (
+                        <SidebarMenuItem key={`skeleton-nav-${i}`}>
+                          <SidebarMenuButton disabled>
+                            <Skeleton className="h-5 w-5 rounded-md" />
+                            <Skeleton className="h-4 w-24 group-data-[state=collapsed]:hidden" />
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))
+                    ) : (
+                      visibleNavItems.map((link) => (
+                        <SidebarMenuItem key={link.href}>
+                          <SidebarMenuButton
+                            asChild
+                            tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
+                            isActive={isLinkActive(link.href, pathname)}
+                          >
+                            <Link href={link.href}>
+                              <link.icon className="h-5 w-5" />
+                              <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))
+                    )}
                   </SidebarMenu>
                 </ScrollArea>
               </SidebarContent>
@@ -693,14 +705,7 @@ export default function AuthenticatedLayout({
                 </div>
               </header>
               <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
-                {(!currentUserProfile && isLoading) && !showSubscriptionBlock ? (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <Loader className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground animate-pulse">Loading workspace...</p>
-                    </div>
-                  </div>
-                ) : showSubscriptionBlock ? (
+                {showSubscriptionBlock ? (
                   <div className="flex h-full min-h-[400px] w-full items-center justify-center p-4">
                     <Card className="w-full max-w-lg border-none shadow-xl bg-gradient-to-br from-background to-muted/50 overflow-hidden animate-in fade-in zoom-in duration-500">
                       <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600"></div>
@@ -755,7 +760,11 @@ export default function AuthenticatedLayout({
               )}
             </div>
           </div>
-          <MobileBottomNav navItems={mainMobileNavItems} moreNavItems={allMoreNavItems} />
+          <MobileBottomNav 
+            navItems={isUserLoading ? [] : mainMobileNavItems} 
+            moreNavItems={isUserLoading ? [] : allMoreNavItems} 
+            isLoading={isUserLoading}
+          />
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
         </SidebarProvider>
       </TooltipProvider>
