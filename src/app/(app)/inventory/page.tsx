@@ -671,7 +671,7 @@ function InventoryPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-grow p-0 overflow-y-auto">
-          {isLoading ? (
+          {(isLoading || isPageLoading) ? (
             <Table>
               <TableHeader>
                 <TableRow>
