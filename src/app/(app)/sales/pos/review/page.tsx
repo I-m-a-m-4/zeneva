@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { logAuditEvent } from '@/lib/audit';
 
 
-export default function ReviewPage() {
+function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint } = usePOS();
@@ -395,4 +395,17 @@ export default function ReviewPage() {
             </div>
         </div>
     )
+}
+
+export default function ReviewPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
+            </div>
+        }>
+            <ReviewPageContent />
+        </React.Suspense>
+    );
 }
