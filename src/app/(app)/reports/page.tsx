@@ -240,8 +240,9 @@ export default function ReportsDashboard() {
                 featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
                 className="flex-grow flex flex-col"
                 placeholderContent={<ReportsPlaceholder />}
+                isLoading={isPosLoading}
             >
-                <div className="flex flex-wrap items-center gap-2 no-capture mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-2 no-capture mb-6">
                     <DateRangePicker date={date} onDateChange={setDate} />
                     <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4" />Download</Button>
                 </div>

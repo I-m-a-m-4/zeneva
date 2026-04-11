@@ -10,6 +10,8 @@ import type { Customer, Receipt } from '@/types';
 import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
 
 interface CustomerAnalyticsProps {
   customers: Customer[];
@@ -18,6 +20,8 @@ interface CustomerAnalyticsProps {
 }
 
 export default function CustomerAnalytics({ customers, receipts, currencySymbol }: CustomerAnalyticsProps) {
+  const [timeframe, setTimeframe] = React.useState<Timeframe>('90d');
+
   const analyticsData = React.useMemo(() => {
     if (!customers || !receipts) {
       return {
@@ -70,13 +74,18 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     if (!customers) return [];
     const days: Record<string, number> = {};
     
-    // Take last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Take based on timeframe
+    const now = new Date();
+    let limitDate: Date;
+    if (timeframe === 'today') limitDate = startOfDay(now);
+    else if (timeframe === '7d') limitDate = subDays(now, 7);
+    else if (timeframe === '30d') limitDate = subDays(now, 30);
+    else if (timeframe === '90d') limitDate = subDays(now, 90);
+    else limitDate = new Date(0);
 
     customers.forEach(c => {
         const date = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.createdAt || 0);
-        if (date >= thirtyDaysAgo) {
+        if (date >= limitDate) {
             const day = date.toISOString().split('T')[0];
             days[day] = (days[day] || 0) + 1;
         }
@@ -85,7 +94,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     return Object.entries(days)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([day, count]) => ({ day, count }));
-  }, [customers]);
+  }, [customers, timeframe]);
 
   return (
     <Card>
@@ -122,7 +131,10 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
 
             <div className="grid lg:grid-cols-2 gap-6">
                 <div>
-                    <h4 className="font-semibold mb-2">Customer Acquisition (Last 90 Days)</h4>
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Customer Acquisition</h4>
+                        <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                    </div>
                     <div className="h-[400px] w-full border rounded-lg p-4 bg-muted/20">
                         {acquisitionData.length > 0 ? (
                             <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
@@ -147,10 +159,10 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                         )}
                     </div>
                 </div>
-                <div>
+                <div className="md:col-span-1">
                     <h4 className="font-semibold mb-2">Top 5 Customers by Spending</h4>
-                    <div className="border rounded-lg overflow-hidden">
-                        <Table>
+                    <div className="border rounded-lg overflow-x-auto w-full">
+                        <Table className="min-w-[300px]">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Customer</TableHead>

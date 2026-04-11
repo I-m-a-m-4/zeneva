@@ -14,6 +14,7 @@ interface FeatureGateProps {
   featureDescription: string;
   className?: string;
   placeholderContent?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 export default function FeatureGate({
@@ -25,6 +26,7 @@ export default function FeatureGate({
   featureDescription,
   className,
   placeholderContent,
+  isLoading,
 }: FeatureGateProps) {
   const planHierarchy = {
     starter: 0,
@@ -36,6 +38,15 @@ export default function FeatureGate({
   const requiredPlanLevel = planHierarchy[requiredPlan];
 
   const hasAccess = hasLifetimeAccess || userPlanLevel >= requiredPlanLevel;
+
+  if (isLoading) {
+    return (
+        <div className={`flex flex-col items-center justify-center p-12 min-h-[300px] ${className}`}>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-xs text-muted-foreground mt-4 animate-pulse">Verifying credentials...</p>
+        </div>
+    );
+  }
 
   if (hasAccess) {
     return <>{children}</>;

@@ -8,6 +8,8 @@ import { LineChart, CartesianGrid, XAxis, YAxis, Line } from 'recharts';
 import { TrendingUp, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
 
 const chartConfig = {
   sales: {
@@ -23,17 +25,35 @@ interface SalesOverTimeChartProps {
 }
 
 export default function SalesOverTimeChart({ receipts, currencySymbol, data }: SalesOverTimeChartProps) {
+    const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+
     const chartData = React.useMemo(() => {
-        if (data) return data;
+        if (data && timeframe === 'all') return data;
         
+        let filteredReceipts = [...receipts];
+        
+        if (timeframe !== 'all') {
+            const now = new Date();
+            let limitDate: Date;
+            if (timeframe === 'today') limitDate = startOfDay(now);
+            else if (timeframe === '7d') limitDate = subDays(now, 7);
+            else if (timeframe === '30d') limitDate = subDays(now, 30);
+            else limitDate = subDays(now, 90);
+
+            filteredReceipts = receipts.filter(r => {
+                const rd = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || 0);
+                return rd >= limitDate;
+            });
+        }
+
         const monthlySales: Record<string, number> = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const currentYear = new Date().getFullYear();
 
-        receipts.forEach(receipt => {
+        filteredReceipts.forEach(receipt => {
           const date = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
           const year = date.getFullYear();
-          if (year === currentYear) { 
+          if (year === currentYear || timeframe !== 'all') { 
             const monthName = monthNames[date.getMonth()];
             monthlySales[monthName] = (monthlySales[monthName] || 0) + receipt.total;
           }
@@ -43,15 +63,18 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
           month,
           sales: monthlySales[month] || 0,
         }));
-    }, [receipts, data]);
+    }, [receipts, data, timeframe]);
 
     const noData = chartData.every(d => d.sales === 0);
 
     return (
          <Card>
-            <CardHeader>
-                <CardTitle>Sales Over Time</CardTitle>
-                <CardDescription>Revenue performance for the current year.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                   <CardTitle>Sales Over Time</CardTitle>
+                   <CardDescription>Revenue performance trends.</CardDescription>
+                </div>
+                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                 {noData ? (

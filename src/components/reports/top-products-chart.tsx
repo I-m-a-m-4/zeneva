@@ -8,6 +8,8 @@ import { BarChart, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
 import { Package, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
 
 const chartConfig = {
   quantity: {
@@ -21,9 +23,27 @@ interface TopProductsChartProps {
 }
 
 export default function TopProductsChart({ receipts }: TopProductsChartProps) {
+    const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+
     const chartData = React.useMemo(() => {
+        let filteredReceipts = [...receipts];
+        
+        if (timeframe !== 'all') {
+            const now = new Date();
+            let limitDate: Date;
+            if (timeframe === 'today') limitDate = startOfDay(now);
+            else if (timeframe === '7d') limitDate = subDays(now, 7);
+            else if (timeframe === '30d') limitDate = subDays(now, 30);
+            else limitDate = subDays(now, 90);
+
+            filteredReceipts = receipts.filter(r => {
+                const rd = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || 0);
+                return rd >= limitDate;
+            });
+        }
+
         const productSales: Record<string, number> = {};
-        receipts.forEach(receipt => {
+        filteredReceipts.forEach(receipt => {
             receipt.items.forEach(item => {
                 productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
             });
@@ -33,15 +53,18 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
             .sort(([, qtyA], [, qtyB]) => qtyB - qtyA)
             .slice(0, 5)
             .map(([name, quantity]) => ({ name, quantity }));
-    }, [receipts]);
+    }, [receipts, timeframe]);
     
     const noData = chartData.length === 0;
 
     return (
          <Card>
-            <CardHeader>
-                <CardTitle>Top Selling Products</CardTitle>
-                <CardDescription>Top 5 products by quantity sold.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle>Top Selling Products</CardTitle>
+                  <CardDescription>Bestsellers by quantity sold.</CardDescription>
+                </div>
+                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                  {noData ? (
