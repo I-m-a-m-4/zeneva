@@ -584,7 +584,44 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error('Search products failed:', e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, products]); // Added products to dependency to check local if needed
+
+  // Background Loader: Deeply fills the products cache after initial fast-load
+  useEffect(() => {
+    if (!businessId || !firestore || isLoadingProducts || !products || products.length === 0) return;
+    
+    // If we already have a lot of items or we think we are done, don't keep hammering
+    // But for a true 'Sync', we want to get them all eventually if catalog is < 10,000
+    const fetchRemaining = async () => {
+      let currentProductsCount = products.length;
+      let lastDoc = null; // We would need to track the lastDoc from useCollection or restart
+      // Actually, since useCollection handles the first 50, we start after that.
+      // For simplicity, let's just do one large follow-up fetch of 1000 items
+      try {
+        const q = query(
+          collection(firestore, 'products'),
+          where('businessId', '==', businessId),
+          orderBy('name', 'asc'),
+          limit(1000) // Fetch a decent chunk for local filtering
+        );
+        const snap = await getDocs(q);
+        const all = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+        
+        // Merge with existing but avoid duplicates
+        mutateProducts(prev => {
+          const existingIds = new Set(prev?.map(p => p.id) || []);
+          const uniqueNew = all.filter(p => !existingIds.has(p.id));
+          return [...(prev || []), ...uniqueNew];
+        });
+      } catch (e) {
+        console.error('Background product sync failed:', e);
+      }
+    };
+
+    // Delay background sync slightly to prioritize UI snappiness
+    const timer = setTimeout(fetchRemaining, 5000);
+    return () => clearTimeout(timer);
+  }, [businessId, firestore]); // Only run once business is ready
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku || !businessId || !firestore) return null;

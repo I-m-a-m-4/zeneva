@@ -173,22 +173,22 @@ function InventoryPageContent() {
   const isLoading = isPosLoading || isSearching;
   const isPageLoading = isLoading;
 
-  // Surgical Search Effect
-  React.useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim()) {
-        setSearchResults(null);
-        return;
-      }
-      setIsSearching(true);
-      const results = await searchProducts(searchTerm.trim());
-      setSearchResults(results);
-      setIsSearching(false);
-    };
+  // Surgical Search Helper
+  const performSearch = React.useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    setIsSearching(true);
+    const results = await searchProducts(term.trim());
+    setSearchResults(results);
+    setIsSearching(false);
+  }, [searchProducts]);
 
-    const handler = setTimeout(performSearch, 500);
+  React.useEffect(() => {
+    const handler = setTimeout(() => performSearch(searchTerm), 500);
     return () => clearTimeout(handler);
-  }, [searchTerm, searchProducts]);
+  }, [searchTerm, performSearch]);
 
   // Update hasMore if products change
   React.useEffect(() => {
@@ -421,12 +421,23 @@ function InventoryPageContent() {
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                // If there's an exact match, maybe we want to highlight it or do something
-                // For inventory page, just leave it as is since it filters the list
+                performSearch(searchTerm);
               }
             }}
           />
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
+          onClick={() => performSearch(searchTerm)}
+        >
+          {isSearching ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Search className="h-5 w-5" />
+          )}
+        </Button>
         <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && (
               <>
@@ -652,210 +663,141 @@ function InventoryPageContent() {
             Manage your products and view their sales performance.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-grow p-0 overflow-y-auto">
-          {(isLoading || isPageLoading) ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"><Checkbox disabled /></TableHead>
-                  <TableHead className="hidden w-[100px] sm:table-cell">
-                    <span className="sr-only">Image</span>
-                  </TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  {canManageStock && <TableHead>Price</TableHead>}
-                  {canManageStock && <TableHead className="hidden md:table-cell">Stock</TableHead>}
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <ProductRowSkeleton />
-                <ProductRowSkeleton />
-                <ProductRowSkeleton />
-                <ProductRowSkeleton />
-                <ProductRowSkeleton />
-              </TableBody>
-            </Table>
-          ) : filteredProducts && filteredProducts.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead className="hidden w-[100px] sm:table-cell">
-                    <span className="sr-only">Image</span>
-                  </TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  {canManageStock && <TableHead>Price</TableHead>}
-                  {canManageStock && <TableHead className="hidden md:table-cell">Stock</TableHead>}
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedProducts.map((product) => (
-                  <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
-                    <TableCell>
+        <CardContent className="flex-grow p-0 overflow-y-auto min-h-[400px]">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
+              <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
+              <p className="text-muted-foreground animate-pulse font-medium">Scanning inventory catalogs...</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-2 uppercase tracking-widest">Just a moment</p>
+            </div>
+          ) : (
+            filteredProducts && filteredProducts.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedProductIds.includes(product.id)}
-                        onCheckedChange={() => handleRowSelect(product.id)}
-                        disabled={(product as any).isOptimistic}
+                        checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length}
+                        onCheckedChange={handleSelectAll}
                       />
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/${product.id}`)}>
-                      {product.imageUrl ? (
-                        <div className="relative h-16 w-16">
-                          <Image
-                            alt={product.name}
-                            className="aspect-square rounded-md object-cover"
-                            fill // Changed to fill for better responsiveness/layout in relative container
-                            src={product.imageUrl}
-                            data-ai-hint={product.imageHint || product.category}
-                          />
-                          {(product as any).isOptimistic && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
-                          <Package />
-                          {(product as any).isOptimistic && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium whitespace-normal">
-                      <div className="flex items-center gap-2">
-                        <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
-                          {product.name}
-                        </Link>
-                        {product.type === 'composite' && (
-                          <Badge variant="outline" className="text-[10px] h-4 bg-primary/5 text-primary border-primary/20 gap-1 px-1">
-                            <Layers className="h-2 w-2" /> Bundle
-                          </Badge>
-                        )}
-                        {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">Saving...</Badge>}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                        <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
-                        {product.baseUnit && <span className="text-[10px]">• Sold in {product.baseUnit}</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {product.categoryType === 'service' ? (
-                        <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/50 flex items-center gap-1 w-fit">
-                          <Activity className="h-3 w-3" /> Service Only
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant={
-                            (product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" :
-                              (product.stock || 0) > 0 ? "secondary" :
-                                (product.stock || 0) < 0 ? "destructive" : "destructive"
-                          }
-                          className={cn(
-                            "whitespace-nowrap",
-                            (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
-                          )}
-                        >
-                          {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                    {canManageStock && (
-                      <TableCell className="hidden md:table-cell">
-                        {product.categoryType === 'service' ? (
-                          <div className="flex flex-col">
-                            <span className="text-xs font-semibold text-primary">{(product as any).totalSoldAcrossAll || 0} Sold</span>
-                            <span className="text-[10px] text-muted-foreground leading-tight">Revenue Service</span>
+                    </TableHead>
+                    <TableHead className="hidden w-[100px] sm:table-cell">
+                      <span className="sr-only">Image</span>
+                    </TableHead>
+                    <TableHead className="font-semibold">Name</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    {canManageStock && <TableHead className="font-semibold">Price</TableHead>}
+                    {canManageStock && <TableHead className="hidden md:table-cell font-semibold">Stock</TableHead>}
+                    <TableHead className="text-right font-semibold pr-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedProducts.map((product) => (
+                    <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedProductIds.includes(product.id)}
+                          onCheckedChange={() => handleRowSelect(product.id)}
+                          disabled={(product as any).isOptimistic}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/${product.id}`)}>
+                        {product.imageUrl ? (
+                          <div className="relative h-16 w-16">
+                            <Image
+                              alt={product.name}
+                              className="aspect-square rounded-md object-cover"
+                              fill
+                              src={product.imageUrl}
+                            />
+                            {(product as any).isOptimistic && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          product.stock || 0
+                          <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
+                            <Package />
+                            {(product as any).isOptimistic && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <DropdownMenu 
-                        open={openMenuId === product.id} 
-                        onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
-                      >
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-haspopup="true"
-                            size="icon"
-                            variant="ghost"
-                            disabled={false} // Enable for cancellation
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          {/* Cancel Optimistic Action */}
-                          {(product as any).isOptimistic && (product as any).queueId && (
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer"
-                              onSelect={() => removeFromQueue((product as any).queueId)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Discard
-                            </DropdownMenuItem>
+                      <TableCell className="font-medium whitespace-normal">
+                        <div className="flex items-center gap-2">
+                          <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
+                            {product.name}
+                          </Link>
+                          {product.type === 'composite' && (
+                            <Badge variant="outline" className="text-[10px] h-4 bg-primary/5 text-primary border-primary/20 gap-1 px-1">
+                              <Layers className="h-2 w-2" /> Bundle
+                            </Badge>
                           )}
-                          <DropdownMenuItem className="cursor-pointer" onSelect={() => { NProgress.start(); router.push(`/inventory/${product.id}`); }} disabled={!canManageStock || (product as any).isOptimistic}>
-                            <Edit className="mr-2 h-4 w-4" /> Full Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setQuickEditProduct(product) }} disabled={!canManageStock || (product as any).isOptimistic}>
-                            <Edit className="mr-2 h-4 w-4" /> Quick Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setBarcodeProduct(product); }} disabled={!product.sku}>
-                            <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-12 m-6">
-              <div className="relative mb-4">
-                <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent rounded-full blur-xl transform scale-150 opacity-50" />
-                <PackageOpen className="h-24 w-24 text-muted-foreground/30 relative z-10" strokeWidth={1} />
-                <div className="text-muted-foreground/30 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full h-8 w-0.5 border-l-2 border-dashed border-muted-foreground/30" />
-                {/* Since we can't easily add arbitrary SVG paths outside the icon, I'll stick to the icon + styling */}
+                          {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">Saving...</Badge>}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                          <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={(product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" : "destructive"}
+                        >
+                          {(product.stock || 0) > 0 ? "In Stock" : "Out of Stock"}
+                        </Badge>
+                      </TableCell>
+                      {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
+                      {canManageStock && <TableCell className="hidden md:table-cell">{product.stock || 0}</TableCell>}
+                      <TableCell className="text-right pr-6">
+                        <DropdownMenu 
+                          open={openMenuId === product.id} 
+                          onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
+                        >
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => router.push(`/inventory/${product.id}`)}>
+                              <Edit className="mr-2 h-4 w-4" /> Full Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
+                              <Edit className="mr-2 h-4 w-4" /> Quick Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
+                              <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px]">
+                <PackageOpen className="h-24 w-24 text-muted-foreground/30 mb-4" />
+                <h3 className="text-xl font-semibold">{searchTerm ? 'No product found' : 'Empty Inventory'}</h3>
+                <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
+                  {searchTerm ? `Try searching for something else or clear the search.` : 'Start adding products to your shop.'}
+                </p>
+                <div className="flex gap-2">
+                  <Button asChild>
+                    <Link href="/inventory/add">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                    </Link>
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4" /> Import CSV
+                  </Button>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-foreground">{searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? 'No product found' : 'No products yet'}</h3>
-              <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
-                {searchTerm || stockFilter !== 'all' || categoryFilter !== 'all' ? `We couldn't find any products matching your search.` : 'Get started by creating your first product.'}
-              </p>
-              <div className="flex gap-3">
-                <Button asChild>
-                  <Link href="/inventory/add">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Product
-                  </Link>
-                </Button>
-                <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Import CSV
-                </Button>
-              </div>
-            </div>
+            )
           )}
         </CardContent>
         {filteredProducts && filteredProducts.length > 0 && (
