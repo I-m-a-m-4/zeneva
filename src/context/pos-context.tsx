@@ -28,8 +28,10 @@ interface POSContextType {
   stats: BusinessStats | null;
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
+  searchProducts: (term: string) => Promise<Product[]>;
   fetchMoreReceipts: () => Promise<number>;
   fetchMoreCustomers: () => Promise<number>;
+  fetchMoreProducts: () => Promise<number>;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
   isUserLoading: boolean;
@@ -139,69 +141,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
   const { data: business, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
-  // MODIFIED: Fetch products in two stages for speed and cost efficiency.
-  // Stage 1: Fast initial fetch of first 100 products
-  const initialProductsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(100)) : null), [businessId, firestore, refreshKey]);
-  const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateInitialProducts } = useCollection<Product>(initialProductsQuery);
+  const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
+  const { data: products, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [businessId, firestore, refreshKey]);
   const { data: stats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
-
-  const [products, setProducts] = useState<Product[] | null>(null);
-  const [backgroundLoading, setBackgroundLoading] = useState(false);
-  const [productsFullLoaded, setProductsFullLoaded] = useState(false);
-
-  // Sync initialProducts to products and trigger background fetch
-  useEffect(() => {
-    if (initialProducts) {
-      setProducts((prev: Product[] | null) => {
-        // If background fetch is done, merge updates to the first 100
-        if (productsFullLoaded && prev && prev.length >= initialProducts.length) {
-          const newProducts = [...prev];
-          initialProducts.forEach(ip => {
-            const index = newProducts.findIndex(p => p.id === ip.id);
-            if (index !== -1) {
-              newProducts[index] = ip;
-            } else {
-              newProducts.push(ip);
-            }
-          });
-          return newProducts;
-        }
-        // Otherwise, just use the initial ones for now
-        return initialProducts;
-      });
-      
-      // Stage 2: Background full fetch if we haven't already
-      if (businessId && !backgroundLoading && !productsFullLoaded) {
-        const fetchRemaining = async () => {
-          try {
-            setBackgroundLoading(true);
-            const fullQuery = query(collection(firestore, "products"), where("businessId", "==", businessId));
-            const snap = await getDocs(fullQuery);
-            const allItems = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
-            setProducts(allItems);
-            setProductsFullLoaded(true);
-          } catch (e) {
-            console.error("Background fetch failed:", e);
-          } finally {
-            setBackgroundLoading(false);
-          }
-        };
-        fetchRemaining();
-      }
-    }
-  }, [initialProducts, businessId, firestore, refreshKey, backgroundLoading, productsFullLoaded]);
-
-  // Keep products in sync with mutations
-  const mutateProducts = useCallback((updater: React.SetStateAction<Product[] | null>) => {
-    setProducts((prev: Product[] | null) => {
-      if (typeof updater === 'function') return (updater as (p: Product[] | null) => Product[] | null)(prev);
-      return updater;
-    });
-    // Also mutate initial set if possible to keep it fast
-    mutateInitialProducts(updater);
-  }, [mutateInitialProducts]);
 
   const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
@@ -212,7 +156,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
-  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingInitialProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingStats;
+  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingStats;
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -453,7 +397,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
 
     setIsQueueProcessing(false);
-    // triggerRefresh(); // No longer needed!
   }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast, business, customers, mutateCustomers, mutateProducts, mutateReceipts]);
 
   const clearFailedActions = useCallback(() => {
@@ -594,6 +537,48 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return 0;
     }
   }, [businessId, firestore, receipts, mutateReceipts]);
+
+  const searchProducts = useCallback(async (term: string) => {
+    if (!term.trim() || !businessId || !firestore) return [];
+    try {
+      const lowerTerm = term.toLowerCase();
+      const q = query(
+        collection(firestore, 'products'),
+        where('businessId', '==', businessId),
+        where('name', '>=', lowerTerm),
+        where('name', '<=', lowerTerm + '\uf8ff'),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+    } catch (e) {
+      console.error('Search products failed:', e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
+  const fetchMoreProducts = useCallback(async () => {
+    if (!businessId || !firestore || !products || products.length === 0) return 0;
+    try {
+      const lastProduct = products[products.length - 1];
+      const q = query(
+        collection(firestore, "products"),
+        where("businessId", "==", businessId),
+        orderBy("createdAt", "desc"),
+        startAfter(lastProduct.createdAt),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const more = snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+      if (more.length > 0) {
+        mutateProducts(prev => [...(prev || []), ...more]);
+      }
+      return more.length;
+    } catch (e) {
+      console.error("Fetch more products failed:", e);
+      return 0;
+    }
+  }, [businessId, firestore, products, mutateProducts]);
 
   const fetchMoreCustomers = useCallback(async () => {
     if (!businessId || !firestore || !customers || customers.length === 0) return 0;
@@ -883,7 +868,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const value = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile, users: null, isLoading, isUserLoading, user,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
@@ -896,8 +881,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts,
-    fetchMoreReceipts, fetchMoreCustomers,
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, searchProducts,
+    fetchMoreReceipts, fetchMoreCustomers, fetchMoreProducts,
     stats,
 
     isSubscriptionActive: business

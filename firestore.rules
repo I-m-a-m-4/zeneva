@@ -115,6 +115,11 @@ service cloud.firestore {
          allow update: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
          allow delete: if false;
       }
+
+      match /stats/{statId} {
+        allow read: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+        allow write: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+      }
     }
 
     match /users/{userId} {

@@ -176,7 +176,17 @@ const CartContents = () => {
 
 
 export default function SelectProductsPage() {
-    const { cart, addToCart, subtotal, currencySymbol, products, isLoading, business } = usePOS();
+    const { 
+        cart, 
+        addToCart, 
+        subtotal, 
+        currencySymbol, 
+        products, 
+        isLoading: isPosLoading, 
+        business,
+        searchProducts,
+        fetchMoreProducts
+    } = usePOS();
     const router = useRouter();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -202,24 +212,46 @@ export default function SelectProductsPage() {
         }
     }, [business, router, toast]);
 
-    const filteredProducts = React.useMemo(() => {
-        if (!products) return [];
+    const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
+    const [isSearching, setIsSearching] = React.useState(false);
+    const [isFetchingMore, setIsFetchingMore] = React.useState(false);
+    const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
-        let filtered = products;
+    const isLoading = isPosLoading || isSearching;
+
+    // Surgical Search Effect
+    React.useEffect(() => {
+        const performSearch = async () => {
+            if (!searchTerm.trim()) {
+                setSearchResults(null);
+                return;
+            }
+            setIsSearching(true);
+            const results = await searchProducts(searchTerm.trim());
+            setSearchResults(results);
+            setIsSearching(false);
+        };
+
+        const handler = setTimeout(performSearch, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm, searchProducts]);
+
+    const filteredProducts = React.useMemo(() => {
+        let base = searchTerm.trim() ? (searchResults || []) : (products || []);
 
         if (categoryFilter !== 'all') {
-            filtered = filtered.filter(p => p.category === categoryFilter);
+            base = base.filter(p => p.category === categoryFilter);
         }
 
-        if (searchTerm) {
-            filtered = filtered.filter(p =>
-                p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-        }
+        return base;
+    }, [products, searchResults, searchTerm, categoryFilter]);
 
-        return filtered;
-    }, [products, searchTerm, categoryFilter]);
+    const handleLoadMore = async () => {
+        setIsFetchingMore(true);
+        const count = await fetchMoreProducts();
+        if (count === 0) setHasMore(false);
+        setIsFetchingMore(false);
+    };
 
     const handleAddToCart = React.useCallback((product: Product) => {
         addToCart(product);
@@ -321,36 +353,54 @@ export default function SelectProductsPage() {
                         <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
                             {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
                         </div>
-                    ) : filteredProducts && filteredProducts.length > 0 ? (
-                        <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
-                            {filteredProducts.map(product => (
-                                <ProductItem
-                                    key={product.id}
-                                    product={product}
-                                    currencySymbol={currencySymbol}
-                                    handleAddToCart={handleAddToCart}
-                                    addToCart={addToCart}
-                                />
-                            ))}
-                        </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed rounded-lg h-96">
-                            <PackageOpen className="h-12 w-12 text-muted-foreground" />
-                            <h3 className="text-xl font-semibold mt-4">No Products Found</h3>
-                            <p className="text-muted-foreground mt-2 mb-4">
-                                {searchTerm || categoryFilter !== 'all' ? `No products match your search or filter criteria.` : "You haven't added any products yet."}
-                            </p>
-                            {!searchTerm && categoryFilter === 'all' && (
-                                <Button size="sm" asChild className="h-8 gap-1">
-                                    <Link href="/inventory/add">
-                                        <PlusCircle className="h-3.5 w-3.5" />
-                                        <span className="sm:whitespace-nowrap">
-                                            Add Product
-                                        </span>
-                                    </Link>
-                                </Button>
+                        <>
+                            {filteredProducts && filteredProducts.length > 0 ? (
+                                <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
+                                    {filteredProducts.map(product => (
+                                        <ProductItem
+                                            key={product.id}
+                                            product={product}
+                                            currencySymbol={currencySymbol}
+                                            handleAddToCart={handleAddToCart}
+                                            addToCart={addToCart}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed rounded-lg h-96">
+                                    <PackageOpen className="h-12 w-12 text-muted-foreground" />
+                                    <h3 className="text-xl font-semibold mt-4">No Products Found</h3>
+                                    <p className="text-muted-foreground mt-2 mb-4">
+                                        {searchTerm || categoryFilter !== 'all' ? `No products match your search or filter criteria.` : "You haven't added any products yet."}
+                                    </p>
+                                    {!searchTerm && categoryFilter === 'all' && (
+                                        <Button size="sm" asChild className="h-8 gap-1">
+                                            <Link href="/inventory/add">
+                                                <PlusCircle className="h-3.5 w-3.5" />
+                                                <span className="sm:whitespace-nowrap">
+                                                    Add Product
+                                                </span>
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
                             )}
-                        </div>
+
+                            {!searchTerm && hasMore && (
+                                <div className="mt-8 flex justify-center pb-24">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={handleLoadMore} 
+                                        disabled={isFetchingMore}
+                                        className="gap-2"
+                                    >
+                                        {isFetchingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                                        Load More Products
+                                    </Button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

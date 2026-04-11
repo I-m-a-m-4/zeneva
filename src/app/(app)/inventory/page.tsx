@@ -118,11 +118,34 @@ function ProductRowSkeleton() {
 
 const PRODUCTS_PER_PAGE = 60;
 
+export default function InventoryPage() {
+    return (
+        <React.Suspense fallback={<DashboardSkeleton />}>
+            <InventoryPageContent />
+        </React.Suspense>
+    );
+}
+
 function InventoryPageContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { products: allProducts, receipts, onlineOrders, optimisticProducts, isLoading, business, currencySymbol, currentUserProfile, triggerRefresh, removeFromQueue, addToQueue } = usePOS();
+  const { 
+    products, 
+    receipts, 
+    onlineOrders, 
+    optimisticProducts, 
+    isLoading: isPosLoading, 
+    business, 
+    currencySymbol, 
+    currentUserProfile, 
+    triggerRefresh, 
+    removeFromQueue, 
+    addToQueue,
+    searchProducts,
+    fetchMoreProducts,
+    queuedActions
+  } = usePOS();
 
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -135,7 +158,6 @@ function InventoryPageContent() {
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = React.useState('');
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
 
@@ -143,9 +165,37 @@ function InventoryPageContent() {
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
 
-  // Server-side state (Removed Firestore-specific pagination in favor of local memoized filtering)
-  // Total count for pagination is now based on local filtered list
+  const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
+  const [isFetchingMore, setIsFetchingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
+
+  const isLoading = isPosLoading || isSearching;
   const isPageLoading = isLoading;
+
+  // Surgical Search Effect
+  React.useEffect(() => {
+    const performSearch = async () => {
+      if (!searchTerm.trim()) {
+        setSearchResults(null);
+        return;
+      }
+      setIsSearching(true);
+      const results = await searchProducts(searchTerm.trim());
+      setSearchResults(results);
+      setIsSearching(false);
+    };
+
+    const handler = setTimeout(performSearch, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm, searchProducts]);
+
+  // Update hasMore if products change
+  React.useEffect(() => {
+    if (products && products.length < 50) {
+      setHasMore(false);
+    }
+  }, [products]);
 
   React.useEffect(() => {
     const s = searchParams.get('sortBy');
@@ -153,14 +203,6 @@ function InventoryPageContent() {
       setSortBy(s);
     }
   }, [searchParams]);
-
-  // Debounce search term
-  React.useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
 
   React.useEffect(() => {
     if (business) {
@@ -183,7 +225,6 @@ function InventoryPageContent() {
   const canManageStock = userRole === 'admin' || userRole === 'manager';
 
   // Get IDs of products queued for deletion
-  const { queuedActions } = usePOS();
   const queuedDeletionIds = React.useMemo(() => {
     return queuedActions
       .filter(a => a.type === 'delete-product' && (a.status === 'pending' || a.status === 'processing'))
@@ -191,31 +232,20 @@ function InventoryPageContent() {
   }, [queuedActions]);
 
   const filteredProducts = React.useMemo(() => {
-    if (!allProducts) return [];
-
+    let base = searchTerm.trim() ? (searchResults || []) : (products || []);
+    
     // 1. Combine with optimistic products
-    let combined = [...(optimisticProducts || []), ...allProducts];
+    let combined = [...(optimisticProducts || []), ...base];
     
     // 2. Filter out queued deletions
     let valid = combined.filter(p => !queuedDeletionIds.includes(p.id));
 
-    // 3. Apply Filters locally
-    
-    // Search
-    if (debouncedSearchTerm.trim()) {
-      const term = debouncedSearchTerm.toLowerCase().trim();
-      valid = valid.filter(p => 
-        p.name.toLowerCase().includes(term) || 
-        (p.sku && p.sku.toLowerCase().includes(term))
-      );
-    }
-
-    // Category
+    // 3. Category
     if (categoryFilter !== 'all') {
       valid = valid.filter(p => p.category === categoryFilter);
     }
 
-    // Stock Status
+    // 4. Stock Status
     if (stockFilter === 'out-of-stock') {
       valid = valid.filter(p => (p.stock || 0) === 0);
     } else if (stockFilter === 'debt') {
@@ -226,7 +256,7 @@ function InventoryPageContent() {
       valid = valid.filter(p => (p.stock || 0) <= (p.lowStockThreshold || 10));
     }
 
-    // 4. Apply Sorting
+    // 5. Apply Sorting
     valid.sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
@@ -242,28 +272,8 @@ function InventoryPageContent() {
       return 0;
     });
 
-    // 5. Augment with stats (pre-existing logic)
-    return valid.map(p => {
-      let totalSoldFromReceipts = 0;
-      receipts?.forEach(r => {
-        r.items.forEach(i => {
-          if (i.productId === p.id) totalSoldFromReceipts += i.quantity;
-        });
-      });
-
-      let totalSoldFromOnline = 0;
-      onlineOrders?.forEach(o => {
-        o.items.forEach(i => {
-          if (i.productId === p.id) totalSoldFromOnline += i.quantity;
-        });
-      });
-
-      return {
-        ...p,
-        totalSoldAcrossAll: totalSoldFromReceipts + totalSoldFromOnline
-      };
-    });
-  }, [allProducts, optimisticProducts, queuedDeletionIds, receipts, onlineOrders, debouncedSearchTerm, categoryFilter, stockFilter, sortBy]);
+    return valid;
+  }, [products, searchResults, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
   // Handle Pagination Locally
   const totalCount = filteredProducts.length;
@@ -272,24 +282,18 @@ function InventoryPageContent() {
     return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
   }, [filteredProducts, currentPage]);
 
-  // Simplified Pagination Handlers
-  const handleNextPage = () => {
-    if (currentPage < pageCount) {
-      setCurrentPage(prev => prev + 1);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
-
   const pageCount = Math.ceil(totalCount / PRODUCTS_PER_PAGE);
+
+  const handleLoadMore = async () => {
+    setIsFetchingMore(true);
+    const count = await fetchMoreProducts();
+    if (count === 0) setHasMore(false);
+    setIsFetchingMore(false);
+  };
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, stockFilter, categoryFilter, sortBy]);
+  }, [searchTerm, stockFilter, categoryFilter, sortBy]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -423,24 +427,7 @@ function InventoryPageContent() {
             }}
           />
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
-          onClick={() => {
-            setDebouncedSearchTerm(searchTerm); // Manual trigger
-            setIsManualSearching(true);
-            setTimeout(() => setIsManualSearching(false), 600);
-          }}
-        >
-          {isManualSearching ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Search className="h-5 w-5" />
-          )}
-        </Button>
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && (
               <>
                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
@@ -871,66 +858,95 @@ function InventoryPageContent() {
             </div>
           )}
         </CardContent>
-        {totalCount > 0 && (
-          <CardFooter className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              Showing <strong>{(currentPage - 1) * PRODUCTS_PER_PAGE + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, totalCount)}</strong> of <strong>{totalCount}</strong>
+        {filteredProducts && filteredProducts.length > 0 && (
+          <CardFooter className="flex flex-col border-t py-4 gap-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{(currentPage - 1) * PRODUCTS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)}</strong> of <strong>{filteredProducts.length}</strong> products
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={currentPage >= pageCount}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrevPage}
-                disabled={currentPage <= 1 || isPageLoading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={currentPage >= pageCount || isPageLoading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+
+            {!searchTerm && hasMore && (
+              <div className="flex justify-center w-full pt-4 border-t border-dashed">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLoadMore} 
+                  disabled={isFetchingMore}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  {isFetchingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Load More from Database
+                </Button>
+              </div>
+            )}
           </CardFooter>
         )}
       </Card>
-      <ImportDialog
-        isOpen={isImportOpen}
-        onOpenChange={setIsImportOpen}
-        onSuccess={handleImportSuccess}
-        businessId={business?.id}
-        products={allProducts}
-      />
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {selectedProductIds.length} product(s). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      {currentUserProfile && (
-        <QuickEditDialog
-          product={quickEditProduct}
-          userProfile={currentUserProfile}
-          isOpen={!!quickEditProduct}
-          onOpenChange={(open) => {
-            if (!open) {
-              setQuickEditProduct(null);
-            }
-          }}
+      
+      {business && (
+        <ImportDialog
+          isOpen={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          businessId={business.id}
+          products={products}
+          onSuccess={handleImportSuccess}
         />
       )}
-      {currentUserProfile && (
+
+      {isDeleteDialogOpen && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action will queue the deletion of {selectedProductIds.length} products. This is permanent once synced.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {quickEditProduct && currentUserProfile && (
+        <QuickEditDialog
+          product={quickEditProduct}
+          isOpen={!!quickEditProduct}
+          onOpenChange={(open) => !open && setQuickEditProduct(null)}
+          userProfile={currentUserProfile}
+        />
+      )}
+
+      {isBulkEditDialogOpen && (
         <BulkEditDialog
           productIds={selectedProductIds}
           isOpen={isBulkEditDialogOpen}
@@ -938,15 +954,15 @@ function InventoryPageContent() {
           onSuccess={handleBulkEditSuccess}
         />
       )}
-      <BarcodeDialog
-        product={barcodeProduct}
-        isOpen={!!barcodeProduct}
-        onOpenChange={(open) => {
-          if (!open) {
-            setBarcodeProduct(null);
-          }
-        }}
-      />
+
+      {barcodeProduct && (
+        <BarcodeDialog
+          product={barcodeProduct}
+          isOpen={!!barcodeProduct}
+          onOpenChange={(open) => !open && setBarcodeProduct(null)}
+        />
+      )}
+
       {isScannerOpen && (
         <BarcodeScanner
           isOpen={isScannerOpen}
@@ -954,10 +970,6 @@ function InventoryPageContent() {
           onScan={(sku) => {
             setSearchTerm(sku);
             setIsScannerOpen(false);
-            toast({
-              title: "Barcode Scanned",
-              description: `Searching for SKU: ${sku}`,
-            });
           }}
         />
       )}
@@ -965,14 +977,23 @@ function InventoryPageContent() {
   );
 }
 
-export default function InventoryPage() {
+function DashboardSkeleton() {
   return (
-    <React.Suspense fallback={
-      <div className="flex h-full w-full items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex flex-col gap-6 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="w-full space-y-2">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
       </div>
-    }>
-      <InventoryPageContent />
-    </React.Suspense>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+      </div>
+      <Skeleton className="h-[400px] w-full" />
+    </div>
   );
 }
+
