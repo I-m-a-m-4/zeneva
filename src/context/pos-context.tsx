@@ -194,16 +194,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const customers = useMemo(() => {
-    if (syncedCustomers.length > (initialCustomers?.length || 0)) {
-      return syncedCustomers;
+    let base = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
+    
+    if (base.length === syncedCustomers.length && initialCustomers) {
+      const ids = new Set(base.map(c => c.id));
+      initialCustomers.forEach(c => { if (!ids.has(c.id)) base.push(c); });
     }
-    const merged = [...(initialCustomers || [])];
-    const existingIds = new Set(merged.map(c => c.id));
-    syncedCustomers.forEach(c => {
-      if (!existingIds.has(c.id)) merged.push(c);
-    });
-    return merged;
-  }, [initialCustomers, syncedCustomers]);
+
+    if (receipts && receipts.length > 0) {
+      const spentMap: Record<string, number> = {};
+      receipts.forEach(r => { if (r.customer?.id) spentMap[r.customer.id] = (spentMap[r.customer.id] || 0) + r.total; });
+      return base.map(c => {
+        const memorySpent = spentMap[c.id] || 0;
+        return (memorySpent > (c.totalSpent || 0)) ? { ...c, totalSpent: memorySpent } : c;
+      });
+    }
+    return base;
+  }, [initialCustomers, syncedCustomers, receipts]);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
@@ -338,16 +345,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
               updatedAt: serverTimestamp() 
             }, { merge: true });
 
-            if (receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
+            if (receiptData.customer) {
               const customerRef = doc(firestore, 'customers', receiptData.customer.id);
-              const pointsPerUnit = business.settings.pointsPerUnit || 0;
-              const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
-              batch.update(customerRef, { 
-                loyaltyPoints: increment(pointsEarned),
+              const updates: any = {
                 totalSpent: increment(receiptData.total),
                 lastPurchaseDate: serverTimestamp(),
                 updatedAt: serverTimestamp()
-              });
+              };
+
+              if (business?.settings?.loyaltyProgramEnabled) {
+                const pointsPerUnit = business.settings.pointsPerUnit || 0;
+                const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+                updates.loyaltyPoints = increment(pointsEarned);
+              }
+
+              batch.update(customerRef, updates);
             }
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'sale.create',
@@ -438,11 +450,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
               return update ? { ...p, stock: update.newStock, updatedAt: new Date() as any } : p;
             }) : null);
 
-            // 3. Update Loyalty Points
-            if (action.payload.receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
-              const pointsPerUnit = business.settings.pointsPerUnit || 0;
-              const pointsEarned = Math.floor(action.payload.receiptData.total * pointsPerUnit);
-              mutateCustomers((prev) => prev ? prev.map(c => c.id === action.payload.receiptData.customer.id ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsEarned, totalSpent: (c.totalSpent || 0) + action.payload.receiptData.total, updatedAt: new Date() as any } : c) : null);
+            // 3. Update Customer Stats
+            if (action.payload.receiptData.customer) {
+              mutateCustomers((prev) => prev ? prev.map(c => {
+                if (c.id === action.payload.receiptData.customer.id) {
+                    const updates: Partial<Customer> = {
+                        totalSpent: (c.totalSpent || 0) + action.payload.receiptData.total,
+                        updatedAt: new Date() as any,
+                        lastPurchaseDate: new Date() as any
+                    };
+                    if (business?.settings?.loyaltyProgramEnabled) {
+                        const pointsPerUnit = business.settings.pointsPerUnit || 0;
+                        const pointsEarned = Math.floor(action.payload.receiptData.total * pointsPerUnit);
+                        updates.loyaltyPoints = (c.loyaltyPoints || 0) + pointsEarned;
+                    }
+                    return { ...c, ...updates };
+                }
+                return c;
+              }) : null);
             }
             break;
         }
