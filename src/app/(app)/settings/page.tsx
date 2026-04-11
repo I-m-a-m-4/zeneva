@@ -511,9 +511,15 @@ function SettingsPageContent() {
                                         <SelectItem value="EUR">EUR (€)</SelectItem>
                                         <SelectItem value="GBP">GBP (£)</SelectItem>
                                         <SelectItem value="CAD">CAD ($)</SelectItem>
+                                        <SelectItem value="AUD">AUD ($)</SelectItem>
                                         <SelectItem value="GHS">GHS (GH¢)</SelectItem>
                                         <SelectItem value="ZAR">ZAR (R)</SelectItem>
                                         <SelectItem value="KES">KES (KSh)</SelectItem>
+                                        <SelectItem value="JPY">JPY (¥)</SelectItem>
+                                        <SelectItem value="CNY">CNY (¥)</SelectItem>
+                                        <SelectItem value="INR">INR (₹)</SelectItem>
+                                        <SelectItem value="BRL">BRL (R$)</SelectItem>
+                                        <SelectItem value="CHF">CHF (Fr)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

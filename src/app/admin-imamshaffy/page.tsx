@@ -546,8 +546,6 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             topLocations
         }
     }, [businesses, products, receipts, users]);
-
-
     const analyticsData = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
         const allUsers = users || [];
@@ -645,10 +643,38 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             }
         }
 
+        // --- New Daily Metrics ---
+        const earliestBusiness = businesses?.reduce((earliest, b) => {
+            if (!b.createdAt) return earliest;
+            const bDate = b.createdAt.toDate();
+            return bDate < earliest ? bDate : earliest;
+        }, new Date());
+        
+        const daysActive = Math.max(differenceInDays(new Date(), earliestBusiness), 1);
+        const averageSalesPerDay = platformGmv / daysActive;
+        const averageReceiptsPerDay = totalReceipts / daysActive;
+
+        const dailyGmv: Record<string, number> = {};
+        const dailyReceipts: Record<string, number> = {};
+        
+        receipts?.forEach(r => {
+            const date = format(r.createdAt.toDate(), 'MMM d');
+            dailyGmv[date] = (dailyGmv[date] || 0) + r.total;
+            dailyReceipts[date] = (dailyReceipts[date] || 0) + 1;
+        });
+
+        const dailyGmvData = Object.entries(dailyGmv).map(([date, amount]) => ({ date, 'Revenue': amount })).slice(-14);
+        const dailyReceiptsData = Object.entries(dailyReceipts).map(([date, count]) => ({ date, 'Sales': count })).slice(-14);
+
         return {
-            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, richestBusiness
+            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, 
+            totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, 
+            newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
+            trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
+            richestBusiness, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData
         };
     }, [users, businesses, products, receipts, purchases]);
+
 
     const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying') => {
         let modalData = { open: true, title: '', description: '', businesses: [] as BusinessInstance[] };
@@ -849,6 +875,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
+                    <TabsTrigger value="performance">Performance & Intel</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="performers">Top Performers</TabsTrigger>
@@ -862,13 +889,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 Platform Health Overview
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
                                 <StatCard title="Total Active Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
                             </button>
                             <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
                                 <StatCard title="Activated Businesses" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products & >=1 sale" />
                             </button>
+                            <StatCard title="Avg. Sales/Day" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={TrendingUp} description="Zeneva Sales Velocity" />
                             <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
                                 <StatCard title="Businesses At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales in 14 days" />
                             </button>
@@ -1148,6 +1176,108 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </Table>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="performance" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-green-500" /> Platform Revenue Velocity (GMV)</CardTitle>
+                                <CardDescription>Combined sales across all Zeneva businesses (Last 14 days).</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <ReLineChart data={analyticsData.dailyGmvData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis tickFormatter={(val) => `₦${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} tick={{ fontSize: 12 }} />
+                                        <ReTooltip content={<CustomTooltip />} />
+                                        <Line name="Revenue" type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={3} dot={false} />
+                                    </ReLineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-500" /> User Acquisition Trend</CardTitle>
+                                <CardDescription>New user signups over time.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <ReLineChart data={analyticsData.newUserGrowth}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis tick={{ fontSize: 12 }} />
+                                        <ReTooltip content={<CustomTooltip />} />
+                                        <Line name="New Users" type="monotone" dataKey="New Users" stroke="#3b82f6" strokeWidth={3} dot />
+                                    </ReLineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-orange-500" /> Transaction Volume</CardTitle>
+                                <CardDescription>Daily number of receipts generated platform-wide.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <ReBarChart data={analyticsData.dailyReceiptsData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis tick={{ fontSize: 12 }} />
+                                        <ReTooltip content={<CustomTooltip />} />
+                                        <Bar name="Sales" dataKey="Sales" fill="#f97316" radius={[4, 4, 0, 0]} />
+                                    </ReBarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><PieChartIcon className="h-5 w-5 text-purple-500" /> Plan Distribution</CardTitle>
+                                <CardDescription>How businesses are distributed across tiers.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex items-center justify-center">
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <RePieChart>
+                                        <Pie
+                                            data={analyticsData.planDistributionData}
+                                            innerRadius={60}
+                                            outerRadius={100}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {analyticsData.planDistributionData.map((entry: any, index: number) => (
+                                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <ReTooltip />
+                                        <Legend />
+                                    </RePieChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="lg:col-span-2">
+                             <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-pink-500" /> Revenue Growth Index</CardTitle>
+                                <CardDescription>Aggregated subscription revenue performance.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <ReBarChart data={analyticsData.revenueGrowth}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12 }} />
+                                        <ReTooltip content={<CustomTooltip />} />
+                                        <Bar dataKey="Revenue" fill="#ec4899" radius={[4, 4, 0, 0]} />
+                                    </ReBarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </TabsContent>
 
                 <TabsContent value="users" className="space-y-6">
