@@ -73,6 +73,8 @@ export interface Customer {
     phone?: string;
     code?: string;
     loyaltyPoints?: number;
+    totalSpent?: number;
+    lastPurchaseDate?: any;
     createdAt?: any;
     updatedAt?: any;
     aiInsights?: CustomerInsightsOutput;
@@ -443,4 +445,13 @@ export interface AuditLog {
     entityId: string;
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
+}
+
+export interface BusinessStats {
+    id: string; // The businessId
+    totalCustomers: number;
+    totalProducts: number;
+    totalRevenue: number;
+    totalSales: number;
+    updatedAt: any;
 }

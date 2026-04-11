@@ -3,7 +3,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, limit, or, getDoc, and } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 
 interface StoreContextType {
@@ -16,6 +16,7 @@ interface StoreContextType {
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   onOrderPlaced: () => void;
+  searchProducts: (term: string) => Promise<Product[]>;
   subtotal: number;
 }
 
@@ -98,8 +99,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     findBusiness();
   }, [firestore, businessIdOrSlug]);
 
-  const productsQuery = useMemoFirebase(() => (business?.id ? query(collection(firestore, "products"), where("businessId", "==", business.id)) : null), [business?.id, firestore]);
+  const productsQuery = useMemoFirebase(() => (business?.id ? query(collection(firestore, "products"), where("businessId", "==", business.id), limit(24)) : null), [business?.id, firestore]);
   const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  const searchProducts = useCallback(async (term: string) => {
+    if (!business?.id || !term.trim()) return [];
+    try {
+        const q = query(
+            collection(firestore, "products"),
+            and(
+                where("businessId", "==", business.id),
+                or(
+                    where("name", ">=", term),
+                    where("name", "<=", term + '\uf8ff')
+                )
+            ),
+            limit(24)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+    } catch (e) {
+        console.error("Store search failed:", e);
+        return [];
+    }
+  }, [business?.id, firestore]);
 
   const isLoading = businessLoading || isLoadingProducts;
 
@@ -156,8 +179,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateQuantity,
     clearCart,
     onOrderPlaced,
+    searchProducts,
     subtotal
-  }), [business, products, isLoading, cart, subtotal]);
+  }), [business, products, isLoading, cart, searchProducts, subtotal]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

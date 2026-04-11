@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders } = usePOS();
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats } = usePOS();
 
   // Date range state, defaults to today
   const [date, setDate] = React.useState<DateRange | undefined>({
@@ -186,16 +186,22 @@ export default function DashboardPage() {
     const sortedCustomers = [...allCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
     const topLoyaltyCustomers = sortedCustomers.slice(0, 3);
 
+    // If no date range is set (initial state or explicit 'All Time'), use denormalized stats
+    const isTodayOnly = date?.from && date?.to && startOfDay(date.from).getTime() === startOfDay(new Date()).getTime() && endOfDay(date.to).getTime() === endOfDay(new Date()).getTime();
+    
+    // We use stats for lifetime totals if the range is broad/default
+    const showLifetime = !date?.from || !date?.to;
+
     return {
       totalStock,
       uniqueSkus,
       lowStockItems,
-      totalSalesValue,
-      totalReceipts: totalReceiptsCount,
+      totalSalesValue: showLifetime ? (stats?.totalRevenue || 0) : totalSalesValue,
+      totalReceipts: showLifetime ? (stats?.totalSales || 0) : totalReceiptsCount,
       totalOnlineSalesValue,
       totalOnlineOrdersCount,
-      totalRevenue,
-      newCustomersCount: newCustomers.length,
+      totalRevenue: showLifetime ? (stats?.totalRevenue || 0) : totalRevenue,
+      newCustomersCount: showLifetime ? (stats?.totalCustomers || 0) : newCustomers.length,
       totalUnitsSold,
       topSellingItems,
       topLoyaltyCustomers,
@@ -204,7 +210,7 @@ export default function DashboardPage() {
       serviceUnitsSold,
       productUnitsSold
     };
-  }, [products, receipts, customers, onlineOrders, date]);
+  }, [products, receipts, customers, onlineOrders, date, stats]);
 
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;

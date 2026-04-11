@@ -78,7 +78,15 @@ function CustomerRowSkeleton() {
 const CUSTOMERS_PER_PAGE = 10;
 
 export default function CustomersPage() {
-  const { customers, receipts, isLoading: isPosLoading, business, currentUserProfile: currentUser, triggerRefresh, searchCustomers } = usePOS();
+  const { 
+    customers, 
+    isLoading: isPosLoading, 
+    business, 
+    currentUserProfile: currentUser, 
+    triggerRefresh, 
+    searchCustomers,
+    fetchMoreCustomers 
+  } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -89,55 +97,49 @@ export default function CustomersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
 
-  const [displayedCustomers, setDisplayedCustomers] = React.useState<Customer[] | null>(null);
+  const [searchResults, setSearchResults] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [isFetchingMore, setIsFetchingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(customers ? customers.length >= 50 : true);
+
+  // Update hasMore if customers change
+  React.useEffect(() => {
+    if (customers && customers.length < 50) {
+      setHasMore(false);
+    }
+  }, [customers]);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
 
   const isLoading = isPosLoading || isSearching;
 
-  const customerTotals = React.useMemo(() => {
-    const totals: Record<string, { total: number }> = {};
-    if (receipts) {
-      for (const receipt of receipts) {
-        if (receipt.customer?.id) {
-          if (!totals[receipt.customer.id]) {
-            totals[receipt.customer.id] = { total: 0 };
-          }
-          totals[receipt.customer.id].total += receipt.total;
-        }
-      }
-    }
-    return totals;
-  }, [receipts]);
-
+  // Surgical Search Effect
   React.useEffect(() => {
-    if (!customers) {
-      setDisplayedCustomers(null);
-      return;
-    }
+    const performSearch = async () => {
+      if (!searchTerm.trim()) {
+        setSearchResults(null);
+        return;
+      }
+      setIsSearching(true);
+      const results = await searchCustomers(searchTerm.trim());
+      setSearchResults(results);
+      setIsSearching(false);
+    };
 
-    let filtered = [...customers];
+    const handler = setTimeout(performSearch, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm, searchCustomers]);
 
-    if (searchTerm.trim()) {
-      const lowerTerm = searchTerm.toLowerCase();
-      filtered = filtered.filter(customer => {
-        return (
-          (customer.name && customer.name.toLowerCase().includes(lowerTerm)) ||
-          (customer.email && customer.email.toLowerCase().includes(lowerTerm)) ||
-          (customer.code && customer.code.toLowerCase().includes(lowerTerm)) ||
-          (customer.phone && customer.phone.toLowerCase().includes(lowerTerm))
-        );
-      });
-    }
+  const displayedList = React.useMemo(() => {
+    let base = searchTerm.trim() ? (searchResults || []) : (customers || []);
+    
+    let filtered = [...base];
 
     // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === 'spent') {
-        const spentA = customerTotals[a.id]?.total ?? 0;
-        const spentB = customerTotals[b.id]?.total ?? 0;
-        return spentB - spentA;
+        return (b.totalSpent || 0) - (a.totalSpent || 0);
       }
       if (sortBy === 'loyalty') {
         return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
@@ -151,17 +153,22 @@ export default function CustomersPage() {
       return Number(dateB) - Number(dateA);
     });
 
-    setDisplayedCustomers(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, customers, sortBy, customerTotals]);
+    return filtered;
+  }, [searchTerm, searchResults, customers, sortBy]);
 
   const paginatedCustomers = React.useMemo(() => {
-    if (!displayedCustomers) return [];
     const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
-    return displayedCustomers.slice(startIndex, startIndex + CUSTOMERS_PER_PAGE);
-  }, [displayedCustomers, currentPage]);
+    return displayedList.slice(startIndex, startIndex + CUSTOMERS_PER_PAGE);
+  }, [displayedList, currentPage]);
 
-  const pageCount = Math.ceil((displayedCustomers?.length || 0) / CUSTOMERS_PER_PAGE);
+  const pageCount = Math.ceil(displayedList.length / CUSTOMERS_PER_PAGE);
+
+  const handleLoadMore = async () => {
+    setIsFetchingMore(true);
+    const count = await fetchMoreCustomers();
+    if (count === 0) setHasMore(false);
+    setIsFetchingMore(false);
+  };
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -170,7 +177,7 @@ export default function CustomersPage() {
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      setSelectedCustomerIds(displayedCustomers?.map(c => c.id) || []);
+      setSelectedCustomerIds(displayedList.map(c => c.id));
     } else {
       setSelectedCustomerIds([]);
     }
@@ -295,13 +302,13 @@ export default function CustomersPage() {
                 <CustomerRowSkeleton />
               </TableBody>
             </Table>
-          ) : displayedCustomers && displayedCustomers.length > 0 ? (
+          ) : displayedList && displayedList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={displayedCustomers.length > 0 && selectedCustomerIds.length === displayedCustomers.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
+                      checked={displayedList.length > 0 && selectedCustomerIds.length === displayedList.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -320,7 +327,7 @@ export default function CustomersPage() {
               </TableHeader>
               <TableBody>
                 {paginatedCustomers.map((customer) => {
-                  const totalSpent = customerTotals[customer.id]?.total ?? 0;
+                  const totalSpent = customer.totalSpent ?? 0;
                   return (
                     <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
                       <TableCell>
@@ -365,43 +372,66 @@ export default function CustomersPage() {
             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
               <User className="h-12 w-12 text-muted-foreground" />
               <h3 className="text-xl font-semibold mt-4">No Customers Found</h3>
-              <p className="text-muted-foreground mt-2 mb-4">Get started by adding your first customer.</p>
-              <Button size="sm" asChild className="h-8 gap-1">
+              <p className="text-muted-foreground mt-2 mb-4">
+                {searchTerm ? 'Try a different search term.' : 'Get started by adding your first customer.'}
+              </p>
+              {!searchTerm && (
                 <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                     Add Customer
                   </span>
                 </Button>
-              </Button>
+              )}
             </div>
           )}
         </CardContent>
-        {displayedCustomers && displayedCustomers.length > 0 && (
-          <CardFooter className="flex items-center justify-between border-t py-4">
-            <div className="text-sm text-muted-foreground">
-              Showing <strong>{(currentPage - 1) * CUSTOMERS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * CUSTOMERS_PER_PAGE, displayedCustomers.length)}</strong> of <strong>{displayedCustomers.length}</strong> customers
+        {displayedList && displayedList.length > 0 && (
+          <CardFooter className="flex flex-col border-t py-4 gap-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{(currentPage - 1) * CUSTOMERS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * CUSTOMERS_PER_PAGE, displayedList.length)}</strong> of <strong>{displayedList.length}</strong> customers
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={currentPage >= pageCount}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => p - 1)}
-                disabled={currentPage <= 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => p + 1)}
-                disabled={currentPage >= pageCount}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
+
+            {!searchTerm && hasMore && (
+              <div className="flex justify-center w-full pt-4 border-t border-dashed">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLoadMore} 
+                  disabled={isFetchingMore}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  {isFetchingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Load More from Database
+                </Button>
+              </div>
+            )}
           </CardFooter>
         )}
       </Card>

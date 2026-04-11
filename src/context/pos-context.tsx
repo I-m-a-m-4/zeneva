@@ -2,10 +2,10 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
-import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction } from '@/types';
+import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or, increment, setDoc, and, startAfter } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 
@@ -25,7 +25,11 @@ interface POSContextType {
   receipts: Receipt[] | null;
   customers: Customer[] | null;
   onlineOrders: OnlineOrder[] | null;
+  stats: BusinessStats | null;
   searchCustomers: (term: string) => Promise<Customer[]>;
+  searchReceipts: (term: string) => Promise<Receipt[]>;
+  fetchMoreReceipts: () => Promise<number>;
+  fetchMoreCustomers: () => Promise<number>;
   currentUserProfile: UserProfile | null;
   isLoading: boolean;
   isUserLoading: boolean;
@@ -140,6 +144,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const initialProductsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(100)) : null), [businessId, firestore, refreshKey]);
   const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateInitialProducts } = useCollection<Product>(initialProductsQuery);
 
+  const statsDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [businessId, firestore, refreshKey]);
+  const { data: stats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
+
   const [products, setProducts] = useState<Product[] | null>(null);
   const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [productsFullLoaded, setProductsFullLoaded] = useState(false);
@@ -196,16 +203,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     mutateInitialProducts(updater);
   }, [mutateInitialProducts]);
 
-  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [businessId, firestore, refreshKey]);
+  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [businessId, firestore, refreshKey]);
+  const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: customers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
-  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingInitialProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders;
+  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingInitialProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingStats;
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -257,6 +264,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
             const customersRef = collection(firestore, 'customers');
             const newCustomerRef = doc(customersRef);
             batch.set(newCustomerRef, { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            
+            // Increment Stats
+            const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+            batch.set(statsRef, { totalCustomers: increment(1), updatedAt: serverTimestamp() }, { merge: true });
+
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'customer.create',
               entity: { type: 'Customer', id: newCustomerRef.id, name: action.payload.name },
@@ -298,13 +310,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
               batch.update(productRef, { stock: update.newStock, updatedAt: serverTimestamp() });
             });
 
+            // Increment Stats
+            const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+            batch.set(statsRef, { 
+              totalSales: increment(1), 
+              totalRevenue: increment(receiptData.total),
+              updatedAt: serverTimestamp() 
+            }, { merge: true });
+
             if (receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
               const customerRef = doc(firestore, 'customers', receiptData.customer.id);
               const pointsPerUnit = business.settings.pointsPerUnit || 0;
               const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
-              const customer = customers?.find(c => c.id === receiptData.customer.id);
-              const currentPoints = customer?.loyaltyPoints || 0;
-              batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned, updatedAt: serverTimestamp() });
+              batch.update(customerRef, { 
+                loyaltyPoints: increment(pointsEarned),
+                totalSpent: increment(receiptData.total),
+                lastPurchaseDate: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
             }
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'sale.create',
@@ -314,7 +337,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             resultData.newReceiptId = newReceiptRef.id;
             break;
           }
-          case 'add-product':
+          case 'add-product': {
             const productsRef = collection(firestore, 'products');
             const newProductRef = doc(productsRef, action.payload.id);
             const { id, ...productData } = action.payload;
@@ -325,6 +348,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
               updatedAt: serverTimestamp()
             });
 
+            // Increment Stats
+            const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+            batch.set(statsRef, { totalProducts: increment(1), updatedAt: serverTimestamp() }, { merge: true });
+
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.create',
               entity: { type: 'Product', id: newProductRef.id, name: action.payload.name },
@@ -332,11 +359,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
             });
             resultData.newId = newProductRef.id; // Usually same as payload.id
             break;
+          }
           case 'delete-product':
             action.payload.productIds.forEach((id: string) => {
               const productRef = doc(firestore, 'products', id);
               batch.delete(productRef);
             });
+
+            // Decrement Stats
+            const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+            batch.set(statsRef, { totalProducts: increment(-action.payload.productIds.length), updatedAt: serverTimestamp() }, { merge: true });
+
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.delete',
               entity: { type: 'Product', id: 'multiple', name: 'Multiple Products' },
@@ -521,6 +554,69 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return [];
     }
   }, [businessId, firestore]);
+
+  const searchReceipts = useCallback(async (term: string) => {
+    if (!businessId || !term.trim() || !firestore) return [];
+    try {
+      const q = query(
+        collection(firestore, 'receipts'),
+        where('businessId', '==', businessId),
+        where('id', '==', term), // Exact lookup for receipt ID
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+    } catch (e) {
+      console.error("Receipt lookup failed:", e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
+  const fetchMoreReceipts = useCallback(async () => {
+    if (!businessId || !firestore || !receipts || receipts.length === 0) return 0;
+    try {
+      const lastReceipt = receipts[receipts.length - 1];
+      const q = query(
+        collection(firestore, "receipts"),
+        where("businessId", "==", businessId),
+        orderBy("createdAt", "desc"),
+        startAfter(lastReceipt.createdAt),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const more = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+      if (more.length > 0) {
+        mutateReceipts(prev => [...(prev || []), ...more]);
+      }
+      return more.length;
+    } catch (e) {
+      console.error("Fetch more receipts failed:", e);
+      return 0;
+    }
+  }, [businessId, firestore, receipts, mutateReceipts]);
+
+  const fetchMoreCustomers = useCallback(async () => {
+    if (!businessId || !firestore || !customers || customers.length === 0) return 0;
+    try {
+      const lastCustomer = customers[customers.length - 1];
+      const q = query(
+        collection(firestore, "customers"),
+        where("businessId", "==", businessId),
+        orderBy("createdAt", "desc"),
+        startAfter(lastCustomer.createdAt),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const more = snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      if (more.length > 0) {
+        mutateCustomers(prev => [...(prev || []), ...more]);
+      }
+      return more.length;
+    } catch (e) {
+      console.error("Fetch more customers failed:", e);
+      return 0;
+    }
+  }, [businessId, firestore, customers, mutateCustomers]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // 1. Generate local blob URL for optimistic UI if image exists
@@ -800,7 +896,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers,
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts,
+    fetchMoreReceipts, fetchMoreCustomers,
+    stats,
 
     isSubscriptionActive: business
       ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
@@ -811,7 +909,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, setAutoPrint, resetPOS,
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchMoreReceipts, fetchMoreCustomers, stats
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

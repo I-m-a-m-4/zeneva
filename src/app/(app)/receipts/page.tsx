@@ -45,25 +45,67 @@ function ReceiptRowSkeleton() {
 }
 
 export default function ReceiptsPage() {
-  const { receipts, isLoading, business, currentUserProfile: currentUser, currencySymbol, triggerRefresh } = usePOS();
+  const { 
+    receipts, 
+    isLoading: isPosLoading, 
+    business, 
+    currentUserProfile: currentUser, 
+    currencySymbol, 
+    triggerRefresh,
+    searchReceipts,
+    fetchMoreReceipts
+  } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<Receipt[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isFetchingMore, setIsFetchingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(receipts ? receipts.length >= 50 : true);
 
-  const filteredReceiptsList = React.useMemo(() => {
+  // Update hasMore if receipts change
+  React.useEffect(() => {
+    if (receipts && receipts.length < 50) {
+      setHasMore(false);
+    }
+  }, [receipts]);
+
+  // Surgical Search Effect
+  React.useEffect(() => {
+    const performSearch = async () => {
+      if (!searchTerm.trim()) {
+        setSearchResults(null);
+        return;
+      }
+      setIsSearching(true);
+      const results = await searchReceipts(searchTerm.trim());
+      setSearchResults(results);
+      setIsSearching(false);
+    };
+
+    const handler = setTimeout(performSearch, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm, searchReceipts]);
+
+  const displayedReceipts = React.useMemo(() => {
+    // If searching, show search results
+    if (searchTerm.trim()) return searchResults || [];
+    // Otherwise show the default receipts list (limited to 50 + anything loaded more)
     if (!receipts) return [];
-    return receipts
-      .filter(r => r.paymentMethod !== 'Invoice')
-      .filter(r => {
-        const searchLower = searchTerm.toLowerCase();
-        const receiptId = r.id.toLowerCase();
-        const customerName = (r.customer?.name || 'walk-in').toLowerCase();
-        return receiptId.includes(searchLower) || customerName.includes(searchLower);
-      });
-  }, [receipts, searchTerm]);
+    return receipts.filter(r => r.paymentMethod !== 'Invoice');
+  }, [receipts, searchTerm, searchResults]);
+
+  const handleLoadMore = async () => {
+    setIsFetchingMore(true);
+    const count = await fetchMoreReceipts();
+    if (count === 0) setHasMore(false);
+    setIsFetchingMore(false);
+  };
+
+  const isLoading = isPosLoading || isSearching;
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;
@@ -174,59 +216,83 @@ export default function ReceiptsPage() {
                 <ReceiptRowSkeleton />
               </TableBody>
             </Table>
-          ) : filteredReceiptsList && filteredReceiptsList.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Receipt ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReceiptsList.map((receipt) => (
-                  <TableRow key={receipt.id}>
-                    <TableCell className="font-medium">{receipt.id.substring(0, 8)}...</TableCell>
-                    <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
-                    <TableCell>{receipt.createdAt.toDate ? format(receipt.createdAt.toDate(), 'PP') : format(new Date(receipt.createdAt), 'PP')}</TableCell>
-                    <TableCell>{receipt.paymentMethod}</TableCell>
-                    <TableCell className="text-right">{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={() => window.open(`/receipts/${receipt.id}`, '_blank')}>
-                            <Eye className="mr-2 h-4 w-4" /> View
-                          </DropdownMenuItem>
-                          {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setReceiptToDelete(receipt); }}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Void Sale
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+          ) : displayedReceipts && displayedReceipts.length > 0 ? (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Receipt ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Payment Method</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead><span className="sr-only">Actions</span></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {displayedReceipts.map((receipt: Receipt) => (
+                    <TableRow key={receipt.id}>
+                      <TableCell className="font-medium">{receipt.id.substring(0, 8)}...</TableCell>
+                      <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
+                      <TableCell>{receipt.createdAt?.toDate ? format(receipt.createdAt.toDate(), 'PP') : (receipt.createdAt ? format(new Date(receipt.createdAt), 'PP') : 'N/A')}</TableCell>
+                      <TableCell>{receipt.paymentMethod}</TableCell>
+                      <TableCell className="text-right">{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => window.open(`/receipts/${receipt.id}`, '_blank')}>
+                              <Eye className="mr-2 h-4 w-4" /> View
+                            </DropdownMenuItem>
+                            {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setReceiptToDelete(receipt); }}>
+                                  <Trash2 className="mr-2 h-4 w-4" /> Void Sale
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {!searchTerm && hasMore && (
+                <div className="flex justify-center mt-6 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleLoadMore} 
+                    disabled={isFetchingMore}
+                    className="min-w-[200px]"
+                  >
+                    {isFetchingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Receipts'
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
               <Inbox className="h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mt-4">No Transactions Yet</h3>
-              <p className="text-muted-foreground mt-2 mb-4">Completed sales will appear here.</p>
+              <h3 className="text-xl font-semibold mt-4">No Transactions Found</h3>
+              <p className="text-muted-foreground mt-2 mb-4">
+                {searchTerm ? 'Try a different search term.' : 'Completed sales will appear here.'}
+              </p>
             </div>
           )}
         </CardContent>
