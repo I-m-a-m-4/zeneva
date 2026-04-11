@@ -75,9 +75,17 @@ export default function ReportsDashboard() {
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
-        from: subDays(new Date(), 730), // Default to 2 years ago for "lifetime" view
+        from: subDays(new Date(), 365), // Fallback initial
         to: new Date(),
     });
+
+    // Auto-adjust to Business Lifetime once loaded
+    React.useEffect(() => {
+        if (business?.createdAt) {
+            const inception = business.createdAt.toDate ? business.createdAt.toDate() : new Date(business.createdAt);
+            setDate({ from: inception, to: new Date() });
+        }
+    }, [business?.createdAt]);
 
     const hasLifetimeAccess = business?.accessLevel === 'lifetime';
 
