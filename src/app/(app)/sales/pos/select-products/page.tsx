@@ -238,7 +238,29 @@ export default function SelectProductsPage() {
     }, [searchTerm, searchProducts]);
 
     const filteredProducts = React.useMemo(() => {
-        let base = searchTerm.trim() ? (searchResults || []) : (products || []);
+        // If searching, we combine searchResults with a local filter of currently cached products
+        // This ensures the user sees SOMETHING instantly while the DB query completes
+        let base = (products || []);
+        
+        if (searchTerm.trim()) {
+            const localTerm = searchTerm.toLowerCase();
+            const localMatches = base.filter(p => 
+                p.name.toLowerCase().includes(localTerm) || 
+                p.sku?.toLowerCase().includes(localTerm)
+            );
+            
+            // If we have DB search results, they take priority (more accurate prefix match)
+            if (searchResults && searchResults.length > 0) {
+                // Merge and keep unique
+                const merged = [...searchResults];
+                localMatches.forEach(p => {
+                    if (!merged.find(m => m.id === p.id)) merged.push(p);
+                });
+                base = merged;
+            } else {
+                base = localMatches;
+            }
+        }
 
         if (categoryFilter !== 'all') {
             base = base.filter(p => p.category === categoryFilter);
@@ -291,10 +313,10 @@ export default function SelectProductsPage() {
         <div className="grid md:grid-cols-3 md:gap-8">
             <div className="md:col-span-2">
                 <div className="flex items-center mb-4 gap-4 sticky top-0 bg-background py-2 z-10">
-                    <div className="relative w-full">
+                    <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by name or SKU..."
+                            placeholder="Search name or SKU..."
                             className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -321,6 +343,21 @@ export default function SelectProductsPage() {
                             }}
                         />
                     </div>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0 border-primary/20 hover:bg-muted"
+                        onClick={async () => {
+                            if (searchTerm.trim()) {
+                                setIsSearching(true);
+                                const results = await searchProducts(searchTerm.trim());
+                                setSearchResults(results);
+                                setIsSearching(false);
+                            }
+                        }}
+                    >
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
                     <Button
                         variant="outline"
                         size="icon"
@@ -361,9 +398,10 @@ export default function SelectProductsPage() {
                     </Select>
                 </div>
                 <div className="pb-24 md:pb-0">
-                    {isLoading ? (
-                        <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
-                            {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+                    {isLoading && !filteredProducts.length ? (
+                        <div className="flex flex-col items-center justify-center p-12 min-h-[300px] text-center">
+                            <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
+                            <p className="text-muted-foreground animate-pulse">Filtering products...</p>
                         </div>
                     ) : (
                         <>
@@ -380,19 +418,20 @@ export default function SelectProductsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed rounded-lg h-96">
-                                    <PackageOpen className="h-12 w-12 text-muted-foreground" />
-                                    <h3 className="text-xl font-semibold mt-4">No Products Found</h3>
-                                    <p className="text-muted-foreground mt-2 mb-4">
-                                        {searchTerm || categoryFilter !== 'all' ? `No products match your search or filter criteria.` : "You haven't added any products yet."}
+                                <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg min-h-[400px]">
+                                    <Package className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
+                                    <h3 className="text-xl font-semibold">No products found</h3>
+                                    <p className="text-muted-foreground mt-2 mb-6 max-w-[250px] mx-auto">
+                                        {searchTerm ? `We couldn't find matches for "${searchTerm}" in your synchronized catalog.` : "This category is currently empty."}
                                     </p>
-                                    {!searchTerm && categoryFilter === 'all' && (
-                                        <Button size="sm" asChild className="h-8 gap-1">
+                                    {searchTerm ? (
+                                        <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setSearchResults(null); }}>
+                                            Clear Search
+                                        </Button>
+                                    ) : (
+                                        <Button size="sm" asChild>
                                             <Link href="/inventory/add">
-                                                <PlusCircle className="h-3.5 w-3.5" />
-                                                <span className="sm:whitespace-nowrap">
-                                                    Add Product
-                                                </span>
+                                                <PlusCircle className="h-4 w-4 mr-2" /> Add Product
                                             </Link>
                                         </Button>
                                     )}
