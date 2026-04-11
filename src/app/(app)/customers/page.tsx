@@ -75,7 +75,7 @@ function CustomerRowSkeleton() {
   )
 }
 
-const CUSTOMERS_PER_PAGE = 10;
+const CUSTOMERS_PER_PAGE = 200;
 
 export default function CustomersPage() {
   const { 
@@ -84,9 +84,6 @@ export default function CustomersPage() {
     business, 
     currentUserProfile: currentUser, 
     triggerRefresh, 
-    searchCustomers,
-    searchCustomersByField,
-    fetchMoreCustomers,
     isSyncingCustomers 
   } = usePOS();
   const firestore = useFirestore();
@@ -99,51 +96,20 @@ export default function CustomersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
 
-  const [searchResults, setSearchResults] = React.useState<Customer[] | null>(null);
-  const [isSearching, setIsSearching] = React.useState(false);
-  const [isFetchingMore, setIsFetchingMore] = React.useState(false);
-  const [hasMore, setHasMore] = React.useState(customers ? customers.length >= 50 : true);
-
-  // Update hasMore if customers change
-  React.useEffect(() => {
-    if (customers && customers.length < 50) {
-      setHasMore(false);
-    }
-  }, [customers]);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
 
-  const isLoading = isPosLoading || isSearching;
+  const isLoading = isPosLoading;
 
-  // Deep Search Effect: Searches local cache first, then hits the DB for exact field matches (e.g. unique codes)
+  // Local-First Search for Instant Performance
   React.useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim()) {
-        setSearchResults(null);
-        return;
-      }
-      setIsSearching(true);
-      
-      // Attempt field-specific search (fast/indexed) then fallback to general search
-      const results = await searchCustomers(searchTerm.trim());
-      setSearchResults(results);
-      setIsSearching(false);
-    };
-
-    const handler = setTimeout(performSearch, 400); // 400ms debounce for responsiveness
-    return () => clearTimeout(handler);
-  }, [searchTerm, searchCustomers]);
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const displayedList = React.useMemo(() => {
     let base = [...(customers || [])];
     
-    if (searchResults && searchTerm.trim()) {
-      searchResults.forEach(p => {
-        if (!base.find(b => b.id === p.id)) base.push(p);
-      });
-    }
-
     let filtered = searchTerm.trim() 
       ? base.filter(c => 
           c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -171,7 +137,7 @@ export default function CustomersPage() {
     });
 
     return filtered;
-  }, [searchTerm, searchResults, customers, sortBy]);
+  }, [searchTerm, customers, sortBy]);
 
   const paginatedCustomers = React.useMemo(() => {
     const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
@@ -180,12 +146,7 @@ export default function CustomersPage() {
 
   const pageCount = Math.ceil(displayedList.length / CUSTOMERS_PER_PAGE);
 
-  const handleLoadMore = async () => {
-    setIsFetchingMore(true);
-    const count = await fetchMoreCustomers();
-    if (count === 0) setHasMore(false);
-    setIsFetchingMore(false);
-  };
+  const handleLoadMore = null;
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -264,11 +225,6 @@ export default function CustomersPage() {
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                   />
-                  {isSearching && (
-                    <div className="absolute right-2.5 top-2.5">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
                 </div>
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                   <SelectTrigger className="w-[180px]">
@@ -440,26 +396,12 @@ export default function CustomersPage() {
             </div>
 
             {/* Background Sync & Deep Retrieval Bridge */}
-            {!searchTerm && (
+            {isSyncingCustomers && (
               <div className="flex flex-col items-center justify-center pt-4 border-t w-full space-y-2">
-                {hasMore && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs text-muted-foreground hover:text-primary"
-                    onClick={handleLoadMore}
-                    disabled={isFetchingMore}
-                  >
-                    {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Upload className="h-3 w-3 mr-2 rotate-180" />}
-                    Load More from Database
-                  </Button>
-                )}
-                {isSyncingCustomers && (
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                    Syncing full catalog in background...
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  Syncing full catalog in background...
+                </div>
               </div>
             )}
           </CardFooter>
