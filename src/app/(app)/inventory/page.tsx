@@ -877,33 +877,20 @@ function InventoryPageContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  disabled={currentPage >= pageCount}
+                  onClick={async () => {
+                    if (currentPage >= pageCount && hasMore && !searchTerm) {
+                      await handleLoadMore();
+                    }
+                    setCurrentPage(p => p + 1);
+                  }}
+                  disabled={(currentPage >= pageCount && !hasMore) || (currentPage >= pageCount && !!searchTerm) || isFetchingMore}
                 >
-                  Next
+                  {isFetchingMore ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : "Next"}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
 
-            {!searchTerm && hasMore && (
-              <div className="flex justify-center w-full pt-4 border-t border-dashed">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleLoadMore} 
-                  disabled={isFetchingMore}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  {isFetchingMore ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Load More from Database
-                </Button>
-              </div>
-            )}
           </CardFooter>
         )}
       </Card>
