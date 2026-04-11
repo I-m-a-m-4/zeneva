@@ -353,12 +353,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     useEffect(() => {
         const fetchSubscribers = async () => {
             try {
-                const docRef = doc(firestore, 'platform', 'stats');
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists() && docSnap.data().appInstalls) {
-                    setTotalSubscribers(docSnap.data().appInstalls);
-                } else {
-                    setTotalSubscribers(0);
+                const user = (firestore as any).auth?.currentUser;
+                const token = await user?.getIdToken();
+                const response = await fetch('/api/admin/platform-overview', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (data.success && data.appInstalls !== undefined) {
+                    setTotalSubscribers(data.appInstalls);
                 }
             } catch (error) {
                 console.error("Error fetching app installs:", error);

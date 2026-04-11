@@ -34,6 +34,11 @@ export async function getCachedPlatformAnalytics(forceRefresh = false) {
   // Basic stats
   const totalGmv = receipts.reduce((sum: number, r: any) => sum + (r.total || 0), 0);
   const totalReceipts = receipts.length;
+  
+  // Platform stats
+  const platformStatsDoc = await adminFirestore.collection('platform').doc('stats').get();
+  const appInstalls = platformStatsDoc.exists ? platformStatsDoc.data()?.appInstalls || 0 : 0;
+
   const activatedBusinesses = businesses.filter((b: any) => {
       const bizProducts = products.filter((p: any) => p.businessId === b.id);
       const bizReceipts = receipts.filter((r: any) => r.businessId === b.id);
@@ -47,6 +52,7 @@ export async function getCachedPlatformAnalytics(forceRefresh = false) {
     totalUsers: users.length,
     totalBusinesses: businesses.length,
     activatedBusinessesCount: activatedBusinesses,
+    appInstalls,
     lastUpdated: now,
     fromCache: false
   };
