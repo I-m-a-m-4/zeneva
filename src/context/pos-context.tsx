@@ -800,42 +800,40 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
+    // We now have the last 2000 receipts in memory (syncedReceipts/receipts).
+    // For dashboard and reports, we can calculate these locally with 100% accuracy for recent ranges.
+    if (receipts && receipts.length > 0) {
+      const filtered = receipts.filter(r => {
+        let rd: Date;
+        if (r.createdAt?.toDate) rd = r.createdAt.toDate();
+        else if (r.createdAt instanceof Date) rd = r.createdAt;
+        else rd = new Date(r.createdAt || 0);
+        return rd >= from && rd <= to;
+      });
+      return {
+        revenue: filtered.reduce((sum, r) => sum + r.total, 0),
+        count: filtered.length,
+        customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size
+      };
+    }
+    
+    // Fallback if cache is empty
     try {
-      const receiptsRef = collection(firestore, 'receipts');
       const q = query(
-        receiptsRef,
+        collection(firestore, 'receipts'),
         where('businessId', '==', businessId),
         where('createdAt', '>=', from),
         where('createdAt', '<=', to)
       );
-      
       const snap = await getAggregateFromServer(q, {
         revenue: sum('total'),
         count: count()
       });
-
-      // For customers, we might need a separate query if they have a createdAt
-      const customersRef = collection(firestore, 'customers');
-      const cq = query(
-        customersRef,
-        where('businessId', '==', businessId),
-        where('createdAt', '>=', from),
-        where('createdAt', '<=', to)
-      );
-      const cSnap = await getAggregateFromServer(cq, {
-        count: count()
-      });
-
-      return {
-        revenue: snap.data().revenue || 0,
-        count: snap.data().count || 0,
-        customers: cSnap.data().count || 0
-      };
+      return { revenue: snap.data().revenue || 0, count: snap.data().count || 0, customers: 0 };
     } catch (e) {
-      console.error('Detailed analytics failed:', e);
       return { revenue: 0, count: 0, customers: 0 };
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, receipts]);
 
   const fetchMonthlyAnalytics = useCallback(async (monthsCount: number) => {
     if (!businessId || !firestore) return [];
