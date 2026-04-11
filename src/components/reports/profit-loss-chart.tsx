@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -8,6 +7,8 @@ import { LineChart, CartesianGrid, XAxis, YAxis, Line, Legend } from 'recharts';
 import { TrendingUp, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
 
 const chartConfig = {
   revenue: {
@@ -28,9 +29,6 @@ interface ProfitLossChartProps {
     receipts: Receipt[];
     currencySymbol: string;
 }
-
-import { TimeframePicker, type Timeframe } from './timeframe-picker';
-import { subDays, startOfDay } from 'date-fns';
 
 export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLossChartProps) {
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
@@ -151,6 +149,5 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                 )}
             </CardContent>
         </Card>
-    )
+    );
 }
-创新
