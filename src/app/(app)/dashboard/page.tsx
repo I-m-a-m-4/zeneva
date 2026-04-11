@@ -27,7 +27,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import type { TopSellingItem, BusinessAnalysisOutput } from '@/types';
+import type { TopSellingItem, BusinessAnalysisOutput, Receipt } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
-  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats } = usePOS();
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange } = usePOS();
 
   // Date range state, defaults to today
   const [date, setDate] = React.useState<DateRange | undefined>({
@@ -96,11 +96,14 @@ export default function DashboardPage() {
     to: endOfDay(new Date()),
   });
 
-  const isLoading = isPosLoading;
+  const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);
+  const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
+
+  const isLoading = isPosLoading || isFetchingBatch;
 
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];
-    const allReceipts = receipts || [];
+    const allReceipts = dashboardBatchReceipts.length > 0 ? dashboardBatchReceipts : (receipts || []);
     const allCustomers = customers || [];
     const allOnlineOrders = onlineOrders || [];
 
@@ -144,8 +147,8 @@ export default function DashboardPage() {
 
     const totalRevenue = totalSalesValue + totalOnlineSalesValue;
 
-    const posUnitsSold = filteredReceipts.reduce((sum, r) => sum + r.items.reduce((q, i) => q + i.quantity, 0), 0);
-    const onlineUnitsSold = filteredOnlineOrders.reduce((sum, o) => sum + o.items.reduce((q, i) => q + i.quantity, 0), 0);
+    const posUnitsSold = filteredReceipts.reduce((sum, r) => sum + r.items.reduce((q: number, i: { quantity: number }) => q + i.quantity, 0), 0);
+    const onlineUnitsSold = filteredOnlineOrders.reduce((sum, o) => sum + o.items.reduce((q: number, i: { quantity: number }) => q + i.quantity, 0), 0);
     const totalUnitsSold = posUnitsSold + onlineUnitsSold;
 
     const itemSalesCount: Record<string, number> = {};
@@ -217,7 +220,7 @@ export default function DashboardPage() {
       serviceUnitsSold,
       productUnitsSold
     };
-  }, [products, receipts, customers, onlineOrders, date, stats]);
+  }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts]);
 
   // Surgical Analytics for Date Range
   const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
@@ -244,14 +247,27 @@ export default function DashboardPage() {
   React.useEffect(() => {
     if (date?.from && date?.to) {
       const fetchRange = async () => {
-        const res = await fetchDetailedAnalytics(startOfDay(date.from!), endOfDay(date.to!));
-        setRangeStats(res);
+        setIsFetchingBatch(true);
+        try {
+          // Fetch high-fidelity range stats
+          const res = await fetchDetailedAnalytics(startOfDay(date.from!), endOfDay(date.to!));
+          setRangeStats(res);
+          
+          // Also fetch the actual receipts for Top Selling Items calculation
+          const BatchRes = await fetchReceiptsInRange(startOfDay(date.from!), endOfDay(date.to!), 500);
+          setDashboardBatchReceipts(BatchRes);
+        } catch (err) {
+          console.error("Dashboard range fetch failed:", err);
+        } finally {
+          setIsFetchingBatch(false);
+        }
       };
       fetchRange();
     } else {
       setRangeStats(null);
+      setDashboardBatchReceipts([]);
     }
-  }, [date, fetchDetailedAnalytics]);
+  }, [date, fetchDetailedAnalytics, fetchReceiptsInRange]);
 
   // Merge range stats into dashboard calculations
   const finalDashboardData = React.useMemo(() => {
