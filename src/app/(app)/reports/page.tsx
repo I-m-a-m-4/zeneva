@@ -5,7 +5,7 @@ import { usePOS } from '@/context/pos-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
@@ -21,7 +21,7 @@ import CustomerAnalytics from '@/components/reports/customer-analytics';
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
 
-function ReportStatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
+function ReportStatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) {
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -30,9 +30,10 @@ function ReportStatCard({ title, value, icon: Icon }: { title: string, value: st
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>
+                {description && <p className="text-[10px] text-muted-foreground mt-1">{description}</p>}
             </CardContent>
         </Card>
-    )
+    );
 }
 
 const PlaceholderChart = ({ title, description }: { title: string, description: string }) => {
@@ -113,9 +114,11 @@ export default function ReportsDashboard() {
 
         let totalProductsSold = 0;
         let totalServicesSold = 0;
+        const uniqueProductIds = new Set<string>();
 
         targetReceipts.forEach(r => {
             r.items.forEach(i => {
+                uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
                 if (product?.categoryType === 'service') {
                     totalServicesSold += i.quantity;
@@ -125,15 +128,23 @@ export default function ReportsDashboard() {
             });
         });
 
+        const activeDays = new Set(targetReceipts.map(r => {
+            const d = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
+            return d.toISOString().split('T')[0];
+        })).size || 1;
+
         return {
             totalRevenue,
             totalSales,
             averageOrderValue,
             inventoryValue,
-            totalCustomers: stats?.totalCustomers || customers.length,
+            totalCustomers: Math.max(stats?.totalCustomers || 0, customers.length),
             totalProductsSold,
             totalServicesSold,
-            totalItemsSold: totalProductsSold + totalServicesSold
+            totalItemsSold: totalProductsSold + totalServicesSold,
+            uniqueProductsSold: uniqueProductIds.size,
+            dailyAverageSales: totalSales / activeDays,
+            dailyAverageRevenue: totalRevenue / activeDays
         }
 
     }, [reportBatchReceipts, receipts, products, customers, isLoading, stats]);
@@ -159,7 +170,7 @@ export default function ReportsDashboard() {
         if (date?.from && date?.to) {
             const fetchBatch = async () => {
                 setIsFetchingBatch(true);
-                const res = await fetchReceiptsInRange(date.from!, date.to!, 1000);
+                const res = await fetchReceiptsInRange(date.from!, date.to!, 5000);
                 setReportBatchReceipts(res);
                 setIsFetchingBatch(false);
             };
@@ -241,31 +252,48 @@ export default function ReportsDashboard() {
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
                             <ReportStatCard
-                                title="Total Revenue"
+                                title="Revenue"
                                 value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                 icon={DollarSign}
+                                description="Total earnings"
                             />
                             <ReportStatCard
-                                title="Total Sales"
+                                title="Sales"
                                 value={finalReportData?.totalSales.toLocaleString() || '0'}
                                 icon={ShoppingCart}
+                                description="Total transactions"
                             />
                             <ReportStatCard
-                                title="Avg. Order Value"
-                                value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
-                                icon={FileText}
-                            />
-                            <ReportStatCard
-                                title="Items Sold"
-                                value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
+                                title="Unique Products"
+                                value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
                                 icon={Package}
+                                description="Different products sold"
                             />
                             <ReportStatCard
-                                title="Total Customers"
+                                title="Units Sold"
+                                value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
+                                icon={Layers}
+                                description="Total pieces moved"
+                            />
+                             <ReportStatCard
+                                title="Daily Velocity"
+                                value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
+                                icon={TrendingUp}
+                                description="Sales per day"
+                            />
+                            <ReportStatCard
+                                title="Avg Order"
+                                value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                icon={FileText}
+                                description="Revenue per sale"
+                            />
+                            <ReportStatCard
+                                title="Customers"
                                 value={finalReportData?.totalCustomers.toLocaleString() || '0'}
                                 icon={Users}
+                                description="Total unique buyers"
                             />
                         </div>
 

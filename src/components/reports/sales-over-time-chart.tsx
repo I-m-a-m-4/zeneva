@@ -67,7 +67,17 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
                         <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                            <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `${currencySymbol}${Number(value) / 1000}k`} />
+                            <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickMargin={8} 
+                                tickFormatter={(value) => {
+                                    const val = Number(value);
+                                    if (val >= 1000000) return `${currencySymbol}${(val / 1000000).toFixed(1)}M`;
+                                    if (val >= 1000) return `${currencySymbol}${val / 1000}k`;
+                                    return `${currencySymbol}${val}`;
+                                }} 
+                            />
                             <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString()}`} />} />
                             <Line dataKey="sales" type="monotone" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
                         </LineChart>
