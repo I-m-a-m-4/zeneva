@@ -186,10 +186,7 @@ export default function DashboardPage() {
     const sortedCustomers = [...allCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
     const topLoyaltyCustomers = sortedCustomers.slice(0, 3);
 
-    // If no date range is set (initial state or explicit 'All Time'), use denormalized stats
-    const isTodayOnly = date?.from && date?.to && startOfDay(date.from).getTime() === startOfDay(new Date()).getTime() && endOfDay(date.to).getTime() === endOfDay(new Date()).getTime();
-    
-    // We use stats for lifetime totals if the range is broad/default
+    // Default to lifetime stats if no range is selected or if it's broad
     const showLifetime = !date?.from || !date?.to;
 
     return {
@@ -212,6 +209,46 @@ export default function DashboardPage() {
     };
   }, [products, receipts, customers, onlineOrders, date, stats]);
 
+  // Surgical Analytics for Date Range
+  const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
+  const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, totalSales: number }[] | null>(null);
+  const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
+
+  React.useEffect(() => {
+    // Fetch monthly stats for current year (last 12 months)
+    const fetchHistory = async () => {
+      const res = await fetchMonthlyAnalytics(12);
+      setMonthlyStats(res.map(m => ({ month: m.month, totalSales: m.revenue })));
+    };
+    fetchHistory();
+  }, [fetchMonthlyAnalytics]);
+
+  React.useEffect(() => {
+    if (date?.from && date?.to) {
+      const fetchRange = async () => {
+        const res = await fetchDetailedAnalytics(startOfDay(date.from!), endOfDay(date.to!));
+        setRangeStats(res);
+      };
+      fetchRange();
+    } else {
+      setRangeStats(null);
+    }
+  }, [date, fetchDetailedAnalytics]);
+
+  // Merge range stats into dashboard calculations
+  const finalDashboardData = React.useMemo(() => {
+    if (!dashboardData) return null;
+    if (!rangeStats) return dashboardData;
+
+    return {
+      ...dashboardData,
+      totalRevenue: rangeStats.revenue,
+      totalSalesValue: rangeStats.revenue,
+      totalReceipts: rangeStats.count,
+      newCustomersCount: rangeStats.customers
+    };
+  }, [dashboardData, rangeStats]);
+
   const handleDownloadImage = async () => {
     const element = dashboardRef.current;
     if (!element) return;
@@ -233,11 +270,11 @@ export default function DashboardPage() {
     }
   };
 
-  if (isLoading || !dashboardData) {
+  if (isLoading || !finalDashboardData) {
     return <DashboardSkeleton />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = dashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
 
   const { currentUserProfile } = usePOS();
   const isOperator = currentUserProfile?.role === 'vendor_operator';
@@ -316,7 +353,7 @@ export default function DashboardPage() {
       {!isOperator && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} />
+            <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
           </div>
           <CategoryPieChart products={products || []} />
         </div>

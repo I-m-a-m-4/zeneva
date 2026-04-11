@@ -5,7 +5,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or, increment, setDoc, and, startAfter } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or, increment, setDoc, and, startAfter, getAggregateFromServer, sum, count } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 
@@ -29,6 +29,8 @@ interface POSContextType {
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
   searchProducts: (term: string) => Promise<Product[]>;
+  fetchDetailedAnalytics: (from: Date, to: Date) => Promise<{ revenue: number, count: number, customers: number }>;
+  fetchMonthlyAnalytics: (months: number) => Promise<{ month: string, revenue: number, count: number }[]>;
   fetchMoreReceipts: () => Promise<number>;
   fetchMoreCustomers: () => Promise<number>;
   fetchMoreProducts: () => Promise<number>;
@@ -557,6 +559,82 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore]);
 
+  const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
+    if (!businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
+    try {
+      const receiptsRef = collection(firestore, 'receipts');
+      const q = query(
+        receiptsRef,
+        where('businessId', '==', businessId),
+        where('createdAt', '>=', from),
+        where('createdAt', '<=', to)
+      );
+      
+      const snap = await getAggregateFromServer(q, {
+        revenue: sum('total'),
+        count: count()
+      });
+
+      // For customers, we might need a separate query if they have a createdAt
+      const customersRef = collection(firestore, 'customers');
+      const cq = query(
+        customersRef,
+        where('businessId', '==', businessId),
+        where('createdAt', '>=', from),
+        where('createdAt', '<=', to)
+      );
+      const cSnap = await getAggregateFromServer(cq, {
+        count: count()
+      });
+
+      return {
+        revenue: snap.data().revenue || 0,
+        count: snap.data().count || 0,
+        customers: cSnap.data().count || 0
+      };
+    } catch (e) {
+      console.error('Detailed analytics failed:', e);
+      return { revenue: 0, count: 0, customers: 0 };
+    }
+  }, [businessId, firestore]);
+
+  const fetchMonthlyAnalytics = useCallback(async (monthsCount: number) => {
+    if (!businessId || !firestore) return [];
+    try {
+      const results = [];
+      const receiptsRef = collection(firestore, 'receipts');
+      
+      for (let i = monthsCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+        
+        const q = query(
+          receiptsRef,
+          where('businessId', '==', businessId),
+          where('createdAt', '>=', start),
+          where('createdAt', '<=', end)
+        );
+        
+        const snap = await getAggregateFromServer(q, {
+          revenue: sum('total'),
+          count: count()
+        });
+        
+        results.push({
+          month: d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+          revenue: snap.data().revenue || 0,
+          count: snap.data().count || 0
+        });
+      }
+      return results;
+    } catch (e) {
+      console.error('Monthly analytics failed:', e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
   const fetchMoreProducts = useCallback(async () => {
     if (!businessId || !firestore || !products || products.length === 0) return 0;
     try {
@@ -882,6 +960,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, searchProducts,
+    fetchDetailedAnalytics, fetchMonthlyAnalytics,
     fetchMoreReceipts, fetchMoreCustomers, fetchMoreProducts,
     stats,
 

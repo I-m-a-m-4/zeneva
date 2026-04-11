@@ -67,7 +67,7 @@ const ReportsPlaceholder = () => (
 
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts } = usePOS();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats } = usePOS();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
@@ -127,13 +127,56 @@ export default function ReportsDashboard() {
             totalSales,
             averageOrderValue,
             inventoryValue,
-            totalCustomers: customers.length,
+            totalCustomers: stats?.totalCustomers || customers.length,
             totalProductsSold,
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold
         }
 
-    }, [receipts, products, customers, isLoading]);
+    }, [receipts, products, customers, isLoading, stats]);
+
+    // Surgical Analytics
+    const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
+    const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
+    const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
+
+    React.useEffect(() => {
+        if (date?.from && date?.to) {
+            const fetchRange = async () => {
+                const res = await fetchDetailedAnalytics(date.from!, date.to!);
+                setRangeStats(res);
+            };
+            fetchRange();
+        } else {
+            setRangeStats(null);
+        }
+    }, [date, fetchDetailedAnalytics]);
+
+    React.useEffect(() => {
+        const fetchHistory = async () => {
+             const res = await fetchMonthlyAnalytics(12);
+             setMonthlyStats(res.map(m => ({ month: m.month, sales: m.revenue })));
+        }
+        fetchHistory();
+    }, [fetchMonthlyAnalytics]);
+
+    const finalReportData = React.useMemo(() => {
+        if (!reportData) return null;
+        if (!rangeStats) {
+           return {
+             ...reportData,
+             totalRevenue: stats?.totalRevenue || 0,
+             totalSales: stats?.totalSales || 0,
+             totalCustomers: stats?.totalCustomers || 0
+           };
+        }
+        return {
+            ...reportData,
+            totalRevenue: rangeStats.revenue,
+            totalSales: rangeStats.count,
+            totalCustomers: rangeStats.customers
+        };
+    }, [reportData, rangeStats, stats]);
 
     const handleDownloadImage = async () => {
         const element = dashboardRef.current;
@@ -184,34 +227,34 @@ export default function ReportsDashboard() {
                         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
                             <ReportStatCard
                                 title="Total Revenue"
-                                value={`${currencySymbol}${reportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                 icon={DollarSign}
                             />
                             <ReportStatCard
                                 title="Total Sales"
-                                value={reportData?.totalSales.toLocaleString() || '0'}
+                                value={finalReportData?.totalSales.toLocaleString() || '0'}
                                 icon={ShoppingCart}
                             />
                             <ReportStatCard
                                 title="Avg. Order Value"
-                                value={`${currencySymbol}${reportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
+                                value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
                                 icon={FileText}
                             />
                             <ReportStatCard
                                 title="Items Sold"
-                                value={reportData?.totalItemsSold.toLocaleString() || '0'}
+                                value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
                                 icon={Package}
                             />
                             <ReportStatCard
                                 title="Total Customers"
-                                value={reportData?.totalCustomers.toLocaleString() || '0'}
+                                value={finalReportData?.totalCustomers.toLocaleString() || '0'}
                                 icon={Users}
                             />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                             <div className="lg:col-span-3">
-                                <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} />
+                                <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
                             </div>
                             <div className="lg:col-span-2">
                                 <TopProductsChart receipts={receipts || []} />

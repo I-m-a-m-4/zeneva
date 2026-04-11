@@ -20,10 +20,13 @@ const chartConfig = {
 interface OverviewChartProps {
   receipts: Receipt[];
   currencySymbol: string;
+  data?: { month: string, totalSales: number }[];
 }
 
-export default function OverviewChart({ receipts, currencySymbol }: OverviewChartProps) {
+export default function OverviewChart({ receipts, currencySymbol, data }: OverviewChartProps) {
   const chartData = React.useMemo(() => {
+    if (data) return data;
+    
     const monthlySales: Record<string, number> = {};
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
@@ -42,7 +45,7 @@ export default function OverviewChart({ receipts, currencySymbol }: OverviewChar
       month,
       totalSales: monthlySales[month] || 0,
     }));
-  }, [receipts]);
+  }, [receipts, data]);
 
   const noData = chartData.every(d => d.totalSales === 0);
 

@@ -19,10 +19,13 @@ const chartConfig = {
 interface SalesOverTimeChartProps {
     receipts: Receipt[];
     currencySymbol: string;
+    data?: { month: string, sales: number }[];
 }
 
-export default function SalesOverTimeChart({ receipts, currencySymbol }: SalesOverTimeChartProps) {
+export default function SalesOverTimeChart({ receipts, currencySymbol, data }: SalesOverTimeChartProps) {
     const chartData = React.useMemo(() => {
+        if (data) return data;
+        
         const monthlySales: Record<string, number> = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const currentYear = new Date().getFullYear();
@@ -40,7 +43,7 @@ export default function SalesOverTimeChart({ receipts, currencySymbol }: SalesOv
           month,
           sales: monthlySales[month] || 0,
         }));
-    }, [receipts]);
+    }, [receipts, data]);
 
     const noData = chartData.every(d => d.sales === 0);
 
