@@ -75,7 +75,7 @@ export default function ReportsDashboard() {
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
-        from: subDays(new Date(), 29),
+        from: subDays(new Date(), 730), // Default to 2 years ago for "lifetime" view
         to: new Date(),
     });
 

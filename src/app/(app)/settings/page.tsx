@@ -501,7 +501,22 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-4">
-                            <div><Label>Currency</Label><Select value={currency} onValueChange={setCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent></Select></div>
+                            <div>
+                                <Label>Currency</Label>
+                                <Select value={currency} onValueChange={setCurrency}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="NGN">NGN (₦)</SelectItem>
+                                        <SelectItem value="USD">USD ($)</SelectItem>
+                                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                                        <SelectItem value="CAD">CAD ($)</SelectItem>
+                                        <SelectItem value="GHS">GHS (GH¢)</SelectItem>
+                                        <SelectItem value="ZAR">ZAR (R)</SelectItem>
+                                        <SelectItem value="KES">KES (KSh)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div><Label>Timezone</Label><Select value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem></SelectContent></Select></div>
                             <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>

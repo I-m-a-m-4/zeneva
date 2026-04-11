@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Users } from 'lucide-react';
 import type { Customer, Receipt } from '@/types';
+import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 
@@ -121,8 +122,8 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
 
             <div className="grid lg:grid-cols-2 gap-6">
                 <div>
-                    <h4 className="font-semibold mb-2">Customer Acquisition (Last 30 Days)</h4>
-                    <div className="h-[250px] w-full border rounded-lg p-4 bg-muted/20">
+                    <h4 className="font-semibold mb-2">Customer Acquisition (Last 90 Days)</h4>
+                    <div className="h-[400px] w-full border rounded-lg p-4 bg-muted/20">
                         {acquisitionData.length > 0 ? (
                             <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
                                 <BarChart data={acquisitionData}>
@@ -158,9 +159,12 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                             </TableHeader>
                             <TableBody>
                                 {analyticsData.topCustomersBySpend.map(c => (
-                                    <TableRow key={c.id}>
+                                    <TableRow 
+                                        key={c.id} 
+                                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                    >
                                         <TableCell>
-                                            <div className="flex items-center gap-2">
+                                            <Link href={`/customers/${c.id}`} className="flex items-center gap-2">
                                                 <Avatar className="h-8 w-8">
                                                     <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
                                                 </Avatar>
@@ -168,7 +172,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                                                     <div className="font-medium">{c.name}</div>
                                                     <div className="text-xs text-muted-foreground">{c.email}</div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         </TableCell>
                                         <TableCell className="text-right font-semibold">{currencySymbol}{c.totalSpent.toLocaleString()}</TableCell>
                                     </TableRow>
