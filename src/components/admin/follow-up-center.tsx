@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock } from 'lucide-react';
+import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -32,6 +32,7 @@ interface FollowUpLog {
   openedAt?: any;
   status: 'sent' | 'opened' | 'failed';
   openCount: number;
+  converted: boolean;
 }
 
 interface FollowUpCenterProps {
@@ -226,6 +227,15 @@ export default function FollowUpCenter({ atRiskBusinesses, users }: FollowUpCent
                           <Badge variant="destructive">Failed</Badge>
                         ) : (
                           <Badge variant="secondary">Sent</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {log.converted ? (
+                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
+                              <TrendingUp className="h-3 w-3 mr-1" /> Converted
+                           </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

@@ -10,9 +10,27 @@ export async function GET(req: NextRequest) {
       .limit(50)
       .get();
 
-    const logs = logsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    const logs = await Promise.all(logsSnapshot.docs.map(async (doc: any) => {
+      const logData = doc.data();
+      const sentAt = logData.sentAt?.toDate();
+      let converted = false;
+
+      if (sentAt && logData.businessId !== 'unknown') {
+        // Check if there are any receipts for this business AFTER sentAt
+        const receiptsSnapshot = await adminFirestore.collection('receipts')
+          .where('businessId', '==', logData.businessId)
+          .where('createdAt', '>', sentAt)
+          .limit(1)
+          .get();
+        
+        converted = !receiptsSnapshot.empty;
+      }
+
+      return {
+        id: doc.id,
+        ...logData,
+        converted
+      };
     }));
 
     return NextResponse.json({ success: true, logs });
