@@ -185,6 +185,7 @@ export default function SelectProductsPage() {
         isLoading: isPosLoading, 
         business,
         searchProducts,
+        findProductBySku,
         fetchMoreProducts
     } = usePOS();
     const router = useRouter();
@@ -257,8 +258,14 @@ export default function SelectProductsPage() {
         addToCart(product);
     }, [addToCart]);
 
-    const handleScan = (sku: string) => {
-        const product = products?.find(p => p.sku === sku);
+    const handleScan = async (sku: string) => {
+        let product = products?.find(p => p.sku === sku);
+        
+        if (!product) {
+            // Surgical search in DB
+            product = await findProductBySku(sku) || undefined;
+        }
+
         if (product) {
             addToCart(product);
             toast({
@@ -291,18 +298,23 @@ export default function SelectProductsPage() {
                             className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={(e) => {
+                            onKeyDown={async (e) => {
                                 if (e.key === 'Enter') {
-                                    const exactMatch = products?.find(p =>
+                                    let exactMatch = products?.find(p =>
                                         p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
                                         p.name.toLowerCase() === searchTerm.toLowerCase()
                                     );
+
+                                    if (!exactMatch && searchTerm.trim()) {
+                                        exactMatch = await findProductBySku(searchTerm.trim()) || undefined;
+                                    }
+
                                     if (exactMatch) {
-                                        handleAddToCart(exactMatch);
+                                        addToCart(exactMatch);
                                         setSearchTerm('');
                                         toast({
-                                            title: "Product Added",
-                                            description: `${exactMatch.name} has been added to the cart.`,
+                                            title: "Added to Cart",
+                                            description: exactMatch.name
                                         });
                                     }
                                 }

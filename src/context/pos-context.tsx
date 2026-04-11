@@ -29,6 +29,7 @@ interface POSContextType {
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
   searchProducts: (term: string) => Promise<Product[]>;
+  findProductBySku: (sku: string) => Promise<Product | null>;
   fetchDetailedAnalytics: (from: Date, to: Date) => Promise<{ revenue: number, count: number, customers: number }>;
   fetchMonthlyAnalytics: (months: number) => Promise<{ month: string, revenue: number, count: number }[]>;
   fetchMoreReceipts: () => Promise<number>;
@@ -543,19 +544,63 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchProducts = useCallback(async (term: string) => {
     if (!term.trim() || !businessId || !firestore) return [];
     try {
-      const lowerTerm = term.toLowerCase();
-      const q = query(
-        collection(firestore, 'products'),
+      const lowerTerm = term.trim().toLowerCase();
+      const productsRef = collection(firestore, 'products');
+
+      // Query 1: Name Prefix
+      const qName = query(
+        productsRef,
         where('businessId', '==', businessId),
-        where('name', '>=', lowerTerm),
-        where('name', '<=', lowerTerm + '\uf8ff'),
+        where('name', '>=', term.trim()), // Prefix search is case-sensitive in Firestore usually, but we assume names match user input
+        where('name', '<=', term.trim() + '\uf8ff'),
         limit(20)
       );
-      const snap = await getDocs(q);
-      return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+
+      // Query 2: SKU Equality/Prefix (if short)
+      const qSku = query(
+        productsRef,
+        where('businessId', '==', businessId),
+        where('sku', '>=', term.trim()),
+        where('sku', '<=', term.trim() + '\uf8ff'),
+        limit(20)
+      );
+
+      const [snapName, snapSku] = await Promise.all([
+        getDocs(qName),
+        getDocs(qSku)
+      ]);
+
+      const nameResults = snapName.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+      const skuResults = snapSku.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+
+      // Merge and remove duplicates
+      const merged = [...nameResults];
+      skuResults.forEach(p => {
+        if (!merged.find(m => m.id === p.id)) merged.push(p);
+      });
+
+      return merged.slice(0, 20);
     } catch (e) {
       console.error('Search products failed:', e);
       return [];
+    }
+  }, [businessId, firestore]);
+
+  const findProductBySku = useCallback(async (sku: string) => {
+    if (!sku || !businessId || !firestore) return null;
+    try {
+      const q = query(
+        collection(firestore, 'products'),
+        where('businessId', '==', businessId),
+        where('sku', '==', sku),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      return { ...snap.docs[0].data(), id: snap.docs[0].id } as Product;
+    } catch (e) {
+      console.error('Find product by SKU failed:', e);
+      return null;
     }
   }, [businessId, firestore]);
 
@@ -959,8 +1004,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, searchProducts,
-    fetchDetailedAnalytics, fetchMonthlyAnalytics,
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts,
+    searchProducts,
+    findProductBySku,
+    fetchDetailedAnalytics,
+    fetchMonthlyAnalytics,
     fetchMoreReceipts, fetchMoreCustomers, fetchMoreProducts,
     stats,
 
