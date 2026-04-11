@@ -238,28 +238,22 @@ export default function SelectProductsPage() {
     }, [searchTerm, searchProducts]);
 
     const filteredProducts = React.useMemo(() => {
-        // If searching, we combine searchResults with a local filter of currently cached products
-        // This ensures the user sees SOMETHING instantly while the DB query completes
-        let base = (products || []);
+        // Combined Local + DB Results
+        let base = [...(products || [])];
         
+        if (searchResults && searchTerm.trim()) {
+            searchResults.forEach(p => {
+                if (!base.find(b => b.id === p.id)) base.push(p);
+            });
+        }
+
+        // Apply instant local substring filter
         if (searchTerm.trim()) {
-            const localTerm = searchTerm.toLowerCase();
-            const localMatches = base.filter(p => 
-                p.name.toLowerCase().includes(localTerm) || 
-                p.sku?.toLowerCase().includes(localTerm)
+            const lower = searchTerm.toLowerCase();
+            base = base.filter(p => 
+                p.name.toLowerCase().includes(lower) || 
+                p.sku?.toLowerCase().includes(lower)
             );
-            
-            // If we have DB search results, they take priority (more accurate prefix match)
-            if (searchResults && searchResults.length > 0) {
-                // Merge and keep unique
-                const merged = [...searchResults];
-                localMatches.forEach(p => {
-                    if (!merged.find(m => m.id === p.id)) merged.push(p);
-                });
-                base = merged;
-            } else {
-                base = localMatches;
-            }
         }
 
         if (categoryFilter !== 'all') {

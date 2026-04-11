@@ -547,81 +547,89 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const lowerTerm = term.trim().toLowerCase();
       const productsRef = collection(firestore, 'products');
 
-      // Query 1: Name Prefix
-      const qName = query(
+      // Helper for prefix search (handles common casing issues)
+      const qPrefix = (field: string, text: string) => query(
         productsRef,
         where('businessId', '==', businessId),
-        where('name', '>=', term.trim()), // Prefix search is case-sensitive in Firestore usually, but we assume names match user input
-        where('name', '<=', term.trim() + '\uf8ff'),
+        where(field, '>=', text),
+        where(field, '<=', text + '\uf8ff'),
         limit(20)
       );
 
-      // Query 2: SKU Equality/Prefix (if short)
-      const qSku = query(
-        productsRef,
-        where('businessId', '==', businessId),
-        where('sku', '>=', term.trim()),
-        where('sku', '<=', term.trim() + '\uf8ff'),
-        limit(20)
-      );
+      // We search for:
+      // 1. Lowercase prefix if it exists (for new/migrated data)
+      // 2. Normal prefix (for existing data)
+      // 3. Capitalized prefix (for common Name cases)
+      const capitalized = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
 
-      const [snapName, snapSku] = await Promise.all([
-        getDocs(qName),
-        getDocs(qSku)
+      const [snapLower, snapNormal, snapCap] = await Promise.all([
+        getDocs(qPrefix('lowercaseName', lowerTerm)),
+        getDocs(qPrefix('name', term.trim())),
+        getDocs(qPrefix('name', capitalized))
       ]);
 
-      const nameResults = snapName.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
-      const skuResults = snapSku.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+      const results: Product[] = [];
+      const addFromSnap = (snap: any) => {
+        snap.docs.forEach((doc: any) => {
+          const data = { ...doc.data(), id: doc.id } as Product;
+          if (!results.find(r => r.id === data.id)) results.push(data);
+        });
+      };
 
-      // Merge and remove duplicates
-      const merged = [...nameResults];
-      skuResults.forEach(p => {
-        if (!merged.find(m => m.id === p.id)) merged.push(p);
-      });
+      addFromSnap(snapLower);
+      addFromSnap(snapNormal);
+      addFromSnap(snapCap);
 
-      return merged.slice(0, 20);
+      return results.slice(0, 30);
     } catch (e) {
       console.error('Search products failed:', e);
       return [];
     }
-  }, [businessId, firestore, products]); // Added products to dependency to check local if needed
+  }, [businessId, firestore]);
 
   // Background Loader: Deeply fills the products cache after initial fast-load
   useEffect(() => {
     if (!businessId || !firestore || isLoadingProducts || !products || products.length === 0) return;
     
-    // If we already have a lot of items or we think we are done, don't keep hammering
-    // But for a true 'Sync', we want to get them all eventually if catalog is < 10,000
-    const fetchRemaining = async () => {
-      let currentProductsCount = products.length;
-      let lastDoc = null; // We would need to track the lastDoc from useCollection or restart
-      // Actually, since useCollection handles the first 50, we start after that.
-      // For simplicity, let's just do one large follow-up fetch of 1000 items
+    let isMounted = true;
+    
+    const fetchRemainingRecursive = async (lastDoc: any = null) => {
+      if (!isMounted) return;
       try {
         const q = query(
           collection(firestore, 'products'),
           where('businessId', '==', businessId),
           orderBy('name', 'asc'),
-          limit(1000) // Fetch a decent chunk for local filtering
+          ...(lastDoc ? [startAfter(lastDoc)] : []),
+          limit(1000) 
         );
         const snap = await getDocs(q);
+        if (snap.empty) return;
+        
         const all = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
         
-        // Merge with existing but avoid duplicates
         mutateProducts(prev => {
           const existingIds = new Set(prev?.map(p => p.id) || []);
           const uniqueNew = all.filter(p => !existingIds.has(p.id));
           return [...(prev || []), ...uniqueNew];
         });
+
+        // If we got a full batch, there's likely more. Continue syncing.
+        if (snap.docs.length === 1000) {
+            // Wait 2 seconds between batches to avoid performance stalls
+            setTimeout(() => fetchRemainingRecursive(snap.docs[snap.docs.length - 1]), 2000);
+        }
       } catch (e) {
         console.error('Background product sync failed:', e);
       }
     };
 
-    // Delay background sync slightly to prioritize UI snappiness
-    const timer = setTimeout(fetchRemaining, 5000);
-    return () => clearTimeout(timer);
-  }, [businessId, firestore]); // Only run once business is ready
+    const timer = setTimeout(() => fetchRemainingRecursive(), 3000);
+    return () => {
+        isMounted = false;
+        clearTimeout(timer);
+    };
+  }, [businessId, firestore]); 
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku || !businessId || !firestore) return null;

@@ -232,7 +232,25 @@ function InventoryPageContent() {
   }, [queuedActions]);
 
   const filteredProducts = React.useMemo(() => {
-    let base = searchTerm.trim() ? (searchResults || []) : (products || []);
+    // Merge local products + search results
+    let base = [...(products || [])];
+    
+    // Add search results if not already in local cache
+    if (searchResults && searchTerm.trim()) {
+      searchResults.forEach(p => {
+        if (!base.find(b => b.id === p.id)) base.push(p);
+      });
+    }
+
+    // Apply local substring filter if searching
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      base = base.filter(p => 
+        p.name.toLowerCase().includes(lower) || 
+        p.sku?.toLowerCase().includes(lower) ||
+        p.category?.toLowerCase().includes(lower)
+      );
+    }
     
     // 1. Combine with optimistic products
     let combined = [...(optimisticProducts || []), ...base];
