@@ -36,33 +36,36 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
     const [selectedProduct, setSelectedProduct] = React.useState<ProductAnalysis | null>(null);
 
     const analysisData = React.useMemo(() => {
-        const productRevenue: Record<string, { revenue: number, quantity: number, orderCount: number }> = {};
+        const productDataMap: Record<string, { revenue: number, quantity: number, orderCount: number, name: string }> = {};
 
         receipts.forEach(receipt => {
             const productsInReceipt = new Set(receipt.items.map(i => i.productId));
             productsInReceipt.forEach(pid => {
-                if (!productRevenue[pid]) productRevenue[pid] = { revenue: 0, quantity: 0, orderCount: 0 };
-                productRevenue[pid].orderCount++;
+                // Pre-initialize with receipt item data if available
+                if (!productDataMap[pid]) {
+                    const item = receipt.items.find(i => i.productId === pid);
+                    productDataMap[pid] = { revenue: 0, quantity: 0, orderCount: 0, name: item?.name || 'Unknown Product' };
+                }
+                productDataMap[pid].orderCount++;
             });
             receipt.items.forEach(item => {
-                if (!productRevenue[item.productId]) {
-                    productRevenue[item.productId] = { revenue: 0, quantity: 0, orderCount: 0 };
+                if (!productDataMap[item.productId]) {
+                    productDataMap[item.productId] = { revenue: 0, quantity: 0, orderCount: 0, name: item.name };
                 }
-                productRevenue[item.productId].revenue += item.price * item.quantity;
-                productRevenue[item.productId].quantity += item.quantity;
+                productDataMap[item.productId].revenue += item.price * item.quantity;
+                productDataMap[item.productId].quantity += item.quantity;
             });
         });
 
-        const totalRevenue = Object.values(productRevenue).reduce((sum, { revenue }) => sum + revenue, 0);
+        const totalRevenue = Object.values(productDataMap).reduce((sum, { revenue }) => sum + revenue, 0);
 
         if (totalRevenue === 0) {
             return { all: [], classA: [], classB: [], classC: [] };
         }
 
-        const sortedProducts = Object.entries(productRevenue)
+        const sortedProducts = Object.entries(productDataMap)
             .map(([productId, data]) => ({
                 id: productId,
-                name: products.find(p => p.id === productId)?.name || 'Unknown Product',
                 ...data,
             }))
             .sort((a, b) => b.revenue - a.revenue);

@@ -144,6 +144,7 @@ function InventoryPageContent() {
     removeFromQueue, 
     addToQueue,
     searchProducts,
+    searchProductsByField,
     fetchMoreProducts,
     queuedActions
   } = usePOS();
@@ -167,6 +168,7 @@ function InventoryPageContent() {
   const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
 
   const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
+  const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
@@ -197,6 +199,20 @@ function InventoryPageContent() {
       setHasMore(false);
     }
   }, [products]);
+
+  React.useEffect(() => {
+    if (categoryFilter !== 'all') {
+      const fetchGlobal = async () => {
+        setIsSearching(true);
+        const results = await searchProductsByField('category', categoryFilter);
+        setFilterResults(results);
+        setIsSearching(false);
+      };
+      fetchGlobal();
+    } else {
+      setFilterResults(null);
+    }
+  }, [categoryFilter, searchProductsByField]);
 
   React.useEffect(() => {
     const s = searchParams.get('sortBy');
@@ -241,6 +257,13 @@ function InventoryPageContent() {
       searchResults.forEach(p => {
         if (!base.find(b => b.id === p.id)) base.push(p);
       });
+    }
+
+    // Add filter results if not already in local cache
+    if (filterResults && categoryFilter !== 'all') {
+        filterResults.forEach(p => {
+            if (!base.find(b => b.id === p.id)) base.push(p);
+        });
     }
 
     // Apply local substring filter if searching
@@ -426,30 +449,45 @@ function InventoryPageContent() {
   };
 
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
-
   return (
     <div className="flex flex-col h-full w-full pb-16 md:pb-0">
       <div className="flex items-center pb-4 gap-4">
         <div className="flex flex-col flex-1">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search products..."
-              className="w-full rounded-lg bg-background pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  performSearch(searchTerm);
-                }
-              }}
-            />
+          <div className="relative flex items-center gap-2">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Input
+                type="search"
+                placeholder="Search products..."
+                className="w-full rounded-lg bg-background pl-8 ring-offset-background focus-visible:ring-primary h-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    performSearch(searchTerm);
+                  }
+                }}
+              />
+              {isSearching && (
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                </div>
+              )}
+            </div>
+            <Button 
+               variant="secondary" 
+               className="h-10 px-3 hidden sm:flex shrink-0 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+               onClick={() => performSearch(searchTerm)}
+               disabled={isSearching}
+            >
+              <Search className="h-4 w-4" />
+              <span className="text-xs font-semibold">Search</span>
+            </Button>
           </div>
           {isSyncing && (
-            <div className="flex items-center gap-1.5 mt-1 ml-1">
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <span className="text-[10px] text-muted-foreground font-medium animate-pulse">Syncing complete catalog for deep search...</span>
+            <div className="flex items-center gap-1.5 mt-2 ml-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Global Catalog Syncing...</span>
             </div>
           )}
         </div>

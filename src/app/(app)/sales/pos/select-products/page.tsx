@@ -185,6 +185,7 @@ export default function SelectProductsPage() {
         isLoading: isPosLoading, 
         business,
         searchProducts,
+        searchProductsByField,
         findProductBySku,
         fetchMoreProducts,
         isSyncing
@@ -196,6 +197,7 @@ export default function SelectProductsPage() {
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+    const [isSearching, setIsSearching] = React.useState(false);
 
     React.useEffect(() => {
         if (business) {
@@ -215,11 +217,34 @@ export default function SelectProductsPage() {
     }, [business, router, toast]);
 
     const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
-    const [isSearching, setIsSearching] = React.useState(false);
+    const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
     const isLoading = isPosLoading || isSearching;
+
+    const performManualSearch = async () => {
+        if (!searchTerm.trim()) return;
+        setIsSearching(true);
+        let exactMatch = products?.find(p =>
+            p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
+            p.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+
+        if (!exactMatch && searchTerm.trim()) {
+            exactMatch = await findProductBySku(searchTerm.trim()) || undefined;
+        }
+
+        if (exactMatch) {
+            addToCart(exactMatch);
+            setSearchTerm('');
+            toast({
+                title: "Added to Cart",
+                description: exactMatch.name
+            });
+        }
+        setIsSearching(false);
+    };
 
     // Surgical Search Effect
     React.useEffect(() => {
@@ -238,12 +263,32 @@ export default function SelectProductsPage() {
         return () => clearTimeout(handler);
     }, [searchTerm, searchProducts]);
 
+    React.useEffect(() => {
+        if (categoryFilter !== 'all') {
+            const fetchGlobal = async () => {
+                setIsSearching(true);
+                const results = await searchProductsByField('category', categoryFilter);
+                setFilterResults(results);
+                setIsSearching(false);
+            };
+            fetchGlobal();
+        } else {
+            setFilterResults(null);
+        }
+    }, [categoryFilter, searchProductsByField]);
+
     const filteredProducts = React.useMemo(() => {
         // Combined Local + DB Results
         let base = [...(products || [])];
         
         if (searchResults && searchTerm.trim()) {
             searchResults.forEach(p => {
+                if (!base.find(b => b.id === p.id)) base.push(p);
+            });
+        }
+
+        if (filterResults && categoryFilter !== 'all') {
+            filterResults.forEach(p => {
                 if (!base.find(b => b.id === p.id)) base.push(p);
             });
         }
@@ -307,96 +352,81 @@ export default function SelectProductsPage() {
     return (
         <div className="grid md:grid-cols-3 md:gap-8">
             <div className="md:col-span-2">
-                <div className="flex items-center mb-4 gap-4 sticky top-0 bg-background py-2 z-10">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search name or SKU..."
-                            className="pl-8"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={async (e) => {
-                                if (e.key === 'Enter') {
-                                    let exactMatch = products?.find(p =>
-                                        p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
-                                        p.name.toLowerCase() === searchTerm.toLowerCase()
-                                    );
-
-                                    if (!exactMatch && searchTerm.trim()) {
-                                        exactMatch = await findProductBySku(searchTerm.trim()) || undefined;
+                <div className="flex flex-col mb-4 gap-2 sticky top-0 bg-background py-2 z-10 border-b">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1 group">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Input
+                                placeholder="Search name or SKU..."
+                                className="pl-8 ring-offset-background focus-visible:ring-primary h-11"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        performManualSearch();
                                     }
-
-                                    if (exactMatch) {
-                                        addToCart(exactMatch);
-                                        setSearchTerm('');
-                                        toast({
-                                            title: "Added to Cart",
-                                            description: exactMatch.name
-                                        });
-                                    }
-                                }
-                            }}
-                        />
-                        {isSyncing && (
-                            <div className="flex items-center gap-1.5 mt-1 ml-1">
-                                <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                                <span className="text-[10px] text-muted-foreground font-medium animate-pulse leading-none">Catalog sync in progress (warming up results)...</span>
-                            </div>
-                        )}
+                                }}
+                            />
+                            {isSearching && (
+                                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                </div>
+                            )}
+                        </div>
+                        <Button 
+                            variant="secondary" 
+                            className="h-11 px-4 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+                            onClick={performManualSearch}
+                            disabled={isSearching}
+                        >
+                            <Search className="h-4 w-4" />
+                            <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Search</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 md:hidden shrink-0 border-primary/20 text-primary hover:bg-primary/5"
+                            onClick={() => setIsScannerOpen(true)}
+                        >
+                            <QrCode className="h-6 w-6" />
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-11 gap-1.5 min-w-[44px]">
+                                    <ListFilter className="h-4 w-4" />
+                                    <span className="sr-only sm:not-sr-only">Filter</span>
+                                    {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">1</Badge>}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
+                                    <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                                    {business?.settings?.productCategories?.map(cat => (
+                                        <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
+                                    ))}
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Select onValueChange={setColumnClass} defaultValue={columnClass}>
+                            <SelectTrigger className="w-[150px] h-11 hidden lg:flex">
+                                <Columns className="h-4 w-4 mr-2" />
+                                <SelectValue placeholder="Layout" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="lg:grid-cols-3">3 Columns</SelectItem>
+                                <SelectItem value="lg:grid-cols-4">4 Columns</SelectItem>
+                                <SelectItem value="lg:grid-cols-5">5 Columns</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 shrink-0 border-primary/20 hover:bg-muted"
-                        onClick={async () => {
-                            if (searchTerm.trim()) {
-                                setIsSearching(true);
-                                const results = await searchProducts(searchTerm.trim());
-                                setSearchResults(results);
-                                setIsSearching(false);
-                            }
-                        }}
-                    >
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 md:hidden shrink-0 border-primary/20 text-primary hover:bg-primary/5"
-                        onClick={() => setIsScannerOpen(true)}
-                    >
-                        <QrCode className="h-5 w-5" />
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 gap-1.5">
-                                <ListFilter className="h-4 w-4" />
-                                <span className="sr-only sm:not-sr-only">Filter</span>
-                                {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">1</Badge>}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
-                                <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
-                                {business?.settings?.productCategories?.map(cat => (
-                                    <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
-                                ))}
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Select onValueChange={setColumnClass} defaultValue={columnClass}>
-                        <SelectTrigger className="w-[150px] hidden lg:flex">
-                            <Columns className="h-4 w-4 mr-2" />
-                            <SelectValue placeholder="Layout" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="lg:grid-cols-3">3 Columns</SelectItem>
-                            <SelectItem value="lg:grid-cols-4">4 Columns</SelectItem>
-                            <SelectItem value="lg:grid-cols-5">5 Columns</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    {isSyncing && (
+                        <div className="flex items-center gap-2 ml-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest leading-none">Global Catalog Syncing...</span>
+                        </div>
+                    )}
                 </div>
                 <div className="pb-24 md:pb-0">
                     {isLoading && !filteredProducts.length ? (

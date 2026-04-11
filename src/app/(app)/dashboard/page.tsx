@@ -216,11 +216,19 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     // Fetch monthly stats for current year (last 12 months)
+    let isMounted = true;
     const fetchHistory = async () => {
-      const res = await fetchMonthlyAnalytics(12);
-      setMonthlyStats(res.map(m => ({ month: m.month, totalSales: m.revenue })));
+      try {
+        const res = await fetchMonthlyAnalytics(12);
+        if (isMounted) {
+            setMonthlyStats(res.map(m => ({ month: m.month, totalSales: m.revenue })));
+        }
+      } catch (err) {
+        console.error("Dashboard history fetch failed:", err);
+      }
     };
     fetchHistory();
+    return () => { isMounted = false; };
   }, [fetchMonthlyAnalytics]);
 
   React.useEffect(() => {

@@ -85,7 +85,9 @@ export default function CustomersPage() {
     currentUserProfile: currentUser, 
     triggerRefresh, 
     searchCustomers,
-    fetchMoreCustomers 
+    searchCustomersByField,
+    fetchMoreCustomers,
+    isSyncingCustomers 
   } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -114,7 +116,7 @@ export default function CustomersPage() {
 
   const isLoading = isPosLoading || isSearching;
 
-  // Surgical Search Effect
+  // Deep Search Effect: Searches local cache first, then hits the DB for exact field matches (e.g. unique codes)
   React.useEffect(() => {
     const performSearch = async () => {
       if (!searchTerm.trim()) {
@@ -122,19 +124,34 @@ export default function CustomersPage() {
         return;
       }
       setIsSearching(true);
+      
+      // Attempt field-specific search (fast/indexed) then fallback to general search
       const results = await searchCustomers(searchTerm.trim());
       setSearchResults(results);
       setIsSearching(false);
     };
 
-    const handler = setTimeout(performSearch, 500);
+    const handler = setTimeout(performSearch, 400); // 400ms debounce for responsiveness
     return () => clearTimeout(handler);
   }, [searchTerm, searchCustomers]);
 
   const displayedList = React.useMemo(() => {
-    let base = searchTerm.trim() ? (searchResults || []) : (customers || []);
+    let base = [...(customers || [])];
     
-    let filtered = [...base];
+    if (searchResults && searchTerm.trim()) {
+      searchResults.forEach(p => {
+        if (!base.find(b => b.id === p.id)) base.push(p);
+      });
+    }
+
+    let filtered = searchTerm.trim() 
+      ? base.filter(c => 
+          c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.phone?.includes(searchTerm) ||
+          c.code?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : base;
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -234,16 +251,24 @@ export default function CustomersPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Customers</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Customers
+                {isSyncingCustomers && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+              </CardTitle>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
-                <div className="relative w-full max-w-sm">
-                  <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <div className="relative w-full max-w-sm group">
+                  <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
-                    placeholder="Search by name, email, or unique code..."
-                    className="pl-8"
+                    placeholder="Search name, email, or code..."
+                    className="pl-8 ring-offset-background focus-visible:ring-primary"
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                   />
+                  {isSearching && (
+                    <div className="absolute right-2.5 top-2.5">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                   <SelectTrigger className="w-[180px]">
@@ -414,22 +439,27 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            {!searchTerm && hasMore && (
-              <div className="flex justify-center w-full pt-4 border-t border-dashed">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleLoadMore} 
-                  disabled={isFetchingMore}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  {isFetchingMore ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Load More from Database
-                </Button>
+            {/* Background Sync & Deep Retrieval Bridge */}
+            {!searchTerm && (
+              <div className="flex flex-col items-center justify-center pt-4 border-t w-full space-y-2">
+                {hasMore && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    onClick={handleLoadMore}
+                    disabled={isFetchingMore}
+                  >
+                    {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Upload className="h-3 w-3 mr-2 rotate-180" />}
+                    Load More from Database
+                  </Button>
+                )}
+                {isSyncingCustomers && (
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    Syncing full catalog in background...
+                  </div>
+                )}
               </div>
             )}
           </CardFooter>

@@ -3,23 +3,23 @@
 import * as React from 'react';
 import Link from 'next/link'; // Import Link
 import { usePOS } from '@/context/pos-context';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs } from 'firebase/firestore';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import type { AuditLog } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, History, User, FileText, Package, Bot, Lightbulb, Flame, ShieldAlert, Info, CheckCircle } from 'lucide-react';
+import { Loader2, History, User, FileText, Package, Bot, Lightbulb, Flame, ShieldAlert, Info, CheckCircle, Search } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import FeatureGate from '@/components/shared/feature-gate';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-
 
 type SuspiciousActivity = {
     title: string;
@@ -196,15 +196,69 @@ function AuditLogPageContent() {
     const [analysis, setAnalysis] = React.useState<{ summary: string; suspiciousActivities: SuspiciousActivity[] } | null>(null);
     const [selectedLog, setSelectedLog] = React.useState<AuditLog | null>(null);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
+    const [searchTerm, setSearchTerm] = React.useState('');
+    const [actionFilter, setActionFilter] = React.useState('all');
+    const [isFetchingMore, setIsFetchingMore] = React.useState(false);
+    const [hasMore, setHasMore] = React.useState(true);
+    const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
 
+    // Fetch Initial Logs
+    React.useEffect(() => {
+        if (!business?.id || !firestore) return;
 
-    const auditLogQuery = useMemoFirebase(
-        () => business?.id ? query(collection(firestore, 'businessInstances', business.id, 'auditLogs'), orderBy('createdAt', 'desc')) : null,
-        [business?.id, firestore]
-    );
+        const baseQuery = query(
+            collection(firestore, 'businessInstances', business.id, 'auditLogs'),
+            orderBy('createdAt', 'desc'),
+            limit(50)
+        );
 
-    const { data: auditLogs, isLoading: isLoadingLogs } = useCollection<AuditLog>(auditLogQuery);
-    const isLoading = isPosLoading || isLoadingLogs;
+        const unsubscribe = onSnapshot(baseQuery, (snap) => {
+            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+            setAuditLogs(logs);
+            if (snap.docs.length < 50) setHasMore(false);
+        });
+
+        return () => unsubscribe();
+    }, [business?.id, firestore]);
+
+    const handleLoadMore = async () => {
+        if (!business?.id || !firestore || auditLogs.length === 0) return;
+        setIsFetchingMore(true);
+        try {
+            const lastDoc = auditLogs[auditLogs.length - 1];
+            const nextQuery = query(
+                collection(firestore, 'businessInstances', business.id, 'auditLogs'),
+                orderBy('createdAt', 'desc'),
+                startAfter(lastDoc.createdAt),
+                limit(50)
+            );
+            const snap = await getDocs(nextQuery);
+            const more = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+            if (more.length > 0) {
+                setAuditLogs(prev => [...prev, ...more]);
+            }
+            if (snap.docs.length < 50) setHasMore(false);
+        } finally {
+            setIsFetchingMore(false);
+        }
+    };
+
+    const filteredLogs = React.useMemo(() => {
+        let result = auditLogs;
+        if (actionFilter !== 'all') {
+            result = result.filter(log => log.action.startsWith(`${actionFilter}.`));
+        }
+        if (searchTerm.trim()) {
+            const lower = searchTerm.toLowerCase();
+            result = result.filter(log => 
+                log.userName?.toLowerCase().includes(lower) || 
+                log.userEmail?.toLowerCase().includes(lower) ||
+                log.details.entityName?.toLowerCase().includes(lower) ||
+                log.id.toLowerCase().includes(lower)
+            );
+        }
+        return result;
+    }, [auditLogs, actionFilter, searchTerm]);
 
     const handleAnalyze = () => {
         const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
@@ -230,103 +284,151 @@ function AuditLogPageContent() {
         });
     }
 
+    const isLoading = isPosLoading || (auditLogs.length === 0);
+
     return (
         <>
             {analysis && <AnalysisResults analysis={analysis} />}
             <Card>
                 <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <CardTitle className="flex items-center gap-2"><History /> Audit Log</CardTitle>
-                            <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
+                    <div className="flex flex-col gap-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-2xl font-bold"><History className="text-primary" /> Audit Log</CardTitle>
+                                <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
+                            </div>
+                            <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto shadow-sm">
+                                {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+                                {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
+                            </Button>
                         </div>
-                        <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto">
-                            {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
-                            {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
-                        </Button>
+                        
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="relative flex-1">
+                                <History className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search by user, email, or entity..." 
+                                    className="pl-9"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {['all', 'sale', 'product', 'customer', 'user'].map(filter => (
+                                    <Button 
+                                        key={filter}
+                                        variant={actionFilter === filter ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setActionFilter(filter)}
+                                        className="capitalize rounded-full h-8 px-4"
+                                    >
+                                        {filter}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>User</TableHead>
-                                    <TableHead>Action</TableHead>
-                                    <TableHead>Details</TableHead>
-                                    <TableHead className="text-right">Date</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <AuditLogRowSkeleton />
-                                <AuditLogRowSkeleton />
-                                <AuditLogRowSkeleton />
-                                <AuditLogRowSkeleton />
-                            </TableBody>
-                        </Table>
+                        <div className="space-y-4">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Action</TableHead>
+                                        <TableHead>Details</TableHead>
+                                        <TableHead className="text-right">Date</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <AuditLogRowSkeleton />
+                                    <AuditLogRowSkeleton />
+                                    <AuditLogRowSkeleton />
+                                    <AuditLogRowSkeleton />
+                                </TableBody>
+                            </Table>
+                        </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>User</TableHead>
-                                    <TableHead>Action</TableHead>
-                                    <TableHead>Details</TableHead>
-                                    <TableHead className="text-right">Date</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {auditLogs && auditLogs.length > 0 ? (
-                                    auditLogs.map(log => {
-                                        const entityType = log.action.split('.')[0];
-                                        const Icon = actionIcons[entityType] || History;
-                                        return (
-                                            <TableRow key={log.id} onClick={() => setSelectedLog(log)} className="cursor-pointer">
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Avatar className="h-8 w-8 hidden sm:flex">
-                                                            <AvatarFallback>{(log.userName || 'U').charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <div className="font-medium">{log.userName || 'Unknown User'}</div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-xs text-muted-foreground">{log.userEmail}</span>
-                                                                {log.userRole && (
-                                                                    <>
-                                                                        <span className="text-[10px] text-muted-foreground/30">•</span>
-                                                                        <span className="text-[10px] uppercase tracking-wider font-semibold text-primary/70">{log.userRole.replace('_', ' ')}</span>
-                                                                    </>
-                                                                )}
+                        <div className="space-y-4">
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                            <TableHead>User</TableHead>
+                                            <TableHead>Action</TableHead>
+                                            <TableHead>Details</TableHead>
+                                            <TableHead className="text-right">Date</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredLogs.length > 0 ? (
+                                            filteredLogs.map(log => {
+                                                const entityType = log.action.split('.')[0];
+                                                const Icon = actionIcons[entityType] || History;
+                                                return (
+                                                    <TableRow key={log.id} onClick={() => setSelectedLog(log)} className="cursor-pointer hover:bg-muted/30">
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <Avatar className="h-8 w-8 hidden sm:flex border">
+                                                                    <AvatarFallback>{(log.userName || 'U').charAt(0)}</AvatarFallback>
+                                                                </Avatar>
+                                                                <div>
+                                                                    <div className="font-medium text-sm">{log.userName || 'Unknown User'}</div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-muted-foreground">{log.userEmail}</span>
+                                                                        {log.userRole && (
+                                                                            <>
+                                                                                <span className="text-[10px] text-muted-foreground/30">•</span>
+                                                                                <span className="text-[10px] uppercase tracking-wider font-bold text-primary/70">{log.userRole.replace('_', ' ')}</span>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary" className="capitalize whitespace-nowrap">
-                                                        <Icon className="mr-1.5 h-3 w-3" />
-                                                        {log.action.replace('.', ' ')}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium truncate max-w-xs">{log.details.entityName || log.entityType}</div>
-                                                    <div className="text-xs text-muted-foreground truncate max-w-xs" title={log.entityId}>
-                                                        ID: {log.entityId}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right text-muted-foreground whitespace-nowrap">
-                                                    {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : ''}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="secondary" className="capitalize whitespace-nowrap text-[10px] py-0 h-5 font-bold">
+                                                                <Icon className="mr-1 h-2.5 w-2.5" />
+                                                                {log.action.replace('.', ' ')}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-sm font-medium truncate max-w-[150px] sm:max-w-xs">{log.details.entityName || log.entityType || 'N/A'}</div>
+                                                            <div className="text-[10px] text-muted-foreground truncate max-w-[150px] sm:max-w-xs" title={log.entityId}>
+                                                                {log.entityId}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-muted-foreground text-xs whitespace-nowrap">
+                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : ''}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                                                    No logs found matching your filters.
                                                 </TableCell>
                                             </TableRow>
-                                        )
-                                    })
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            No audit events recorded yet.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            
+                            {hasMore && !searchTerm && actionFilter === 'all' && (
+                                <div className="flex justify-center pt-4">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={handleLoadMore} 
+                                        disabled={isFetchingMore}
+                                        className="w-full max-w-xs"
+                                    >
+                                        {isFetchingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Load More Events"}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </CardContent>
             </Card>

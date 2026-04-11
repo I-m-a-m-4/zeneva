@@ -27,8 +27,10 @@ interface POSContextType {
   onlineOrders: OnlineOrder[] | null;
   stats: BusinessStats | null;
   searchCustomers: (term: string) => Promise<Customer[]>;
+  searchCustomersByField: (field: string, value: string) => Promise<Customer[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
   searchProducts: (term: string) => Promise<Product[]>;
+  searchProductsByField: (field: string, value: string) => Promise<Product[]>;
   findProductBySku: (sku: string) => Promise<Product | null>;
   fetchDetailedAnalytics: (from: Date, to: Date) => Promise<{ revenue: number, count: number, customers: number }>;
   fetchMonthlyAnalytics: (months: number) => Promise<{ month: string, revenue: number, count: number }[]>;
@@ -75,6 +77,7 @@ interface POSContextType {
   addToQueue: (action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => void;
   mutateBusiness: (data?: any) => Promise<any> | void;
   isSyncing: boolean;
+  isSyncingCustomers: boolean;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
   optimisticProducts: Product[];
@@ -103,6 +106,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // --- UI State ---
   const [isConfettiActive, setIsConfettiActive] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
+  const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   // --- Impersonation State ---
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
@@ -171,12 +176,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
-  const { data: customers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
+  const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
+
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
+  const customers = useMemo(() => {
+    const merged = [...(initialCustomers || [])];
+    const existingIds = new Set(merged.map(c => c.id));
+    syncedCustomers.forEach(c => {
+      if (!existingIds.has(c.id)) merged.push(c);
+    });
+    return merged;
+  }, [initialCustomers, syncedCustomers]);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
-  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingStats;
+  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats;
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -189,6 +204,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // --- Offline Queue State ---
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+
+  useEffect(() => {
+    if (businessId && firestore) {
+      getInventoryStats().then(setExtraStats);
+    }
+  }, [businessId, firestore, refreshKey]);
+
+  const mergedStats = useMemo(() => {
+    if (!stats && !extraStats.totalProducts) return null;
+    return {
+      ...(stats as any || {}),
+      ...extraStats
+    } as BusinessStats;
+  }, [stats, extraStats]);
 
   useEffect(() => {
     try {
@@ -227,7 +256,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
           case 'add-customer': {
             const customersRef = collection(firestore, 'customers');
             const newCustomerRef = doc(customersRef);
-            batch.set(newCustomerRef, { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            batch.set(newCustomerRef, { 
+              ...action.payload, 
+              lowercaseName: action.payload.name.toLowerCase(),
+              lowercaseEmail: action.payload.email?.toLowerCase() || '',
+              createdAt: serverTimestamp(), 
+              updatedAt: serverTimestamp() 
+            });
             
             // Increment Stats
             const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
@@ -244,7 +279,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
           case 'update-product': {
             const productRef = doc(firestore, 'products', action.payload.productId);
             const cleanValues = Object.fromEntries(Object.entries(action.payload.values).filter(([_, v]) => v !== undefined));
-            batch.update(productRef, { ...cleanValues, updatedAt: serverTimestamp() });
+            const updates: any = { ...cleanValues, updatedAt: serverTimestamp() };
+            if (cleanValues.name) updates.lowercaseName = (cleanValues.name as string).toLowerCase();
+            batch.update(productRef, updates);
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.update',
               entity: { type: 'Product', id: action.payload.productId, name: 'Product' }, // Name might be unknown without fetch, generic fallback
@@ -255,7 +292,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
           case 'bulk-update-products': {
             action.payload.productIds.forEach((id: string) => {
               const productRef = doc(firestore, 'products', id);
-              batch.update(productRef, { ...action.payload.values, updatedAt: serverTimestamp() });
+              const updates: any = { ...action.payload.values, updatedAt: serverTimestamp() };
+              if (action.payload.values.name) updates.lowercaseName = (action.payload.values.name as string).toLowerCase();
+              batch.update(productRef, updates);
             });
             await logAuditEvent(firestore, businessId, currentUserProfile, {
               action: 'product.update',
@@ -308,6 +347,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
             batch.set(newProductRef, {
               ...Object.fromEntries(Object.entries(productData).filter(([_, v]) => v !== undefined)),
+              lowercaseName: action.payload.name.toLowerCase(),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             });
@@ -467,53 +507,45 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchCustomers = useCallback(async (term: string) => {
     if (!term.trim() || !businessId || !firestore) return [];
     try {
-      const lowerTerm = term.toLowerCase();
-      const upperTerm = term.toUpperCase();
+      const lower = term.toLowerCase().trim();
+      const customersRef = collection(firestore, 'customers');
 
-      // Search by name prefix
-      const nameQuery = query(
-        collection(firestore, 'customers'),
+      const q = (field: string) => query(
+        customersRef,
         where('businessId', '==', businessId),
-        where('name', '>=', term),
-        where('name', '<=', term + '\uf8ff'),
+        where(field, '>=', lower),
+        where(field, '<=', lower + '\uf8ff'),
         limit(20)
       );
 
-      // Search by code prefix
-      const codeQuery = query(
-        collection(firestore, 'customers'),
-        where('businessId', '==', businessId),
-        where('code', '>=', upperTerm),
-        where('code', '<=', upperTerm + '\uf8ff'),
-        limit(20)
-      );
-
-      // Search by email prefix
-      const emailQuery = query(
-        collection(firestore, 'customers'),
-        where('businessId', '==', businessId),
-        where('email', '>=', lowerTerm),
-        where('email', '<=', lowerTerm + '\uf8ff'),
-        limit(20)
-      );
-
-      const [nameSnap, codeSnap, emailSnap] = await Promise.all([
-        getDocs(nameQuery),
-        getDocs(codeQuery),
-        getDocs(emailQuery)
+      const [nameSnap, emailSnap] = await Promise.all([
+        getDocs(q('lowercaseName')),
+        getDocs(q('lowercaseEmail'))
       ]);
 
-      const nameResults = nameSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-      const codeResults = codeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-      const emailResults = emailSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-
-      // Merge and remove duplicates
-      const combined = [...nameResults, ...codeResults, ...emailResults];
+      const combined = [...nameSnap.docs, ...emailSnap.docs].map(d => ({ ...d.data() as any, id: d.id } as Customer));
       const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
       return uniqueResults.slice(0, 20);
     } catch (e) {
       console.error("Error searching customers:", e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
+  const searchCustomersByField = useCallback(async (field: string, value: string) => {
+    if (!value.trim() || !businessId || !firestore) return [];
+    try {
+      const q = query(
+        collection(firestore, 'customers'),
+        where('businessId', '==', businessId),
+        where(field, '==', value),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer));
+    } catch (e) {
+      console.error(`Search customers by ${field} failed:`, e);
       return [];
     }
   }, [businessId, firestore]);
@@ -564,42 +596,37 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const lowerTerm = term.trim().toLowerCase();
       const productsRef = collection(firestore, 'products');
 
-      // Helper for prefix search (handles common casing issues)
-      const qPrefix = (field: string, text: string) => query(
+      const q = query(
         productsRef,
         where('businessId', '==', businessId),
-        where(field, '>=', text),
-        where(field, '<=', text + '\uf8ff'),
-        limit(20)
+        where('lowercaseName', '>=', lowerTerm),
+        where('lowercaseName', '<=', lowerTerm + '\uf8ff'),
+        limit(30)
       );
 
-      // We search for multiple permutations to overcome Firestore's case-sensitivity
-      const capitalized = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
-      const allUpper = term.toUpperCase();
+      const snap = await getDocs(q);
+      const results = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
 
-      const [snapLower, snapNormal, snapCap, snapUpper] = await Promise.all([
-        getDocs(qPrefix('lowercaseName', lowerTerm)),
-        getDocs(qPrefix('name', term.trim())),
-        getDocs(qPrefix('name', capitalized)),
-        getDocs(qPrefix('name', allUpper))
-      ]);
-
-      const results: Product[] = [];
-      const addFromSnap = (snap: any) => {
-        snap.docs.forEach((doc: any) => {
-          const data = { ...doc.data(), id: doc.id } as Product;
-          if (!results.find(r => r.id === data.id)) results.push(data);
-        });
-      };
-
-      addFromSnap(snapLower);
-      addFromSnap(snapNormal);
-      addFromSnap(snapCap);
-      addFromSnap(snapUpper);
-
-      return results.slice(0, 30);
+      return results;
     } catch (e) {
       console.error('Search products failed:', e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
+  const searchProductsByField = useCallback(async (field: string, value: string) => {
+    if (!value.trim() || !businessId || !firestore) return [];
+    try {
+      const q = query(
+        collection(firestore, 'products'),
+        where('businessId', '==', businessId),
+        where(field, '==', value),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+    } catch (e) {
+      console.error(`Search products by ${field} failed:`, e);
       return [];
     }
   }, [businessId, firestore]);
@@ -627,7 +654,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
             return;
         }
         
-        const all = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+        const all = snap.docs.map(doc => {
+            const data = doc.data() as any;
+            return { 
+                ...data, 
+                id: doc.id,
+                lowercaseName: data.lowercaseName || data.name.toLowerCase() // Heal local cache
+            } as Product;
+        });
         
         setSyncedProducts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
@@ -654,6 +688,59 @@ export function POSProvider({ children }: { children: ReactNode }) {
         clearTimeout(timer);
     };
   }, [businessId, firestore]); 
+
+  // Background Loader: Deeply fills the customers cache
+  useEffect(() => {
+    if (!businessId || !firestore || !initialCustomers) return;
+
+    const fetchRemainingCustomersRecursive = async (lastDoc: any = null) => {
+      setIsSyncingCustomers(true);
+      try {
+        let q = query(
+          collection(firestore, 'customers'),
+          where('businessId', '==', businessId),
+          orderBy('name', 'asc'),
+          limit(200)
+        );
+
+        if (lastDoc) q = query(q, startAfter(lastDoc));
+
+        const snap = await getDocs(q);
+        if (snap.docs.length > 0) {
+          const fetched = snap.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              ...data,
+              id: doc.id,
+              lowercaseName: data.lowercaseName || data.name.toLowerCase(),
+              lowercaseEmail: data.lowercaseEmail || data.email?.toLowerCase() || ''
+            } as Customer;
+          });
+          setSyncedCustomers(prev => {
+            const result = [...prev];
+            fetched.forEach(p => {
+              if (!result.find(r => r.id === p.id)) result.push(p);
+            });
+            return result;
+          });
+
+          if (snap.docs.length === 200) {
+            await new Promise(r => setTimeout(r, 2000));
+            await fetchRemainingCustomersRecursive(snap.docs[snap.docs.length - 1]);
+          } else {
+            setIsSyncingCustomers(false);
+          }
+        } else {
+          setIsSyncingCustomers(false);
+        }
+      } catch (e) {
+        console.error("Background customer sync failed", e);
+        setIsSyncingCustomers(false);
+      }
+    };
+
+    fetchRemainingCustomersRecursive();
+  }, [businessId, firestore, initialCustomers]);
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku || !businessId || !firestore) return null;
@@ -715,37 +802,64 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchMonthlyAnalytics = useCallback(async (monthsCount: number) => {
     if (!businessId || !firestore) return [];
     try {
-      const results = [];
       const receiptsRef = collection(firestore, 'receipts');
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       
-      for (let i = monthsCount - 1; i >= 0; i--) {
+      const ranges = Array.from({ length: monthsCount }, (_, i) => {
         const d = new Date();
-        d.setMonth(d.getMonth() - i);
+        d.setMonth(d.getMonth() - (monthsCount - 1 - i));
         const start = new Date(d.getFullYear(), d.getMonth(), 1);
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-        
+        return { start, end, month: monthNames[d.getMonth()] };
+      });
+
+      const results = await Promise.all(ranges.map(async ({ start, end, month }) => {
         const q = query(
           receiptsRef,
           where('businessId', '==', businessId),
           where('createdAt', '>=', start),
           where('createdAt', '<=', end)
         );
-        
         const snap = await getAggregateFromServer(q, {
           revenue: sum('total'),
           count: count()
         });
-        
-        results.push({
-          month: d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+        return {
+          month,
           revenue: snap.data().revenue || 0,
           count: snap.data().count || 0
-        });
-      }
+        };
+      }));
+
       return results;
     } catch (e) {
       console.error('Monthly analytics failed:', e);
       return [];
+    }
+  }, [businessId, firestore]);
+
+  const getInventoryStats = useCallback(async () => {
+    if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
+    try {
+      const productsRef = collection(firestore, 'products');
+      const q = query(productsRef, where('businessId', '==', businessId));
+      
+      const snap = await getAggregateFromServer(q, {
+        totalProducts: count(),
+        totalStockValue: sum('stockValue')
+      });
+
+      const lowStockQ = query(productsRef, where('businessId', '==', businessId), where('stock', '<', 5));
+      const lowStockSnap = await getAggregateFromServer(lowStockQ, { count: count() });
+
+      return {
+        totalProducts: snap.data().totalProducts || 0,
+        totalStockValue: snap.data().totalStockValue || 0,
+        lowStockCount: lowStockSnap.data().count || 0
+      };
+    } catch (e) {
+      console.error('Inventory stats failed:', e);
+      return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
     }
   }, [businessId, firestore]);
 
@@ -1071,17 +1185,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     mutateBusiness,
     isSyncing,
+    isSyncingCustomers,
     optimisticProducts: queuedActions
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts,
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchCustomersByField, searchReceipts,
     searchProducts,
+    searchProductsByField,
     findProductBySku,
     fetchDetailedAnalytics,
     fetchMonthlyAnalytics,
     fetchMoreReceipts, fetchMoreCustomers, fetchMoreProducts,
-    stats,
+    stats: mergedStats,
 
     isSubscriptionActive: business
       ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
