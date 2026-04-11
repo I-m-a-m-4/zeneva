@@ -17,6 +17,7 @@ export interface Product {
     updatedAt?: any;
     expiryDate?: any;
     categoryType?: 'product' | 'service';
+    lowercaseName?: string;
 
     // --- Premium Inventory Features ---
     type?: 'single' | 'variant' | 'composite';
@@ -77,6 +78,8 @@ export interface Customer {
     lastPurchaseDate?: any;
     createdAt?: any;
     updatedAt?: any;
+    lowercaseName?: string;
+    lowercaseEmail?: string;
     aiInsights?: CustomerInsightsOutput;
 }
 

@@ -654,14 +654,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
             return;
         }
         
-        const all = snap.docs.map(doc => {
-            const data = doc.data() as any;
-            return { 
+        const allPromises = snap.docs.map(async (docSnap) => {
+            const data = docSnap.data() as any;
+            const product = { 
                 ...data, 
-                id: doc.id,
-                lowercaseName: data.lowercaseName || data.name.toLowerCase() // Heal local cache
+                id: docSnap.id,
+                lowercaseName: data.lowercaseName || data.name.toLowerCase()
             } as Product;
+
+            // Self-Healing: Patch missing search index in database
+            if (!data.lowercaseName && navigator.onLine) {
+                try {
+                    updateDoc(docSnap.ref, { lowercaseName: product.lowercaseName }).catch(() => {});
+                } catch {}
+            }
+            return product;
         });
+        const all = await Promise.all(allPromises);
         
         setSyncedProducts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
@@ -1208,7 +1217,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, setAutoPrint, resetPOS,
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchMoreReceipts, fetchMoreCustomers, stats
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchMoreReceipts, fetchMoreCustomers, mergedStats
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

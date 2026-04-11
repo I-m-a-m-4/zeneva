@@ -109,8 +109,16 @@ export default function DashboardPage() {
     const toDate = date?.to;
 
     const filterByDate = (item: { createdAt?: any }) => {
-      if (!item.createdAt?.toDate) return false;
-      const itemDate = item.createdAt.toDate();
+      if (!item.createdAt) return false;
+      let itemDate: Date;
+      if (item.createdAt.toDate) {
+        itemDate = item.createdAt.toDate();
+      } else if (item.createdAt instanceof Date) {
+        itemDate = item.createdAt;
+      } else {
+        itemDate = new Date(item.createdAt);
+      }
+      
       if (fromDate && !toDate) { // single day selection
         return isWithinInterval(itemDate, { start: startOfDay(fromDate), end: endOfDay(fromDate) });
       }
@@ -147,8 +155,9 @@ export default function DashboardPage() {
     filteredReceipts.forEach(receipt => {
       receipt.items.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
+        const name = product?.name || item.name || 'Unknown Item';
+        itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;
         if (product) {
-          itemSalesCount[product.name] = (itemSalesCount[product.name] || 0) + item.quantity;
           if (product.categoryType === 'service') {
             serviceUnitsSold += item.quantity;
           } else {
@@ -161,8 +170,9 @@ export default function DashboardPage() {
     filteredOnlineOrders.forEach(order => {
       order.items.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
+        const name = product?.name || item.name || 'Unknown Item';
+        itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;
         if (product) {
-          itemSalesCount[product.name] = (itemSalesCount[product.name] || 0) + item.quantity;
           if (product.categoryType === 'service') {
             serviceUnitsSold += item.quantity;
           } else {
@@ -174,11 +184,11 @@ export default function DashboardPage() {
 
     const topSellingItems = Object.entries(itemSalesCount)
       .sort(([, qtyA], [, qtyB]) => qtyB - qtyA)
-      .slice(0, 3)
+      .slice(0, 5) // Show top 5
       .map(([name, quantitySold]) => {
         const inventoryItem = inventoryItems.find(invItem => invItem.name === name);
         return {
-          ...(inventoryItem || { id: name, name: name, sku: 'N/A', stock: 0, price: 0, category: 'N/A', lowStockThreshold: 0 }),
+          ...(inventoryItem || { id: `manual-${name}`, name: name, sku: 'N/A', stock: 0, price: 0, category: 'N/A', lowStockThreshold: 10 }),
           quantitySold: quantitySold
         } as TopSellingItem;
       });

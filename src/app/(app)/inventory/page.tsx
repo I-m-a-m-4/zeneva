@@ -491,18 +491,6 @@ function InventoryPageContent() {
             </div>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0 border-primary/20 text-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
-          onClick={() => performSearch(searchTerm)}
-        >
-          {isSearching ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Search className="h-5 w-5" />
-          )}
-        </Button>
         <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && (
               <>
