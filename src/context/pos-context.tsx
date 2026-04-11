@@ -194,6 +194,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const customers = useMemo(() => {
+    if (syncedCustomers.length > (initialCustomers?.length || 0)) {
+      return syncedCustomers;
+    }
     const merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
     syncedCustomers.forEach(c => {
@@ -439,7 +442,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             if (action.payload.receiptData.customer && business?.settings?.loyaltyProgramEnabled) {
               const pointsPerUnit = business.settings.pointsPerUnit || 0;
               const pointsEarned = Math.floor(action.payload.receiptData.total * pointsPerUnit);
-              mutateCustomers((prev) => prev ? prev.map(c => c.id === action.payload.receiptData.customer.id ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsEarned, updatedAt: new Date() as any } : c) : null);
+              mutateCustomers((prev) => prev ? prev.map(c => c.id === action.payload.receiptData.customer.id ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsEarned, totalSpent: (c.totalSpent || 0) + action.payload.receiptData.total, updatedAt: new Date() as any } : c) : null);
             }
             break;
         }
@@ -677,7 +680,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const q = query(
           collection(firestore, 'products'),
           where('businessId', '==', businessId),
-          limit(5000) 
+          limit(10000) 
         );
         const snap = await getDocs(q);
         if (!isMounted) return;
@@ -719,7 +722,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const q = query(
           collection(firestore, 'customers'),
           where('businessId', '==', businessId),
-          limit(2000)
+          limit(5000)
         );
 
         const snap = await getDocs(q);
