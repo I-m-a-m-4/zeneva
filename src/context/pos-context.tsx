@@ -73,6 +73,8 @@ interface POSContextType {
   queuedActions: QueuedAction[];
   isQueueProcessing: boolean;
   addToQueue: (action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => void;
+  mutateBusiness: (data?: any) => Promise<any> | void;
+  isSyncing: boolean;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
   optimisticProducts: Product[];
@@ -100,6 +102,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // --- UI State ---
   const [isConfettiActive, setIsConfettiActive] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // --- Impersonation State ---
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
@@ -145,7 +148,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: business, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
-  const { data: products, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
+  const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
+
+  // Sync state to hold ALL products found during sync
+  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
+  const products = useMemo(() => {
+    // Merge initial 50 with synced results, prioritizing fresh synced data
+    const merged = [...(initialProducts || [])];
+    const existingIds = new Set(merged.map(p => p.id));
+    syncedProducts.forEach(p => {
+      if (!existingIds.has(p.id)) merged.push(p);
+    });
+    return merged;
+  }, [initialProducts, syncedProducts]);
+
+  const isLoadingProducts = isLoadingInitialProducts;
 
   const statsDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [businessId, firestore, refreshKey]);
   const { data: stats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
@@ -589,9 +606,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // Background Loader: Deeply fills the products cache after initial fast-load
   useEffect(() => {
-    if (!businessId || !firestore || isLoadingProducts || !products || products.length === 0) return;
+    if (!businessId || !firestore || isLoadingProducts || !initialProducts) return;
     
     let isMounted = true;
+    setIsSyncing(true);
     
     const fetchRemainingRecursive = async (lastDoc: any = null) => {
       if (!isMounted) return;
@@ -604,23 +622,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
           limit(1000) 
         );
         const snap = await getDocs(q);
-        if (snap.empty) return;
+        if (snap.empty) {
+            setIsSyncing(false);
+            return;
+        }
         
         const all = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
         
-        mutateProducts(prev => {
-          const existingIds = new Set(prev?.map(p => p.id) || []);
+        setSyncedProducts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
           const uniqueNew = all.filter(p => !existingIds.has(p.id));
-          return [...(prev || []), ...uniqueNew];
+          return [...prev, ...uniqueNew];
         });
 
         // If we got a full batch, there's likely more. Continue syncing.
         if (snap.docs.length === 1000) {
-            // Wait 2 seconds between batches to avoid performance stalls
-            setTimeout(() => fetchRemainingRecursive(snap.docs[snap.docs.length - 1]), 2000);
+            // Wait 1 second between batches
+            setTimeout(() => fetchRemainingRecursive(snap.docs[snap.docs.length - 1]), 1000);
+        } else {
+            setIsSyncing(false);
         }
       } catch (e) {
         console.error('Background product sync failed:', e);
+        setIsSyncing(false);
       }
     };
 
@@ -1045,6 +1069,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
+    mutateBusiness,
+    isSyncing,
     optimisticProducts: queuedActions
       .filter(a => a.type === 'add-product' && (a.status === 'pending' || a.status === 'processing'))
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],

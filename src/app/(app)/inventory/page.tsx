@@ -136,6 +136,7 @@ function InventoryPageContent() {
     onlineOrders, 
     optimisticProducts, 
     isLoading: isPosLoading, 
+    isSyncing,
     business, 
     currencySymbol, 
     currentUserProfile, 
@@ -429,20 +430,28 @@ function InventoryPageContent() {
   return (
     <div className="flex flex-col h-full w-full pb-16 md:pb-0">
       <div className="flex items-center pb-4 gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search products..."
-            className="w-full rounded-lg bg-background pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                performSearch(searchTerm);
-              }
-            }}
-          />
+        <div className="flex flex-col flex-1">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search products..."
+              className="w-full rounded-lg bg-background pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  performSearch(searchTerm);
+                }
+              }}
+            />
+          </div>
+          {isSyncing && (
+            <div className="flex items-center gap-1.5 mt-1 ml-1">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span className="text-[10px] text-muted-foreground font-medium animate-pulse">Syncing complete catalog for deep search...</span>
+            </div>
+          )}
         </div>
         <Button
           variant="outline"

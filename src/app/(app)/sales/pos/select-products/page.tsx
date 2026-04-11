@@ -186,7 +186,8 @@ export default function SelectProductsPage() {
         business,
         searchProducts,
         findProductBySku,
-        fetchMoreProducts
+        fetchMoreProducts,
+        isSyncing
     } = usePOS();
     const router = useRouter();
     const { toast } = useToast();
@@ -336,6 +337,12 @@ export default function SelectProductsPage() {
                                 }
                             }}
                         />
+                        {isSyncing && (
+                            <div className="flex items-center gap-1.5 mt-1 ml-1">
+                                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                <span className="text-[10px] text-muted-foreground font-medium animate-pulse leading-none">Catalog sync in progress (warming up results)...</span>
+                            </div>
+                        )}
                     </div>
                     <Button
                         variant="outline"
