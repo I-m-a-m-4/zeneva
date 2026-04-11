@@ -2,6 +2,11 @@
 
 'use client';
 import FollowUpCenter from '@/components/admin/follow-up-center';
+import PlatformRevenueChart from '@/components/admin/charts/PlatformRevenueChart';
+import UserGrowthChart from '@/components/admin/charts/UserGrowthChart';
+import TransactionVolumeChart from '@/components/admin/charts/TransactionVolumeChart';
+import RevenueGrowthIndexChart from '@/components/admin/charts/RevenueGrowthIndexChart';
+import PlanDistributionChart from '@/components/admin/charts/PlanDistributionChart';
 import {
     Card,
     CardContent,
@@ -876,10 +881,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
-                    <TabsTrigger value="performance">Performance & Intel</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
-                    <TabsTrigger value="performers">Top Performers</TabsTrigger>
                     <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
                 </TabsList>
 
@@ -1080,6 +1083,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </Card>
                         </CardContent>
                     </Card>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
+                        <PlatformRevenueChart receipts={receipts || []} />
+                        <UserGrowthChart users={users || []} />
+                        <TransactionVolumeChart receipts={receipts || []} />
+                        <PlanDistributionChart businesses={businesses || []} />
+                        <div className="lg:col-span-2">
+                            <RevenueGrowthIndexChart purchases={purchases || []} />
+                        </div>
+                    </div>
                 </TabsContent>
 
                 <TabsContent value="growth" className="space-y-6">
@@ -1180,107 +1193,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="performance" className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-green-500" /> Platform Revenue Velocity (GMV)</CardTitle>
-                                <CardDescription>Combined sales across all Zeneva businesses (Last 14 days).</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ReLineChart data={analyticsData.dailyGmvData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                        <YAxis tickFormatter={(val) => `₦${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} tick={{ fontSize: 12 }} />
-                                        <ReTooltip content={<CustomTooltip />} />
-                                        <Line name="Revenue" type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={3} dot={false} />
-                                    </ReLineChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-500" /> User Acquisition Trend</CardTitle>
-                                <CardDescription>New user signups over time.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ReLineChart data={analyticsData.newUserGrowth}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                        <YAxis tick={{ fontSize: 12 }} />
-                                        <ReTooltip content={<CustomTooltip />} />
-                                        <Line name="New Users" type="monotone" dataKey="New Users" stroke="#3b82f6" strokeWidth={3} dot />
-                                    </ReLineChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-orange-500" /> Transaction Volume</CardTitle>
-                                <CardDescription>Daily number of receipts generated platform-wide.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ReBarChart data={analyticsData.dailyReceiptsData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                        <YAxis tick={{ fontSize: 12 }} />
-                                        <ReTooltip content={<CustomTooltip />} />
-                                        <Bar name="Sales" dataKey="Sales" fill="#f97316" radius={[4, 4, 0, 0]} />
-                                    </ReBarChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><PieChartIcon className="h-5 w-5 text-purple-500" /> Plan Distribution</CardTitle>
-                                <CardDescription>How businesses are distributed across tiers.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex items-center justify-center">
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <RePieChart>
-                                        <Pie
-                                            data={analyticsData.planDistributionData}
-                                            innerRadius={60}
-                                            outerRadius={100}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {analyticsData.planDistributionData.map((entry: any, index: number) => (
-                                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <ReTooltip />
-                                        <Legend />
-                                    </RePieChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="lg:col-span-2">
-                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-pink-500" /> Revenue Growth Index</CardTitle>
-                                <CardDescription>Aggregated subscription revenue performance.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ReBarChart data={analyticsData.revenueGrowth}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                        <YAxis tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12 }} />
-                                        <ReTooltip content={<CustomTooltip />} />
-                                        <Bar dataKey="Revenue" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                                    </ReBarChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
 
                 <TabsContent value="users" className="space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1467,71 +1380,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="performers" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-yellow-500" /> Platform Top Performers</CardTitle>
-                            <CardDescription>Businesses and users excelling on the Zeneva platform.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Functionality 1: Richest Business */}
-                                <Card className="border-yellow-500/30 overflow-hidden relative">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none" />
-                                    <CardHeader className="pb-3 relative z-10">
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <Trophy className="h-6 w-6 text-yellow-500" /> Richest Business
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="relative z-10">
-                                        {analyticsData.richestBusiness ? (
-                                            <div className="space-y-4 shadow-sm bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50">
-                                                <div>
-                                                    <p className="font-bold text-xl">{analyticsData.richestBusiness.name}</p>
-                                                    <p className="text-sm text-yellow-600 dark:text-yellow-500 font-bold mt-1 tracking-wider uppercase">NO. 1 IN SALES</p>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm border-t pt-3">
-                                                    <span className="text-muted-foreground">Total GMV</span>
-                                                    <span className="font-bold text-lg">₦{(analyticsData.richestBusiness as any).totalRevenue.toLocaleString()}</span>
-                                                </div>
-                                                <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white" onClick={() => {
-                                                    const owner = users?.find(u => u.id === analyticsData.richestBusiness?.ownerId);
-                                                    if (owner) {
-                                                        setSelectedUserForDetail(owner);
-                                                        setIsUserDetailOpen(true);
-                                                    } else {
-                                                        toast({ title: 'Owner Not Found', description: 'Could not locate the owner profile for this business.' });
-                                                    }
-                                                }}>View Business Details</Button>
-                                            </div>
-                                        ) : (
-                                            <p className="text-center text-muted-foreground py-8">Not enough data to determine the richest business.</p>
-                                        )}
-                                    </CardContent>
-                                </Card>
 
-                                <Card className="border-border">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm">More Important Metrics</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                                            <div className="flex items-center gap-2"><Store className="h-4 w-4 text-primary" /> Max Active Businesses</div>
-                                            <span className="font-bold">{platformAnalytics.totalActiveBusinesses}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                                            <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> Fully Activated</div>
-                                            <span className="font-bold">{platformAnalytics.activatedBusinessesCount}</span>
-                                        </div>
-                                        <div className="flex text-sm text-muted-foreground mt-4 p-2">
-                                            Check back here later for newly added top performers metrics as the platform grows!
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
 
                 <TabsContent value="followups" className="space-y-6">
                     <FollowUpCenter 
