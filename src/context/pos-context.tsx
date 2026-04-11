@@ -29,6 +29,7 @@ interface POSContextType {
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchCustomersByField: (field: string, value: string) => Promise<Customer[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
+  fetchReceiptsInRange: (from: Date, to: Date, limitCount?: number) => Promise<Receipt[]>;
   searchProducts: (term: string) => Promise<Product[]>;
   searchProductsByField: (field: string, value: string) => Promise<Product[]>;
   findProductBySku: (sku: string) => Promise<Product | null>;
@@ -563,6 +564,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
     } catch (e) {
       console.error("Receipt lookup failed:", e);
+      return [];
+    }
+  }, [businessId, firestore]);
+
+  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 1000) => {
+    if (!businessId || !firestore) return [];
+    try {
+      const q = query(
+        collection(firestore, 'receipts'),
+        where('businessId', '==', businessId),
+        where('createdAt', '>=', from),
+        where('createdAt', '<=', to),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+    } catch (e) {
+      console.error("Fetch receipts in range failed:", e);
       return [];
     }
   }, [businessId, firestore]);
@@ -1200,6 +1220,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       .map(a => ({ ...a.payload, isOptimistic: true, status: 'pending', queueId: a.id })) as Product[],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchCustomersByField, searchReceipts,
+    fetchReceiptsInRange,
     searchProducts,
     searchProductsByField,
     findProductBySku,
@@ -1217,7 +1238,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, setAutoPrint, resetPOS,
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchMoreReceipts, fetchMoreCustomers, mergedStats
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchReceiptsInRange, fetchMoreReceipts, fetchMoreCustomers, mergedStats
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

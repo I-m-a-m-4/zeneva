@@ -67,9 +67,11 @@ const ReportsPlaceholder = () => (
 
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats } = usePOS();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange } = usePOS();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
+    const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
+    const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: subDays(new Date(), 29),
@@ -98,20 +100,21 @@ export default function ReportsDashboard() {
         });
     }, [allReceipts, date]);
 
-    const isLoading = isPosLoading;
+    const isLoading = isPosLoading || isFetchingBatch;
 
     const reportData = React.useMemo(() => {
-        if (isLoading || !receipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0 };
+        const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
+        if (isLoading || !targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0 };
 
-        const totalRevenue = receipts.reduce((sum, r) => sum + r.total, 0);
-        const totalSales = receipts.length;
+        const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
+        const totalSales = targetReceipts.length;
         const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
         const inventoryValue = products.filter(p => p.categoryType !== 'service').reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
 
         let totalProductsSold = 0;
         let totalServicesSold = 0;
 
-        receipts.forEach(r => {
+        targetReceipts.forEach(r => {
             r.items.forEach(i => {
                 const product = products.find(p => p.id === i.productId);
                 if (product?.categoryType === 'service') {
@@ -133,7 +136,7 @@ export default function ReportsDashboard() {
             totalItemsSold: totalProductsSold + totalServicesSold
         }
 
-    }, [receipts, products, customers, isLoading, stats]);
+    }, [reportBatchReceipts, receipts, products, customers, isLoading, stats]);
 
     // Surgical Analytics
     const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
@@ -151,6 +154,18 @@ export default function ReportsDashboard() {
             setRangeStats(null);
         }
     }, [date, fetchDetailedAnalytics]);
+
+    React.useEffect(() => {
+        if (date?.from && date?.to) {
+            const fetchBatch = async () => {
+                setIsFetchingBatch(true);
+                const res = await fetchReceiptsInRange(date.from!, date.to!, 1000);
+                setReportBatchReceipts(res);
+                setIsFetchingBatch(false);
+            };
+            fetchBatch();
+        }
+    }, [date, fetchReceiptsInRange]);
 
     React.useEffect(() => {
         const fetchHistory = async () => {
@@ -198,7 +213,7 @@ export default function ReportsDashboard() {
         } catch (err) {
             toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
         }
-    };
+        const deepReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : receipts;
 
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
@@ -254,19 +269,19 @@ export default function ReportsDashboard() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                             <div className="lg:col-span-3">
-                                <SalesOverTimeChart receipts={receipts || []} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
                             </div>
                             <div className="lg:col-span-2">
-                                <TopProductsChart receipts={receipts || []} />
+                                <TopProductsChart receipts={deepReceipts} />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                             <div className="lg:col-span-3">
-                                <ProfitLossChart receipts={receipts || []} currencySymbol={currencySymbol} />
+                                <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
                             </div>
                             <div className="lg:col-span-2">
-                                <TopCustomersList receipts={receipts || []} currencySymbol={currencySymbol} />
+                                <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
                             </div>
                         </div>
 
@@ -277,7 +292,7 @@ export default function ReportsDashboard() {
                             featureName="Customer Intelligence"
                             featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
                         >
-                            <CustomerAnalytics customers={customers || []} receipts={receipts || []} currencySymbol={currencySymbol} />
+                            <CustomerAnalytics customers={customers || []} receipts={deepReceipts} currencySymbol={currencySymbol} />
                         </FeatureGate>
 
                         <FeatureGate
@@ -287,7 +302,7 @@ export default function ReportsDashboard() {
                             featureName="Inventory Velocity"
                             featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
                         >
-                            <AbcAnalysis receipts={receipts || []} products={products || []} currencySymbol={currencySymbol} />
+                            <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
                         </FeatureGate>
                     </div>
                 )}
