@@ -1,6 +1,7 @@
 
 
 'use client';
+import FollowUpCenter from '@/components/admin/follow-up-center';
 import {
     Card,
     CardContent,
@@ -879,6 +880,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="performers">Top Performers</TabsTrigger>
+                    <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
@@ -1529,6 +1531,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="followups" className="space-y-6">
+                    <FollowUpCenter 
+                        atRiskBusinesses={platformAnalytics.atRiskBusinesses}
+                        users={users || []}
+                    />
                 </TabsContent>
             </Tabs>
 
