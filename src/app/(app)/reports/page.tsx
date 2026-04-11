@@ -213,7 +213,9 @@ export default function ReportsDashboard() {
         } catch (err) {
             toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
         }
-        const deepReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : receipts;
+    };
+
+    const deepReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : receipts;
 
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
