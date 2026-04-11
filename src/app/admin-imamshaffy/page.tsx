@@ -7,6 +7,8 @@ import UserGrowthChart from '@/components/admin/charts/UserGrowthChart';
 import TransactionVolumeChart from '@/components/admin/charts/TransactionVolumeChart';
 import RevenueGrowthIndexChart from '@/components/admin/charts/RevenueGrowthIndexChart';
 import PlanDistributionChart from '@/components/admin/charts/PlanDistributionChart';
+import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
+import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
 import {
     Card,
     CardContent,
@@ -927,23 +929,32 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </CardContent>
                         </Card>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Bot className="h-5 w-5 text-primary" />
-                                    Zen AI Adoption
+                        <Card className="border-yellow-500/20 overflow-hidden relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none" />
+                            <CardHeader className="pb-3 relative z-10">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Trophy className="h-5 w-5 text-yellow-500" /> Platform Performer Spotlight
                                 </CardTitle>
-                                <CardDescription>Feature usage stats.</CardDescription>
+                                <CardDescription>The business driving the most GMV.</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4 items-center">
-                                <div className="text-center p-4 bg-muted/20 rounded-lg">
-                                    <p className="text-3xl font-bold text-primary">{platformAnalytics.aiAdoption30.toFixed(1)}%</p>
-                                    <p className="text-sm text-muted-foreground mt-1">30-Day Adoption</p>
-                                </div>
-                                <div className="text-center p-4 bg-muted/20 rounded-lg">
-                                    <p className="text-3xl font-bold text-primary">{platformAnalytics.businessAnalysisUsers}</p>
-                                    <p className="text-sm text-muted-foreground mt-1">Analysis Users</p>
-                                </div>
+                            <CardContent className="relative z-10">
+                                {analyticsData.richestBusiness ? (
+                                    <div className="space-y-4 shadow-sm bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="font-bold text-xl leading-none">{analyticsData.richestBusiness.name}</p>
+                                                <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-bold mt-1 tracking-wider uppercase">Current Top Earner</p>
+                                            </div>
+                                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-0">№ 1</Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm border-t pt-3">
+                                            <span className="text-muted-foreground">Total Revenue</span>
+                                            <span className="font-bold text-lg">₦{analyticsData.richestBusiness.totalRevenue.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 text-muted-foreground text-sm">Waiting for more high-performing data...</div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -1091,6 +1102,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         <PlanDistributionChart businesses={businesses || []} />
                         <div className="lg:col-span-2">
                             <RevenueGrowthIndexChart purchases={purchases || []} />
+                        </div>
+                        <div className="lg:col-span-2">
+                            <RetentionCohortChart users={users || []} receipts={receipts || []} />
+                        </div>
+                        <div className="lg:col-span-2">
+                            <FeatureStickinessChart businesses={businesses || []} products={products || []} />
                         </div>
                     </div>
                 </TabsContent>
