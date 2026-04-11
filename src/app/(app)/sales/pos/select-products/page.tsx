@@ -375,12 +375,12 @@ export default function SelectProductsPage() {
                         </div>
                         <Button 
                             variant="secondary" 
-                            className="h-11 px-4 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+                            className="h-11 px-3 sm:px-4 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
                             onClick={performManualSearch}
                             disabled={isSearching}
                         >
                             <Search className="h-4 w-4" />
-                            <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Search</span>
+                            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Search</span>
                         </Button>
                         <Button
                             variant="outline"

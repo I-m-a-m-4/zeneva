@@ -476,7 +476,7 @@ function InventoryPageContent() {
             </div>
             <Button 
                variant="secondary" 
-               className="h-10 px-3 hidden sm:flex shrink-0 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+               className="h-10 px-3 shrink-0 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
                onClick={() => performSearch(searchTerm)}
                disabled={isSearching}
             >

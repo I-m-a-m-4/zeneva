@@ -664,7 +664,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const q = query(
           collection(firestore, 'products'),
           where('businessId', '==', businessId),
-          orderBy('name', 'asc'),
           ...(lastDoc ? [startAfter(lastDoc)] : []),
           limit(1000) 
         );
@@ -728,7 +727,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
         let q = query(
           collection(firestore, 'customers'),
           where('businessId', '==', businessId),
-          orderBy('name', 'asc'),
           limit(200)
         );
 
