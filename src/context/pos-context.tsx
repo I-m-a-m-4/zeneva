@@ -158,6 +158,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // Sync state to hold ALL products found during sync
   const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
+  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
+
   const products = useMemo(() => {
     // Merge initial 50 with synced results, prioritizing fresh synced data
     const merged = [...(initialProducts || [])];
@@ -174,12 +177,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: stats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
 
   const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
-  const { data: receipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
+  const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
+
+  const receipts = useMemo(() => {
+    const merged = [...(initialReceipts || [])];
+    if (syncedReceipts.length > 0) {
+      const existingIds = new Set(merged.map(r => r.id));
+      syncedReceipts.forEach(r => {
+        if (!existingIds.has(r.id)) merged.push(r);
+      });
+    }
+    return merged;
+  }, [initialReceipts, syncedReceipts]);
 
   const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
-  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
   const customers = useMemo(() => {
     const merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
@@ -658,116 +671,111 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     setIsSyncing(true);
     
-    const fetchRemainingRecursive = async (lastDoc: any = null) => {
+    const fetchMegaBatch = async () => {
       if (!isMounted) return;
       try {
         const q = query(
           collection(firestore, 'products'),
           where('businessId', '==', businessId),
-          ...(lastDoc ? [startAfter(lastDoc)] : []),
-          limit(1000) 
+          limit(5000) 
         );
         const snap = await getDocs(q);
-        if (snap.empty) {
-            setIsSyncing(false);
-            return;
-        }
-        
-        const allPromises = snap.docs.map(async (docSnap) => {
+        if (!isMounted) return;
+
+        const all = snap.docs.map((docSnap) => {
             const data = docSnap.data() as any;
-            const product = { 
+            return { 
                 ...data, 
                 id: docSnap.id,
                 lowercaseName: data.lowercaseName || data.name.toLowerCase()
             } as Product;
-
-            // Self-Healing: Patch missing search index in database
-            if (!data.lowercaseName && navigator.onLine) {
-                try {
-                    updateDoc(docSnap.ref, { lowercaseName: product.lowercaseName }).catch(() => {});
-                } catch {}
-            }
-            return product;
         });
-        const all = await Promise.all(allPromises);
         
         setSyncedProducts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const uniqueNew = all.filter(p => !existingIds.has(p.id));
           return [...prev, ...uniqueNew];
         });
-
-        // If we got a full batch, there's likely more. Continue syncing.
-        if (snap.docs.length === 1000) {
-            // Wait 1 second between batches
-            setTimeout(() => fetchRemainingRecursive(snap.docs[snap.docs.length - 1]), 1000);
-        } else {
-            setIsSyncing(false);
-        }
+        setIsSyncing(false);
       } catch (e) {
-        console.error('Background product sync failed:', e);
+        console.error('Mega product sync failed:', e);
         setIsSyncing(false);
       }
     };
 
-    const timer = setTimeout(() => fetchRemainingRecursive(), 3000);
+    const timer = setTimeout(fetchMegaBatch, 1000);
     return () => {
         isMounted = false;
         clearTimeout(timer);
     };
-  }, [businessId, firestore]); 
+  }, [businessId, firestore, initialProducts]); 
 
   // Background Loader: Deeply fills the customers cache
   useEffect(() => {
     if (!businessId || !firestore || !initialCustomers) return;
 
-    const fetchRemainingCustomersRecursive = async (lastDoc: any = null) => {
-      setIsSyncingCustomers(true);
+    const fetchMegaCustomers = async () => {
       try {
-        let q = query(
+        const q = query(
           collection(firestore, 'customers'),
           where('businessId', '==', businessId),
-          limit(200)
+          limit(2000)
         );
 
-        if (lastDoc) q = query(q, startAfter(lastDoc));
-
         const snap = await getDocs(q);
-        if (snap.docs.length > 0) {
-          const fetched = snap.docs.map(doc => {
-            const data = doc.data() as any;
-            return {
-              ...data,
-              id: doc.id,
-              lowercaseName: data.lowercaseName || data.name.toLowerCase(),
-              lowercaseEmail: data.lowercaseEmail || data.email?.toLowerCase() || ''
-            } as Customer;
+        const fetched = snap.docs.map(doc => {
+          const data = doc.data() as any;
+          return {
+            ...data,
+            id: doc.id,
+            lowercaseName: data.lowercaseName || data.name.toLowerCase(),
+            lowercaseEmail: data.lowercaseEmail || data.email?.toLowerCase() || ''
+          } as Customer;
+        });
+        setSyncedCustomers(prev => {
+          const result = [...prev];
+          fetched.forEach(p => {
+            if (!result.find(r => r.id === p.id)) result.push(p);
           });
-          setSyncedCustomers(prev => {
-            const result = [...prev];
-            fetched.forEach(p => {
-              if (!result.find(r => r.id === p.id)) result.push(p);
-            });
-            return result;
-          });
-
-          if (snap.docs.length === 200) {
-            await new Promise(r => setTimeout(r, 2000));
-            await fetchRemainingCustomersRecursive(snap.docs[snap.docs.length - 1]);
-          } else {
-            setIsSyncingCustomers(false);
-          }
-        } else {
-          setIsSyncingCustomers(false);
-        }
+          return result;
+        });
       } catch (e) {
-        console.error("Background customer sync failed", e);
-        setIsSyncingCustomers(false);
+        console.error("Mega customer sync failed", e);
       }
     };
 
-    fetchRemainingCustomersRecursive();
+    fetchMegaCustomers();
   }, [businessId, firestore, initialCustomers]);
+
+  // Background Loader: Deeply fills the receipts cache
+  useEffect(() => {
+    if (!businessId || !firestore) return;
+
+    const fetchMegaReceipts = async () => {
+      try {
+        const q = query(
+          collection(firestore, 'receipts'),
+          where('businessId', '==', businessId),
+          orderBy('createdAt', 'desc'),
+          limit(2000)
+        );
+
+        const snap = await getDocs(q);
+        const fetched = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Receipt));
+        setSyncedReceipts(prev => {
+          const result = [...prev];
+          fetched.forEach(p => {
+            if (!result.find(r => r.id === p.id)) result.push(p);
+          });
+          return result;
+        });
+      } catch (e) {
+        console.error("Mega receipt sync failed", e);
+      }
+    };
+
+    fetchMegaReceipts();
+  }, [businessId, firestore]);
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku || !businessId || !firestore) return null;
