@@ -763,9 +763,15 @@ function InventoryPageContent() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={(product.stock || 0) > (product.lowStockThreshold || 5) ? "outline" : "destructive"}
+                          variant={
+                            (product.stock || 0) > 0 ? "outline" : "destructive"
+                          }
+                          className={cn(
+                            "whitespace-nowrap",
+                            (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                          )}
                         >
-                          {(product.stock || 0) > 0 ? "In Stock" : "Out of Stock"}
+                          {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
                         </Badge>
                       </TableCell>
                       {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}

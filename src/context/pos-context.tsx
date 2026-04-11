@@ -556,16 +556,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
         limit(20)
       );
 
-      // We search for:
-      // 1. Lowercase prefix if it exists (for new/migrated data)
-      // 2. Normal prefix (for existing data)
-      // 3. Capitalized prefix (for common Name cases)
+      // We search for multiple permutations to overcome Firestore's case-sensitivity
       const capitalized = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
+      const allUpper = term.toUpperCase();
 
-      const [snapLower, snapNormal, snapCap] = await Promise.all([
+      const [snapLower, snapNormal, snapCap, snapUpper] = await Promise.all([
         getDocs(qPrefix('lowercaseName', lowerTerm)),
         getDocs(qPrefix('name', term.trim())),
-        getDocs(qPrefix('name', capitalized))
+        getDocs(qPrefix('name', capitalized)),
+        getDocs(qPrefix('name', allUpper))
       ]);
 
       const results: Product[] = [];
@@ -579,6 +578,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       addFromSnap(snapLower);
       addFromSnap(snapNormal);
       addFromSnap(snapCap);
+      addFromSnap(snapUpper);
 
       return results.slice(0, 30);
     } catch (e) {
