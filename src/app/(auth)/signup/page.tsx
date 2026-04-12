@@ -230,7 +230,7 @@ export default function SignupPage() {
       </div>
       <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
-          src="/zeneva-signup.png?v=3"
+          src="/zeneva-signup-v3.png"
           alt="Abstract 3D network visualization with golden data streams and glassmorphism elements."
           width="1920"
           height="1080"
