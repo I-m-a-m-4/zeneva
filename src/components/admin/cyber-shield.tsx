@@ -34,7 +34,12 @@ import {
     Search,
     RefreshCw
 } from 'lucide-react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { 
+    multiFactor,
+    PhoneAuthProvider,
+    PhoneMultiFactorGenerator
+} from 'firebase/auth';
 import { 
     collectionGroup, 
     query, 
@@ -53,6 +58,7 @@ import { cn } from '@/lib/utils';
 
 export default function CyberShield() {
     const firestore = useFirestore();
+    const { user: authUser } = useUser();
     const { toast } = useToast();
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [isLoadingLogs, setIsLoadingLogs] = useState(true);
@@ -64,6 +70,16 @@ export default function CyberShield() {
     const { data: allUsers } = useCollection<any>(usersQuery);
 
     const adminCount = useMemo(() => allUsers?.filter(u => u.role === 'admin').length || 0, [allUsers]);
+
+    const mfaStatus = useMemo(() => {
+        if (!authUser) return { enabled: false, color: 'text-rose-500' };
+        const enrolled = (authUser as any).multiFactor?.enrolledFactors?.length > 0;
+        return {
+            enabled: enrolled,
+            color: enrolled ? 'text-emerald-500' : 'text-rose-500',
+            label: enrolled ? 'ENFORCED' : 'NOT CONFIGURED'
+        };
+    }, [authUser]);
 
     const fetchGlobalAudit = async () => {
         if (!firestore) return;
@@ -202,17 +218,17 @@ export default function CyberShield() {
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent pointer-events-none" />
                     <CardHeader className="pb-2">
                         <CardTitle className="flex justify-between items-center text-sm font-bold opacity-70">
-                            SYSTEM INTEGRITY
-                            <div className="p-2 bg-emerald-100 rounded-full">
-                                <Shield className="h-4 w-4 text-emerald-600" />
+                            MFA COMPLIANCE
+                            <div className={cn("p-2 rounded-full", mfaStatus.enabled ? "bg-emerald-100" : "bg-rose-100")}>
+                                <Lock className={cn("h-4 w-4", mfaStatus.color)} />
                             </div>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-emerald-400">
-                            100% SECURE
+                        <p className={cn("text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r", mfaStatus.enabled ? "from-emerald-600 to-emerald-400" : "from-rose-600 to-rose-400")}>
+                            {mfaStatus.label}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2 font-medium">All sub-tenants isolated</p>
+                        <p className="text-xs text-muted-foreground mt-2 font-medium">Identity Platform Protection</p>
                     </CardContent>
                 </Card>
             </div>

@@ -70,10 +70,18 @@ export default function LoginPage() {
     }
     setIsLoading(true);
     signInWithEmailAndPassword(auth, email, password)
-      .then(() => {
-        // On success, do nothing. The auth layout will detect the state
-        // change and handle the redirection automatically. This prevents
-        // any flashes of content or layout shifts.
+      .then((userCredential) => {
+        const user = userCredential.user;
+        const isSuperAdmin = user.email === 'belloimam431@gmail.com';
+        
+        // Check for MFA enrollment if Super Admin
+        if (isSuperAdmin && user.providerData[0].providerId === 'password') {
+          const enrolledFactors = (user as any).multiFactor?.enrolledFactors || [];
+          if (enrolledFactors.length === 0) {
+              console.warn("MFA Requirement: Super Admin must enroll in MFA.");
+              // We'll handle redirection in the AuthLayout or here if preferred.
+          }
+        }
       })
       .catch((error) => {
         let description = "Invalid email or password. Please try again.";
