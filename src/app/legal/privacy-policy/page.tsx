@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage() {
       
       <h2>7. Contact Us</h2>
       <p>
-        If you have questions or comments about this Privacy Policy, please contact us at: <strong>belloimam431@gmail.com</strong>.
+        If you have questions or comments about this Privacy Policy, please contact us at: <strong>zenevapos@gmail.com</strong>.
       </p>
     </>
   );

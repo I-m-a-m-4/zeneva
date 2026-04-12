@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const decodedToken = await adminAuth.verifyIdToken(token);
     // You might want to check for a specific admin role or email here
-    if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'belloimam431@gmail.com') {
+    if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'belloimam431@gmail.com' && decodedToken.email !== 'zenevapos@gmail.com') {
        // Optional: Add stricter admin check
     }
 

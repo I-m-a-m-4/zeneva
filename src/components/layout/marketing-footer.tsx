@@ -65,7 +65,7 @@ export default function MarketingFooter() {
                       </li>
                     </ul>
                     <div className="flex items-center gap-3 pt-2 text-sm">
-                      <a href="mailto:belloimam431@gmail.com" className="inline-flex items-center gap-2 transition hover:text-primary text-white">belloimam431@gmail.com</a>
+                      <a href="mailto:zenevapos@gmail.com" className="inline-flex items-center gap-2 transition hover:text-primary text-white">zenevapos@gmail.com</a>
                       <span className="text-white/20">•</span>
                       <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 transition text-white hover:text-primary">
                         <Phone className="w-4 h-4" />
