@@ -135,7 +135,7 @@ export default function DashboardPage() {
     const filteredOnlineOrders = allOnlineOrders.filter(filterByDate);
     const newCustomers = allCustomers.filter(filterByDate);
 
-    const totalStock = inventoryItems.filter(item => item.categoryType !== 'service').reduce((sum, item) => sum + (item.stock || 0), 0);
+    const totalStock = inventoryItems.filter(item => item.categoryType !== 'service').reduce((sum, item) => sum + Math.max(0, item.stock || 0), 0);
     const uniqueSkus = inventoryItems.filter(item => item.categoryType !== 'service').length;
     const lowStockItems = inventoryItems.filter(item => item.categoryType !== 'service' && (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
 
