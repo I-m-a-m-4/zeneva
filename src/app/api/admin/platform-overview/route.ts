@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
-    if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'zenevapos@gmail.com' && decodedToken.email !== 'imamshaffy@gmail.com') {
+    if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'belloimam431@gmail.com') {
        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 

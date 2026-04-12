@@ -81,7 +81,7 @@ export default function TermsOfServicePage() {
 
       <h2>12. Contact Us</h2>
       <p>
-        If you have any questions about these Terms, please contact us at: <strong>zenevapos@gmail.com</strong>.
+        If you have any questions about these Terms, please contact us at: <strong>belloimam431@gmail.com</strong>.
       </p>
     </>
   );
