@@ -4,13 +4,23 @@ import { adminFirestore } from '@/firebase/admin';
  * Calculates and caches platform-wide analytics in Firestore to optimize R/W operations.
  */
 export async function getCachedPlatformAnalytics(forceRefresh = false) {
+  if (!adminFirestore) {
+    throw new Error("Firebase Admin not initialized. Check FIREBASE_PROJECT_ID, CLIENT_EMAIL, and PRIVATE_KEY.");
+  }
+
   const cacheDocRef = adminFirestore.collection('admin_analytics').doc('overview');
-  const cacheDoc = await cacheDocRef.get();
+  let cacheDoc: any = null;
+  
+  try {
+    cacheDoc = await cacheDocRef.get();
+  } catch (e) {
+    console.error("Failed to fetch cache doc:", e);
+  }
 
   const now = new Date();
   const CACHE_TTL_HOURS = 6;
 
-  if (!forceRefresh && cacheDoc.exists) {
+  if (!forceRefresh && cacheDoc?.exists) {
     const data = cacheDoc.data();
     const lastUpdated = data?.lastUpdated?.toDate();
     
@@ -19,44 +29,61 @@ export async function getCachedPlatformAnalytics(forceRefresh = false) {
     }
   }
 
-  // RE-CALCULATE EVERYTHING
-  // Note: For very large datasets, you'd use a cloud function or limit the query range.
-  const usersSnapshot = await adminFirestore.collection('users').get();
-  const businessSnapshot = await adminFirestore.collection('businessInstances').get();
-  const receiptsSnapshot = await adminFirestore.collection('receipts').limit(5000).get(); // Limit for safety
-  const productSnapshot = await adminFirestore.collection('products').limit(10000).get();
+  try {
+    // RE-CALCULATE EVERYTHING
+    // Note: For very large datasets, use aggregation queries (count())
+    const [usersSnap, businessSnap, receiptsSnap, productSnap] = await Promise.all([
+      adminFirestore.collection('users').select('id').get(),
+      adminFirestore.collection('businessInstances').get(),
+      adminFirestore.collection('receipts').limit(2000).get(), // Reduced limit for stability
+      adminFirestore.collection('products').limit(5000).get() // Reduced limit for stability
+    ]);
 
-  const users = usersSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-  const businesses = businessSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-  const receipts = receiptsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-  const products = productSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    const users = usersSnap.docs;
+    const businesses = businessSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    const receipts = receiptsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    const products = productSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-  // Basic stats
-  const totalGmv = receipts.reduce((sum: number, r: any) => sum + (r.total || 0), 0);
-  const totalReceipts = receipts.length;
-  
-  // Platform stats
-  const platformStatsDoc = await adminFirestore.collection('platform').doc('stats').get();
-  const appInstalls = platformStatsDoc.exists ? platformStatsDoc.data()?.appInstalls || 0 : 0;
+    // Basic stats
+    const totalGmv = receipts.reduce((sum: number, r: any) => sum + (r.total || 0), 0);
+    const totalReceipts = receipts.length;
+    
+    // Platform stats
+    const platformStatsDoc = await adminFirestore.collection('platform').doc('stats').get();
+    const appInstalls = platformStatsDoc.exists ? platformStatsDoc.data()?.appInstalls || 0 : 0;
 
-  const activatedBusinesses = businesses.filter((b: any) => {
-      const bizProducts = products.filter((p: any) => p.businessId === b.id);
-      const bizReceipts = receipts.filter((r: any) => r.businessId === b.id);
-      return bizProducts.length >= 10 && bizReceipts.length >= 1;
-  }).length;
+    const activatedBusinesses = businesses.filter((b: any) => {
+        const hasProducts = products.some((p: any) => p.businessId === b.id);
+        const hasReceipts = receipts.some((r: any) => r.businessId === b.id);
+        return hasProducts && hasReceipts;
+    }).length;
 
-  // New Analytics Result Object
-  const analyticsPayload = {
-    platformGmv: totalGmv,
-    totalReceipts,
-    totalUsers: users.length,
-    totalBusinesses: businesses.length,
-    activatedBusinessesCount: activatedBusinesses,
-    appInstalls,
-    lastUpdated: now,
-    fromCache: false
-  };
+    // New Analytics Result Object
+    const analyticsPayload = {
+      platformGmv: totalGmv,
+      totalReceipts,
+      totalUsers: users.length,
+      totalBusinesses: businesses.length,
+      activatedBusinessesCount: activatedBusinesses,
+      appInstalls,
+      lastUpdated: now,
+      fromCache: false
+    };
 
-  await cacheDocRef.set(analyticsPayload);
-  return analyticsPayload;
+    try {
+      await cacheDocRef.set(analyticsPayload);
+    } catch (e) {
+      console.warn("Could not update analytics cache:", e);
+    }
+    
+    return analyticsPayload;
+
+  } catch (error: any) {
+    console.error("Heavy Analytics Calculation Error:", error);
+    // If it fails, try to return the old cache as a fallback instead of 500
+    if (cacheDoc?.exists) {
+        return { ...cacheDoc.data(), fromCache: true, fallback: true };
+    }
+    throw error;
+  }
 }
