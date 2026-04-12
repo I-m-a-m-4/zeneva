@@ -29,6 +29,36 @@ const signupSchema = z.object({
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+
+const signupSlides = [
+  {
+    src: "/zeneva-signup-v3.png",
+    alt: "Luxury boutique storefront at night.",
+    title: "Scale Your Business Galaxy",
+    description: "Join a network of thriving businesses and unlock premium tools designed for exponential growth."
+  },
+  {
+    src: "/zeneva-signup-2.png",
+    alt: "Modern high-end shopping street at twilight.",
+    title: "Thriving Ecosystem",
+    description: "Place your business in the spotlight with an infrastructure built for success."
+  },
+  {
+    src: "/zeneva-signup-3.png",
+    alt: "Minimalist glass boutique entrance.",
+    title: "Seamless Entry",
+    description: "Launch your business in minutes with our intuitive onboarding and management suite."
+  },
+  {
+    src: "/zeneva-signup-4.png",
+    alt: "Futuristic modern marketplace visualization.",
+    title: "Global Reach",
+    description: "Scale from a single location to a global franchise with Zeneva's multi-store intelligence."
+  }
+];
+
 export default function SignupPage() {
   const router = useRouter();
   const auth = useAuth();
@@ -38,10 +68,18 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   const [invitationDetails, setInvitationDetails] = useState<{ businessName: string, role: string } | null>(null);
   const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
   const invitationCode = searchParams.get('invitationCode');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % signupSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -229,21 +267,60 @@ export default function SignupPage() {
         </div>
       </div>
       <div className="hidden bg-muted lg:block relative overflow-hidden">
-        <Image
-          src="/zeneva-signup-v3.png"
-          alt="Abstract 3D network visualization with golden data streams and glassmorphism elements."
-          width="1920"
-          height="1080"
-          quality={100}
-          priority
-          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
-        />
-        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">
-          <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">Scale Your <br /><span className="text-primary italic">Business Galaxy</span></h2>
-          <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">Join a network of thriving businesses and unlock premium tools designed for exponential growth.</p>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlide}
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0 h-full w-full"
+          >
+            <Image
+              src={signupSlides[currentSlide].src}
+              alt={signupSlides[currentSlide].alt}
+              width={1920}
+              height={1080}
+              quality={100}
+              priority
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent z-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+            >
+              <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">
+                {signupSlides[currentSlide].title.split(" ").map((word, i) => (
+                  <React.Fragment key={i}>
+                    {word === "Galaxy" || word === "Ecosystem" || word === "Entry" || word === "Reach" ? <span className="text-primary italic"> {word} </span> : word + " "}
+                  </React.Fragment>
+                ))}
+              </h2>
+              <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">
+                {signupSlides[currentSlide].description}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
           <div className="mt-6 flex items-center gap-3">
-            <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
-            <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.3em] drop-shadow-sm">Growth Ecosystem v1</span>
+            {signupSlides.map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-1.5 transition-all duration-500 rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]",
+                  currentSlide === i ? "w-12 bg-primary" : "w-2 bg-white/30"
+                )}
+              />
+            ))}
           </div>
         </div>
       </div>

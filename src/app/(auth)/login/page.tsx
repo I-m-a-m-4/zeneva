@@ -12,6 +12,35 @@ import React, { useState } from "react";
 import { AppConfig } from "@/lib/config";
 import Image from "next/image";
 
+import { motion, AnimatePresence } from 'framer-motion';
+
+const loginSlides = [
+  {
+    src: "/zeneva-login.png?v=2",
+    alt: "Modern retail store interior with minimalist design and warm lighting.",
+    title: "Operating System for Business",
+    description: "Streamline your inventory, maximize your profit, and build lasting customer relationships."
+  },
+  {
+    src: "/zeneva-login-2.png",
+    alt: "Elite dashboard on a black marble counter.",
+    title: "Precision Analytics",
+    description: "Real-time insights tailored for high-growth retail environments."
+  },
+  {
+    src: "/zeneva-login-3.png",
+    alt: "Organized luxury retail storage room.",
+    title: "Inventory Mastery",
+    description: "Never lose track of a single item with our intelligent stock management system."
+  },
+  {
+    src: "/zeneva-login-4.png",
+    alt: "Minimalist cafe interior.",
+    title: "Work From Anywhere",
+    description: "Secure, cloud-based access that puts your business in the palm of your hand."
+  }
+];
+
 export default function LoginPage() {
   const auth = useAuth();
   const { toast } = useToast();
@@ -19,6 +48,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % loginSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,21 +161,60 @@ export default function LoginPage() {
         </div>
       </div>
       <div className="hidden bg-muted lg:block relative overflow-hidden">
-        <Image
-          src="/zeneva-login.png?v=2"
-          alt="Modern retail store interior with minimalist design and warm lighting."
-          width="1920"
-          height="1080"
-          quality={100}
-          priority
-          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
-        />
-        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">
-          <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">The Operating System <br /><span className="text-primary italic">for Business</span></h2>
-          <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one secure platform.</p>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlide}
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0 h-full w-full"
+          >
+            <Image
+              src={loginSlides[currentSlide].src}
+              alt={loginSlides[currentSlide].alt}
+              width={1920}
+              height={1080}
+              quality={100}
+              priority
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent z-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+            >
+              <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">
+                {loginSlides[currentSlide].title.split(" ").map((word, i) => (
+                  <React.Fragment key={i}>
+                    {word === "for" || word === "Galaxy" || word === "System" ? <span className="text-primary italic"> {word} </span> : word + " "}
+                  </React.Fragment>
+                ))}
+              </h2>
+              <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">
+                {loginSlides[currentSlide].description}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
           <div className="mt-6 flex items-center gap-3">
-            <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
-            <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.3em] drop-shadow-sm">Business Intelligence v2</span>
+            {loginSlides.map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-1.5 transition-all duration-500 rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]",
+                  currentSlide === i ? "w-12 bg-primary" : "w-2 bg-white/30"
+                )}
+              />
+            ))}
           </div>
         </div>
       </div>
