@@ -585,7 +585,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return true;
         });
 
-        const mrr = (payingBusinesses?.filter(b => b.plan === 'pro').length || 0) * 10000 + (payingBusinesses?.filter(b => b.plan === 'business').length || 0) * 30000;
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        const recentPurchases = (purchases || []).filter(p => {
+            const pDate = p.timestamp?.toDate ? p.timestamp.toDate() : (p.timestamp?.seconds ? new Date(p.timestamp.seconds * 1000) : new Date(0));
+            return pDate > thirtyDaysAgo;
+        });
+
+        const mrr = recentPurchases.reduce((sum, p) => sum + p.amount, 0);
         const arr = mrr * 12;
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
@@ -901,7 +907,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 Platform Health Overview
                             </CardTitle>
                         </CardHeader>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
                             <StatCard title="Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
                         </button>
