@@ -38,9 +38,11 @@ interface FollowUpLog {
 interface FollowUpCenterProps {
   atRiskBusinesses: any[];
   users: any[];
+  conversionRate?: number;
+  churnRiskCount?: number;
 }
 
-export default function FollowUpCenter({ atRiskBusinesses, users }: FollowUpCenterProps) {
+export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate = 0, churnRiskCount = 0 }: FollowUpCenterProps) {
   const [logs, setLogs] = React.useState<FollowUpLog[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
@@ -133,6 +135,49 @@ export default function FollowUpCenter({ atRiskBusinesses, users }: FollowUpCent
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Churn Risk</CardTitle>
+            <AlertCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold">{churnRiskCount}</div>
+            <p className="text-xs text-muted-foreground">High risk accounts</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Conv. Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold">{conversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Trial to Paid</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold">{atRiskBusinesses.length}</div>
+            <p className="text-xs text-muted-foreground">Inactive &gt; 14 days</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Support</CardTitle>
+            <Mail className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold">{logs.length}</div>
+            <p className="text-xs text-muted-foreground">Follow-ups sent</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Col: At Risk Businesses */}
         <Card className="lg:col-span-1">

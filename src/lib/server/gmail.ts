@@ -44,7 +44,7 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
   const trackingPixel = `<img src="${BASE_URL}/api/track?tid=${trackId}" width="1" height="1" style="display:none;" />`;
   const htmlWithPixel = `${params.body}${trackingPixel}`;
 
-  // 3. Setup OAuth2 & Transport
+  // 3. Setup OAuth2
   const OAuth2 = google.auth.OAuth2;
   const oauth2Client = new OAuth2(
     GMAIL_CLIENT_ID,
@@ -57,31 +57,29 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
   });
 
   try {
-    const accessTokenResponse = await oauth2Client.getAccessToken();
-    const accessToken = accessTokenResponse.token;
-
-    if (!accessToken) throw new Error("Failed to generate access token.");
-
+    // We create the transporter but let Nodemailer handle the token refresh
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         type: 'OAuth2',
         user: GMAIL_USER,
         clientId: GMAIL_CLIENT_ID,
         clientSecret: GMAIL_CLIENT_SECRET,
         refreshToken: GMAIL_REFRESH_TOKEN,
-        accessToken: accessToken
       }
     } as any);
 
     // 4. Send Email
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `Zeneva Success Team <${GMAIL_USER}>`,
       to: params.to,
       subject: params.subject,
       html: htmlWithPixel,
     });
 
+    console.log('Email sent: %s', info.messageId);
     return trackId;
 
   } catch (error: any) {

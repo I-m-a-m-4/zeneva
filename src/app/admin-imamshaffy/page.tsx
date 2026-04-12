@@ -348,6 +348,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [isDownloading, setIsDownloading] = useState(false);
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+    const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
     const [totalSubscribers, setTotalSubscribers] = useState(0);
 
     useEffect(() => {
@@ -634,24 +635,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return acc;
         }, {} as Record<string, number>);
 
-        const businessRevenues = (receipts || []).reduce((acc, r) => {
-            if (r.businessId) {
-                acc[r.businessId] = (acc[r.businessId] || 0) + r.total;
-            }
-            return acc;
-        }, {} as Record<string, number>);
-
-        let richestBusiness = null;
-        let maxRevenue = 0;
-        for (const [bId, rev] of Object.entries(businessRevenues)) {
-            if (rev > maxRevenue) {
-                maxRevenue = rev;
+        const sortedBusinessRevenues = Object.entries(businessRevenues)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3)
+            .map(([bId, rev]) => {
                 const business = businesses?.find(b => b.id === bId);
-                if (business) {
-                    richestBusiness = { ...business, totalRevenue: rev };
-                }
-            }
-        }
+                return business ? { ...business, totalRevenue: rev } : null;
+            })
+            .filter((b): b is any => b !== null);
+
+        const richestBusiness = sortedBusinessRevenues[0] || null;
+        const topPerformers = sortedBusinessRevenues;
 
         // --- New Daily Metrics ---
         const earliestBusiness = businesses?.reduce((earliest, b) => {
@@ -676,12 +670,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const dailyGmvData = Object.entries(dailyGmv).map(([date, amount]) => ({ date, 'Revenue': amount })).slice(-14);
         const dailyReceiptsData = Object.entries(dailyReceipts).map(([date, count]) => ({ date, 'Sales': count })).slice(-14);
 
+        // LTV = Total Subscription Revenue / Total Customers
+        const ltv = totalBusinesses > 0 ? totalSubscriptionRevenue / totalBusinesses : 0;
+
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, 
-            totalReceipts, platformAOV, mrr, arr, activeUsers, inactiveUsers, 
+            totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
-            richestBusiness, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData
+            richestBusiness, topPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData
         };
     }, [users, businesses, products, receipts, purchases]);
 
@@ -884,7 +881,6 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="growth">Growth & Retention</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
@@ -898,21 +894,26 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 Platform Health Overview
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
-                                <StatCard title="Total Active Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
-                            </button>
-                            <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
-                                <StatCard title="Activated Businesses" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products & >=1 sale" />
-                            </button>
-                            <StatCard title="Avg. Sales/Day" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={TrendingUp} description="Zeneva Sales Velocity" />
-                            <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
-                                <StatCard title="Businesses At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales in 14 days" />
-                            </button>
-                            <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
-                                <StatCard title="Paying Businesses" value={platformAnalytics.payingBusinessesCount} icon={ShieldCheck} description="Pro + Business Plans" />
-                            </button>
-                        </CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                        <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
+                            <StatCard title="Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
+                            <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="Monthly Recurring" />
+                        </button>
+                        <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="Annual Target" />
+                        <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
+                        <StatCard title="Sub Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`} icon={ShieldCheck} description="Total Software Sales" />
+                        <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full">
+                            <StatCard title="Avg. Sales/Day" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Activity} description="Sales Velocity" />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
+                            <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products" />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
+                            <StatCard title="At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales 14 days" />
+                        </button>
+                    </div>
                     </Card>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -937,23 +938,33 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Trophy className="h-5 w-5 text-yellow-500" /> Platform Performer Spotlight
                                 </CardTitle>
-                                <CardDescription>The business driving the most GMV.</CardDescription>
+                                <CardDescription>Top 3 businesses driving the most GMV.</CardDescription>
                             </CardHeader>
-                            <CardContent className="relative z-10">
-                                {analyticsData.richestBusiness ? (
-                                    <div className="space-y-4 shadow-sm bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-bold text-xl leading-none">{analyticsData.richestBusiness.name}</p>
-                                                <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-bold mt-1 tracking-wider uppercase">Current Top Earner</p>
+                            <CardContent className="relative z-10 space-y-3">
+                                {analyticsData.topPerformers && analyticsData.topPerformers.length > 0 ? (
+                                    analyticsData.topPerformers.map((business, index) => (
+                                        <div key={business.id} className={cn(
+                                            "flex items-center justify-between p-3 rounded-lg border",
+                                            index === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-500/30" : "bg-background/60 border-border/50"
+                                        )}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                                    index === 0 ? "bg-yellow-500 text-white" : "bg-muted text-muted-foreground"
+                                                )}>
+                                                    #{index + 1}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold leading-none">{business.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground mt-1">Platform Partner</p>
+                                                </div>
                                             </div>
-                                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-0">№ 1</Badge>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold">₦{business.totalRevenue.toLocaleString()}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">Gross GMV</p>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-between items-center text-sm border-t pt-3">
-                                            <span className="text-muted-foreground">Total Revenue</span>
-                                            <span className="font-bold text-lg">₦{analyticsData.richestBusiness.totalRevenue.toLocaleString()}</span>
-                                        </div>
-                                    </div>
+                                    ))
                                 ) : (
                                     <div className="text-center py-6 text-muted-foreground text-sm">Waiting for more high-performing data...</div>
                                 )}
@@ -1112,105 +1123,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             <FeatureStickinessChart businesses={businesses || []} products={products || []} />
                         </div>
                     </div>
-                </TabsContent>
-
-                <TabsContent value="growth" className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Trial Conversion</CardTitle>
-                                <CardDescription>How effectively trials convert to paid.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-center py-6">
-                                    <div className="text-5xl font-bold text-primary mb-2">{platformAnalytics.conversionRate.toFixed(1)}%</div>
-                                    <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="lg:col-span-2">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-amber-500" /> Expiring Soon (Next 3 Days)</CardTitle>
-                                <CardDescription>Reach out to these users to close the sale.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ScrollArea className="h-[200px]">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Business</TableHead>
-                                                <TableHead>Expiry</TableHead>
-                                                <TableHead>Action</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {platformAnalytics.expiringSoonList.length > 0 ? (
-                                                platformAnalytics.expiringSoonList.map(b => (
-                                                    <TableRow key={b.id}>
-                                                        <TableCell className="font-medium">{b.name}</TableCell>
-                                                        <TableCell>{formatDistanceToNow(b.trialExpiresAt.toDate(), { addSuffix: true })}</TableCell>
-                                                        <TableCell>
-                                                            <Button size="sm" variant="outline" onClick={() => {
-                                                                const owner = users?.find(u => u.id === b.ownerId);
-                                                                if (owner?.email) window.location.href = `mailto:${owner.email}?subject=Your Trial is Expiring Soon!`;
-                                                            }}>Email</Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            ) : (
-                                                <TableRow><TableCell colSpan={3} className="text-center h-12">No trials expiring soon.</TableCell></TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><AlertCircle className="h-5 w-5 text-destructive" /> Churn Risk Prediction</CardTitle>
-                            <CardDescription>High risk users based on inactivity and low sales.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Business</TableHead>
-                                        <TableHead>Owner</TableHead>
-                                        <TableHead>Risk Score</TableHead>
-                                        <TableHead>Factors</TableHead>
-                                        <TableHead>Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {platformAnalytics.churnRiskList.length > 0 ? (
-                                        platformAnalytics.churnRiskList.map(item => (
-                                            <TableRow key={item.business.id}>
-                                                <TableCell className="font-medium">{item.business.name}</TableCell>
-                                                <TableCell>{item.owner?.name || 'Unknown'}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant="destructive">{item.riskScore}/100</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    {item.riskFactors.join(', ')}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button size="sm" variant="ghost" className="text-primary hover:text-primary/80" onClick={() => {
-                                                        if (item.owner?.email) window.location.href = `mailto:${item.owner.email}?subject=How can we help at Zeneva?`;
-                                                    }}>Contact</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow><TableCell colSpan={5} className="text-center h-12">No high-risk businesses detected.</TableCell></TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                 </TabsContent>
 
 
 
@@ -1405,6 +1318,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <FollowUpCenter 
                         atRiskBusinesses={platformAnalytics.atRiskBusinesses}
                         users={users || []}
+                        conversionRate={platformAnalytics.conversionRate}
+                        churnRiskCount={platformAnalytics.churnRiskList.length}
                     />
                 </TabsContent>
             </Tabs>
@@ -1510,6 +1425,47 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 open={isUserDetailOpen}
                 onOpenChange={setIsUserDetailOpen}
             />
+
+            <Dialog open={isSalesVelocityOpen} onOpenChange={setIsSalesVelocityOpen}>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-primary" />
+                            Platform Sales Velocity
+                        </DialogTitle>
+                        <DialogDescription>
+                            Historical sales performance across and transaction frequency.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="grid gap-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} />
+                            <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} />
+                            <StatCard title="Overall ARPU" value={`₦${(analyticsData.platformGmv / (analyticsData.totalBusinesses || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Users} />
+                        </div>
+                        
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium">Daily Revenue (Last 14 Days)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[300px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ReLineChart data={analyticsData.dailyGmvData}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `₦${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                            <ReTooltip content={<CustomTooltip />} />
+                                            <Line type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                        </ReLineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
