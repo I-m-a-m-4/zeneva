@@ -127,11 +127,6 @@ function BillingPage() {
                     <TrialCountdown expiryDate={currentBusiness.trialExpiresAt?.toDate() || null} />
                 )}
                 
-                {currentBusiness.accessLevel !== 'lifetime' && (
-                    <p className="text-xs text-muted-foreground mt-2 italic">
-                        If you've recently been granted lifetime access, please use the <span className="font-bold text-primary">Refresh</span> button to sync.
-                    </p>
-                )}
             </div>
             <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />
         </CardContent>
