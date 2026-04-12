@@ -13,6 +13,7 @@ import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
 import { AppConfig } from "@/lib/config";
 import Image from "next/image";
 
+import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from 'framer-motion';
 
 const loginSlides = [
