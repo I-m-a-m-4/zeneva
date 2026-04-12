@@ -13,8 +13,10 @@ if (!admin.apps.length) {
                 credential: admin.credential.cert({
                     projectId,
                     clientEmail,
-                    // Replace \n from the private key string in environment variable
-                    privateKey: privateKey.replace(/\\n/g, '\n'),
+                    // Handle literal \n and real newlines in the string
+                    privateKey: privateKey.includes('---') 
+                        ? privateKey.replace(/\\n/g, '\n') 
+                        : privateKey,
                 }),
             });
         } catch (error: any) {

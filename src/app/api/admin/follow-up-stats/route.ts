@@ -20,10 +20,9 @@ export async function GET(req: NextRequest) {
       let converted = false;
 
       if (sentAt && logData.businessId !== 'unknown') {
-        // Check if there are any receipts for this business AFTER sentAt
+        // Check if there are any receipts for this business at all (simpler query, no index required)
         const receiptsSnapshot = await adminFirestore.collection('receipts')
           .where('businessId', '==', logData.businessId)
-          .where('createdAt', '>', sentAt)
           .limit(1)
           .get();
         
