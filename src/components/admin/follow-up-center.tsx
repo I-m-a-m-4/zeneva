@@ -44,6 +44,7 @@ interface FollowUpCenterProps {
 
 export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate = 0, churnRiskCount = 0 }: FollowUpCenterProps) {
   const [logs, setLogs] = React.useState<FollowUpLog[]>([]);
+  const [sentCount, setSentCount] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const { toast } = useToast();
@@ -55,11 +56,12 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
-      // In a real app, you'd fetch this from your new API or direct Firestore if permissions allow
-      // For now, we'll assume a basic fetch logic
       const response = await fetch('/api/admin/follow-up-stats');
       const data = await response.json();
-      if (data.success) setLogs(data.logs);
+      if (data.success) {
+        setLogs(data.logs);
+        setSentCount(data.sentCount || 0);
+      }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
     } finally {
@@ -172,7 +174,7 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
             <Mail className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{logs.length}</div>
+            <div className="text-2xl font-bold">{sentCount}</div>
             <p className="text-xs text-muted-foreground">Follow-ups sent</p>
           </CardContent>
         </Card>

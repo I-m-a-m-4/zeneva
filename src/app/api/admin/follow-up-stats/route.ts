@@ -14,6 +14,12 @@ export async function GET(req: NextRequest) {
       .limit(50)
       .get();
 
+    // Calculate Sent count (only those that actually succeeded)
+    const successCountSnapshot = await adminFirestore.collection('follow_up_logs')
+      .where('status', '==', 'sent')
+      .get();
+    const sentCount = successCountSnapshot.size;
+
     const logs = await Promise.all(logsSnapshot.docs.map(async (doc: any) => {
       const logData = doc.data();
       const sentAt = logData.sentAt?.toDate();
@@ -36,7 +42,7 @@ export async function GET(req: NextRequest) {
       };
     }));
 
-    return NextResponse.json({ success: true, logs });
+    return NextResponse.json({ success: true, logs, sentCount });
 
   } catch (error: any) {
     console.error('Fetch Follow-Up Stats Error:', error);

@@ -354,8 +354,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     useEffect(() => {
         const fetchSubscribers = async () => {
             try {
-                const user = (firestore as any).auth?.currentUser;
-                const token = await user?.getIdToken();
+                // Ensure auth is loaded
+                const auth = (firestore as any).auth;
+                if (!auth) return;
+
+                // Wait for user to be available
+                const user = auth.currentUser;
+                if (!user) return;
+
+                const token = await user.getIdToken();
+                if (!token) return;
+
                 const response = await fetch('/api/admin/platform-overview', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -364,7 +373,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     setTotalSubscribers(data.appInstalls);
                 }
             } catch (error) {
-                console.error("Error fetching app installs:", error);
+                console.error("Error fetching platform overview data:", error);
             }
         };
         fetchSubscribers();

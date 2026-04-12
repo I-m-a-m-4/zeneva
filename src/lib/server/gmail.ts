@@ -28,13 +28,13 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
 
   const trackId = uuidv4();
   
-  // 1. Create Log document in Firestore
+  // 1. Create Log document in Firestore (Start as pending)
   await adminFirestore.collection('follow_up_logs').doc(trackId).set({
     sentTo: params.to,
     recipientName: params.name,
     subject: params.subject,
     sentAt: new Date(),
-    status: 'sent',
+    status: 'pending',
     businessId: params.businessId || 'unknown',
     type: params.type || 'follow-up',
     openCount: 0
@@ -59,9 +59,7 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
   try {
     // We create the transporter but let Nodemailer handle the token refresh
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      service: 'gmail',
       auth: {
         type: 'OAuth2',
         user: GMAIL_USER,
@@ -69,7 +67,7 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
         clientSecret: GMAIL_CLIENT_SECRET,
         refreshToken: GMAIL_REFRESH_TOKEN,
       }
-    } as any);
+    });
 
     // 4. Send Email
     const info = await transporter.sendMail({
@@ -80,6 +78,12 @@ export async function sendGmailFollowUp(params: FollowUpParams, retryCount = 0):
     });
 
     console.log('Email sent: %s', info.messageId);
+    
+    // Update log to sent on SUCCESS
+    await adminFirestore.collection('follow_up_logs').doc(trackId).update({
+      status: 'sent'
+    });
+
     return trackId;
 
   } catch (error: any) {
