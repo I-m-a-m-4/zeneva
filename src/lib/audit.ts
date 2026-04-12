@@ -7,7 +7,7 @@ type AuditAction =
     | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update'
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete'
-    | 'user.invite' | 'user.update_status'
+    | 'user.invite' | 'user.update_status' | 'user.impersonate' | 'user.stop_impersonate'
     | 'settings.update';
 
 interface AuditEvent {

@@ -121,21 +121,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // Track the last user ID to prevent unnecessary POS resets
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  const impersonateUser = useCallback((userId: string) => {
-    setImpersonatedUserId(userId);
-    sessionStorage.setItem('zeneva_impersonated_user_id', userId);
-    toast({ title: 'Impersonating User', description: 'Switching view to user dashboard...' });
-    // Force refresh to ensure new data is fetched
-    setRefreshKey(prev => prev + 1);
-  }, [toast]);
-
-  const stopImpersonation = useCallback(() => {
-    setImpersonatedUserId(null);
-    sessionStorage.removeItem('zeneva_impersonated_user_id');
-    toast({ title: 'Impersonation Ended', description: 'Returning to your account.' });
-    setRefreshKey(prev => prev + 1);
-  }, [toast]);
-
   const isImpersonating = !!impersonatedUserId;
   // Effective User ID: Use impersonated ID if set, otherwise real user ID
   const effectiveUserId = impersonatedUserId || user?.uid;
@@ -149,6 +134,36 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
 
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
+
+  const impersonateUser = useCallback((userId: string) => {
+    // Log the impersonation event before switching context
+    if (firestore && businessId && currentUserProfile) {
+      logAuditEvent(firestore, businessId, currentUserProfile, {
+        action: 'user.impersonate',
+        entity: { type: 'user', id: userId },
+        details: { targetUserId: userId }
+      });
+    }
+
+    setImpersonatedUserId(userId);
+    sessionStorage.setItem('zeneva_impersonated_user_id', userId);
+    toast({ title: 'Impersonating User', description: 'Switching view to user dashboard...' });
+    // Force refresh to ensure new data is fetched
+    setRefreshKey(prev => prev + 1);
+  }, [toast, firestore, businessId, currentUserProfile]);
+
+  const stopImpersonation = useCallback(() => {
+    if (firestore && businessId && currentUserProfile && impersonatedUserId) {
+      logAuditEvent(firestore, businessId, currentUserProfile, {
+        action: 'user.stop_impersonate',
+        entity: { type: 'user', id: impersonatedUserId },
+      });
+    }
+    setImpersonatedUserId(null);
+    sessionStorage.removeItem('zeneva_impersonated_user_id');
+    toast({ title: 'Impersonation Ended', description: 'Returning to your account.' });
+    setRefreshKey(prev => prev + 1);
+  }, [toast, firestore, businessId, currentUserProfile, impersonatedUserId]);
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
   const { data: business, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
