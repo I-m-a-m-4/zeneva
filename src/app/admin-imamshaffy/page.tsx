@@ -1348,6 +1348,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         conversionRate={platformAnalytics.conversionRate}
                         churnRiskCount={platformAnalytics.churnRiskList.length}
                     />
+                </TabsContent>
                 <TabsContent value="security">
                     <CyberShield />
                 </TabsContent>
