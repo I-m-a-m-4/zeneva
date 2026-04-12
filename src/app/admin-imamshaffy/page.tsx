@@ -132,6 +132,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CyberShield from '@/components/admin/cyber-shield';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -906,6 +907,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
+                    <TabsTrigger value="security" className="gap-2">
+                        <ShieldCheck className="h-4 w-4" />
+                        Cyber Shield
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
@@ -1430,6 +1435,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </div>
                 </DialogContent>
             </Dialog>
+
+                <TabsContent value="security">
+                    <CyberShield />
+                </TabsContent>
+            </Tabs>
 
             <BusinessDetailDialog
                 open={detailModalState.open}

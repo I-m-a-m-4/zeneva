@@ -1127,6 +1127,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setDiscount(0);
     setTaxRate(business?.settings?.defaultTaxRate ?? 0);
     setPaymentMethod('Cash');
+    setSyncedProducts([]);
+    setSyncedCustomers([]);
+    setSyncedReceipts([]);
     try {
       localStorage.removeItem(POS_CART_KEY);
       localStorage.removeItem(POS_CUSTOMER_KEY);
@@ -1136,7 +1139,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch { }
   }, [business]);
 
-  // Effect to reset POS state and CLEAR IMPERSONATION when user changes/logs out
+  // Effect to reset POS state and CLEAR IMPERSONATION when user changes or business changes
   useEffect(() => {
     if (!isUserLoading) {
       if (!user) {
@@ -1145,14 +1148,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
         resetPOS();
         setLastUserId(null);
       } else {
-        // If user changed, reset POS
-        if (lastUserId && user.uid !== lastUserId) {
-          resetPOS();
+        // If business ID changed (common during impersonation), reset POS to prevent data leak
+        if (businessId && lastUserId && businessId !== lastUserId) {
+           resetPOS();
         }
-        setLastUserId(user.uid);
+        setLastUserId(businessId || user.uid);
       }
     }
-  }, [user, isUserLoading, resetPOS, setImpersonatedUserId, lastUserId]);
+  }, [user, isUserLoading, resetPOS, setImpersonatedUserId, lastUserId, businessId]);
 
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {
