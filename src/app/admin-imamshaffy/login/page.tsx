@@ -1,18 +1,4 @@
-
-'use client';
-
-import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
-import { useAuth, useFirestore } from '@/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { formatDistanceToNow } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, EyeOff, Loader } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -111,59 +97,88 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Admin Login</CardTitle>
-          <CardDescription>Enter your admin credentials to access the dashboard.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2 focus-within-glow rounded-md">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isProcessing}
-                placeholder="admin@zeneva.com"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-2 focus-within-glow rounded-md">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
+    <div className="w-full min-h-screen flex lg:grid lg:grid-cols-2">
+      <div className="flex items-center justify-center min-h-screen bg-background p-6">
+        <Card className="w-full max-w-md shadow-2xl border-white/5">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold tracking-tight">Admin Login</CardTitle>
+            <CardDescription className="text-muted-foreground">Enter your admin credentials to access the dashboard.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2 focus-within-glow rounded-md">
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isProcessing}
-                  placeholder="Enter your password"
+                  placeholder="admin@zeneva.com"
                   autoComplete="off"
+                  className="bg-muted/30"
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
               </div>
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full button-glow" disabled={isProcessing}>
-              {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-              {isProcessing ? 'Logging In...' : 'Login'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="space-y-2 focus-within-glow rounded-md">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isProcessing}
+                    placeholder="Enter your password"
+                    autoComplete="off"
+                    className="bg-muted/30"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              {error && <p className="text-sm text-destructive font-medium">{error}</p>}
+              <Button type="submit" className="w-full button-glow py-6" disabled={isProcessing}>
+                {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                {isProcessing ? 'Verifying Credentials...' : 'Access Dashboard'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="hidden bg-muted lg:block relative overflow-hidden">
+        <Image
+          src="/zeneva-login.png?v=2"
+          alt="Modern retail store interior with minimalist design and warm lighting."
+          width="1920"
+          height="1080"
+          quality={100}
+          priority
+          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">
+          <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">
+            Zen Command <span className="text-primary">Center</span>
+          </h2>
+          <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">
+             Manage the heartbeat of Zeneva. Monitor platform growth, oversee business health, and coordinate strategic outreach from one secure intelligence hub.
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+            <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_10px_rgba(255,165,0,0.5)]" />
+            <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.3em] drop-shadow-sm">Command Hub v2.4</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
