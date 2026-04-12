@@ -1348,6 +1348,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         conversionRate={platformAnalytics.conversionRate}
                         churnRiskCount={platformAnalytics.churnRiskList.length}
                     />
+                <TabsContent value="security">
+                    <CyberShield />
                 </TabsContent>
             </Tabs>
 
@@ -1436,10 +1438,6 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </DialogContent>
             </Dialog>
 
-                <TabsContent value="security">
-                    <CyberShield />
-                </TabsContent>
-            </Tabs>
 
             <BusinessDetailDialog
                 open={detailModalState.open}
