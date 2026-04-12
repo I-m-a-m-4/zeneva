@@ -33,7 +33,7 @@ import {
     XCircle,
     Shield
 } from 'lucide-react';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { 
     collectionGroup, 
     query, 
@@ -54,8 +54,8 @@ export default function CyberShield() {
     const [indexError, setIndexError] = useState<string | null>(null);
 
     // Fetch REAL system state
-    const usersQuery = useMemo(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
-    const businessesQuery = useMemo(() => firestore ? query(collection(firestore, 'businessInstances')) : null, [firestore]);
+    const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+    const businessesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'businessInstances')) : null, [firestore]);
     
     const { data: allUsers } = useCollection<any>(usersQuery);
     const { data: allBusinesses } = useCollection<any>(businessesQuery);
