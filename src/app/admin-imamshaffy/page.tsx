@@ -635,6 +635,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return acc;
         }, {} as Record<string, number>);
 
+        const businessRevenues = (receipts || []).reduce((acc, r) => {
+            if (r.businessId) {
+                acc[r.businessId] = (acc[r.businessId] || 0) + r.total;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+
         const sortedBusinessRevenues = Object.entries(businessRevenues)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 3)
