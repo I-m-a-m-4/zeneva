@@ -126,7 +126,7 @@ export default function LoginPage() {
       <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
           src="/zeneva-login.png"
-          alt="A premium 3D visualization of a business intelligence dashboard on a glass screen."
+          alt="Modern retail store interior with minimalist design and warm lighting."
           width="1920"
           height="1080"
           quality={100}

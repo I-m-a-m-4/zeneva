@@ -231,7 +231,7 @@ export default function SignupPage() {
       <div className="hidden bg-muted lg:block relative overflow-hidden">
         <Image
           src="/zeneva-signup.png"
-          alt="A breathtaking premium 3D visualization of a digital network representing business growth."
+          alt="Abstract 3D network visualization with golden data streams and glassmorphism elements."
           width="1920"
           height="1080"
           quality={100}
