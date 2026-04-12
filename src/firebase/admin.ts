@@ -18,10 +18,14 @@ if (!admin.apps.length) {
                 }),
             });
         } catch (error: any) {
-            console.error('Firebase admin initialization error', error.stack);
+            console.error('Firebase admin initialization error:', error.message);
         }
     } else {
-        console.warn("Firebase Admin initialized without credentials (missing env vars). Some features may fail.");
+        const missing = [];
+        if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+        if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+        if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
+        console.warn(`Firebase Admin missing: ${missing.join(', ')}. Admin features will be disabled.`);
     }
 }
 

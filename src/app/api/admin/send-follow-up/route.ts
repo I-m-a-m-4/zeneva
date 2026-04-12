@@ -12,6 +12,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    if (!adminAuth) {
+        return NextResponse.json({ success: false, message: 'Firebase Admin not initialized. Check env vars.' }, { status: 503 });
+    }
+
     const decodedToken = await adminAuth.verifyIdToken(token);
     // You might want to check for a specific admin role or email here
     if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'imamshaffy@gmail.com') {

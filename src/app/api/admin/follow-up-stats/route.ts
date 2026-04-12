@@ -5,6 +5,10 @@ export async function GET(req: NextRequest) {
   try {
     // In a production environment, you would check for admin authorization here.
     
+    if (!adminFirestore) {
+        return NextResponse.json({ success: false, message: 'Firestore Admin not initialized. Check env vars.' }, { status: 503 });
+    }
+
     const logsSnapshot = await adminFirestore.collection('follow_up_logs')
       .orderBy('sentAt', 'desc')
       .limit(50)

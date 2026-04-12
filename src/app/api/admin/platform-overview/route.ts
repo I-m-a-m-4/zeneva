@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    if (!adminAuth) {
+        return NextResponse.json({ success: false, message: 'Firebase Admin not initialized on server. Check env vars.' }, { status: 503 });
+    }
+
     const decodedToken = await adminAuth.verifyIdToken(token);
     if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'zenevapos@gmail.com' && decodedToken.email !== 'imamshaffy@gmail.com') {
        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
