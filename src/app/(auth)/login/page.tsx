@@ -10,7 +10,6 @@ import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
-import React, { useState, useEffect } from "react";
 import { AppConfig } from "@/lib/config";
 import Image from "next/image";
 
