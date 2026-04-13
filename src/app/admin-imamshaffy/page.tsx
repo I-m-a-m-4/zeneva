@@ -541,13 +541,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         }, {} as Record<string, number>);
 
         const countryCounts = activeBusinesses.reduce((acc, b) => {
-            const country = b.settings?.country || 'Unknown';
+            const country = b.settings?.country || 'Pending Onboarding';
             acc[country] = (acc[country] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
 
         const industryCounts = activeBusinesses.reduce((acc, b) => {
-            const industry = b.settings?.industry || 'Unspecified';
+            const industry = b.settings?.industry || 'Pending Onboarding';
             acc[industry] = (acc[industry] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -589,11 +589,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             topLocations,
             countryData: countryData.map(c => ({
                 ...c,
-                businesses: activeBusinesses.filter(b => (b.settings?.country || 'Unknown') === c.name)
+                businesses: activeBusinesses.filter(b => (b.settings?.country || 'Pending Onboarding') === c.name)
             })),
             industryData: industryData.map(i => ({
                 ...i,
-                businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Unspecified') === i.name)
+                businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Pending Onboarding') === i.name)
             }))
         }
     }, [businesses, products, receipts, users]);
@@ -1239,6 +1239,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                 if (normalized.includes('canada')) return '🇨🇦';
                                                 if (normalized.includes('south africa')) return '🇿🇦';
                                                 if (normalized.includes('kenya')) return '🇰🇪';
+                                                if (normalized.includes('onboarding')) return '⏳';
                                                 return '🌐';
                                             };
                                             return (
