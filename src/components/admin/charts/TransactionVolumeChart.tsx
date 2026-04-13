@@ -15,7 +15,7 @@ interface TransactionVolumeChartProps {
 export default function TransactionVolumeChart({ receipts }: TransactionVolumeChartProps) {
   const [timeframe, setTimeframe] = React.useState<Timeframe>('30d');
 
-  const chartData = React.useMemo(() => {
+  const { chartData, averageSales } = React.useMemo(() => {
     const now = new Date();
     let limitDate: Date;
     if (timeframe === 'today') limitDate = startOfDay(now);
@@ -41,14 +41,27 @@ export default function TransactionVolumeChart({ receipts }: TransactionVolumeCh
       }
     });
 
-    return Object.entries(dailyData).map(([date, count]) => ({ date, Sales: count }));
+    const dataArray = Object.entries(dailyData).map(([date, count]) => ({ date, Sales: count }));
+    const totalSales = dataArray.reduce((acc, curr) => acc + curr.Sales, 0);
+    const average = dataArray.length > 0 ? totalSales / dataArray.length : 0;
+
+    return { chartData: dataArray, averageSales: average };
   }, [receipts, timeframe]);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-orange-500" /> Transaction Volume</CardTitle>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-orange-500" /> 
+              Transaction Volume
+            </CardTitle>
+            <div className="text-right mr-4">
+              <span className="text-2xl font-bold">{averageSales.toFixed(1)}</span>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Avg Sales / Day</p>
+            </div>
+          </div>
           <CardDescription>Daily number of receipts generated platform-wide.</CardDescription>
         </div>
         <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
