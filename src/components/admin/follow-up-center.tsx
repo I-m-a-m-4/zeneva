@@ -33,6 +33,8 @@ interface FollowUpLog {
   status: 'sent' | 'opened' | 'failed';
   openCount: number;
   converted: boolean;
+  html?: string;
+  behaviorContext?: string;
 }
 
 interface FollowUpCenterProps {
@@ -40,20 +42,55 @@ interface FollowUpCenterProps {
   users: any[];
   conversionRate?: number;
   churnRiskCount?: number;
+  cachedLogs?: FollowUpLog[];
+  cachedSentCount?: number;
+  isLoading?: boolean;
+  onRefresh?: () => void;
+  onMount?: () => void;
 }
 
-export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate = 0, churnRiskCount = 0 }: FollowUpCenterProps) {
-  const [logs, setLogs] = React.useState<FollowUpLog[]>([]);
-  const [sentCount, setSentCount] = React.useState(0);
+export default function FollowUpCenter({ 
+    atRiskBusinesses, 
+    users, 
+    conversionRate = 0, 
+    churnRiskCount = 0,
+    cachedLogs = [],
+    cachedSentCount = 0,
+    isLoading: parentLoading = false,
+    onRefresh,
+    onMount
+}: FollowUpCenterProps) {
+  const [logs, setLogs] = React.useState<FollowUpLog[]>(cachedLogs);
+  const [sentCount, setSentCount] = React.useState(cachedSentCount);
   const [isLoading, setIsLoading] = React.useState(false);
+  
+  // Sync with parent cache
+  React.useEffect(() => {
+    if (cachedLogs.length > 0) {
+      setLogs(cachedLogs);
+      setSentCount(cachedSentCount);
+    }
+  }, [cachedLogs, cachedSentCount]);
+
+  React.useEffect(() => {
+    if (onMount && cachedLogs.length === 0) {
+      onMount();
+    }
+  }, []);
   const [isSending, setIsSending] = React.useState(false);
   const { toast } = useToast();
   const [selectedRecipient, setSelectedRecipient] = React.useState<any>(null);
   const [subject, setSubject] = React.useState('Getting the most out of Zeneva');
   const [emailBody, setEmailBody] = React.useState('');
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [viewLog, setViewLog] = React.useState<FollowUpLog | null>(null);
 
   const fetchLogs = async () => {
+    if (onRefresh) {
+        onRefresh();
+        return;
+    }
+    // Fallback if not controlled
     setIsLoading(true);
     try {
       const response = await fetch('/api/admin/follow-up-stats');
@@ -69,9 +106,7 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
     }
   };
 
-  React.useEffect(() => {
-    fetchLogs();
-  }, []);
+  // Controlled internally or by parent via useEffect hooks above
 
   const handleSendEmail = async () => {
     if (!selectedRecipient || !subject || !emailBody) {
@@ -118,14 +153,14 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
 
   const templates = [
     {
-      name: 'Re-engagement',
-      subject: 'We miss you at Zeneva!',
-      body: (name: string) => `Hi ${name},<br><br>We noticed you haven't recorded many sales lately. Is there anything we can help with?<br><br>Our new Analytics Dashboard just launched, and it's perfect for tracking your growth.<br><br>Best,<br>The Zeneva Team`
+      name: 'Mission Recon',
+      subject: 'Strategy Check: Your ZENEVA Node',
+      body: (name: string) => `Hi ${name},<br><br>We noticed your node hasn't been mission-active lately. Is there a tactical hurdle we can help clear?<br><br>Our team is ready to assist in deploying your assets more effectively.<br><br>Best,<br>Bime @ ZENEVA POS & INVENTORY`
     },
     {
-      name: 'Trial Expiring',
-      subject: 'Your Zeneva Trial is ending soon',
-      body: (name: string) => `Hi ${name},<br><br>Your pro trial is coming to an end. Upgrade now to keep accessing advanced features like AI insights and custom reports.<br><br>Best,<br>The Zeneva Team`
+      name: 'Asset Provisioning',
+      subject: 'Critical: Finalize your Business Architecture',
+      body: (name: string) => `Hi ${name},<br><br>Your business container is established but assets are not yet provisioned. Let's get your first products deployed today to reach optimal readiness.<br><br>Best,<br>Bime @ ZENEVA POS & INVENTORY`
     }
   ];
 
@@ -241,58 +276,95 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
               <TableHeader>
                 <TableRow>
                   <TableHead>Recipient</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Sent At</TableHead>
+                  <TableHead>Mission Context</TableHead>
+                  <TableHead>Telemetry</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Engagement</TableHead>
+                  <TableHead className="text-right">Audit</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No outreach logs found. Start by sending a follow-up.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        <div className="font-medium text-xs">{log.recipientName}</div>
-                        <div className="text-[10px] text-muted-foreground">{log.sentTo}</div>
-                      </TableCell>
-                      <TableCell className="max-w-[150px] truncate text-xs">{log.subject}</TableCell>
-                      <TableCell className="text-xs">
-                        {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {log.status === 'opened' ? (
-                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                             <CheckCircle2 className="h-3 w-3 mr-1" /> Opened
-                          </Badge>
-                        ) : log.status === 'failed' ? (
-                          <Badge variant="destructive">Failed</Badge>
-                        ) : (
-                          <Badge variant="secondary">Sent</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {log.converted ? (
-                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
-                              <TrendingUp className="h-3 w-3 mr-1" /> Converted
-                           </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2 text-xs">
-                          <Eye className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-bold">{log.openCount || 0}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  (() => {
+                    const groupedLogs: Record<string, any> = {};
+                    logs.forEach(log => {
+                      const key = `${log.sentTo}-${log.type || 'follow-up'}`;
+                      if (!groupedLogs[key]) {
+                        groupedLogs[key] = { ...log, count: 1 };
+                      } else {
+                        groupedLogs[key].count++;
+                        groupedLogs[key].openCount = Math.max(groupedLogs[key].openCount, log.openCount);
+                        if (log.status === 'opened') groupedLogs[key].status = 'opened';
+                        else if (log.status === 'failed' && groupedLogs[key].status !== 'opened') groupedLogs[key].status = 'failed';
+                      }
+                    });
+
+                    return Object.values(groupedLogs).map((log: any) => (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <div className="font-bold text-xs flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                            {log.recipientName}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground ml-3">{log.sentTo}</div>
+                        </TableCell>
+                        <TableCell className="max-w-[180px]">
+                          <div className="text-xs font-medium truncate">{log.subject}</div>
+                          {log.behaviorContext && (
+                            <div className="flex items-center gap-1 mt-1">
+                                <Bot className="h-3 w-3 text-indigo-400" />
+                                <span className="text-[9px] text-indigo-400/80 font-black uppercase tracking-tighter">Intel: {log.behaviorContext}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono whitespace-nowrap">
+                          {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}
+                          <div className="text-[9px] text-muted-foreground">via Bime@ZENEVA</div>
+                        </TableCell>
+                        <TableCell>
+                          {log.status === 'opened' || (log.openCount > 0 && log.status === 'sent') ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] font-black uppercase">
+                               <CheckCircle2 className="h-3 w-3 mr-1" /> Opened
+                               {log.count > 1 && <span className="ml-1 opacity-70">[{log.count}]</span>}
+                            </Badge>
+                          ) : log.status === 'failed' ? (
+                            <Badge variant="destructive" className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px] font-black uppercase">
+                              <AlertCircle className="h-3 w-3 mr-1" /> FAILED
+                              {log.count > 1 && <span className="ml-1">({log.count}x)</span>}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[10px] font-black uppercase">
+                              <Clock className="h-3 w-3 mr-1" /> Dispatch
+                              {log.count > 1 && <span className="ml-1">({log.count})</span>}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {log.converted ? (
+                             <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30 text-[10px] font-black">
+                                <TrendingUp className="h-3 w-3 mr-1" /> CONVERTED
+                             </Badge>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2 text-xs">
+                              <Eye className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-bold">{log.openCount || 0}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-indigo-500/10" onClick={() => setViewLog(log)}>
+                            <Search className="h-4 w-4 text-indigo-400" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })()
                 )}
               </TableBody>
             </Table>
@@ -343,6 +415,34 @@ export default function FollowUpCenter({ atRiskBusinesses, users, conversionRate
               {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               Dispatch Email
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* View Email Modal */}
+      <Dialog open={!!viewLog} onOpenChange={(open) => !open && setViewLog(null)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Outreach Audit: {viewLog?.subject}
+            </DialogTitle>
+            <DialogDescription>
+              Sent to {viewLog?.recipientName} ({viewLog?.sentTo})
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto border rounded-md p-4 bg-white mt-4">
+             {viewLog?.html ? (
+               <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: viewLog.html }} />
+             ) : (
+               <div className="text-center py-10 text-muted-foreground italic">
+                 Email body not stored in this log.
+               </div>
+             )}
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setViewLog(null)}>Close Audit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

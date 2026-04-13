@@ -2,9 +2,9 @@ import { Resend } from 'resend';
 import { adminFirestore } from '@/firebase/admin';
 import { v4 as uuidv4 } from 'uuid';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resend = (typeof process !== 'undefined' && process.env.RESEND_API_KEY) ? new Resend(process.env.RESEND_API_KEY) : null;
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space';
-const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'Zeneva <onboarding@resend.dev>';
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'Bime <bime@zeneva.space>';
 
 export interface EmailParams {
   to: string;

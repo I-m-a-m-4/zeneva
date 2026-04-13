@@ -80,7 +80,11 @@ import {
     Trophy,
     CheckCircle,
     Globe,
+    Mail,
+    Zap,
+    Radar,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
@@ -100,7 +104,7 @@ import {
     getDoc,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, auth } from '@/firebase';
 import {
     Table,
     TableBody,
@@ -352,15 +356,45 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
     const [totalSubscribers, setTotalSubscribers] = useState(0);
+    
+    // --- PERSISTENT CACHE FOR OUTREACH ---
+    const [outreachLogs, setOutreachLogs] = useState<any[]>([]);
+    const [outreachSentCount, setOutreachSentCount] = useState(0);
+    const [isOutreachLoading, setIsOutreachLoading] = useState(false);
+    const [hasLoadedOutreach, setHasLoadedOutreach] = useState(false);
+
+    const fetchOutreachData = async (force = false) => {
+        // PREVENT REDUNDANT FETCHING: Return early if already loaded and not forced
+        // This addresses the user's concern about cost and redundant reads.
+        if (hasLoadedOutreach && !force) {
+            console.log("Admin Intelligence: Outreach cache hit, skipping fetch.");
+            return;
+        }
+        
+        setIsOutreachLoading(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) throw new Error("Auth mission readiness: token unavailable");
+            
+            const response = await fetch('/api/admin/follow-up-stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setOutreachLogs(data.logs);
+                setOutreachSentCount(data.sentCount || 0);
+                setHasLoadedOutreach(true);
+            }
+        } catch (error) {
+            console.error('Failed to fetch outreach logs:', error);
+        } finally {
+            setIsOutreachLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchSubscribers = async () => {
             try {
-                // Ensure auth is loaded
-                const auth = (firestore as any).auth;
-                if (!auth) return;
-
-                // Wait for user to be available
                 const user = auth.currentUser;
                 if (!user) return;
 
@@ -569,6 +603,55 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             }))
             .sort((a, b) => b.value - a.value);
 
+        // --- ELITE BEHAVIORAL INTELLIGENCE ---
+        const totalUsers = users?.length || 0;
+        const usersWithBusiness = users?.filter(u => u.businessId).length || 0;
+        const businessesWithProducts = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0).length;
+        const businessesWithSales = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0).length;
+
+        const behaviorFunnel = [
+            { 
+                stage: 'Node Establishment', 
+                count: totalUsers, 
+                description: 'Initial authentication successful.', 
+                color: 'from-blue-500 to-indigo-600', 
+                dropped: totalUsers - usersWithBusiness,
+                intel: `${totalUsers - usersWithBusiness} users failed to create a business container after signup.`
+            },
+            { 
+                stage: 'Architecture Provisioning', 
+                count: usersWithBusiness, 
+                description: 'Business environment virtualized.', 
+                color: 'from-emerald-500 to-teal-600', 
+                dropped: usersWithBusiness - businessesWithProducts,
+                intel: `${usersWithBusiness - businessesWithProducts} businesses exist but have ZERO inventory assets.`
+            },
+            { 
+                stage: 'Asset Deployment', 
+                count: businessesWithProducts, 
+                description: 'Inventory/Catalog operational.', 
+                color: 'from-amber-500 to-orange-600', 
+                dropped: businessesWithProducts - businessesWithSales,
+                intel: `${businessesWithProducts - businessesWithSales} businesses have setup inventory but haven't triggered a sale yet.`
+            },
+            { 
+                stage: 'Operational Mission', 
+                count: businessesWithSales, 
+                description: 'Tactical revenue stream active.', 
+                color: 'from-fuchsia-500 to-pink-600', 
+                dropped: 0,
+                intel: 'Fully operational nodes active in the field.'
+            }
+        ];
+
+        // Derived Tactical Intelligence
+        const averageLtv = 12000; // Estimated 12k NGN per user
+        const totalDropouts = totalUsers - businessesWithSales;
+        const revenueOpportunity = totalDropouts * averageLtv;
+        
+        const bottleneck = behaviorFunnel.slice(1).reduce((prev, curr) => 
+            ((curr.dropped || 0) / (behaviorFunnel[behaviorFunnel.indexOf(curr)-1].count || 1)) > 
+            ((prev.dropped || 0) / (behaviorFunnel[behaviorFunnel.indexOf(prev)-1].count || 1)) ? curr : prev, behaviorFunnel[1]);
 
         return {
             totalActiveBusinesses: activeBusinesses.length,
@@ -587,6 +670,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             conversionRate,
             expiringSoonList,
             topLocations,
+            behaviorFunnel,
+            intelligence: {
+                revenueOpportunity,
+                bottleneck: bottleneck.stage,
+                riskFactor: Math.round((totalDropouts / totalUsers) * 100) || 0,
+                prediction: `High conversion friction detected at ${bottleneck.stage} phase.`
+            },
             countryData: countryData.map(c => ({
                 ...c,
                 businesses: activeBusinesses.filter(b => (b.settings?.country || 'Pending Onboarding') === c.name)
@@ -594,7 +684,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             industryData: industryData.map(i => ({
                 ...i,
                 businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Pending Onboarding') === i.name)
-            }))
+            })),
+            businessesWithProducts,
+            businessesWithSales
         }
     }, [businesses, products, receipts, users]);
     const analyticsData = useMemo(() => {
@@ -948,28 +1040,59 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <HeartPulse className="h-5 w-5 text-primary" />
-                                Platform Health Overview
+                                Tactical Platform Command
                             </CardTitle>
                         </CardHeader>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full">
-                            <StatCard title="Businesses" value={platformAnalytics.totalActiveBusinesses} icon={Building} />
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+                        <StatCard 
+                            title="Nodes Established" 
+                            value={analyticsData.totalUsers} 
+                            icon={Users} 
+                            description="Total authenticated identities"
+                        />
+                        <StatCard 
+                            title="Operational Architectures" 
+                            value={analyticsData.totalBusinesses} 
+                            icon={Building} 
+                            description="Active business containers"
+                        />
+                        <StatCard 
+                            title="Asset Provisioning" 
+                            value={platformAnalytics.businessesWithProducts} 
+                            icon={Package} 
+                            description="Businesses with inventory"
+                        />
+                        <StatCard 
+                            title="Combat Ready" 
+                            value={platformAnalytics.businessesWithSales} 
+                            icon={Zap} 
+                            description="Revenue-generating nodes"
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 border-t border-white/5 pt-6">
+                        <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard title="Strategic Nodes" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Active business structures" />
                         </button>
-                        <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full" disabled={platformAnalytics.payingBusinessesList.length === 0}>
+                        <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full transition-transform active:scale-95" disabled={platformAnalytics.payingBusinessesList.length === 0}>
                             <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="Monthly Recurring" />
                         </button>
+                        <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description="Nodes with >10 assets" />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full transition-transform active:scale-95" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
+                            <StatCard title="At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No telemetry 14 days" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 mt-4">
                         <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="Annual Target" />
                         <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
                         <StatCard title="Sub Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`} icon={ShieldCheck} description="Total Software Sales" />
-                        <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full">
-                            <StatCard title="Avg. Sales/Day" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Activity} description="Sales Velocity" />
-                        </button>
-                        <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full">
-                            <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description=">=10 products" />
-                        </button>
-                        <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
-                            <StatCard title="At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No sales 14 days" />
-                        </button>
+                        <StatCard title="Platform AOV" value={`₦${analyticsData.platformAOV.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} description="Avg. Receipt Value" />
                     </div>
                     </Card>
 
@@ -1164,6 +1287,126 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </Card>
                         </CardContent>
                     </Card>
+                    <div className="mb-8">
+                    <div className="mb-6">
+                        {/* COMPREHENSIVE BEHAVIORAL INTELLIGENCE HEATMAP */}
+                        <Card className="bg-card border-border overflow-hidden relative group shadow-lg">
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
+                            <CardHeader className="relative z-10 border-b border-border/50 pb-8">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <CardTitle className="text-xl font-black text-foreground flex items-center gap-2 tracking-tight">
+                                            <Radar className="h-5 w-5 text-indigo-500 animate-pulse" />
+                                            MISSION BEHAVIORAL HEATMAP
+                                        </CardTitle>
+                                        <CardDescription className="text-muted-foreground font-bold tracking-[0.2em] uppercase text-[9px] mt-1">Intelligence Assessment & Live Attrition Telemetry</CardDescription>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-black text-indigo-600/80 uppercase tracking-widest mb-1">Revenue Opportunity</div>
+                                        <div className="text-3xl font-black text-foreground tracking-tighter">₦{platformAnalytics.intelligence.revenueOpportunity.toLocaleString()}</div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+
+                            <CardContent className="relative z-10 pt-10 pb-14 bg-muted/30">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
+                                    {platformAnalytics.behaviorFunnel.map((step, idx) => {
+                                        const isBottleneck = platformAnalytics.intelligence.bottleneck === step.stage;
+                                        return (
+                                            <div key={idx} className={cn(
+                                                "relative p-8 rounded-[2rem] border transition-all duration-500 group bg-card shadow-sm",
+                                                isBottleneck ? "border-rose-500/30 shadow-[0_0_30px_rgba(244,63,94,0.05)] ring-1 ring-rose-500/10" : "border-border hover:border-indigo-500/30 hover:shadow-md"
+                                            )}>
+                                                <div className="flex items-center justify-between mb-8">
+                                                    <div className={cn(
+                                                        "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br border border-white/20",
+                                                        step.color
+                                                    )}>
+                                                        {idx === 0 && <Users className="h-7 w-7 text-white" />}
+                                                        {idx === 1 && <Building className="h-7 w-7 text-white" />}
+                                                        {idx === 2 && <Package className="h-7 w-7 text-white" />}
+                                                        {idx === 3 && <Trophy className="h-7 w-7 text-white" />}
+                                                    </div>
+                                                    {step.dropped > 0 && (
+                                                        <div className="text-right">
+                                                            <div className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Attrition</div>
+                                                            <Badge variant="outline" className="border-rose-500/20 text-rose-600 bg-rose-500/5 px-3 py-1 text-[10px] font-black rounded-lg">
+                                                                -{step.dropped} 
+                                                            </Badge>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-1.5 mb-6">
+                                                    <div className="text-5xl font-black tracking-tighter text-foreground tabular-nums">{step.count}</div>
+                                                    <div className="text-[11px] font-black uppercase text-indigo-600/80 tracking-widest h-8">{step.stage}</div>
+                                                    <div className="text-[11px] text-muted-foreground leading-relaxed font-medium italic min-h-[3rem]">"{step.intel}"</div>
+                                                </div>
+
+                                                <div className="mt-8 pt-6 border-t border-border/50 space-y-4">
+                                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        <span>Retention Rate</span>
+                                                        <span className="text-indigo-600 font-bold">{Math.round((step.count / platformAnalytics.totalUsers) * 100)}%</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50 p-0.5">
+                                                        <motion.div 
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${(step.count / platformAnalytics.totalUsers) * 100}%` }}
+                                                            transition={{ duration: 1.5, ease: "easeOut" }}
+                                                            className={cn("h-full rounded-full shadow-lg bg-gradient-to-r", step.color)}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {step.dropped > 0 && (
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        className={cn(
+                                                            "mt-6 w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-xl",
+                                                            isBottleneck 
+                                                                ? "bg-rose-500/10 border-rose-500/20 text-rose-600 hover:bg-rose-500 hover:text-white" 
+                                                                : "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 hover:bg-indigo-500 hover:text-white"
+                                                        )}
+                                                        onClick={() => {
+                                                            (document.querySelector('[value="followups"]') as any)?.click();
+                                                        }}
+                                                    >
+                                                        Initiate Strike <Send className="h-3 w-3 ml-2" />
+                                                    </Button>
+                                                )}
+
+                                                {isBottleneck && (
+                                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                                                        <Badge className="bg-rose-600 border-rose-400 text-[10px] font-black animate-pulse shadow-lg uppercase px-4 py-1 rounded-full">
+                                                            Warning: High Friction
+                                                        </Badge>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                            
+                            <CardFooter className="bg-muted/50 border-t border-border py-6 px-10 flex justify-between items-center">
+                                <div className="flex gap-10 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500 shadow-md animate-pulse" />
+                                        Attrition Factor: {platformAnalytics.intelligence.riskFactor}%
+                                    </div>
+                                    <div className="flex items-center gap-2.5 text-indigo-600/80">
+                                        <Bot className="h-4 w-4" />
+                                        AI RECON: {platformAnalytics.intelligence.prediction}
+                                    </div>
+                                </div>
+                                <div className="text-[10px] font-bold italic text-muted-foreground uppercase tracking-widest">
+                                    *Validated Mission Telemetry
+                                </div>
+                            </CardFooter>
+                        </Card>
+                    </div>
+
                     
                     {/* New Industry & Country Analytics */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1269,8 +1512,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </CardContent>
                         </Card>
                     </div>
+                </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
                         <PlatformRevenueChart receipts={receipts || []} />
                         <UserGrowthChart users={users || []} />
                         <TransactionVolumeChart receipts={receipts || []} />
@@ -1482,6 +1726,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         users={users || []}
                         conversionRate={platformAnalytics.conversionRate}
                         churnRiskCount={platformAnalytics.churnRiskList.length}
+                        cachedLogs={outreachLogs}
+                        cachedSentCount={outreachSentCount}
+                        isLoading={isOutreachLoading}
+                        onRefresh={() => fetchOutreachData(true)}
+                        onMount={fetchOutreachData}
                     />
                 </TabsContent>
                 <TabsContent value="security">

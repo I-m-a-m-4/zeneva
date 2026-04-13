@@ -23,7 +23,7 @@ import { sendReceiptEmail } from '@/lib/email';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import usePaystack from '@/hooks/use-paystack';
-import StoreFooter from './footer';
+import StoreFooter from '@/components/store/footer';
 import { Switch } from '@/components/ui/switch';
 import { AppConfig } from '@/lib/config';
 import { useStore } from '@/context/store-context';
