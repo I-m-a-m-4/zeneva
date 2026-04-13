@@ -1,8 +1,10 @@
 
 import type { NextConfig } from 'next';
 
+const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
+
 const nextConfig: NextConfig = {
-  output: 'export',
+  output: isTauri ? 'export' : undefined,
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -10,7 +12,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: false,
   },
   images: {
-    unoptimized: true,
+    unoptimized: isTauri ? true : undefined,
     minimumCacheTTL: 31536000, // 1 year
     remotePatterns: [
       {
