@@ -137,12 +137,23 @@ export default function CyberShield() {
     }, [firestore]);
 
     const handleSendCode = async () => {
-        if (!auth || !authUser || !phoneNumber) return;
+        if (!auth || !authUser || !phoneNumber) {
+            console.warn("MFA Enrollment Failed: Missing auth context or phone number.");
+            return;
+        }
         setIsEnrolling(true);
+        console.log("Initiating MFA Enrollment for:", phoneNumber);
+        
         try {
+            const container = document.getElementById('recaptcha-container');
+            if (!container) {
+                throw new Error("ReCAPTCHA container missing from DOM.");
+            }
+
             if (!recaptchaRef.current) {
                 recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'invisible'
+                    'size': 'invisible',
+                    'callback': () => { console.log('Recaptcha solved'); }
                 });
             }
 
