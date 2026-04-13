@@ -84,12 +84,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 // --- Sub-components for Situation Awareness ---
 
 const ScanningEffect = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
         <motion.div 
             initial={{ y: "-100%" }}
             animate={{ y: "200%" }}
             transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-            className="h-1/2 w-full bg-gradient-to-b from-transparent via-primary/50 to-transparent"
+            className="h-1/2 w-full bg-gradient-to-b from-transparent via-primary/30 to-transparent"
         />
     </div>
 );
@@ -97,39 +97,42 @@ const ScanningEffect = () => (
 const RadarPulse = () => (
     <div className="relative w-16 h-16 flex items-center justify-center">
         <motion.div 
-            animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+            animate={{ scale: [1, 2], opacity: [0.3, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="absolute inset-0 bg-primary/30 rounded-full"
+            className="absolute inset-0 bg-primary/20 rounded-full"
         />
-        <div className="relative z-10 p-2 bg-background rounded-full border border-primary/20">
+        <div className="relative z-10 p-2 bg-background rounded-full border border-primary/10 shadow-sm">
             <Radar className="h-6 w-6 text-primary animate-spin-slow" />
         </div>
     </div>
 );
 
-const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, borderClass }: any) => (
-    <Card className={cn("bg-black/40 border-slate-800 backdrop-blur-md relative overflow-hidden group hover:border-primary/40 transition-all", borderClass)}>
+const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, borderClass, onClick }: any) => (
+    <Card 
+        className={cn("relative overflow-hidden group hover:shadow-md transition-all border-border/50", borderClass)}
+        onClick={onClick}
+    >
         <ScanningEffect />
         <CardHeader className="p-4 pb-0">
-            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center justify-between">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                 {label}
-                <Icon className={cn("h-3 w-3", colorClass)} />
+                <Icon className={cn("h-3.5 w-3.5", colorClass)} />
             </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
-            <div className={cn("text-2xl font-black font-mono tracking-tighter", colorClass)}>
+            <div className={cn("text-2xl font-black tracking-tight", colorClass)}>
                 {value}
             </div>
-            <div className="text-[9px] text-muted-foreground font-mono mt-1 opacity-60">
+            <div className="text-[10px] text-muted-foreground font-medium mt-1">
                 {subValue}
             </div>
-            <motion.div 
-                className="h-1 bg-current opacity-20 mt-3 rounded-full overflow-hidden"
-                initial={{ width: 0 }}
-                animate={{ width: "100%" }}
-            >
-                <div className={cn("h-full", colorClass.replace('text', 'bg'))} />
-            </motion.div>
+            <div className="h-1 bg-muted mt-3 rounded-full overflow-hidden">
+                <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "100%" }}
+                    className={cn("h-full", colorClass.replace('text', 'bg'))} 
+                />
+            </div>
         </CardContent>
     </Card>
 );
@@ -141,7 +144,6 @@ export default function CyberShield() {
     const [isLoadingLogs, setIsLoadingLogs] = useState(true);
     const [indexError, setIndexError] = useState<string | null>(null);
     const [isRevoking, setIsRevoking] = useState<string | null>(null);
-    const [systemPulse, setSystemPulse] = useState(0);
 
     // MFA Enrollment State
     const [isMfaModalOpen, setIsMfaModalOpen] = useState(false);
@@ -158,19 +160,13 @@ export default function CyberShield() {
 
     const adminCount = useMemo(() => allUsers?.filter(u => u.role === 'admin' || u.role === 'manager').length || 0, [allUsers]);
 
-    // System Pulse Effect
-    useEffect(() => {
-        const interval = setInterval(() => setSystemPulse(p => (p + 1) % 100), 1000);
-        return () => clearInterval(interval);
-    }, []);
-
     const mfaStatus = useMemo(() => {
-        if (!authUser) return { enabled: false, color: 'text-rose-500', bg: 'bg-rose-500' };
+        if (!authUser) return { enabled: false, color: 'text-rose-600', bg: 'bg-rose-600' };
         const enrolled = (authUser as any).multiFactor?.enrolledFactors?.length > 0;
         return {
             enabled: enrolled,
-            color: enrolled ? 'text-emerald-500' : 'text-rose-500',
-            bg: enrolled ? 'bg-emerald-500' : 'bg-rose-500',
+            color: enrolled ? 'text-emerald-600' : 'text-rose-600',
+            bg: enrolled ? 'bg-emerald-600' : 'bg-rose-600',
             label: enrolled ? 'SECURE' : 'UNPROTECTED'
         };
     }, [authUser]);
@@ -258,7 +254,7 @@ export default function CyberShield() {
                 suspendedAt: serverTimestamp(),
                 suspendedBy: 'SOC_PRIME'
             });
-            toast({ title: "Target Neutered", description: "System access revoked. Node dark.", className: "bg-red-950 text-red-500 border-red-500/50" });
+            toast({ title: "Target Neutered", description: "System access revoked. Node dark.", className: "bg-red-600 text-white border-none" });
         } catch (err) {
             toast({ variant: "destructive", title: "Kill Command Failed", description: "Security override insufficient." });
         } finally {
@@ -272,45 +268,45 @@ export default function CyberShield() {
         const criticalDeletes = recentLogs.filter(l => l.action?.includes('delete')).length;
         const sensitiveCount = impersonations + criticalDeletes;
 
-        if (sensitiveCount > 5) return { level: 'CRITICAL', score: 28, color: 'text-rose-500', from: 'from-rose-500', variant: 'destructive' as const };
-        if (sensitiveCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-500', from: 'from-amber-500', variant: 'outline' as const };
-        return { level: 'OPTIMAL', score: 94, color: 'text-emerald-500', from: 'from-emerald-500', variant: 'default' as const };
+        if (sensitiveCount > 5) return { level: 'CRITICAL', score: 28, color: 'text-rose-600', from: 'from-rose-600', variant: 'destructive' as const };
+        if (sensitiveCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-600', from: 'from-amber-600', variant: 'outline' as const };
+        return { level: 'OPTIMAL', score: 94, color: 'text-emerald-600', from: 'from-emerald-600', variant: 'default' as const };
     }, [auditLogs]);
 
     return (
-        <div className="space-y-6 bg-[#020617] p-6 rounded-2xl border border-slate-900 shadow-2xl relative overflow-hidden">
-            {/* Cyber Grid Background */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="space-y-6 relative overflow-hidden">
+            {/* Subtle Grid Background */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
             
             <div id="recaptcha-admin-container"></div>
             
             {/* Top Bar - Situation Room Header */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-b border-white/5 pb-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-b pb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
-                        <h1 className="text-sm font-black tracking-[0.4em] uppercase text-white/90">Cyber Shield v4.2</h1>
+                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <h1 className="text-base font-bold tracking-tight text-foreground/90">Cyber Shield Surveillance</h1>
                     </div>
-                    <p className="text-[10px] font-mono text-muted-foreground uppercase opacity-50 tracking-widest">
-                        Zeneva Surveillance & Response Intelligence Hub
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        Critical Platform Surveillance & Intelligence Hub
                     </p>
                 </div>
                 
                 <div className="flex items-center gap-6">
                     <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-mono text-muted-foreground uppercase mb-1">Grid Latency</span>
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Link integrity</span>
                         <div className="flex gap-1">
                             {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className={cn("h-3 w-1 rounded-sm", i <= 4 ? "bg-emerald-500/50" : "bg-slate-800")} />
+                                <div key={i} className={cn("h-3 w-1 rounded-sm", i <= 4 ? "bg-emerald-500/40" : "bg-muted")} />
                             ))}
                         </div>
                     </div>
-                    <div className="flex flex-col items-end border-l border-white/10 pl-6">
-                        <span className="text-[9px] font-mono text-muted-foreground uppercase mb-1">Uptime</span>
-                        <span className="text-xs font-bold font-mono text-white/80">99.982%</span>
+                    <div className="flex flex-col items-end border-l pl-6">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Grid Uptime</span>
+                        <span className="text-xs font-bold font-mono">99.9%</span>
                     </div>
-                    <Button onClick={fetchGlobalAudit} variant="ghost" className="h-10 w-10 p-0 rounded-full hover:bg-white/5 group">
-                        <RefreshCw className={cn("h-4 w-4 text-primary group-hover:rotate-180 transition-transform duration-500", isLoadingLogs && "animate-spin")} />
+                    <Button onClick={fetchGlobalAudit} variant="outline" size="icon" className="h-9 w-9 rounded-full bg-white group">
+                        <RefreshCw className={cn("h-4 w-4 text-muted-foreground group-hover:rotate-180 transition-transform duration-500", isLoadingLogs && "animate-spin")} />
                     </Button>
                 </div>
             </div>
@@ -318,167 +314,165 @@ export default function CyberShield() {
             {/* Main Situational Display */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10">
                 
-                {/* Tactical Health Core */}
-                <Card className="lg:col-span-1 bg-black/40 border-slate-800 backdrop-blur-xl relative overflow-hidden flex flex-col items-center justify-center p-8">
+                {/* Health Core */}
+                <Card className="lg:col-span-1 border-border/50 relative overflow-hidden flex flex-col items-center justify-center p-8 bg-white/50 backdrop-blur-sm">
                     <ScanningEffect />
                     <RadarPulse />
                     <div className="mt-6 text-center">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Integrity Score</p>
-                        <div className={cn("text-5xl font-black font-mono tracking-tighter", securityMatrix.color)}>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">System Health</p>
+                        <div className={cn("text-5xl font-black tracking-tighter", securityMatrix.color)}>
                             {securityMatrix.score}%
                         </div>
-                        <Badge variant="secondary" className={cn("mt-3 px-3 py-0.5 font-black uppercase text-[10px] tracking-tighter bg-opacity-10", securityMatrix.color.replace('text', 'bg'))}>
+                        <Badge variant="secondary" className="mt-3 font-bold uppercase text-[10px] tracking-tight">
                             {securityMatrix.level}
                         </Badge>
                     </div>
                     <div className="w-full space-y-2 mt-8">
-                        <div className="flex justify-between text-[9px] font-mono text-muted-foreground uppercase">
+                        <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase">
                             <span>Threat Density</span>
                             <span>Low</span>
                         </div>
-                        <Progress value={24} className="h-1 bg-slate-800" indicatorClassName="bg-cyan-500" />
+                        <Progress value={24} className="h-1 bg-muted" indicatorClassName="bg-primary" />
                     </div>
                 </Card>
 
                 {/* Surveillance Metrics Grid */}
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <SecurityMetric 
-                        label="Active Surface Nodes" 
+                        label="Surface Nodes" 
                         value={`${adminCount} ADMINS`}
                         subValue="Verified entry protocols active"
                         icon={Cpu}
-                        colorClass="text-blue-400"
+                        colorClass="text-blue-600"
                     />
                     <SecurityMetric 
-                        label="Encryption Tethers" 
-                        value="AES-256 GCM"
-                        subValue="End-to-end socket verified"
+                        label="Encryption" 
+                        value="AES-256"
+                        subValue="End-to-end verified"
                         icon={LockIcon}
-                        colorClass="text-purple-400"
+                        colorClass="text-purple-600"
                     />
                     <SecurityMetric 
-                        label="Identity Lockdown" 
+                        label="Identity State" 
                         value={mfaStatus.label}
-                        subValue={mfaStatus.enabled ? "Secure Link: Verified" : "CRITICAL: Bypass Danger"}
+                        subValue={mfaStatus.enabled ? "Secure Link: Active" : "Action Required"}
                         icon={Fingerprint}
                         colorClass={mfaStatus.color}
-                        borderClass={!mfaStatus.enabled ? "border-rose-500/30 animate-pulse cursor-pointer" : ""}
+                        borderClass={!mfaStatus.enabled ? "border-rose-500/20 shadow-rose-100 shadow-sm animate-pulse cursor-pointer" : ""}
                         onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}
                     />
                     
                     {/* Live Activity Monitor */}
-                    <Card className="md:col-span-3 bg-black/40 border-slate-800 backdrop-blur-md p-4">
+                    <Card className="md:col-span-3 border-border/50 p-4 bg-white/50 backdrop-blur-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Tactical Feed Overview</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recent Neural Activity</span>
                             </div>
-                            <div className="text-[9px] font-mono text-emerald-500/60 uppercase">
-                                Monitoring {auditLogs.length} Points of Interest
+                            <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
+                                Monitoring Feed
                             </div>
                         </div>
-                        <div className="h-32 overflow-hidden relative">
-                             <div className="space-y-1">
+                        <div className="h-28 overflow-hidden relative">
+                             <div className="space-y-1.5">
                                 {auditLogs.slice(0, 4).map((log, i) => (
-                                    <div key={i} className="flex items-center gap-4 text-[10px] font-mono border-l-2 border-emerald-500/20 pl-4 py-2 hover:bg-white/5 transition-colors cursor-default">
-                                        <span className={cn("font-bold min-w-[60px]", i === 0 ? "text-emerald-400" : "text-slate-500")}>
-                                            [{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm:ss') : 'LIVE'}]
+                                    <div key={i} className="flex items-center gap-4 text-[11px] border-l-2 border-primary/20 pl-4 py-1.5 hover:bg-muted/50 transition-colors cursor-default">
+                                        <span className={cn("font-bold min-w-[60px] font-mono", i === 0 ? "text-primary" : "text-muted-foreground")}>
+                                            [{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : 'NOW'}]
                                         </span>
-                                        <span className="text-slate-400 uppercase">{log.userName}</span>
-                                        <ArrowRight className="h-2 w-2 text-slate-700" />
-                                        <span className="text-white/80 font-bold">{log.action.toUpperCase()}</span>
-                                        <span className="text-slate-600 truncate opacity-40">{log.entityType} › {log.id}</span>
+                                        <span className="text-muted-foreground uppercase font-medium">{log.userName}</span>
+                                        <ArrowRight className="h-2.5 w-2.5 text-muted-foreground/30" />
+                                        <span className="text-foreground font-bold">{log.action.toUpperCase()}</span>
+                                        <span className="text-muted-foreground/50 truncate max-w-[200px]">{log.entityType}</span>
                                     </div>
                                 ))}
                              </div>
-                             <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#020617] to-transparent" />
+                             <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background/80 to-transparent" />
                         </div>
                     </Card>
                 </div>
             </div>
 
             {/* The Intelligence Feed (Audit Logs) */}
-            <Card className="bg-[#020617] border-slate-800 shadow-2xl relative overflow-hidden relative z-10">
-                <CardHeader className="bg-white/5 border-b border-white/5 p-6">
+            <Card className="border-border/50 shadow-sm overflow-hidden relative z-10">
+                <CardHeader className="bg-muted/30 border-b p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <CardTitle className="text-sm flex items-center gap-2 font-black tracking-[0.2em] uppercase text-white/90">
+                            <CardTitle className="text-sm flex items-center gap-2 font-bold tracking-tight">
                                 <Terminal className="h-4 w-4 text-primary" />
-                                Operational Audit Stream
+                                Tactical Audit Stream
                             </CardTitle>
-                            <CardDescription className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                                Raw intelligence feed from all platform nodes.
+                            <CardDescription className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                                Real-time monitoring of all platform nodes.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <Badge variant="outline" className="text-[10px] font-mono border-white/10 bg-white/5 text-white/60">
-                                {auditLogs.length} EVENTS LOADED
-                            </Badge>
-                        </div>
+                        <Badge variant="outline" className="text-[10px] font-bold border-border/50">
+                            {auditLogs.length} EVENTS LOADED
+                        </Badge>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="bg-black/20">
-                                <TableRow className="hover:bg-transparent border-white/5">
-                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12">Identification</TableHead>
-                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12 px-6">Event Protocol</TableHead>
-                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12">Action Payload</TableHead>
-                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12 text-right">Countermeasures</TableHead>
+                            <TableHeader className="bg-muted/10">
+                                <TableRow className="hover:bg-transparent border-border/50">
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Admin Node</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 px-6">Event Type</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Payload</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoadingLogs ? (
                                     [...Array(6)].map((_, i) => (
-                                        <TableRow key={i} className="border-white/5"><TableCell colSpan={4}><div className="h-10 w-full bg-white/5 animate-pulse rounded" /></TableCell></TableRow>
+                                        <TableRow key={i} className="border-border/50"><TableCell colSpan={4}><div className="h-10 w-full bg-muted/20 animate-pulse rounded" /></TableCell></TableRow>
                                     ))
                                 ) : auditLogs.length === 0 ? (
-                                    <TableRow className="border-white/5">
-                                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-mono text-xs italic">
-                                            Operational tranquility confirmed. Zero threat vectors detected.
+                                    <TableRow className="border-border/50">
+                                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-medium text-xs italic">
+                                            No security alerts detected.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     auditLogs.map((log) => (
-                                        <TableRow key={log.id} className="group hover:bg-primary/5 transition-all border-white/5">
+                                        <TableRow key={log.id} className="group hover:bg-muted/30 transition-all border-border/50">
                                             <TableCell>
                                                 <div className="flex flex-col py-2">
-                                                    <span className="font-black text-[11px] text-white/90 tracking-tight">{log.userName}</span>
-                                                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-50">{log.userEmail}</span>
+                                                    <span className="font-bold text-[11px] text-foreground/90">{log.userName}</span>
+                                                    <span className="text-[10px] text-muted-foreground font-medium">{log.userEmail}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="px-6">
                                                 <div className="flex items-center gap-3">
                                                     {log.action?.includes('delete') || log.action?.includes('void') ? (
-                                                        <div className="h-6 w-1 bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+                                                        <div className="h-5 w-1 bg-rose-500 rounded-full" />
                                                     ) : log.action?.includes('impersonation') ? (
-                                                        <div className="h-6 w-1 bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                                                        <div className="h-5 w-1 bg-blue-500 rounded-full" />
                                                     ) : (
-                                                        <div className="h-6 w-1 bg-slate-700" />
+                                                        <div className="h-5 w-1 bg-slate-300 rounded-full" />
                                                     )}
                                                     <div className="flex flex-col">
                                                         <span className={cn(
-                                                            "text-[10px] font-black font-mono tracking-tighter uppercase",
-                                                            log.action?.includes('delete') ? "text-rose-400" : "text-white/70"
+                                                            "text-[11px] font-bold uppercase tracking-tight",
+                                                            log.action?.includes('delete') ? "text-rose-600" : "text-foreground/70"
                                                         )}>{log.action}</span>
-                                                        <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">
-                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'LIVE'}
+                                                        <span className="text-[9px] font-medium text-muted-foreground uppercase">
+                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'NOW'}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                <div className="flex items-center gap-2">
-                                                   <div className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-mono text-white/50">{log.entityType}</div>
-                                                   <span className="text-[10px] font-mono text-slate-400 truncate max-w-[150px]">{log.entityId}</span>
+                                                   <Badge variant="outline" className="px-1.5 py-0 rounded text-[9px] font-bold text-muted-foreground">{log.entityType}</Badge>
+                                                   <span className="text-[10px] font-medium text-slate-500 truncate max-w-[150px]">{log.entityId}</span>
                                                </div>
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 opacity-40 group-hover:opacity-100 transition-all border border-transparent hover:border-rose-500/20"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
                                                     onClick={() => handleHardKill(log.userId, log.userName)}
                                                     disabled={isRevoking === log.userId}
                                                 >
@@ -492,20 +486,16 @@ export default function CyberShield() {
                         </Table>
                     </div>
                 </CardContent>
-                <CardFooter className="bg-black/40 border-t border-white/5 py-3 p-6 flex justify-between items-center">
+                <CardFooter className="bg-muted/20 border-t py-3 p-6 flex justify-between items-center">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
-                            <Server className="h-3 w-3 text-emerald-500/50" />
-                            <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">Main Node: us-central1-f</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 border-l border-white/10 pl-4">
-                            <Shield className="h-3 w-3 text-blue-500/50" />
-                            <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">Auth: Firebase-Admin-v14</span>
+                            <Server className="h-3 w-3 text-muted-foreground/40" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Zeneva Node Linked</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
-                        <span className="text-[8px] font-black text-primary uppercase tracking-[0.3em]">Neural link established</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Secure Link Active</span>
                     </div>
                 </CardFooter>
             </Card>
@@ -514,34 +504,33 @@ export default function CyberShield() {
             <AnimatePresence>
                 {isMfaModalOpen && (
                     <Dialog open={isMfaModalOpen} onOpenChange={setIsMfaModalOpen}>
-                        <DialogContent className="sm:max-w-[400px] bg-[#020617] border-slate-800 text-white overflow-hidden p-0">
-                            <ScanningEffect />
+                        <DialogContent className="sm:max-w-[400px] overflow-hidden p-0 border-border/50">
                             <div className="p-6">
                                 <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-3 text-xl font-black uppercase tracking-tighter italic">
+                                    <DialogTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
                                         <div className="p-2 bg-primary/10 rounded-lg">
                                             <LockIcon className="h-5 w-5 text-primary" />
                                         </div>
-                                        Lockdown Protocol E-2
+                                        Secure Identity Link
                                     </DialogTitle>
-                                    <DialogDescription className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-2">
-                                        Verify physical hardware to secure admin node.
+                                    <DialogDescription className="text-muted-foreground text-xs font-medium uppercase tracking-wider mt-2">
+                                        Protect your admin node with hardware verification.
                                     </DialogDescription>
                                 </DialogHeader>
                                 
                                 <div className="space-y-6 py-8">
                                     {mfaStep === 'phone' ? (
                                         <div className="space-y-3">
-                                            <Label htmlFor="phone" className="text-[10px] font-black uppercase tracking-widest text-slate-500">Secure Comm Link (Phone)</Label>
+                                            <Label htmlFor="phone" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Admin Phone Number</Label>
                                             <div className="relative">
                                                 <Input 
                                                     id="phone" 
                                                     placeholder="+234..." 
                                                     value={phoneNumber} 
                                                     onChange={(e) => setPhoneNumber(e.target.value)}
-                                                    className="bg-black/50 border-slate-800 h-12 font-mono text-lg tracking-widest focus:border-primary transition-all"
+                                                    className="h-12 font-bold text-lg tracking-widest focus:ring-primary transition-all"
                                                 />
-                                                <Smartphone className="absolute right-3 top-3 h-6 w-6 text-slate-800" />
+                                                <Smartphone className="absolute right-3 top-3 h-6 w-6 text-muted-foreground/20" />
                                             </div>
                                         </div>
                                     ) : (
@@ -551,21 +540,14 @@ export default function CyberShield() {
                                             className="text-center"
                                         >
                                             <div className="flex justify-center mb-6">
-                                                <div className="relative">
-                                                    <motion.div 
-                                                        animate={{ scale: [1, 1.2, 1] }}
-                                                        transition={{ duration: 2, repeat: Infinity }}
-                                                        className="absolute inset-0 bg-primary/20 rounded-full blur-xl"
-                                                    />
-                                                    <div className="bg-slate-900 p-4 rounded-full border border-primary/40 relative">
-                                                        <Radio className="h-8 w-8 text-primary" />
-                                                    </div>
+                                                <div className="bg-muted p-4 rounded-full border relative">
+                                                    <Radio className="h-8 w-8 text-primary" />
                                                 </div>
                                             </div>
-                                            <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Transmission Received</Label>
-                                            <p className="text-xs text-slate-500 mt-2 font-mono">Input signal sequence</p>
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Transmission Received</Label>
+                                            <p className="text-xs text-muted-foreground mt-2 font-medium">Input 6-digit signal</p>
                                             <Input 
-                                                className="mt-6 bg-black/50 border-slate-800 text-center text-4xl tracking-[0.6em] font-black h-20 focus:border-emerald-500 focus:ring-emerald-500/20" 
+                                                className="mt-6 text-center text-4xl tracking-widest font-black h-20 focus:ring-emerald-500" 
                                                 maxLength={6} 
                                                 autoFocus
                                                 value={verificationCode}
@@ -580,7 +562,7 @@ export default function CyberShield() {
                                         variant="ghost" 
                                         onClick={() => setIsMfaModalOpen(false)} 
                                         disabled={isEnrolling}
-                                        className="font-black uppercase text-[10px] tracking-widest hover:bg-white/5"
+                                        className="font-bold uppercase text-[10px] tracking-widest"
                                     >
                                         Abort
                                     </Button>
@@ -588,16 +570,16 @@ export default function CyberShield() {
                                         <Button 
                                             onClick={handleSendCode} 
                                             disabled={isEnrolling || !phoneNumber}
-                                            className="flex-1 bg-primary hover:bg-primary/80 font-black uppercase text-[10px] tracking-widest h-12 shadow-[0_0_20px_rgba(3,105,161,0.3)]"
+                                            className="flex-1 bg-primary font-bold uppercase text-[11px] tracking-widest h-12 shadow-md"
                                         >
                                             {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Signal className="h-4 w-4 mr-2" />}
-                                            Establish Link
+                                            Link Node
                                         </Button>
                                     ) : (
                                         <Button 
                                             onClick={handleVerifyAndEnroll} 
                                             disabled={isEnrolling || verificationCode.length < 6}
-                                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-black uppercase text-[10px] tracking-widest h-12 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-bold uppercase text-[11px] tracking-widest h-12 shadow-md text-white border-none"
                                         >
                                             {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Crosshair className="h-4 w-4 mr-2" />}
                                             Confirm Identity
@@ -609,14 +591,6 @@ export default function CyberShield() {
                     </Dialog>
                 )}
             </AnimatePresence>
-            
-            {/* Real-time scanning noise effect - absolute overlay */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.03] animate-pulse bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
         </div>
     );
 }
-
-// Add these custom animations to tailwind.config.js if you want full effect:
-// animation: {
-//   'spin-slow': 'spin 8s linear infinity',
-// }
