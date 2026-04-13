@@ -2,7 +2,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: false,
   },
   images: {
+    unoptimized: true,
     minimumCacheTTL: 31536000, // 1 year
     remotePatterns: [
       {
@@ -85,28 +86,6 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       }
     ],
-  },
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, max-age=0',
-          },
-        ],
-      },
-    ];
-  },
-  async redirects() {
-    return [
-      {
-        source: '/admin/:path*',
-        destination: '/',
-        permanent: true,
-      },
-    ];
   },
 };
 
