@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp } from 'lucide-react';
+import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -154,13 +154,13 @@ export default function FollowUpCenter({
   const templates = [
     {
       name: 'Mission Recon',
-      subject: 'Strategy Check: Your ZENEVA Node',
-      body: (name: string) => `Hi ${name},<br><br>We noticed your node hasn't been mission-active lately. Is there a tactical hurdle we can help clear?<br><br>Our team is ready to assist in deploying your assets more effectively.<br><br>Best,<br>Bime @ ZENEVA POS & INVENTORY`
+      subject: 'Strategy Check: Your ZENEVA Node Architecture',
+      body: (name: string) => `Hi ${name || 'there'},<br><br>I noticed your ZENEVA node has been inactive for a few days. We're eager to see your business operations back in full swing.<br><br>Is there a specific tactical hurdle or technical friction point holding you back? Whether it's stock management or hardware syncing, I'm here to ensure your deployment is successful.<br><br>Reply to this email if you'd like a quick 5-minute audit of your setup.<br><br>Best,<br>Bime @ ZENEVA`
     },
     {
       name: 'Asset Provisioning',
-      subject: 'Critical: Finalize your Business Architecture',
-      body: (name: string) => `Hi ${name},<br><br>Your business container is established but assets are not yet provisioned. Let's get your first products deployed today to reach optimal readiness.<br><br>Best,<br>Bime @ ZENEVA POS & INVENTORY`
+      subject: 'Operational Readiness: Finalize your Business Assets',
+      body: (name: string) => `Hi ${name || 'there'},<br><br>Your ZENEVA business container is established, but we haven't seen your first assets provisioned yet. To reach optimal readiness, let's get your product catalog deployed today.<br><br>Once your inventory is live, you'll be able to trigger your first sales mission and see the full power of the platform.<br><br>Need help importing your data? Just let me know.<br><br>Best,<br>Bime @ ZENEVA`
     }
   ];
 
@@ -309,7 +309,7 @@ export default function FollowUpCenter({
                       <TableRow key={log.id}>
                         <TableCell>
                           <div className="font-bold text-xs flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                             {log.recipientName}
                           </div>
                           <div className="text-[10px] text-muted-foreground ml-3">{log.sentTo}</div>
@@ -318,8 +318,8 @@ export default function FollowUpCenter({
                           <div className="text-xs font-medium truncate">{log.subject}</div>
                           {log.behaviorContext && (
                             <div className="flex items-center gap-1 mt-1">
-                                <Bot className="h-3 w-3 text-indigo-400" />
-                                <span className="text-[9px] text-indigo-400/80 font-black uppercase tracking-tighter">Intel: {log.behaviorContext}</span>
+                                <Bot className="h-3 w-3 text-orange-400" />
+                                <span className="text-[9px] text-orange-400/80 font-black uppercase tracking-tighter">Intel: {log.behaviorContext}</span>
                             </div>
                           )}
                         </TableCell>
@@ -339,7 +339,7 @@ export default function FollowUpCenter({
                               {log.count > 1 && <span className="ml-1">({log.count}x)</span>}
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[10px] font-black uppercase">
+                            <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] font-black uppercase">
                               <Clock className="h-3 w-3 mr-1" /> Dispatch
                               {log.count > 1 && <span className="ml-1">({log.count})</span>}
                             </Badge>
@@ -358,8 +358,8 @@ export default function FollowUpCenter({
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-indigo-500/10" onClick={() => setViewLog(log)}>
-                            <Search className="h-4 w-4 text-indigo-400" />
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-orange-500/10" onClick={() => setViewLog(log)}>
+                            <Search className="h-4 w-4 text-orange-400" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -411,9 +411,9 @@ export default function FollowUpCenter({
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSendEmail} disabled={isSending}>
+            <Button onClick={handleSendEmail} disabled={isSending} className="bg-orange-600 hover:bg-orange-700 text-white">
               {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Dispatch Email
+              Dispatch Strike
             </Button>
           </DialogFooter>
         </DialogContent>

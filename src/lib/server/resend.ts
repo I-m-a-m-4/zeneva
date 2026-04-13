@@ -21,28 +21,39 @@ export interface EmailParams {
 function wrapInTemplate(body: string, trackId: string): string {
   const year = new Date().getFullYear();
   return `
-    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="padding: 20px 0;">
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="background-color: #fcfcfc; padding: 25px; border-bottom: 1px solid #f5f5f5;">
+        <div style="font-size: 20px; font-weight: 800; color: #f97316; letter-spacing: -0.5px;">ZENEVA</div>
+      </div>
+      
+      <div style="padding: 40px 30px; color: #1f2937; line-height: 1.7; font-size: 15px;">
         ${body}
       </div>
       
-      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
-        <p>Talk soon,<br/><strong>Bime from Zeneva</strong></p>
-        <p>--<br/>Account Executive | Zeneva POS & Inventory<br/>
-           <a href="https://zeneva.space" style="color: #6366f1; text-decoration: none;">Visit our workspace</a>
+      <div style="margin: 0 30px; padding: 30px 0; border-top: 1px solid #f0f0f0; font-size: 13px; color: #6b7280;">
+        <p style="margin-bottom: 15px;">Talk soon,<br/><strong>Bime from Zeneva</strong></p>
+        <p style="margin: 0; font-size: 12px; line-height: 1.5;">
+          <strong>Account Executive</strong><br/>
+          Zeneva POS & Inventory<br/>
+          <a href="https://zeneva.space" style="color: #f97316; text-decoration: none; font-weight: 600;">Launch your workspace →</a>
         </p>
       </div>
 
-      <!-- HubSpot-style Branded Bar -->
-      <div style="margin-top: 30px; height: 40px; background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <div style="color: white; font-weight: 800; letter-spacing: 2px; font-size: 14px; text-transform: uppercase;">
-          ZENEVA POS & INVENTORY
+      <!-- ZENEVA Premium Branded Bar - Orange -->
+      <div style="padding: 0 30px 40px;">
+        <div style="height: 50px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 8px; display: table; width: 100%; border-collapse: separate;">
+          <div style="display: table-cell; vertical-align: middle; text-align: center; color: white; font-weight: 900; letter-spacing: 3px; font-size: 14px; text-transform: uppercase;">
+            ZENEVA POS & INVENTORY
+          </div>
         </div>
       </div>
       
-      <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #999;">
+      <div style="background-color: #f9fafb; padding: 30px; text-align: center; font-size: 11px; color: #9ca3af;">
         &copy; ${year} Zeneva Space. All rights reserved.<br/>
-        You are receiving this because you showed interest in our intelligence engine.
+        <div style="margin-top: 10px;">
+          You requested intelligence updates from our engine. 
+          <br/>To optimize your node settings, <a href="https://zeneva.space/settings" style="color: #6b7280; text-decoration: underline;">manage notifications here</a>.
+        </div>
       </div>
 
       <!-- Tracking Pixel -->
@@ -71,6 +82,7 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
     businessId: params.businessId || 'unknown',
     type: params.type || 'follow-up',
     behavior: params.behaviorContext || {}, // Exploit why they quit here
+    html: htmlWithBranding, // Save full HTML for auditing
     openCount: 0
   });
 
