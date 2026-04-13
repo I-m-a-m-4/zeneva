@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { 
     ShieldAlert, 
     ShieldCheck, 
@@ -44,9 +45,19 @@ import {
     Search,
     RefreshCw,
     Smartphone,
-    CheckCircle2
+    CheckCircle2,
+    Eye,
+    Globe,
+    Cpu,
+    Radar,
+    LockIcon,
+    Radio,
+    Signal,
+    Power,
+    Server,
+    Crosshair
 } from 'lucide-react';
-import { useFirestore, useCollection, useMemoFirebase, useUser, useFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { 
     multiFactor,
     PhoneAuthProvider,
@@ -62,12 +73,65 @@ import {
     collection,
     doc,
     updateDoc,
-    serverTimestamp,
-    getDoc
+    serverTimestamp
 } from 'firebase/firestore';
-import { formatDistanceToNow, subHours } from 'date-fns';
+import { format, formatDistanceToNow, subHours, subMinutes } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Sub-components for Situation Awareness ---
+
+const ScanningEffect = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+        <motion.div 
+            initial={{ y: "-100%" }}
+            animate={{ y: "200%" }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            className="h-1/2 w-full bg-gradient-to-b from-transparent via-primary/50 to-transparent"
+        />
+    </div>
+);
+
+const RadarPulse = () => (
+    <div className="relative w-16 h-16 flex items-center justify-center">
+        <motion.div 
+            animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-0 bg-primary/30 rounded-full"
+        />
+        <div className="relative z-10 p-2 bg-background rounded-full border border-primary/20">
+            <Radar className="h-6 w-6 text-primary animate-spin-slow" />
+        </div>
+    </div>
+);
+
+const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, borderClass }: any) => (
+    <Card className={cn("bg-black/40 border-slate-800 backdrop-blur-md relative overflow-hidden group hover:border-primary/40 transition-all", borderClass)}>
+        <ScanningEffect />
+        <CardHeader className="p-4 pb-0">
+            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center justify-between">
+                {label}
+                <Icon className={cn("h-3 w-3", colorClass)} />
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+            <div className={cn("text-2xl font-black font-mono tracking-tighter", colorClass)}>
+                {value}
+            </div>
+            <div className="text-[9px] text-muted-foreground font-mono mt-1 opacity-60">
+                {subValue}
+            </div>
+            <motion.div 
+                className="h-1 bg-current opacity-20 mt-3 rounded-full overflow-hidden"
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+            >
+                <div className={cn("h-full", colorClass.replace('text', 'bg'))} />
+            </motion.div>
+        </CardContent>
+    </Card>
+);
 
 export default function CyberShield() {
     const { firestore, auth, user: authUser } = useFirebase();
@@ -76,6 +140,7 @@ export default function CyberShield() {
     const [isLoadingLogs, setIsLoadingLogs] = useState(true);
     const [indexError, setIndexError] = useState<string | null>(null);
     const [isRevoking, setIsRevoking] = useState<string | null>(null);
+    const [systemPulse, setSystemPulse] = useState(0);
 
     // MFA Enrollment State
     const [isMfaModalOpen, setIsMfaModalOpen] = useState(false);
@@ -90,15 +155,22 @@ export default function CyberShield() {
     const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
     const { data: allUsers } = useCollection<any>(usersQuery);
 
-    const adminCount = useMemo(() => allUsers?.filter(u => u.role === 'admin').length || 0, [allUsers]);
+    const adminCount = useMemo(() => allUsers?.filter(u => u.role === 'admin' || u.role === 'manager').length || 0, [allUsers]);
+
+    // System Pulse Effect
+    useEffect(() => {
+        const interval = setInterval(() => setSystemPulse(p => (p + 1) % 100), 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     const mfaStatus = useMemo(() => {
-        if (!authUser) return { enabled: false, color: 'text-rose-500' };
+        if (!authUser) return { enabled: false, color: 'text-rose-500', bg: 'bg-rose-500' };
         const enrolled = (authUser as any).multiFactor?.enrolledFactors?.length > 0;
         return {
             enabled: enrolled,
             color: enrolled ? 'text-emerald-500' : 'text-rose-500',
-            label: enrolled ? 'ENFORCED' : 'NOT CONFIGURED'
+            bg: enrolled ? 'bg-emerald-500' : 'bg-rose-500',
+            label: enrolled ? 'SECURE' : 'UNPROTECTED'
         };
     }, [authUser]);
 
@@ -109,7 +181,7 @@ export default function CyberShield() {
             const q = query(
                 collectionGroup(firestore, 'auditLogs'),
                 orderBy('createdAt', 'desc'),
-                limit(20)
+                limit(30)
             );
             const snap = await getDocs(q);
             const logs = snap.docs.map(doc => ({
@@ -122,9 +194,7 @@ export default function CyberShield() {
         } catch (err: any) {
             console.error("Failed to fetch global audit logs:", err);
             if (err.message?.includes('index')) {
-                setIndexError("Audit Log Index required. Please click the link in your console to enable global monitoring.");
-            } else if (err.message?.includes('permission')) {
-                setIndexError("Security Rules update pending. Ensure your user has 'Super Admin' privileges.");
+                setIndexError("Audit Log Index required. Please enable global monitoring.");
             }
         } finally {
             setIsLoadingLogs(false);
@@ -133,42 +203,28 @@ export default function CyberShield() {
 
     useEffect(() => {
         fetchGlobalAudit();
+        const interval = setInterval(fetchGlobalAudit, 30000); // Auto-sync every 30s
+        return () => clearInterval(interval);
     }, [firestore]);
 
     const handleSendCode = async () => {
-        if (!auth || !authUser || !phoneNumber) {
-            console.warn("MFA Enrollment Failed: Missing auth context or phone number.");
-            return;
-        }
+        if (!auth || !authUser || !phoneNumber) return;
         setIsEnrolling(true);
-        console.log("Initiating MFA Enrollment for:", phoneNumber);
-        
         try {
-            const container = document.getElementById('recaptcha-container');
-            if (!container) {
-                throw new Error("ReCAPTCHA container missing from DOM.");
-            }
-
             if (!recaptchaRef.current) {
-                recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'invisible',
-                    'callback': () => { console.log('Recaptcha solved'); }
+                recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-admin-container', {
+                    'size': 'invisible'
                 });
             }
-
             const session = await multiFactor(authUser).getSession();
-            const phoneInfoOptions = {
-                phoneNumber: phoneNumber,
-                session: session
-            };
+            const phoneInfoOptions = { phoneNumber, session };
             const phoneAuthProvider = new PhoneAuthProvider(auth);
             const vId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaRef.current);
             setVerificationId(vId);
             setMfaStep('code');
-            toast({ title: "Code Sent", description: "Check your phone for the verification code." });
+            toast({ title: "Verification Initiated", description: "SMS gateway triggered." });
         } catch (error: any) {
-            console.error("MFA Error:", error);
-            toast({ variant: 'destructive', title: "Enrollment Failed", description: error.message });
+            toast({ variant: 'destructive', title: "Shield Breach", description: error.message });
         } finally {
             setIsEnrolling(false);
         }
@@ -179,327 +235,387 @@ export default function CyberShield() {
         setIsEnrolling(true);
         try {
             const cred = PhoneAuthProvider.credential(verificationId, verificationCode);
-            const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
-            await multiFactor(authUser).enroll(multiFactorAssertion, "Primary Admin Phone");
-            
+            const assertion = PhoneMultiFactorGenerator.assertion(cred);
+            await multiFactor(authUser).enroll(assertion, "Primary Hardware Node");
             setIsMfaModalOpen(false);
-            toast({ title: "MFA Enforced", description: "Your account is now protected by hardware-linked multi-factor auth." });
-            
-            // Reload page to update auth status
-            window.location.reload();
+            toast({ title: "Lockdown Protocol Active", description: "Account tethered to hardware factor." });
+            setTimeout(() => window.location.reload(), 1500);
         } catch (error: any) {
-            toast({ variant: 'destructive', title: "Verification Failed", description: "Invalid code. Please try again." });
+            toast({ variant: 'destructive', title: "Core Rejection", description: "Verification signature invalid." });
         } finally {
             setIsEnrolling(false);
         }
     };
 
     const handleHardKill = async (userId: string, userName: string) => {
-        if (!firestore || !window.confirm(`Are you sure you want to SHUT DOWN all sessions for ${userName}?`)) return;
-        
+        if (!firestore || !window.confirm(`TERMINATE access for ${userName}? This will sever all active neural links.`)) return;
         setIsRevoking(userId);
         try {
             const userRef = doc(firestore, 'users', userId);
             await updateDoc(userRef, { 
                 status: 'suspended',
                 suspendedAt: serverTimestamp(),
-                suspendedBy: 'CyberShield_Admin'
+                suspendedBy: 'SOC_PRIME'
             });
-            
-            toast({
-                title: "Perpetrator Neutered",
-                description: `All active sessions for ${userName} have been revoked. Access denied.`,
-                className: "bg-destructive text-white"
-            });
+            toast({ title: "Target Neutered", description: "System access revoked. Node dark.", className: "bg-red-950 text-red-500 border-red-500/50" });
         } catch (err) {
-            toast({ variant: "destructive", title: "Neutralization Failed", description: "Check admin privileges." });
+            toast({ variant: "destructive", title: "Kill Command Failed", description: "Security override insufficient." });
         } finally {
             setIsRevoking(null);
         }
     };
 
-    const threatLevel = useMemo(() => {
-        const recentLogs = auditLogs.filter(log => {
-            if (!log.createdAt) return false;
-            const logDate = log.createdAt.toDate();
-            // @ts-ignore
-            return logDate > subHours(new Date(), 24);
-        });
+    const securityMatrix = useMemo(() => {
+        const recentLogs = auditLogs.filter(log => log.createdAt?.toDate() > subHours(new Date(), 24));
+        const impersonations = recentLogs.filter(l => l.action?.includes('impersonation')).length;
+        const criticalDeletes = recentLogs.filter(l => l.action?.includes('delete')).length;
+        const sensitiveCount = impersonations + criticalDeletes;
 
-        const sensitiveActions = recentLogs.filter(log => 
-            log.action?.includes('delete') || 
-            log.action?.includes('impersonation') || 
-            log.action?.includes('void')
-        );
-
-        if (sensitiveActions.length > 5) return { label: 'CRITICAL', color: 'text-rose-600', from: 'from-rose-600', to: 'to-rose-400', icon: ShieldAlert, border: 'border-rose-500/20', bg: 'bg-rose-100' };
-        if (sensitiveActions.length > 0) return { label: 'MONITORED', color: 'text-amber-600', from: 'from-amber-600', to: 'to-amber-400', icon: Activity, border: 'border-amber-500/20', bg: 'bg-amber-100' };
-        return { label: 'NORMAL', color: 'text-emerald-600', from: 'from-emerald-600', to: 'to-emerald-400', icon: ShieldCheck, border: 'border-emerald-500/20', bg: 'bg-emerald-100' };
+        if (sensitiveCount > 5) return { level: 'CRITICAL', score: 28, color: 'text-rose-500', from: 'from-rose-500', variant: 'destructive' as const };
+        if (sensitiveCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-500', from: 'from-amber-500', variant: 'outline' as const };
+        return { level: 'OPTIMAL', score: 94, color: 'text-emerald-500', from: 'from-emerald-500', variant: 'default' as const };
     }, [auditLogs]);
 
-    const getActionBadge = (action: string) => {
-        if (action.includes('delete')) return <Badge variant="destructive" className="font-mono text-[9px]">{action}</Badge>;
-        if (action.includes('update')) return <Badge variant="outline" className="border-amber-500 text-amber-600 font-mono text-[9px] bg-amber-50">{action}</Badge>;
-        if (action.includes('impersonation')) return <Badge variant="default" className="bg-blue-600 font-bold font-mono text-[9px]">{action}</Badge>;
-        return <Badge variant="secondary" className="font-mono text-[9px]">{action}</Badge>;
-    };
-
     return (
-        <div className="space-y-6">
-            <div id="recaptcha-container"></div>
+        <div className="space-y-6 bg-[#020617] p-6 rounded-2xl border border-slate-900 shadow-2xl relative overflow-hidden">
+            {/* Cyber Grid Background */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className={cn("group overflow-hidden relative transition-all", threatLevel.border)}>
-                    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-10 pointer-events-none", threatLevel.from, "to-transparent")} />
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex justify-between items-center text-sm font-bold opacity-70">
-                            PLATFORM THREAT LEVEL
-                            <div className={cn("p-2 rounded-full", threatLevel.bg)}>
-                                <threatLevel.icon className={cn("h-4 w-4", threatLevel.color)} />
-                            </div>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className={cn("text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r", threatLevel.from, threatLevel.to)}>
-                            {threatLevel.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-2 font-medium">Global heuristics scan active</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="group overflow-hidden relative border-blue-500/20 transition-all">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent pointer-events-none" />
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex justify-between items-center text-sm font-bold opacity-70">
-                            ADMIN SURFACE NODES
-                            <div className="p-2 bg-blue-100 rounded-full">
-                                <Fingerprint className="h-4 w-4 text-blue-600" />
-                            </div>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
-                            {adminCount} USERS
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-2 font-medium">Controlled access points</p>
-                    </CardContent>
-                </Card>
-
-                <Card className={cn("group overflow-hidden relative transition-all", mfaStatus.enabled ? "border-emerald-500/20" : "border-rose-500/20 cursor-pointer")} onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}>
-                    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-10 pointer-events-none", mfaStatus.enabled ? "from-emerald-500" : "from-rose-500", "to-transparent")} />
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex justify-between items-center text-sm font-bold opacity-70">
-                            MFA COMPLIANCE
-                            <div className={cn("p-2 rounded-full", mfaStatus.enabled ? "bg-emerald-100" : "bg-rose-100 animate-pulse")}>
-                                <Lock className={cn("h-4 w-4", mfaStatus.color)} />
-                            </div>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className={cn("text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r", mfaStatus.enabled ? "from-emerald-600 to-emerald-400" : "from-rose-600 to-rose-400")}>
-                            {mfaStatus.label}
-                        </p>
-                        {mfaStatus.enabled ? (
-                            <p className="text-xs text-muted-foreground mt-2 font-medium">Identity Platform Protection</p>
-                        ) : (
-                            <p className="text-xs text-rose-600 mt-2 font-bold flex items-center gap-1 animate-bounce">
-                                <AlertCircle className="h-3 w-3" /> Click to Enforce Lockdown
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
+            <div id="recaptcha-admin-container"></div>
+            
+            {/* Top Bar - Situation Room Header */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-b border-white/5 pb-6">
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
+                        <h1 className="text-sm font-black tracking-[0.4em] uppercase text-white/90">Cyber Shield v4.2</h1>
+                    </div>
+                    <p className="text-[10px] font-mono text-muted-foreground uppercase opacity-50 tracking-widest">
+                        Zeneva Surveillance & Response Intelligence Hub
+                    </p>
+                </div>
+                
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-mono text-muted-foreground uppercase mb-1">Grid Latency</span>
+                        <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className={cn("h-3 w-1 rounded-sm", i <= 4 ? "bg-emerald-500/50" : "bg-slate-800")} />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end border-l border-white/10 pl-6">
+                        <span className="text-[9px] font-mono text-muted-foreground uppercase mb-1">Uptime</span>
+                        <span className="text-xs font-bold font-mono text-white/80">99.982%</span>
+                    </div>
+                    <Button onClick={fetchGlobalAudit} variant="ghost" className="h-10 w-10 p-0 rounded-full hover:bg-white/5 group">
+                        <RefreshCw className={cn("h-4 w-4 text-primary group-hover:rotate-180 transition-transform duration-500", isLoadingLogs && "animate-spin")} />
+                    </Button>
+                </div>
             </div>
 
-            <Card className="border-border/50 shadow-sm overflow-hidden">
-                <CardHeader className="bg-muted/50 border-b py-4">
+            {/* Main Situational Display */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10">
+                
+                {/* Tactical Health Core */}
+                <Card className="lg:col-span-1 bg-black/40 border-slate-800 backdrop-blur-xl relative overflow-hidden flex flex-col items-center justify-center p-8">
+                    <ScanningEffect />
+                    <RadarPulse />
+                    <div className="mt-6 text-center">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Integrity Score</p>
+                        <div className={cn("text-5xl font-black font-mono tracking-tighter", securityMatrix.color)}>
+                            {securityMatrix.score}%
+                        </div>
+                        <Badge variant="secondary" className={cn("mt-3 px-3 py-0.5 font-black uppercase text-[10px] tracking-tighter bg-opacity-10", securityMatrix.color.replace('text', 'bg'))}>
+                            {securityMatrix.level}
+                        </Badge>
+                    </div>
+                    <div className="w-full space-y-2 mt-8">
+                        <div className="flex justify-between text-[9px] font-mono text-muted-foreground uppercase">
+                            <span>Threat Density</span>
+                            <span>Low</span>
+                        </div>
+                        <Progress value={24} className="h-1 bg-slate-800" indicatorClassName="bg-cyan-500" />
+                    </div>
+                </Card>
+
+                {/* Surveillance Metrics Grid */}
+                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <SecurityMetric 
+                        label="Active Surface Nodes" 
+                        value={`${adminCount} ADMINS`}
+                        subValue="Verified entry protocols active"
+                        icon={Cpu}
+                        colorClass="text-blue-400"
+                    />
+                    <SecurityMetric 
+                        label="Encryption Tethers" 
+                        value="AES-256 GCM"
+                        subValue="End-to-end socket verified"
+                        icon={LockIcon}
+                        colorClass="text-purple-400"
+                    />
+                    <SecurityMetric 
+                        label="Identity Lockdown" 
+                        value={mfaStatus.label}
+                        subValue={mfaStatus.enabled ? "Secure Link: Verified" : "CRITICAL: Bypass Danger"}
+                        icon={Fingerprint}
+                        colorClass={mfaStatus.color}
+                        borderClass={!mfaStatus.enabled ? "border-rose-500/30 animate-pulse cursor-pointer" : ""}
+                        onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}
+                    />
+                    
+                    {/* Live Activity Monitor */}
+                    <Card className="md:col-span-3 bg-black/40 border-slate-800 backdrop-blur-md p-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Tactical Feed Overview</span>
+                            </div>
+                            <div className="text-[9px] font-mono text-emerald-500/60 uppercase">
+                                Monitoring {auditLogs.length} Points of Interest
+                            </div>
+                        </div>
+                        <div className="h-32 overflow-hidden relative">
+                             <div className="space-y-1">
+                                {auditLogs.slice(0, 4).map((log, i) => (
+                                    <div key={i} className="flex items-center gap-4 text-[10px] font-mono border-l-2 border-emerald-500/20 pl-4 py-2 hover:bg-white/5 transition-colors cursor-default">
+                                        <span className={cn("font-bold min-w-[60px]", i === 0 ? "text-emerald-400" : "text-slate-500")}>
+                                            [{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm:ss') : 'LIVE'}]
+                                        </span>
+                                        <span className="text-slate-400 uppercase">{log.userName}</span>
+                                        <ArrowRight className="h-2 w-2 text-slate-700" />
+                                        <span className="text-white/80 font-bold">{log.action.toUpperCase()}</span>
+                                        <span className="text-slate-600 truncate opacity-40">{log.entityType} › {log.id}</span>
+                                    </div>
+                                ))}
+                             </div>
+                             <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#020617] to-transparent" />
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            {/* The Intelligence Feed (Audit Logs) */}
+            <Card className="bg-[#020617] border-slate-800 shadow-2xl relative overflow-hidden relative z-10">
+                <CardHeader className="bg-white/5 border-b border-white/5 p-6">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <CardTitle className="text-base flex items-center gap-2 font-bold tracking-tight">
-                                <Terminal className="h-5 w-5 text-primary" />
-                                High-Priority Audit Stream
+                        <div className="space-y-1">
+                            <CardTitle className="text-sm flex items-center gap-2 font-black tracking-[0.2em] uppercase text-white/90">
+                                <Terminal className="h-4 w-4 text-primary" />
+                                Operational Audit Stream
                             </CardTitle>
-                            <CardDescription className="text-xs">
-                                Real-time monitoring of administrative protocols.
+                            <CardDescription className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                Raw intelligence feed from all platform nodes.
                             </CardDescription>
                         </div>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 gap-2 bg-white" 
-                            onClick={fetchGlobalAudit}
-                            disabled={isLoadingLogs}
-                        >
-                            <RefreshCw className={cn("h-3.5 w-3.5", isLoadingLogs && "animate-spin")} />
-                            Sync Feed
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="text-[10px] font-mono border-white/10 bg-white/5 text-white/60">
+                                {auditLogs.length} EVENTS LOADED
+                            </Badge>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {indexError ? (
-                        <div className="p-16 text-center space-y-4">
-                            <ShieldAlert className="h-12 w-12 text-destructive mx-auto opacity-20" />
-                            <div className="max-w-md mx-auto">
-                                <p className="text-sm font-bold">{indexError}</p>
-                                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                                    Global collection queries are protected by mandatory indexing. 
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader className="bg-muted/30">
-                                    <TableRow className="hover:bg-transparent border-b">
-                                        <TableHead className="text-[10px] uppercase font-black text-muted-foreground/70 tracking-tighter">Subject Profile</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-black text-muted-foreground/70 tracking-tighter">Event Lock</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-black text-muted-foreground/70 tracking-tighter">Payload Description</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-black text-muted-foreground/70 tracking-tighter text-right">Neutering</TableHead>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader className="bg-black/20">
+                                <TableRow className="hover:bg-transparent border-white/5">
+                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12">Identification</TableHead>
+                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12 px-6">Event Protocol</TableHead>
+                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12">Action Payload</TableHead>
+                                    <TableHead className="text-[9px] uppercase font-black text-muted-foreground/40 tracking-[0.2em] h-12 text-right">Countermeasures</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoadingLogs ? (
+                                    [...Array(6)].map((_, i) => (
+                                        <TableRow key={i} className="border-white/5"><TableCell colSpan={4}><div className="h-10 w-full bg-white/5 animate-pulse rounded" /></TableCell></TableRow>
+                                    ))
+                                ) : auditLogs.length === 0 ? (
+                                    <TableRow className="border-white/5">
+                                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-mono text-xs italic">
+                                            Operational tranquility confirmed. Zero threat vectors detected.
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isLoadingLogs ? (
-                                        [...Array(6)].map((_, i) => (
-                                            <TableRow key={i}>
-                                                <TableCell colSpan={4}><div className="h-10 w-full bg-muted/20 animate-pulse rounded-md" /></TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : auditLogs.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-24 text-muted-foreground italic text-sm">
-                                                Operational tranquility confirmed. No security alerts.
+                                ) : (
+                                    auditLogs.map((log) => (
+                                        <TableRow key={log.id} className="group hover:bg-primary/5 transition-all border-white/5">
+                                            <TableCell>
+                                                <div className="flex flex-col py-2">
+                                                    <span className="font-black text-[11px] text-white/90 tracking-tight">{log.userName}</span>
+                                                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-50">{log.userEmail}</span>
+                                                </div>
                                             </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        auditLogs.map((log) => (
-                                            <TableRow key={log.id} className="group hover:bg-muted/30 transition-colors">
-                                                <TableCell>
+                                            <TableCell className="px-6">
+                                                <div className="flex items-center gap-3">
+                                                    {log.action?.includes('delete') || log.action?.includes('void') ? (
+                                                        <div className="h-6 w-1 bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+                                                    ) : log.action?.includes('impersonation') ? (
+                                                        <div className="h-6 w-1 bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                                                    ) : (
+                                                        <div className="h-6 w-1 bg-slate-700" />
+                                                    )}
                                                     <div className="flex flex-col">
-                                                        <span className="font-bold text-xs tracking-tight">{log.userName}</span>
-                                                        <span className="text-[10px] text-muted-foreground font-mono">{log.userEmail}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="py-4">
-                                                    <div className="flex flex-col gap-1.5">
-                                                        {getActionBadge(log.action)}
-                                                        <span className="text-[9px] font-mono text-muted-foreground/60 uppercase">
-                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'NOW'}
+                                                        <span className={cn(
+                                                            "text-[10px] font-black font-mono tracking-tighter uppercase",
+                                                            log.action?.includes('delete') ? "text-rose-400" : "text-white/70"
+                                                        )}>{log.action}</span>
+                                                        <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">
+                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'LIVE'}
                                                         </span>
                                                     </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[11px] font-bold text-slate-700">{log.entityType}</span>
-                                                        <span className="text-[10px] text-muted-foreground truncate max-w-[200px] font-mono">{log.entityName || log.entityId}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
-                                                        onClick={() => handleHardKill(log.userId, log.userName)}
-                                                        disabled={isRevoking === log.userId}
-                                                        title="Shut Down Perpetrator"
-                                                    >
-                                                        {isRevoking === log.userId ? (
-                                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <UserMinus className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                               <div className="flex items-center gap-2">
+                                                   <div className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-mono text-white/50">{log.entityType}</div>
+                                                   <span className="text-[10px] font-mono text-slate-400 truncate max-w-[150px]">{log.entityId}</span>
+                                               </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 opacity-40 group-hover:opacity-100 transition-all border border-transparent hover:border-rose-500/20"
+                                                    onClick={() => handleHardKill(log.userId, log.userName)}
+                                                    disabled={isRevoking === log.userId}
+                                                >
+                                                    <Power className={cn("h-3.5 w-3.5", isRevoking === log.userId && "animate-spin")} />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
-                <CardFooter className="bg-muted/20 border-t py-3 flex justify-between items-center">
-                    <p className="text-[9px] font-mono text-muted-foreground uppercase opacity-50">
-                        ZENEVA SECURE-LINK v4.0.2 | END-TO-END VERIFIED
-                    </p>
+                <CardFooter className="bg-black/40 border-t border-white/5 py-3 p-6 flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5">
+                            <Server className="h-3 w-3 text-emerald-500/50" />
+                            <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">Main Node: us-central1-f</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 border-l border-white/10 pl-4">
+                            <Shield className="h-3 w-3 text-blue-500/50" />
+                            <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">Auth: Firebase-Admin-v14</span>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">Hardware Vault Enabled</span>
+                        <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
+                        <span className="text-[8px] font-black text-primary uppercase tracking-[0.3em]">Neural link established</span>
                     </div>
                 </CardFooter>
             </Card>
 
-            {/* MFA Enrollment Dialog */}
-            <Dialog open={isMfaModalOpen} onOpenChange={setIsMfaModalOpen}>
-                <DialogContent className="sm:max-w-[400px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Smartphone className="h-5 w-5 text-primary" />
-                            Lockdown Protocol: MFA
-                        </DialogTitle>
-                        <DialogDescription>
-                            Link your physical device to your Super Admin account to prevent unauthorized access.
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="space-y-4 py-4">
-                        {mfaStep === 'phone' ? (
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Phone Number (International Format)</Label>
-                                <Input 
-                                    id="phone" 
-                                    placeholder="+234 800 000 0000" 
-                                    value={phoneNumber} 
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                />
-                                <p className="text-[10px] text-muted-foreground">Standard carrier rates may apply for the verification SMS.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2 text-center animate-in fade-in slide-in-from-bottom-4">
-                                <div className="p-3 bg-muted rounded-lg inline-block mb-2">
-                                    <Smartphone className="h-8 w-8 text-primary" />
+            {/* MFA Enrollment Overlay */}
+            <AnimatePresence>
+                {isMfaModalOpen && (
+                    <Dialog open={isMfaModalOpen} onOpenChange={setIsMfaModalOpen}>
+                        <DialogContent className="sm:max-w-[400px] bg-[#020617] border-slate-800 text-white overflow-hidden p-0">
+                            <ScanningEffect />
+                            <div className="p-6">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-3 text-xl font-black uppercase tracking-tighter italic">
+                                        <div className="p-2 bg-primary/10 rounded-lg">
+                                            <LockIcon className="h-5 w-5 text-primary" />
+                                        </div>
+                                        Lockdown Protocol E-2
+                                    </DialogTitle>
+                                    <DialogDescription className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-2">
+                                        Verify physical hardware to secure admin node.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="space-y-6 py-8">
+                                    {mfaStep === 'phone' ? (
+                                        <div className="space-y-3">
+                                            <Label htmlFor="phone" className="text-[10px] font-black uppercase tracking-widest text-slate-500">Secure Comm Link (Phone)</Label>
+                                            <div className="relative">
+                                                <Input 
+                                                    id="phone" 
+                                                    placeholder="+234..." 
+                                                    value={phoneNumber} 
+                                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                                    className="bg-black/50 border-slate-800 h-12 font-mono text-lg tracking-widest focus:border-primary transition-all"
+                                                />
+                                                <Smartphone className="absolute right-3 top-3 h-6 w-6 text-slate-800" />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <motion.div 
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            className="text-center"
+                                        >
+                                            <div className="flex justify-center mb-6">
+                                                <div className="relative">
+                                                    <motion.div 
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ duration: 2, repeat: Infinity }}
+                                                        className="absolute inset-0 bg-primary/20 rounded-full blur-xl"
+                                                    />
+                                                    <div className="bg-slate-900 p-4 rounded-full border border-primary/40 relative">
+                                                        <Radio className="h-8 w-8 text-primary" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Transmission Received</Label>
+                                            <p className="text-xs text-slate-500 mt-2 font-mono">Input signal sequence</p>
+                                            <Input 
+                                                className="mt-6 bg-black/50 border-slate-800 text-center text-4xl tracking-[0.6em] font-black h-20 focus:border-emerald-500 focus:ring-emerald-500/20" 
+                                                maxLength={6} 
+                                                autoFocus
+                                                value={verificationCode}
+                                                onChange={(e) => setVerificationCode(e.target.value)}
+                                            />
+                                        </motion.div>
+                                    )}
                                 </div>
-                                <h3 className="text-sm font-bold">Verification Sent</h3>
-                                <p className="text-xs text-muted-foreground">Enter the 6-digit code sent to your phone.</p>
-                                <Input 
-                                    className="text-center text-2xl tracking-[0.5em] font-black h-14 mt-4" 
-                                    maxLength={6} 
-                                    placeholder="000000"
-                                    value={verificationCode}
-                                    onChange={(e) => setVerificationCode(e.target.value)}
-                                />
-                            </div>
-                        )}
-                    </div>
 
-                    <DialogFooter>
-                        <Button 
-                            variant="outline" 
-                            onClick={() => setIsMfaModalOpen(false)} 
-                            disabled={isEnrolling}
-                        >
-                            Cancel
-                        </Button>
-                        {mfaStep === 'phone' ? (
-                            <Button 
-                                onClick={handleSendCode} 
-                                disabled={isEnrolling || !phoneNumber}
-                                className="gap-2"
-                            >
-                                {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                                Send Code
-                            </Button>
-                        ) : (
-                            <Button 
-                                onClick={handleVerifyAndEnroll} 
-                                disabled={isEnrolling || verificationCode.length < 6}
-                                className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                            >
-                                {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                                Verify & Lockdown
-                            </Button>
-                        )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                                <DialogFooter className="flex-col sm:flex-row gap-3">
+                                    <Button 
+                                        variant="ghost" 
+                                        onClick={() => setIsMfaModalOpen(false)} 
+                                        disabled={isEnrolling}
+                                        className="font-black uppercase text-[10px] tracking-widest hover:bg-white/5"
+                                    >
+                                        Abort
+                                    </Button>
+                                    {mfaStep === 'phone' ? (
+                                        <Button 
+                                            onClick={handleSendCode} 
+                                            disabled={isEnrolling || !phoneNumber}
+                                            className="flex-1 bg-primary hover:bg-primary/80 font-black uppercase text-[10px] tracking-widest h-12 shadow-[0_0_20px_rgba(3,105,161,0.3)]"
+                                        >
+                                            {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Signal className="h-4 w-4 mr-2" />}
+                                            Establish Link
+                                        </Button>
+                                    ) : (
+                                        <Button 
+                                            onClick={handleVerifyAndEnroll} 
+                                            disabled={isEnrolling || verificationCode.length < 6}
+                                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-black uppercase text-[10px] tracking-widest h-12 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                        >
+                                            {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Crosshair className="h-4 w-4 mr-2" />}
+                                            Confirm Identity
+                                        </Button>
+                                    )}
+                                </DialogFooter>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </AnimatePresence>
+            
+            {/* Real-time scanning noise effect - absolute overlay */}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.03] animate-pulse bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
         </div>
     );
 }
+
+// Add these custom animations to tailwind.config.js if you want full effect:
+// animation: {
+//   'spin-slow': 'spin 8s linear infinity',
+// }

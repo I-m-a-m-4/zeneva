@@ -124,6 +124,7 @@ export default {
         'clip-in': 'clipIn 1.2s cubic-bezier(0.25, 1, 0.5, 1) both',
         'fade-up': 'fadeUp 0.8s ease-out forwards',
         'float': 'float 6s ease-in-out infinite',
+        'spin-slow': 'spin 8s linear infinite',
       },
     },
   },
