@@ -45,7 +45,7 @@ jobs:
         env:
           IS_TAURI: true
         run: |
-          node -e "const fs = require('fs'); fs.rmSync('src/app/api', { recursive: true, force: true });"
+          node -e "const fs = require('fs'); ['src/app/api', 'src/app/robots.ts', 'src/app/sitemap.ts'].forEach(p => fs.rmSync(p, { recursive: true, force: true }));"
           npm run build
 
       - name: Build the app
