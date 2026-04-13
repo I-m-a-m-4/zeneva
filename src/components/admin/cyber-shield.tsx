@@ -46,7 +46,7 @@ import {
     Smartphone,
     CheckCircle2
 } from 'lucide-react';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useFirebase } from '@/firebase';
 import { 
     multiFactor,
     PhoneAuthProvider,
@@ -70,8 +70,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 export default function CyberShield() {
-    const firestore = useFirestore();
-    const { user: authUser, auth } = useUser();
+    const { firestore, auth, user: authUser } = useFirebase();
     const { toast } = useToast();
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [isLoadingLogs, setIsLoadingLogs] = useState(true);
