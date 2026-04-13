@@ -587,8 +587,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             conversionRate,
             expiringSoonList,
             topLocations,
-            countryData,
-            industryData
+            countryData: countryData.map(c => ({
+                ...c,
+                businesses: activeBusinesses.filter(b => (b.settings?.country || 'Unknown') === c.name)
+            })),
+            industryData: industryData.map(i => ({
+                ...i,
+                businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Unspecified') === i.name)
+            }))
         }
     }, [businesses, products, receipts, users]);
     const analyticsData = useMemo(() => {
@@ -1167,26 +1173,46 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     <Briefcase className="h-5 w-5 text-blue-500" />
                                     Industry Diversity
                                 </CardTitle>
-                                <CardDescription>Breakdown of businesses by category type.</CardDescription>
+                                <CardDescription>Numbers of businesses categorized by industry.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="h-[250px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <RePieChart>
-                                            <Pie
-                                                data={platformAnalytics.industryData}
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
+                                        <ReBarChart
+                                            data={platformAnalytics.industryData}
+                                            layout="vertical"
+                                            margin={{ left: 40, right: 40 }}
+                                            onClick={(data) => {
+                                                if (data && data.activePayload) {
+                                                    const d = data.activePayload[0].payload;
+                                                    setDetailModalState({
+                                                        open: true,
+                                                        title: `${d.name} Businesses`,
+                                                        description: `List of all businesses in the ${d.name} sector.`,
+                                                        businesses: d.businesses,
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis type="number" hide />
+                                            <YAxis
+                                                dataKey="name"
+                                                type="category"
+                                                tick={{ fontSize: 11, fontWeight: 500 }}
+                                                width={100}
+                                            />
+                                            <ReTooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                                            <Bar
                                                 dataKey="value"
+                                                radius={[0, 4, 4, 0]}
+                                                className="cursor-pointer"
                                             >
                                                 {platformAnalytics.industryData.map((entry: any, index: number) => (
                                                     <Cell key={`cell-${index}`} fill={entry.fill} />
                                                 ))}
-                                            </Pie>
-                                            <ReTooltip content={<CustomTooltip />} />
-                                            <Legend verticalAlign="bottom" height={36}/>
-                                        </RePieChart>
+                                            </Bar>
+                                        </ReBarChart>
                                     </ResponsiveContainer>
                                 </div>
                             </CardContent>
@@ -1198,7 +1224,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     <Globe className="h-5 w-5 text-emerald-500" />
                                     Country Presence
                                 </CardTitle>
-                                <CardDescription>Global footprint of the Zeneva network.</CardDescription>
+                                <CardDescription>Global footprint. Click a country to view businesses.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[250px] pr-4">
@@ -1216,12 +1242,24 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                 return '🌐';
                                             };
                                             return (
-                                                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+                                                <div 
+                                                    key={i} 
+                                                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border cursor-pointer group"
+                                                    onClick={() => setDetailModalState({
+                                                        open: true,
+                                                        title: `Businesses in ${item.name}`,
+                                                        description: `Registered business entities operating in ${item.name}.`,
+                                                        businesses: item.businesses
+                                                    })}
+                                                >
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-2xl drop-shadow-sm">{getFlag(item.name)}</span>
+                                                        <span className="text-2xl drop-shadow-sm group-hover:scale-110 transition-transform">{getFlag(item.name)}</span>
                                                         <span className="font-semibold text-sm">{item.name}</span>
                                                     </div>
-                                                    <Badge variant="secondary" className="font-mono">{item.value}</Badge>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="secondary" className="font-mono">{item.value}</Badge>
+                                                        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                                    </div>
                                                 </div>
                                             );
                                         })}
