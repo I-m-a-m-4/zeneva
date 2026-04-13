@@ -79,6 +79,7 @@ import {
     Store,
     Trophy,
     CheckCircle,
+    Globe,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -532,13 +533,22 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return diff >= 0 && diff <= 3;
         });
 
-        // 3. Geographic Distribution
+        // 3. Geographic & Industry Distribution
         const locationCounts = activeBusinesses.reduce((acc, b) => {
-            // Try to find location from various sources
             const state = b.settings?.state || (b.address ? b.address.split(',').pop()?.trim() : undefined) || 'Unknown';
-            if (state) {
-                acc[state] = (acc[state] || 0) + 1;
-            }
+            if (state) acc[state] = (acc[state] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const countryCounts = activeBusinesses.reduce((acc, b) => {
+            const country = b.settings?.country || 'Unknown';
+            acc[country] = (acc[country] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const industryCounts = activeBusinesses.reduce((acc, b) => {
+            const industry = b.settings?.industry || 'Unspecified';
+            acc[industry] = (acc[industry] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
 
@@ -546,6 +556,18 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 5);
+
+        const countryData = Object.entries(countryCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        const industryData = Object.entries(industryCounts)
+            .map(([name, value]) => ({ 
+                name, 
+                value,
+                fill: `hsl(${(Object.keys(industryCounts).indexOf(name) * 137.5) % 360}, 70%, 50%)`
+            }))
+            .sort((a, b) => b.value - a.value);
 
 
         return {
@@ -564,7 +586,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             churnRiskList,
             conversionRate,
             expiringSoonList,
-            topLocations
+            topLocations,
+            countryData,
+            industryData
         }
     }, [businesses, products, receipts, users]);
     const analyticsData = useMemo(() => {
@@ -1134,6 +1158,78 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </Card>
                         </CardContent>
                     </Card>
+                    
+                    {/* New Industry & Country Analytics */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5 text-blue-500" />
+                                    Industry Diversity
+                                </CardTitle>
+                                <CardDescription>Breakdown of businesses by category type.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[250px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RePieChart>
+                                            <Pie
+                                                data={platformAnalytics.industryData}
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {platformAnalytics.industryData.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                ))}
+                                            </Pie>
+                                            <ReTooltip content={<CustomTooltip />} />
+                                            <Legend verticalAlign="bottom" height={36}/>
+                                        </RePieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Globe className="h-5 w-5 text-emerald-500" />
+                                    Country Presence
+                                </CardTitle>
+                                <CardDescription>Global footprint of the Zeneva network.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[250px] pr-4">
+                                    <div className="space-y-4">
+                                        {platformAnalytics.countryData.map((item, i) => {
+                                            const getFlag = (c: string) => {
+                                                const normalized = c.toLowerCase();
+                                                if (normalized.includes('nigeria')) return '🇳🇬';
+                                                if (normalized.includes('united states') || normalized === 'usa') return '🇺🇸';
+                                                if (normalized.includes('united kingdom') || normalized === 'uk') return '🇬🇧';
+                                                if (normalized.includes('ghana')) return '🇬🇭';
+                                                if (normalized.includes('canada')) return '🇨🇦';
+                                                if (normalized.includes('south africa')) return '🇿🇦';
+                                                if (normalized.includes('kenya')) return '🇰🇪';
+                                                return '🌐';
+                                            };
+                                            return (
+                                                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl drop-shadow-sm">{getFlag(item.name)}</span>
+                                                        <span className="font-semibold text-sm">{item.name}</span>
+                                                    </div>
+                                                    <Badge variant="secondary" className="font-mono">{item.value}</Badge>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
                         <PlatformRevenueChart receipts={receipts || []} />
