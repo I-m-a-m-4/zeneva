@@ -104,7 +104,7 @@ service cloud.firestore {
 
       match /auditLogs/{logId} {
         allow list, get: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
-        allow create: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+        allow create: if isUserAuthenticated() && (isRequestingUserMemberOf(businessId) || isSuperAdmin());
         allow update, delete: if false;
       }
 

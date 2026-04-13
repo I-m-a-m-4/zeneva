@@ -304,13 +304,14 @@ export default function DashboardPage() {
     }
   };
 
+  const { currentUserProfile } = usePOS();
+  
   if (isLoading || !finalDashboardData) {
     return <DashboardSkeleton />;
   }
 
   const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
 
-  const { currentUserProfile } = usePOS();
   const isOperator = currentUserProfile?.role === 'vendor_operator';
 
   return (
