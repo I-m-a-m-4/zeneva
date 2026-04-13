@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -73,6 +74,7 @@
     "react-dom": "^19.2.1",
     "react-hook-form": "^7.71.1",
     "recharts": "^2.15.1",
+    "resend": "^6.11.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",
@@ -80,6 +82,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.13",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^20",
     "@types/nprogress": "^0.2.3",
     "@types/papaparse": "^5.3.14",

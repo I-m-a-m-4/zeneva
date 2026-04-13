@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/firebase/admin';
-import { sendGmailFollowUp } from '@/lib/server/gmail';
+import { sendEmail } from '@/lib/server/resend';
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Send Email
-    const trackId = await sendGmailFollowUp({
+    const trackId = await sendEmail({
       to,
       name,
       subject,
