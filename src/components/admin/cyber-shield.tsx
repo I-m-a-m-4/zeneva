@@ -55,7 +55,8 @@ import {
     Signal,
     Power,
     Server,
-    Crosshair
+    Crosshair,
+    ArrowRight
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { 
