@@ -371,22 +371,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return;
         }
         
-        setIsOutreachLoading(true);
+        // Intel Mission: Query Firestore directly for logs to bypass 404 in static desktop environment
         try {
-            const token = await auth.currentUser?.getIdToken();
-            if (!token) throw new Error("Auth mission readiness: token unavailable");
+            const logsQuery = query(
+                collection(firestore, 'follow_up_logs'),
+                orderBy('sentAt', 'desc')
+            );
+            const snapshot = await getDocs(logsQuery);
+            const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            const response = await fetch('/api/admin/follow-up-stats', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            if (data.success) {
-                setOutreachLogs(data.logs);
-                setOutreachSentCount(data.sentCount || 0);
-                setHasLoadedOutreach(true);
-            }
+            setOutreachLogs(logs);
+            setOutreachSentCount(logs.length);
+            setHasLoadedOutreach(true);
         } catch (error) {
-            console.error('Failed to fetch outreach logs:', error);
+            console.error('Failed to fetch outreach logs from Firestore:', error);
         } finally {
             setIsOutreachLoading(false);
         }
@@ -394,22 +392,23 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
     useEffect(() => {
         const fetchSubscribers = async () => {
-            try {
-                const user = auth.currentUser;
-                if (!user) return;
-
-                const token = await user.getIdToken();
-                if (!token) return;
-
-                const response = await fetch('/api/admin/platform-overview', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                if (data.success && data.appInstalls !== undefined) {
-                    setTotalSubscribers(data.appInstalls);
+                // Intel Mission: Directly query the analytics overview document
+                const analyticsRef = doc(firestore, 'admin_analytics', 'overview');
+                const analyticsDoc = await getDoc(analyticsRef);
+                
+                if (analyticsDoc.exists()) {
+                    const data = analyticsDoc.data();
+                    if (data.appInstalls !== undefined) {
+                        setTotalSubscribers(data.appInstalls);
+                    } else if (data.totalUsers !== undefined) {
+                        setTotalSubscribers(data.totalUsers);
+                    }
+                } else {
+                    // Fallback to counting users if overview doc missing
+                    setTotalSubscribers(users?.length || 0);
                 }
             } catch (error) {
-                console.error("Error fetching platform overview data:", error);
+                console.error("Error fetching platform overview data from Firestore:", error);
             }
         };
         fetchSubscribers();

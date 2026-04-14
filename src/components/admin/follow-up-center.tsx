@@ -91,16 +91,23 @@ export default function FollowUpCenter({
         return;
     }
     // Fallback if not controlled
+    // Intel Mission: Query Firestore directly to bypass 404 in static desktop environment
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/follow-up-stats');
-      const data = await response.json();
-      if (data.success) {
-        setLogs(data.logs);
-        setSentCount(data.sentCount || 0);
-      }
+      const { firestore } = await import('@/firebase');
+      const { collection, query, orderBy, getDocs } = await import('firebase/firestore');
+      
+      const logsQuery = query(
+        collection(firestore, 'follow_up_logs'),
+        orderBy('sentAt', 'desc')
+      );
+      const snapshot = await getDocs(logsQuery);
+      const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as FollowUpLog[];
+      
+      setLogs(logsData);
+      setSentCount(logsData.length);
     } catch (error) {
-      console.error('Failed to fetch logs:', error);
+      console.error('Failed to fetch logs from Firestore:', error);
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +126,8 @@ export default function FollowUpCenter({
       const auth = getAuth();
       const token = await auth.currentUser?.getIdToken();
 
-      const response = await fetch('/api/admin/send-follow-up', {
+      // Dispatch Strike: Use absolute URL for the cloud-hosted API
+      const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

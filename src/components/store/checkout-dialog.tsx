@@ -118,7 +118,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
     const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
         toast({ title: "Processing...", description: "Verifying your payment securely." });
         try {
-            const verifyResponse = await fetch('/api/paystack/verify-transaction', {
+            const verifyResponse = await fetch('https://zeneva.space/api/paystack/verify-transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reference: transaction.reference, expectedAmount: total * 100, businessId: business?.id }),
