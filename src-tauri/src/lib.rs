@@ -4,7 +4,8 @@ pub fn run() {
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_stronghold::Builder::new(|_password| {
-        // In a real app, you might want to use a more secure way to provide the password
+        // Provide a default key for the stronghold (in production, this should be more secure)
+        "zeneva-secure-key-2024".as_bytes().to_vec()
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .setup(|app| {
