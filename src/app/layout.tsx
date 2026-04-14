@@ -17,7 +17,6 @@ import { TauriUpdater } from '@/components/TauriUpdater';
 import { DesktopTitleBar } from '@/components/desktop/TitleBar';
 import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
 import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
-import { ChunkErrorListener } from '@/components/ChunkErrorListener';
 import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
@@ -111,7 +110,6 @@ export default function RootLayout({
           <PWAProvider>
             <POSProvider>
               <TauriLayoutWrapper>
-                 <ChunkErrorListener />
                  <UserActivityTracker />
                  <GlobalAnnouncement />
                  <Loader />
