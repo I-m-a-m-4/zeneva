@@ -7,9 +7,10 @@
   ],
   "permissions": [
     "core:default",
-    "fs:all",
-    "sql:all",
-    "stronghold:all",
-    "updater:all"
+    "fs:default",
+    "sql:default",
+    "stronghold:default",
+    "updater:default",
+    "log:default"
   ]
 }
