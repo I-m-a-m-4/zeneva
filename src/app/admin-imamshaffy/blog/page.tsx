@@ -81,7 +81,7 @@ export default function AdminBlogPage() {
                     <p className="text-muted-foreground">Create, edit, and manage your blog posts.</p>
                 </div>
                 <Button asChild>
-                    <Link href="/admin-imamshaffy/blog/create">
+                    <Link href="/admin-imamshaffy/blog/editor?id=create">
                         <PlusCircle className="mr-2 h-4 w-4" /> Create New Post
                     </Link>
                 </Button>
@@ -133,7 +133,7 @@ export default function AdminBlogPage() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="outline" size="sm" asChild className="mr-2">
-                                                    <Link href={`/admin-imamshaffy/blog/${post.id}`}>
+                                                    <Link href={`/admin-imamshaffy/blog/editor?id=${post.id}`}>
                                                         <Edit className="h-4 w-4" />
                                                     </Link>
                                                 </Button>

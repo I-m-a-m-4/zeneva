@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -51,11 +51,11 @@ function EditPostSkeleton() {
     )
 }
 
-export default function EditBlogPostPage() {
+function EditBlogPostContent() {
     const router = useRouter();
-    const params = useParams();
-    const postId = params.id as string;
-    const isCreateMode = postId === 'create';
+    const searchParams = useSearchParams();
+    const postId = searchParams.get('id') || '';
+    const isCreateMode = postId === 'create' || !postId;
 
     const { toast } = useToast();
     const { user } = useUser();
@@ -233,5 +233,13 @@ export default function EditBlogPostPage() {
                 </div>
             </form>
         </Form>
+    );
+}
+
+export default function EditBlogPostPage() {
+    return (
+        <React.Suspense fallback={<EditPostSkeleton />}>
+            <EditBlogPostContent />
+        </React.Suspense>
     );
 }
