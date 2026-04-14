@@ -64,38 +64,35 @@ pub fn run() {
         let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
         let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
-        let tray_icon = app.default_window_icon().cloned().unwrap_or_else(|| {
-             // Fallback or just ignore if no icon
-             tauri::Icon::Raw(vec![]) 
-        });
-
-        let _tray = TrayIconBuilder::new()
-            .icon(tray_icon)
-            .menu(&menu)
-            .on_menu_event(|app, event| {
-                match event.id.as_ref() {
-                    "quit" => {
-                        std::process::exit(0);
+        if let Some(tray_icon) = app.default_window_icon().cloned() {
+            let _tray = TrayIconBuilder::new()
+                .icon(tray_icon)
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "quit" => {
+                            std::process::exit(0);
+                        }
+                        "show" => {
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        }
+                        _ => {}
                     }
-                    "show" => {
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                        let app = tray.app_handle();
                         if let Some(win) = app.get_webview_window("main") {
                             let _ = win.show();
                             let _ = win.set_focus();
                         }
                     }
-                    _ => {}
-                }
-            })
-            .on_tray_icon_event(|tray, event| {
-                if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
-                    let app = tray.app_handle();
-                    if let Some(win) = app.get_webview_window("main") {
-                        let _ = win.show();
-                        let _ = win.set_focus();
-                    }
-                }
-            })
-            .build(app)?;
+                })
+                .build(app)?;
+        }
 
       if cfg!(debug_assertions) {
         app.handle().plugin(
