@@ -87,6 +87,12 @@ const nextConfig: NextConfig = {
         hostname: 'assets.paystack.com',
         port: '',
         pathname: '/**',
+      },
+      { // For Firebase Storage
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**',
       }
     ],
   },

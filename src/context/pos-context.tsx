@@ -8,6 +8,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or, increment, setDoc, and, startAfter, getAggregateFromServer, sum, count } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
+import { syncBusinessToOffline, syncProductsToOffline } from '@/lib/sqlite-sync';
 
 // Define localStorage keys
 const POS_CART_KEY = 'zeneva-pos-cart';
@@ -185,6 +186,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
     return merged;
   }, [initialProducts, syncedProducts]);
+
+  // Handle SQLite Redundant Sync
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri && businessId && products && products.length > 0) {
+      syncProductsToOffline(businessId, products);
+    }
+  }, [products, businessId]);
+
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri && business) {
+      syncBusinessToOffline(business);
+    }
+  }, [business]);
 
   const isLoadingProducts = isLoadingInitialProducts;
 

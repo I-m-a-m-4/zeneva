@@ -55,16 +55,25 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
  */
-export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
-  children,
-  firebaseApp,
-  firestore,
-  auth,
-}) => {
-  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
-    user: null,
-    isUserLoading: true, // Start loading until first auth event
-    userError: null,
+  const [userAuthState, setUserAuthState] = useState<UserAuthState>(() => {
+    // Optimistic initial state for offline support
+    let cachedUser: any = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('zeneva_auth_session');
+        if (stored) {
+          cachedUser = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.warn("Failed to load cached auth session", e);
+      }
+    }
+
+    return {
+      user: cachedUser,
+      isUserLoading: true, // Still loading until Firebase confirms
+      userError: null,
+    };
   });
 
   // Effect to subscribe to Firebase auth state changes
@@ -74,16 +83,31 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       return;
     }
 
-    setUserAuthState({ user: null, isUserLoading: true, userError: null }); // Reset on auth instance change
-
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => { // Auth state determined
+        if (firebaseUser) {
+          // Cache essential user info for offline restart
+          const sessionData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            isAnonymous: firebaseUser.isAnonymous,
+            emailVerified: firebaseUser.emailVerified,
+            // Add a flag to indicate this is a cached user
+            isCached: true,
+          };
+          localStorage.setItem('zeneva_auth_session', JSON.stringify(sessionData));
+        } else {
+          localStorage.removeItem('zeneva_auth_session');
+        }
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => { // Auth listener error
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        setUserAuthState({ user: null, isUserLoading: false, userError: error });
+        // If we have a cached user, we might want to keep it if it's a network error
+        setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: error }));
       }
     );
     return () => unsubscribe(); // Cleanup

@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
 import { getFirestore, enableMultiTabIndexedDbPersistence, type Firestore } from 'firebase/firestore';
 
 // --- Singleton Initialization ---
@@ -16,6 +16,12 @@ if (!getApps().length) {
 }
 
 const auth: Auth = getAuth(firebaseApp);
+
+// Explicitly set persistence to LOCAL (persists across sessions/tabs)
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence)
+    .catch((err) => console.error("Firebase Auth persistence error:", err));
+}
 const firestore: Firestore = getFirestore(firebaseApp);
 
 // Enable persistence only on the client-side. This allows multiple tabs to share

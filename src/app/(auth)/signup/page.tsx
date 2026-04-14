@@ -159,17 +159,16 @@ export default function SignupPage() {
       <div className="flex items-center justify-center relative w-full">
         <div className="absolute top-8 left-4 sm:left-8">
           <Button variant="ghost" asChild>
-            <Link href="/">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Home
+            <Link href="/login">
+              Already have an account?
             </Link>
           </Button>
         </div>
         <div className="mx-auto grid w-full max-w-[380px] gap-6">
           <div className="grid gap-2 text-center">
-            <Link href="/" className="flex items-center justify-center gap-2 mb-4">
+            <div className="flex items-center justify-center gap-2 mb-4">
               <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
-            </Link>
+            </div>
             <h1 className="text-3xl font-bold">Create an account</h1>
             <p className="text-balance text-muted-foreground">
               Enter your information to create your account

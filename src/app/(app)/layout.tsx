@@ -439,29 +439,7 @@ export default function AuthenticatedLayout({
                   <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="w-32 h-auto group-data-[state=expanded]:block hidden" />
                   {/* Collapsed state logo */}
                   <div className="w-12 h-12 group-data-[state=collapsed]:block hidden">
-                    <svg width="48" height="48" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <linearGradient id="zenevaOrangeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" style={{ stopColor: '#ff9933', stopOpacity: 1 }} />
-                          <stop offset="100%" style={{ stopColor: '#cc5200', stopOpacity: 1 }} />
-                        </linearGradient>
-                        <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-                          <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" />
-                          <feOffset dx="0" dy="2" result="offsetblur" />
-                          <feComponentTransfer>
-                            <feFuncA type="linear" slope="0.3" />
-                          </feComponentTransfer>
-                          <feMerge>
-                            <feMergeNode />
-                            <feMergeNode in="SourceGraphic" />
-                          </feMerge>
-                        </filter>
-                      </defs>
-                      <g filter="url(#dropShadow)">
-                        <path d="M 100 55 A 35 35 0 1 0 100 125 A 35 35 0 1 0 100 55 Z M 100 63 A 27 27 0 1 1 100 117 A 27 27 0 1 1 100 63 Z" fill="url(#zenevaOrangeGradient)" stroke="#cc5200" strokeWidth="0.5" />
-                        <path d="M 60 127 Q 100 154 140 127 Q 100 142 60 127 Z" fill="url(#zenevaOrangeGradient)" stroke="#cc5200" strokeWidth="0.5" />
-                      </g>
-                    </svg>
+                    <img src={AppConfig.logoIconUrl} alt="Zeneva Icon" className="w-10 h-10 mx-auto" />
                   </div>
                 </Link>
               </SidebarHeader>
