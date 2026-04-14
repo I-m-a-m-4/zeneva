@@ -1,4 +1,7 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// NOTE: Console is intentionally kept visible for debugging.
+// Once the app launch issue is resolved, restore:
+// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![windows_subsystem = "console"]
 
 fn main() {
   println!("Zeneva: Booting main process...");
