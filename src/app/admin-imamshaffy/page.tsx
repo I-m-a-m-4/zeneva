@@ -392,6 +392,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
     useEffect(() => {
         const fetchSubscribers = async () => {
+            try {
                 // Intel Mission: Directly query the analytics overview document
                 const analyticsRef = doc(firestore, 'admin_analytics', 'overview');
                 const analyticsDoc = await getDoc(analyticsRef);

@@ -8,6 +8,7 @@ const pathsToDelete = [
   'src/app/industries',
   'src/app/blog',
   'src/app/store',
+  'src/app/admin-imamshaffy',
   'src/app/(app)/ai-insights',
   'src/app/(app)/support',
   'src/app/(app)/inventory/troubleshoot'
