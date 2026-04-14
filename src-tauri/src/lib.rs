@@ -30,12 +30,10 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        let _ = app.get_webview_window("main")
-            .expect("no main window")
-            .show();
-        let _ = app.get_webview_window("main")
-            .expect("no main window")
-            .set_focus();
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
     }))
     .invoke_handler(tauri::generate_handler![
         calculate_secure_loyalty, 
@@ -66,8 +64,13 @@ pub fn run() {
         let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
         let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
+        let tray_icon = app.default_window_icon().cloned().unwrap_or_else(|| {
+             // Fallback or just ignore if no icon
+             tauri::Icon::Raw(vec![]) 
+        });
+
         let _tray = TrayIconBuilder::new()
-            .icon(app.default_window_icon().unwrap().clone())
+            .icon(tray_icon)
             .menu(&menu)
             .on_menu_event(|app, event| {
                 match event.id.as_ref() {
@@ -75,9 +78,10 @@ pub fn run() {
                         std::process::exit(0);
                     }
                     "show" => {
-                        let win = app.get_webview_window("main").unwrap();
-                        win.show().unwrap();
-                        win.set_focus().unwrap();
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
                     }
                     _ => {}
                 }

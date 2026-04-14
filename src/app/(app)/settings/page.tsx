@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, LogOut } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, LogOut } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -142,9 +142,18 @@ function SettingsPageContent() {
     const [logoFile, setLogoFile] = React.useState<File | null>(null);
     const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
     const [isTauri, setIsTauri] = React.useState(false);
+    const [currentVersion, setCurrentVersion] = React.useState<string>('0.3.5');
+    const [isCheckingUpdates, setIsCheckingUpdates] = React.useState(false);
 
     React.useEffect(() => {
-        setIsTauri(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__);
+        const checkTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+        setIsTauri(!!checkTauri);
+        
+        if (checkTauri) {
+            import('@tauri-apps/api/app').then(app => {
+                app.getVersion().then(setCurrentVersion);
+            });
+        }
     }, []);
 
     const [currency, setCurrency] = React.useState('NGN');
@@ -357,6 +366,36 @@ function SettingsPageContent() {
             toast({ variant: "destructive", title: 'Verification Failed', description: error.message });
         } finally {
             setIsVerifying(false);
+        }
+    };
+
+    const handleCheckUpdates = async () => {
+        if (!isTauri) return;
+        setIsCheckingUpdates(true);
+        try {
+            const { check } = await import('@tauri-apps/plugin-updater');
+            const update = await check();
+            if (update) {
+                toast({
+                    title: "Update Available",
+                    description: `A new version (v${update.version}) is available. It will begin downloading in the background.`,
+                });
+                // The TauriUpdater component in the root layout will handle the UI for downloading/restarting
+            } else {
+                toast({
+                    title: "Up to Date",
+                    description: "You are running the latest version of Zeneva.",
+                });
+            }
+        } catch (error) {
+            console.error('Update check failed:', error);
+            toast({
+                variant: 'destructive',
+                title: "Update Check Failed",
+                description: "Could not reach the update server. Please check your internet connection.",
+            });
+        } finally {
+            setIsCheckingUpdates(false);
         }
     };
 
@@ -879,6 +918,46 @@ function SettingsPageContent() {
                         </CardFooter>
                     )}
                 </Card>
+
+                {isTauri && (
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Monitor className="h-5 w-5 text-primary" />
+                                Software Updates
+                            </CardTitle>
+                            <CardDescription>
+                                Check for the latest features and security updates for the Zeneva desktop app.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between p-4 rounded-lg border bg-background">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium">Current Version</p>
+                                    <p className="text-2xl font-bold text-primary">v{currentVersion}</p>
+                                </div>
+                                <Button 
+                                    onClick={handleCheckUpdates} 
+                                    disabled={isCheckingUpdates}
+                                    variant="outline"
+                                    className="border-primary text-primary hover:bg-primary hover:text-white"
+                                >
+                                    {isCheckingUpdates ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                    )}
+                                    Check for Updates
+                                </Button>
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <p className="text-xs text-muted-foreground italic">
+                                Note: Zeneva normally checks for updates automatically every hour.
+                            </p>
+                        </CardFooter>
+                    </Card>
+                )}
             </div>
         </div>
     );

@@ -104,7 +104,7 @@ service cloud.firestore {
 
       match /auditLogs/{logId} {
         allow list, get: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
-        allow create: if isUserAuthenticated() && isRequestingUserMemberOf(businessId);
+        allow create: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
         allow update, delete: if false;
       }
 
@@ -149,7 +149,7 @@ service cloud.firestore {
    
     match /invitations/{invitationId} {
       allow read: if true; // Publicly readable by anyone with the unguessable link ID
-      allow create: if isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId);
       allow list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin());
       allow delete: if (isUserAuthenticated() && isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || 
                        isSuperAdmin() ||
@@ -159,23 +159,23 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow get, list: if true;
-      allow create: if isUserAuthenticated() && isRequestingUserManager() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
-      allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
-      allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId);
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
     }
 
     match /receipts/{receiptId} {
         allow read, list: if (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid)) || isSuperAdmin();
-        allow create: if isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId);
-        allow update, delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+        allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId));
+        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
     }
     
     match /customers/{customerId} {
       allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId)) || isSuperAdmin();
       // Allow public creation for checkout
       allow create: if true; 
-      allow update: if isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId);
-      allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
     }
 
     match /admin_analytics/{docId} {
@@ -185,6 +185,18 @@ service cloud.firestore {
     match /system_broadcasts/{broadcastId} {
       allow read: if true;
       allow write: if isSuperAdmin();
+    }
+
+    // --- Global Surveillance Hooks ---
+    
+    // Enable collectionGroup queries for Cyber Shield
+    match /{path=**}/auditLogs/{logId} {
+      allow read, list: if isSuperAdmin();
+    }
+
+    // Outreach Intelligence
+    match /follow_up_logs/{logId} {
+      allow read, list, write: if isSuperAdmin();
     }
   }
 }
