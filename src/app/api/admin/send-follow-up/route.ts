@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/firebase/admin';
-import { sendGmailFollowUp } from '@/lib/server/gmail';
+import { sendEmail } from '@/lib/server/resend';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400, headers: corsHeaders });
     }
 
-    // 3. Send Email
-    const trackId = await sendGmailFollowUp({
+    // 3. Send Email via Resend
+    const trackId = await sendEmail({
       to,
       name,
       subject,
