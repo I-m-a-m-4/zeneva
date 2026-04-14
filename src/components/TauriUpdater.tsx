@@ -1,17 +1,22 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { RefreshCw, ArrowUpCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * TauriUpdater Component
- * Automatically checks for updates and prompts the user or performs background updates.
+ * Automatically checks for updates and shows a restart button when ready.
  */
 export function TauriUpdater() {
   const { toast } = useToast();
+  const [updateReady, setUpdateReady] = useState(false);
+  const [newVersion, setNewVersion] = useState('');
 
   useEffect(() => {
     // Only run in Tauri environment
@@ -21,39 +26,23 @@ export function TauriUpdater() {
       try {
         const update = await check();
         if (update) {
-          console.log(`Update available: ${update.version} from ${update.date}`);
+          setNewVersion(update.version);
+          console.log(`Update available: ${update.version}`);
           
           toast({
             title: "Update Available",
             description: `A new version (v${update.version}) is downloading in the background.`,
-            duration: 10000,
+            duration: 8000,
           });
 
-          let downloaded = 0;
-          let contentLength = 0;
-
           await update.downloadAndInstall((event) => {
-            switch (event.event) {
-              case 'Started':
-                contentLength = event.data.contentLength || 0;
-                console.log(`Started downloading ${contentLength} bytes`);
-                break;
-              case 'Progress':
-                downloaded += event.data.chunkLength;
-                console.log(`Downloaded ${downloaded} from ${contentLength}`);
-                break;
-              case 'Finished':
-                console.log('Download finished');
-                toast({
-                  title: "Update Ready",
-                  description: "Zeneva will now restart to apply the update.",
-                  variant: "success",
-                });
-                // Delay slightly so the user can see the message
-                setTimeout(async () => {
-                  await relaunch();
-                }, 3000);
-                break;
+            if (event.event === 'Finished') {
+              setUpdateReady(true);
+              toast({
+                title: "Update Downloaded",
+                description: "Zeneva is ready to update. Click the restart button to apply.",
+                variant: "success",
+              });
             }
           });
         }
@@ -62,13 +51,45 @@ export function TauriUpdater() {
       }
     };
 
-    // Check on mount
     checkForUpdates();
-
-    // Optionally check every hour
-    const interval = setInterval(checkForUpdates, 3600000);
+    const interval = setInterval(checkForUpdates, 3600000); // Check every hour
     return () => clearInterval(interval);
   }, [toast]);
 
-  return null; // Side-effect only component
+  const handleRestart = async () => {
+    try {
+      await relaunch();
+    } catch (err) {
+      console.error('Failed to relaunch:', err);
+      window.location.reload(); // Fallback
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {updateReady && (
+        <motion.div 
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -50, opacity: 0 }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] no-print"
+        >
+          <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 backdrop-blur-md">
+            <ArrowUpCircle className="h-5 w-5 animate-pulse" />
+            <span className="text-sm font-medium">New Version v{newVersion} Ready</span>
+            <div className="h-4 w-[1px] bg-white/30 mx-1" />
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              onClick={handleRestart}
+              className="h-8 rounded-full px-4 font-bold text-xs"
+            >
+              <RefreshCw className="mr-2 h-3 w-3" />
+              RESTART NOW
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
