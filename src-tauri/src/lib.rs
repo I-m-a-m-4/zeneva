@@ -28,7 +28,7 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  println!("Starting Zeneva Backend...");
+  println!("Zeneva: Initializing Builder...");
   tauri::Builder::default()
     .plugin(tauri_plugin_log::Builder::default()
       .level(log::LevelFilter::Info)
@@ -65,8 +65,10 @@ pub fn run() {
         }
     })
     .setup(|app| {
+        println!("Zeneva: Entering setup...");
         // Explicitly show the main window to ensure it opens on startup
         if let Some(window) = app.get_webview_window("main") {
+            println!("Zeneva: Showing main window...");
             let _ = window.show();
         }
 
@@ -75,6 +77,7 @@ pub fn run() {
         let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
         if let Some(tray_icon) = app.default_window_icon().cloned() {
+            println!("Zeneva: Building tray icon...");
             let _ = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
@@ -106,7 +109,7 @@ pub fn run() {
                 .build(app); // Non-fatal build
         }
 
-      println!("Zeneva Setup Complete.");
+      println!("Zeneva: Setup completed successfully.");
       Ok(())
     })
     .run(tauri::generate_context!())
