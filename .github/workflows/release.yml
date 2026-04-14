@@ -45,10 +45,7 @@ jobs:
         env:
           IS_TAURI: true
         run: |
-          # Strip unnecessary pages and Server Action folders to comply with static export
-          node -e "const fs = require('fs'); ['src/actions', 'src/ai', 'src/app/api', 'src/app/robots.ts', 'src/app/sitemap.ts', 'src/app/industries', 'src/app/blog', 'src/app/store', 'src/app/(app)/ai-insights', 'src/app/(app)/support', 'src/app/(app)/inventory/troubleshoot'].forEach(p => { if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); } });"
-          # Replace root page with a simple redirect to login for the desktop app
-          node -e "const fs = require('fs'); const content = \"'use client';\nimport { useEffect } from 'react';\nimport { useRouter } from 'next/navigation';\n\nexport default function Home() {\n  const router = useRouter();\n  useEffect(() => {\n    router.replace('/login');\n  }, [router]);\n  return null;\n}\"; fs.writeFileSync('src/app/page.tsx', content);"
+          node scripts/prepare-tauri.mjs
           npm run build
 
       - name: Build the app
