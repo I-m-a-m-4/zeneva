@@ -411,6 +411,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               if (business?.settings?.loyaltyProgramEnabled) {
                 const pointsEarned = await calculateLoyaltyPoints(receiptData.total);
                 updates.loyaltyPoints = increment(pointsEarned);
+                resultData.pointsEarned = pointsEarned;
               }
 
               batch.update(customerRef, updates);
@@ -513,9 +514,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
                         updatedAt: new Date() as any,
                         lastPurchaseDate: new Date() as any
                     };
-                    if (business?.settings?.loyaltyProgramEnabled) {
-                        const pointsEarned = await calculateLoyaltyPoints(action.payload.receiptData.total);
-                        updates.loyaltyPoints = (c.loyaltyPoints || 0) + pointsEarned;
+                    if (business?.settings?.loyaltyProgramEnabled && resValue.pointsEarned) {
+                        updates.loyaltyPoints = (c.loyaltyPoints || 0) + resValue.pointsEarned;
                     }
                     return { ...c, ...updates };
                 }
