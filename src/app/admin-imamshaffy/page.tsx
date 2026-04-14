@@ -616,7 +616,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description: 'Initial authentication successful.', 
                 color: 'from-blue-500 to-indigo-600', 
                 dropped: totalUsers - usersWithBusiness,
-                intel: `${totalUsers - usersWithBusiness} users failed to create a business container after signup.`
+                intel: `CRITICAL ATTRITION WARNING: ${totalUsers - usersWithBusiness} authenticated identities (${totalUsers > 0 ? ((totalUsers - usersWithBusiness) / totalUsers * 100).toFixed(1) : 0}% failure) abandoned the pipeline before establishing a business container, directly starving future MRR streams.`
             },
             { 
                 stage: 'Architecture Provisioning', 
@@ -624,7 +624,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description: 'Business environment virtualized.', 
                 color: 'from-emerald-500 to-teal-600', 
                 dropped: usersWithBusiness - businessesWithProducts,
-                intel: `${usersWithBusiness - businessesWithProducts} businesses exist but have ZERO inventory assets.`
+                intel: `DORMANT STATE DETECTED: ${usersWithBusiness - businessesWithProducts} nodes exist as hollow shells with ZERO provisioned assets, indicating severe onboarding friction post-creation.`
             },
             { 
                 stage: 'Asset Deployment', 
@@ -632,7 +632,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description: 'Inventory/Catalog operational.', 
                 color: 'from-amber-500 to-orange-600', 
                 dropped: businessesWithProducts - businessesWithSales,
-                intel: `${businessesWithProducts - businessesWithSales} businesses have setup inventory but haven't triggered a sale yet.`
+                intel: `STALLED ENGAGEMENT: ${businessesWithProducts - businessesWithSales} provisioned nodes are mission-ready but failing to generate checkout velocity. Immediate intervention required.`
             },
             { 
                 stage: 'Operational Mission', 
@@ -640,7 +640,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description: 'Tactical revenue stream active.', 
                 color: 'from-fuchsia-500 to-pink-600', 
                 dropped: 0,
-                intel: 'Fully operational nodes active in the field.'
+                intel: `ELITE TIER ACCCESS: These battle-tested nodes are the primary growth engine, actively processing live field data and driving aggregate GMV.`
             }
         ];
 

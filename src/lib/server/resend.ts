@@ -21,9 +21,9 @@ export interface EmailParams {
 function wrapInTemplate(body: string, trackId: string): string {
   const year = new Date().getFullYear();
   return `
-    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+    <div style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <div style="background-color: #fcfcfc; padding: 25px; border-bottom: 1px solid #f5f5f5;">
-        <div style="font-size: 20px; font-weight: 800; color: #f97316; letter-spacing: -0.5px;">ZENEVA</div>
+        <div style="font-size: 20px; font-weight: 800; color: #f97316; letter-spacing: -0.5px;">Zeneva</div>
       </div>
       
       <div style="padding: 40px 30px; color: #1f2937; line-height: 1.7; font-size: 15px;">
@@ -42,18 +42,17 @@ function wrapInTemplate(body: string, trackId: string): string {
       <!-- ZENEVA Premium Branded Bar - Orange -->
       <div style="padding: 0 30px 40px;">
         <div style="height: 50px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 8px; display: table; width: 100%; border-collapse: separate;">
-          <div style="display: table-cell; vertical-align: middle; text-align: center; color: white; font-weight: 900; letter-spacing: 3px; font-size: 14px; text-transform: uppercase;">
-            ZENEVA POS & INVENTORY
+          <div style="display: table-cell; vertical-align: middle; text-align: center; color: white; font-weight: 900; letter-spacing: 3px; font-size: 14px; text-transform: capitalize;">
+            Zeneva POS & Inventory
           </div>
         </div>
       </div>
       
-      <div style="background-color: #f9fafb; padding: 30px; text-align: center; font-size: 11px; color: #9ca3af;">
-        &copy; ${year} Zeneva Space. All rights reserved.<br/>
-        <div style="margin-top: 10px;">
-          You requested intelligence updates from our engine. 
-          <br/>To optimize your node settings, <a href="https://zeneva.space/settings" style="color: #6b7280; text-decoration: underline;">manage notifications here</a>.
+      <div style="background-color: #fffaf0; border-top: 1px solid #ffedd5; padding: 40px 30px; text-align: center; font-size: 11px; color: #7c2d12;">
+        <div style="font-weight: 800; letter-spacing: 0.2em; margin-bottom: 20px; color: #ea580c; font-size: 14px; text-transform: capitalize;">
+          Zeneva POS & Inventory
         </div>
+        &copy; ${year} Zeneva POS & Inventory. All rights reserved.<br/>
       </div>
 
       <!-- Tracking Pixel -->
@@ -72,7 +71,10 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
 
   const trackId = uuidv4();
   
-  // 1. Create Log document in Firestore with Behavioral Intelligence
+  // 1. Wrap in Premium Template
+  const htmlWithBranding = wrapInTemplate(params.body, trackId);
+  
+  // 2. Create Log document in Firestore with Behavioral Intelligence
   await adminFirestore.collection('follow_up_logs').doc(trackId).set({
     sentTo: params.to,
     recipientName: params.name,
@@ -86,9 +88,6 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
     openCount: 0
   });
 
-  // 2. Wrap in Premium Template
-  const htmlWithBranding = wrapInTemplate(params.body, trackId);
-
   try {
     // 3. Send Email via Resend
     if (!resend) {
@@ -100,6 +99,7 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
       replyTo: 'hello@zeneva.space',
       subject: params.subject,
       html: htmlWithBranding,
+
     });
 
     if (error) {

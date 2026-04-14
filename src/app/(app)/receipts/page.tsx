@@ -59,8 +59,6 @@ export default function ReceiptsPage() {
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [searchResults, setSearchResults] = React.useState<Receipt[] | null>(null);
-  const [isSearching, setIsSearching] = React.useState(false);
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
@@ -73,30 +71,21 @@ export default function ReceiptsPage() {
     }
   }, [receipts]);
 
-  // Surgical Search Effect
-  React.useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim()) {
-        setSearchResults(null);
-        return;
-      }
-      setIsSearching(true);
-      const results = await searchReceipts(searchTerm.trim());
-      setSearchResults(results);
-      setIsSearching(false);
-    };
-
-    const handler = setTimeout(performSearch, 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm, searchReceipts]);
-
   const displayedReceipts = React.useMemo(() => {
-    // If searching, show search results
-    if (searchTerm.trim()) return searchResults || [];
-    // Otherwise show the default receipts list (limited to 50 + anything loaded more)
     if (!receipts) return [];
-    return receipts.filter(r => r.paymentMethod !== 'Invoice');
-  }, [receipts, searchTerm, searchResults]);
+    let filtered = receipts.filter(r => r.paymentMethod !== 'Invoice');
+    
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.id.toLowerCase().includes(lower) || 
+        (r.customer?.name || '').toLowerCase().includes(lower) ||
+        (r.paymentMethod || '').toLowerCase().includes(lower) ||
+        r.total.toString().includes(lower)
+      );
+    }
+    return filtered;
+  }, [receipts, searchTerm]);
 
   const handleLoadMore = async () => {
     setIsFetchingMore(true);
@@ -105,7 +94,7 @@ export default function ReceiptsPage() {
     setIsFetchingMore(false);
   };
 
-  const isLoading = isPosLoading || isSearching;
+  const isLoading = isPosLoading;
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;

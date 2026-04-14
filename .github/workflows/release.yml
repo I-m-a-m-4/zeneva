@@ -45,7 +45,7 @@ jobs:
         env:
           IS_TAURI: true
         run: |
-          node -e "const fs = require('fs'); ['src/app/api', 'src/app/robots.ts', 'src/app/sitemap.ts', 'src/app/industries', 'src/app/blog', 'src/app/store'].forEach(p => { if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); } });"
+          node -e "const fs = require('fs'); ['src/app/api', 'src/app/robots.ts', 'src/app/sitemap.ts', 'src/app/industries', 'src/app/blog', 'src/app/store', 'src/app/(app)/customers', 'src/app/(app)/inventory', 'src/app/(app)/invoice', 'src/app/(app)/receipts'].forEach(p => { if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); } });"
           npm run build
 
       - name: Build the app
