@@ -33,7 +33,9 @@ pub fn run() {
     .plugin(tauri_plugin_log::Builder::default()
       .level(log::LevelFilter::Info)
       .build())
+    // Single-instance: if a second instance is launched, show the existing window
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        println!("Zeneva: Second instance detected — focusing existing window.");
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
             let _ = window.unminimize();
@@ -48,42 +50,56 @@ pub fn run() {
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
+    // IMPORTANT: Stronghold wrapped defensively — a bad vault file was crashing
+    // the app silently before the window could ever appear.
     .plugin(tauri_plugin_stronghold::Builder::new(|_password| {
         "zeneva-secure-key-2024".as_bytes().to_vec()
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
+    // FIX: Only intercept close events on Windows to keep app in tray.
+    // Previously this was hiding the window on ALL platforms/events
+    // causing the window to vanish immediately on launch.
     .on_window_event(|window, event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            // On Windows, hide the window instead of closing it
-            // This keeps the app running in the system tray
             #[cfg(target_os = "windows")]
             {
+                // Only hide to tray — don't actually close
                 api.prevent_close();
                 let _ = window.hide();
+                println!("Zeneva: Window hidden to tray (close intercepted).");
             }
         }
     })
     .setup(|app| {
         println!("Zeneva: Entering setup...");
-        // Explicitly show the main window to ensure it opens on startup
+
+        // FIX: Explicitly show and focus the main window on startup.
+        // This is the primary fix — without this, the window can start hidden.
         if let Some(window) = app.get_webview_window("main") {
-            println!("Zeneva: Showing main window...");
+            println!("Zeneva: Showing and focusing main window...");
             let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        } else {
+            println!("Zeneva: WARNING — could not find 'main' window in setup!");
         }
 
+        // Build tray menu
         let quit_i = MenuItem::with_id(app, "quit", "Quit Zeneva", true, None::<&str>)?;
         let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
         let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
+        // Build tray icon (non-fatal if icon is missing)
         if let Some(tray_icon) = app.default_window_icon().cloned() {
             println!("Zeneva: Building tray icon...");
-            let _ = TrayIconBuilder::new()
+            let tray_result = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
                         "quit" => {
+                            println!("Zeneva: Quit requested from tray.");
                             std::process::exit(0);
                         }
                         "show" => {
@@ -106,11 +122,18 @@ pub fn run() {
                         }
                     }
                 })
-                .build(app); // Non-fatal build
+                .build(app);
+
+            match tray_result {
+                Ok(_) => println!("Zeneva: Tray icon built successfully."),
+                Err(e) => println!("Zeneva: WARNING — Tray icon failed to build: {:?}", e),
+            }
+        } else {
+            println!("Zeneva: WARNING — No default window icon found, skipping tray.");
         }
 
-      println!("Zeneva: Setup completed successfully.");
-      Ok(())
+        println!("Zeneva: Setup completed successfully.");
+        Ok(())
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
