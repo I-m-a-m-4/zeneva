@@ -28,7 +28,11 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  println!("Starting Zeneva Backend...");
   tauri::Builder::default()
+    .plugin(tauri_plugin_log::Builder::default()
+      .level(log::LevelFilter::Info)
+      .build())
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
@@ -102,11 +106,7 @@ pub fn run() {
                 .build(app); // Non-fatal build
         }
 
-      let _ = app.handle().plugin(
-        tauri_plugin_log::Builder::default()
-          .level(log::LevelFilter::Info)
-          .build(),
-      );
+      println!("Zeneva Setup Complete.");
       Ok(())
     })
     .run(tauri::generate_context!())
