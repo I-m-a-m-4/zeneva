@@ -2,9 +2,16 @@ import { Resend } from 'resend';
 import { adminFirestore } from '@/firebase/admin';
 import { v4 as uuidv4 } from 'uuid';
 
-const resend = (typeof process !== 'undefined' && process.env.RESEND_API_KEY) ? new Resend(process.env.RESEND_API_KEY) : null;
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space';
-const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'Bime <bime@zeneva.space>';
+
+/**
+ * Lazy-initialized Resend client to ensure environment variables are loaded.
+ */
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
+}
 
 export interface EmailParams {
   to: string;
@@ -65,7 +72,8 @@ function wrapInTemplate(body: string, trackId: string): string {
  * Sends an email via Resend with 1x1 tracking pixel and premium branding.
  */
 export async function sendEmail(params: EmailParams & { behaviorContext?: any }): Promise<string> {
-  if (!process.env.RESEND_API_KEY) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     throw new Error('RESEND_API_KEY is not configured in environment variables.');
   }
 
@@ -83,23 +91,26 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
     status: 'pending',
     businessId: params.businessId || 'unknown',
     type: params.type || 'follow-up',
-    behavior: params.behaviorContext || {}, // Exploit why they quit here
-    html: htmlWithBranding, // Save full HTML for auditing
+    behavior: params.behaviorContext || {}, 
+    html: htmlWithBranding, 
     openCount: 0
   });
 
   try {
     // 3. Send Email via Resend
+    const resend = getResendClient();
     if (!resend) {
       throw new Error('Resend client not initialized. Check RESEND_API_KEY environment variable.');
     }
+
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Bime <bime@zeneva.space>';
+    
     const { data, error } = await resend.emails.send({
-      from: 'Bime <bime@zeneva.space>',
+      from: fromAddress,
       to: [params.to],
       replyTo: 'hello@zeneva.space',
       subject: params.subject,
       html: htmlWithBranding,
-
     });
 
     if (error) {
