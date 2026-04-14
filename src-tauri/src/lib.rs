@@ -18,10 +18,10 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
         return true;
     }
     
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
+    let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs() as i64,
+        Err(_) => 0,
+    };
         
     trial_expires_at > now
 }
@@ -32,6 +32,7 @@ pub fn run() {
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
+            let _ = window.unminimize();
             let _ = window.set_focus();
         }
     }))
@@ -60,12 +61,17 @@ pub fn run() {
         }
     })
     .setup(|app| {
+        // Explicitly show the main window to ensure it opens on startup
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+        }
+
         let quit_i = MenuItem::with_id(app, "quit", "Quit Zeneva", true, None::<&str>)?;
         let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
         let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
         if let Some(tray_icon) = app.default_window_icon().cloned() {
-            let _tray = TrayIconBuilder::new()
+            let _ = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
                 .on_menu_event(|app, event| {
@@ -76,6 +82,7 @@ pub fn run() {
                         "show" => {
                             if let Some(win) = app.get_webview_window("main") {
                                 let _ = win.show();
+                                let _ = win.unminimize();
                                 let _ = win.set_focus();
                             }
                         }
@@ -87,20 +94,19 @@ pub fn run() {
                         let app = tray.app_handle();
                         if let Some(win) = app.get_webview_window("main") {
                             let _ = win.show();
+                            let _ = win.unminimize();
                             let _ = win.set_focus();
                         }
                     }
                 })
-                .build(app)?;
+                .build(app); // Non-fatal build
         }
 
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      let _ = app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .build(),
+      );
       Ok(())
     })
     .run(tauri::generate_context!())

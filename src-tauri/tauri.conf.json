@@ -18,7 +18,8 @@
         "height": 768,
         "resizable": true,
         "fullscreen": false,
-        "decorations": false
+        "decorations": false,
+        "visible": true
       }
     ],
     "security": {
@@ -34,7 +35,14 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "nsis": {
+      "installerIcon": "icons/icon.ico",
+      "uninstallerIcon": "icons/icon.ico",
+      "displayLanguageSelector": true,
+      "oneClick": false,
+      "allowPrerelease": true
+    }
   },
   "plugins": {
     "dialog": {},
@@ -46,7 +54,7 @@
       "endpoints": [
         "https://github.com/I-m-a-m-4/zeneva/releases/latest/download/latest.json"
       ],
-      "dialog": true,
+      "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREQTAyQjM4QTk1MkI4QgpSV1NMSzVXS3N3TGFCTWdnUVdWM2FhVnZoaG9DaHlWaTZnK1V1WHBIcm9leTl2ZkduUGNnUndicwo="
     }
   }
