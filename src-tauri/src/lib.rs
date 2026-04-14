@@ -8,6 +8,7 @@ pub fn run() {
         "zeneva-secure-key-2024".as_bytes().to_vec()
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_process::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
