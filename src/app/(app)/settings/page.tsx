@@ -141,6 +141,11 @@ function SettingsPageContent() {
     const [businessEmail, setBusinessEmail] = React.useState('');
     const [logoFile, setLogoFile] = React.useState<File | null>(null);
     const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
+    const [isTauri, setIsTauri] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsTauri(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__);
+    }, []);
 
     const [currency, setCurrency] = React.useState('NGN');
     const [timezone, setTimezone] = React.useState('Africa/Lagos');
@@ -277,15 +282,48 @@ function SettingsPageContent() {
     const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            if (file.size > 2 * 1024 * 1024) { // 2MB
-                toast({ variant: 'destructive', title: 'Image Too Large', description: 'Please select an image smaller than 2MB.' });
-                return;
-            }
-            setLogoFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => setLogoPreview(reader.result as string);
-            reader.readAsDataURL(file);
+            processLogoFile(file);
         }
+    };
+
+    const handleNativeLogoUpload = async () => {
+        try {
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const { readFile } = await import('@tauri-apps/plugin-fs');
+            
+            const selected = await open({
+                multiple: false,
+                filters: [{
+                    name: 'Image',
+                    extensions: ['png', 'jpg', 'jpeg', 'webp']
+                }]
+            });
+
+            if (selected && !Array.isArray(selected)) {
+                const fileData = await readFile(selected);
+                const fileName = selected.split(/[\\/]/).pop() || 'logo.png';
+                // Detect mime type from extension
+                const ext = fileName.split('.').pop()?.toLowerCase();
+                const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+                
+                const blob = new Blob([fileData], { type: mimeType });
+                const file = new File([blob], fileName, { type: mimeType });
+                processLogoFile(file);
+            }
+        } catch (err) {
+            console.error('Native upload failed:', err);
+        }
+    };
+
+    const processLogoFile = (file: File) => {
+        if (file.size > 2 * 1024 * 1024) { // 2MB
+            toast({ variant: 'destructive', title: 'Image Too Large', description: 'Please select an image smaller than 2MB.' });
+            return;
+        }
+        setLogoFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoPreview(reader.result as string);
+        reader.readAsDataURL(file);
     };
 
     const handleVerifyAccount = async () => {
@@ -414,9 +452,19 @@ function SettingsPageContent() {
                             </div>
                             <div>
                                 <Label>Business Logo</Label>
-                                <div className="mt-1 w-full aspect-square rounded-md border-2 border-dashed flex items-center justify-center relative overflow-hidden">
+                                <div 
+                                    className="mt-1 w-full aspect-square rounded-md border-2 border-dashed flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors"
+                                    onClick={() => isTauri && handleNativeLogoUpload()}
+                                >
                                     {logoPreview ? <Image src={logoPreview} alt="Logo preview" fill className="object-cover" /> : <Upload className="h-8 w-8 text-muted-foreground" />}
-                                    <Input id="logo-upload" type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" onChange={handleLogoChange} />
+                                    {!isTauri && (
+                                        <Input id="logo-upload" type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" onChange={handleLogoChange} />
+                                    )}
+                                    {isTauri && (
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                            <span className="text-white text-xs font-bold">Pick Image</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

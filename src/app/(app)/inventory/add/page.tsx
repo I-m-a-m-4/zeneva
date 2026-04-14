@@ -90,9 +90,13 @@ export default function AddProductPage() {
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
 
-  // Type helper for date string input
   const [expiryDateInput, setExpiryDateInput] = React.useState("");
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [isTauri, setIsTauri] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsTauri(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__);
+  }, []);
 
   const userProfile = currentUserProfile;
 
@@ -140,22 +144,53 @@ export default function AddProductPage() {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > MAX_FILE_SIZE) {
-        toast({
-          variant: 'destructive',
-          title: 'Image Too Large',
-          description: 'Please select an image smaller than 5MB.',
-        });
-        event.target.value = '';
-        return;
-      }
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      processImageFile(file);
     }
+  };
+
+  const handleNativeImageUpload = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Image',
+          extensions: ['png', 'jpg', 'jpeg', 'webp']
+        }]
+      });
+
+      if (selected && !Array.isArray(selected)) {
+        const fileData = await readFile(selected);
+        const fileName = selected.split(/[\\/]/).pop() || 'product.png';
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+        
+        const blob = new Blob([fileData], { type: mimeType });
+        const file = new File([blob], fileName, { type: mimeType });
+        processImageFile(file);
+      }
+    } catch (err) {
+      console.error('Native upload failed:', err);
+    }
+  };
+
+  const processImageFile = (file: File) => {
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        variant: 'destructive',
+        title: 'Image Too Large',
+        description: 'Please select an image smaller than 5MB.',
+      });
+      return;
+    }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Helper to parse date string DD/MM/YY or DD/MM/YYYY
@@ -667,7 +702,10 @@ export default function AddProductPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2">
-                  <div className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
+                  <div 
+                    className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors"
+                    onClick={() => isTauri && handleNativeImageUpload()}
+                  >
                     {imagePreview ? (
                       <Image src={imagePreview} alt="Product preview" fill style={{ objectFit: "cover" }} />
                     ) : (
@@ -676,13 +714,20 @@ export default function AddProductPage() {
                         <p className="mt-2 text-sm">Click to upload</p>
                       </div>
                     )}
-                    <Input
-                      id="file-upload"
-                      type="file"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      accept="image/png, image/jpeg, image/gif"
-                      onChange={handleImageChange}
-                    />
+                    {!isTauri && (
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        accept="image/png, image/jpeg, image/gif"
+                        onChange={handleImageChange}
+                      />
+                    )}
+                    {isTauri && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                        <span className="text-white text-xs font-bold">Pick Image</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

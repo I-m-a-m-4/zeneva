@@ -13,7 +13,7 @@ import type { Receipt } from '@/types';
 const chartConfig = {
   totalSales: {
     label: "Total Sales",
-    color: "hsl(var(--primary))",
+    color: "#ea580c", // Zeneva Orange
   },
 } satisfies ChartConfig;
 

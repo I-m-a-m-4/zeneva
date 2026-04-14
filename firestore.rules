@@ -178,6 +178,10 @@ service cloud.firestore {
       allow delete: if isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId);
     }
 
+    match /admin_analytics/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     match /system_broadcasts/{broadcastId} {
       allow read: if true;
       allow write: if isSuperAdmin();

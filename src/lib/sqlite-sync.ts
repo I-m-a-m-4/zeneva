@@ -20,7 +20,8 @@ export async function getOfflineDb() {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS sync_metadata (
         id TEXT PRIMARY KEY,
-        last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        business_id TEXT,
+        last_sync_timestamp INTEGER
       );
       
       CREATE TABLE IF NOT EXISTS business (
@@ -40,6 +41,14 @@ export async function getOfflineDb() {
         id TEXT PRIMARY KEY,
         business_id TEXT,
         data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS receipts (
+        id TEXT PRIMARY KEY,
+        business_id TEXT,
+        data TEXT,
+        created_at INTEGER,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -82,14 +91,103 @@ export async function syncProductsToOffline(businessId: string, products: any[])
   }
 }
 
-export async function getCachedBusiness(businessId: string) {
+export async function getCachedProducts(businessId: string) {
   const db = await getOfflineDb();
-  if (!db) return null;
+  if (!db) return [];
   
   try {
-    const result: any[] = await db.select('SELECT data FROM business WHERE id = $1', [businessId]);
-    return result.length > 0 ? JSON.parse(result[0].data) : null;
+    const result: any[] = await db.select('SELECT data FROM products WHERE business_id = $1', [businessId]);
+    return result.map(r => JSON.parse(r.data));
   } catch (err) {
-    return null;
+    console.error('SQLite Retrieval Error (Products):', err);
+    return [];
+  }
+}
+
+export async function setLastSyncMetadata(businessId: string, type: string, timestamp: number) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  const id = `${businessId}_${type}`;
+  try {
+    await db.execute(
+      'INSERT OR REPLACE INTO sync_metadata (id, business_id, last_sync_timestamp) VALUES ($1, $2, $3)',
+      [id, businessId, timestamp]
+    );
+  } catch (err) {
+    console.error('SQLite Metadata Sync Error:', err);
+  }
+}
+
+export async function getLastSyncMetadata(businessId: string, type: string): Promise<number> {
+  const db = await getOfflineDb();
+  if (!db) return 0;
+  const id = `${businessId}_${type}`;
+  try {
+    const result: any[] = await db.select('SELECT last_sync_timestamp FROM sync_metadata WHERE id = $1', [id]);
+    return result.length > 0 ? result[0].last_sync_timestamp : 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+export async function getCachedCustomers(businessId: string) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  
+  try {
+    const result: any[] = await db.select('SELECT data FROM customers WHERE business_id = $1', [businessId]);
+    return result.map(r => JSON.parse(r.data));
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Customers):', err);
+    return [];
+  }
+}
+
+export async function syncCustomersToOffline(businessId: string, customers: any[]) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    for (const customer of customers) {
+      await db.execute(
+        'INSERT OR REPLACE INTO customers (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
+        [customer.id, businessId, JSON.stringify(customer)]
+      );
+    }
+  } catch (err) {
+    console.error('SQLite Sync Error (Customers):', err);
+  }
+}
+
+export async function syncReceiptsToOffline(businessId: string, receipts: any[]) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    for (const receipt of receipts) {
+      const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
+      await db.execute(
+        'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
+        [receipt.id, businessId, JSON.stringify(receipt), createdAt]
+      );
+    }
+  } catch (err) {
+    console.error('SQLite Sync Error (Receipts):', err);
+  }
+}
+
+export async function getCachedReceipts(businessId: string, limit: number = 50) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  
+  try {
+    const result: any[] = await db.select(
+      'SELECT data FROM receipts WHERE business_id = $1 ORDER BY created_at DESC LIMIT $2', 
+      [businessId, limit]
+    );
+    return result.map(r => JSON.parse(r.data));
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Receipts):', err);
+    return [];
   }
 }

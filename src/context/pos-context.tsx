@@ -8,7 +8,17 @@ import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, addDoc, runTransaction, updateDoc, limit, getDocs, or, increment, setDoc, and, startAfter, getAggregateFromServer, sum, count } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
-import { syncBusinessToOffline, syncProductsToOffline } from '@/lib/sqlite-sync';
+import { 
+  syncBusinessToOffline, 
+  syncProductsToOffline, 
+  getCachedProducts, 
+  getCachedCustomers,
+  syncCustomersToOffline,
+  syncReceiptsToOffline,
+  getCachedReceipts,
+  getLastSyncMetadata, 
+  setLastSyncMetadata 
+} from '@/lib/sqlite-sync';
 
 // Define localStorage keys
 const POS_CART_KEY = 'zeneva-pos-cart';
@@ -246,6 +256,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
+  const calculateLoyaltyPoints = useCallback(async (amount: number) => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        return await invoke<number>('calculate_secure_loyalty', { amount });
+      } catch (e) {
+        console.error("Secure loyalty calculation failed, falling back to FE:", e);
+      }
+    }
+    const pointsPerUnit = business?.settings?.pointsPerUnit || 0;
+    return Math.floor(amount * pointsPerUnit);
+  }, [business?.settings?.pointsPerUnit]);
+
   const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats;
 
   const triggerRefresh = useCallback(() => {
@@ -385,8 +409,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               };
 
               if (business?.settings?.loyaltyProgramEnabled) {
-                const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+                const pointsEarned = await calculateLoyaltyPoints(receiptData.total);
                 updates.loyaltyPoints = increment(pointsEarned);
               }
 
@@ -491,8 +514,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                         lastPurchaseDate: new Date() as any
                     };
                     if (business?.settings?.loyaltyProgramEnabled) {
-                        const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                        const pointsEarned = Math.floor(action.payload.receiptData.total * pointsPerUnit);
+                        const pointsEarned = await calculateLoyaltyPoints(action.payload.receiptData.total);
                         updates.loyaltyPoints = (c.loyaltyPoints || 0) + pointsEarned;
                     }
                     return { ...c, ...updates };
@@ -578,11 +600,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   const searchCustomers = useCallback(async (term: string) => {
-    if (!term.trim() || !businessId || !firestore) return [];
-    try {
-      const lower = term.toLowerCase().trim();
-      const customersRef = collection(firestore, 'customers');
+    if (!term.trim()) return [];
+    const lower = term.toLowerCase().trim();
 
+    // 1. Local Search First
+    if (customers && customers.length > 0) {
+      const localResults = customers.filter(c => 
+        c.name.toLowerCase().includes(lower) || 
+        c.email?.toLowerCase().includes(lower) ||
+        c.phone?.includes(term)
+      );
+      if (localResults.length >= 10 || !isSyncingCustomers) {
+        return localResults.slice(0, 20);
+      }
+    }
+
+    if (!businessId || !firestore) return [];
+    try {
+      const customersRef = collection(firestore, 'customers');
       const q = (field: string) => query(
         customersRef,
         where('businessId', '==', businessId),
@@ -604,7 +639,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Error searching customers:", e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, customers, isSyncingCustomers]);
 
   const searchCustomersByField = useCallback(async (field: string, value: string) => {
     if (!value.trim() || !businessId || !firestore) return [];
@@ -624,7 +659,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore]);
 
   const searchReceipts = useCallback(async (term: string) => {
-    if (!businessId || !term.trim() || !firestore) return [];
+    if (!businessId || !term.trim()) return [];
+    const lower = term.toLowerCase().trim();
+
+    // 1. Local Memory Search (contains synced items)
+    if (receipts && receipts.length > 0) {
+      const localResults = receipts.filter(r => 
+        r.id.toLowerCase().includes(lower) || 
+        r.customer?.name.toLowerCase().includes(lower) ||
+        (r as any).receiptNumber?.toLowerCase().includes(lower)
+      );
+      if (localResults.length > 0) return localResults.slice(0, 20);
+    }
+
+    if (!firestore) return [];
     try {
       const q = query(
         collection(firestore, 'receipts'),
@@ -638,7 +686,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Receipt lookup failed:", e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, receipts]);
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 1000) => {
     if (!businessId || !firestore) return [];
@@ -683,11 +731,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, receipts, mutateReceipts]);
 
   const searchProducts = useCallback(async (term: string) => {
-    if (!term.trim() || !businessId || !firestore) return [];
-    try {
-      const lowerTerm = term.trim().toLowerCase();
-      const productsRef = collection(firestore, 'products');
+    if (!term.trim()) return [];
+    const lowerTerm = term.trim().toLowerCase();
 
+    // 1. Prioritize Local Memory Search (already contains initial 50 + synced items)
+    if (products && products.length > 0) {
+      const localResults = products.filter(p => 
+        p.name.toLowerCase().includes(lowerTerm) || 
+        p.sku?.toLowerCase().includes(lowerTerm)
+      );
+      
+      // If we have enough results or syncing is finished, return local results
+      if (localResults.length >= 10 || !isSyncing) {
+        return localResults.slice(0, 30);
+      }
+    }
+
+    // 2. Fallback to Firestore only if necessary (not fully synced or few results)
+    if (!businessId || !firestore) return [];
+    try {
+      const productsRef = collection(firestore, 'products');
       const q = query(
         productsRef,
         where('businessId', '==', businessId),
@@ -704,10 +767,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error('Search products failed:', e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, products, isSyncing]);
 
   const searchProductsByField = useCallback(async (field: string, value: string) => {
-    if (!value.trim() || !businessId || !firestore) return [];
+    if (!value.trim()) return [];
+
+    // Local filter first
+    if (products && products.length > 0) {
+      const local = products.filter(p => (p as any)[field] === value);
+      if (local.length > 0 || !isSyncing) return local;
+    }
+
+    if (!businessId || !firestore) return [];
     try {
       const q = query(
         collection(firestore, 'products'),
@@ -721,23 +792,57 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error(`Search products by ${field} failed:`, e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, products, isSyncing]);
 
   // Background Loader: Deeply fills the products cache after initial fast-load
+  // This is optimized for Tauri to use a differential sync (only fetch updates)
   useEffect(() => {
     if (!businessId || !firestore || isLoadingProducts || !initialProducts) return;
     
     let isMounted = true;
-    setIsSyncing(true);
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     
     const fetchMegaBatch = async () => {
       if (!isMounted) return;
+      setIsSyncing(true);
+      
       try {
-        const q = query(
-          collection(firestore, 'products'),
-          where('businessId', '==', businessId),
-          limit(10000) 
-        );
+        let lastSync = 0;
+        if (isTauri) {
+          // 1. Initial Load from Local Cache for Instant UX
+          const cached = await getCachedProducts(businessId);
+          if (cached.length > 0 && isMounted) {
+            setSyncedProducts(prev => {
+              const ids = new Set(prev.map(p => p.id));
+              const unique = cached.filter((p: any) => !ids.has(p.id));
+              return [...prev, ...unique];
+            });
+            // We have data, so the user can start searching immediately.
+          }
+          lastSync = await getLastSyncMetadata(businessId, 'products');
+        }
+
+        // 2. Fetch only NEW or UPDATED items from Firestore
+        const productsRef = collection(firestore, 'products');
+        let q;
+        
+        if (isTauri && lastSync > 0) {
+          // Differential sync: only get what changed since last time
+          q = query(
+            productsRef,
+            where('businessId', '==', businessId),
+            where('updatedAt', '>', new Date(lastSync)),
+            limit(1000) // Small batches for updates
+          );
+        } else {
+          // Standard full sync (first time)
+          q = query(
+            productsRef,
+            where('businessId', '==', businessId),
+            limit(10000) 
+          );
+        }
+
         const snap = await getDocs(q);
         if (!isMounted) return;
 
@@ -750,11 +855,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
             } as Product;
         });
         
-        setSyncedProducts(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
-          const uniqueNew = all.filter(p => !existingIds.has(p.id));
-          return [...prev, ...uniqueNew];
-        });
+        if (all.length > 0) {
+          setSyncedProducts(prev => {
+            const merged = [...prev];
+            all.forEach(p => {
+              const idx = merged.findIndex(m => m.id === p.id);
+              if (idx >= 0) merged[idx] = p; // Update existing
+              else merged.push(p); // Add new
+            });
+            return merged;
+          });
+
+          // 3. Persist to SQLite if on Tauri
+          if (isTauri) {
+            await syncProductsToOffline(businessId, all);
+            await setLastSyncMetadata(businessId, 'products', Date.now());
+          }
+        }
+        
         setIsSyncing(false);
       } catch (e) {
         console.error('Mega product sync failed:', e);
@@ -762,7 +880,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const timer = setTimeout(fetchMegaBatch, 1000);
+    const timer = setTimeout(fetchMegaBatch, isTauri ? 100 : 1000); // Shorter delay on Tauri
     return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -773,15 +891,47 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!businessId || !firestore || !initialCustomers) return;
 
+    let isMounted = true;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+
     const fetchMegaCustomers = async () => {
+      setIsSyncingCustomers(true);
       try {
-        const q = query(
-          collection(firestore, 'customers'),
-          where('businessId', '==', businessId),
-          limit(5000)
-        );
+        let lastSync = 0;
+        if (isTauri) {
+          // 1. Load from SQLite
+          const cached = await getCachedCustomers(businessId);
+          if (cached.length > 0 && isMounted) {
+            setSyncedCustomers(prev => {
+              const ids = new Set(prev.map(c => c.id));
+              const unique = cached.filter((c: any) => !ids.has(c.id));
+              return [...prev, ...unique];
+            });
+          }
+          lastSync = await getLastSyncMetadata(businessId, 'customers');
+        }
+
+        // 2. Fetch updates
+        const customersRef = collection(firestore, 'customers');
+        let q;
+        if (isTauri && lastSync > 0) {
+           q = query(
+            customersRef,
+            where('businessId', '==', businessId),
+            where('updatedAt', '>', new Date(lastSync)),
+            limit(500)
+          );
+        } else {
+           q = query(
+            customersRef,
+            where('businessId', '==', businessId),
+            limit(5000)
+          );
+        }
 
         const snap = await getDocs(q);
+        if (!isMounted) return;
+
         const fetched = snap.docs.map(doc => {
           const data = doc.data() as any;
           return {
@@ -791,49 +941,110 @@ export function POSProvider({ children }: { children: ReactNode }) {
             lowercaseEmail: data.lowercaseEmail || data.email?.toLowerCase() || ''
           } as Customer;
         });
-        setSyncedCustomers(prev => {
-          const result = [...prev];
-          fetched.forEach(p => {
-            if (!result.find(r => r.id === p.id)) result.push(p);
+
+        if (fetched.length > 0) {
+          setSyncedCustomers(prev => {
+            const merged = [...prev];
+            fetched.forEach(c => {
+              const idx = merged.findIndex(m => m.id === c.id);
+              if (idx >= 0) merged[idx] = c;
+              else merged.push(c);
+            });
+            return merged;
           });
-          return result;
-        });
+
+          if (isTauri) {
+            await syncCustomersToOffline(businessId, fetched);
+            await setLastSyncMetadata(businessId, 'customers', Date.now());
+          }
+        }
       } catch (e) {
         console.error("Mega customer sync failed", e);
+      } finally {
+        setIsSyncingCustomers(false);
       }
     };
 
-    fetchMegaCustomers();
+    const timer = setTimeout(fetchMegaCustomers, isTauri ? 500 : 2000);
+    return () => { isMounted = false; clearTimeout(timer); };
   }, [businessId, firestore, initialCustomers]);
 
   // Background Loader: Deeply fills the receipts cache
   useEffect(() => {
     if (!businessId || !firestore) return;
 
+    let isMounted = true;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+
     const fetchMegaReceipts = async () => {
+      if (!isMounted) return;
       try {
-        const q = query(
-          collection(firestore, 'receipts'),
-          where('businessId', '==', businessId),
-          orderBy('createdAt', 'desc'),
-          limit(2000)
-        );
+        let lastSync = 0;
+        if (isTauri) {
+          // 1. Initial Load from Local Cache
+          const cached = await getCachedReceipts(businessId, 500);
+          if (cached.length > 0 && isMounted) {
+            setSyncedReceipts(prev => {
+              const ids = new Set(prev.map(r => r.id));
+              const unique = cached.filter((r: any) => !ids.has(r.id));
+              return [...prev, ...unique];
+            });
+          }
+          lastSync = await getLastSyncMetadata(businessId, 'receipts');
+        }
+
+        // 2. Fetch NEW items
+        const receiptsRef = collection(firestore, 'receipts');
+        let q;
+        if (isTauri && lastSync > 0) {
+          q = query(
+            receiptsRef,
+            where('businessId', '==', businessId),
+            where('updatedAt', '>', new Date(lastSync)),
+            limit(1000)
+          );
+        } else {
+          q = query(
+            receiptsRef,
+            where('businessId', '==', businessId),
+            orderBy('createdAt', 'desc'),
+            limit(isTauri ? 2000 : 500)
+          );
+        }
 
         const snap = await getDocs(q);
+        if (!isMounted) return;
+
         const fetched = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Receipt));
-        setSyncedReceipts(prev => {
-          const result = [...prev];
-          fetched.forEach(p => {
-            if (!result.find(r => r.id === p.id)) result.push(p);
+        
+        if (fetched.length > 0) {
+          setSyncedReceipts(prev => {
+            const result = [...prev];
+            fetched.forEach(p => {
+              const idx = result.findIndex(r => r.id === p.id);
+              if (idx >= 0) result[idx] = p;
+              else result.push(p);
+            });
+            // Sort by date desc
+            return result.sort((a,b) => {
+              const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
+              const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
+              return tb - ta;
+            });
           });
-          return result;
-        });
+
+          if (isTauri) {
+            await syncReceiptsToOffline(businessId, fetched);
+            await setLastSyncMetadata(businessId, 'receipts', Date.now());
+          }
+        }
       } catch (e) {
         console.error("Mega receipt sync failed", e);
       }
     };
 
-    fetchMegaReceipts();
+    const timer = setTimeout(fetchMegaReceipts, isTauri ? 1000 : 3000);
+    return () => { isMounted = false; clearTimeout(timer); };
   }, [businessId, firestore]);
 
   const findProductBySku = useCallback(async (sku: string) => {
@@ -1267,6 +1478,27 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
   const total = useMemo(() => subtotal + tax - discount, [subtotal, tax, discount]);
 
+  const [isSubscriptionActiveFromRust, setIsSubscriptionActiveFromRust] = useState(true);
+
+  useEffect(() => {
+    const checkRustSubscription = async () => {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      if (isTauri && business) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const expiry = business.trialExpiresAt?.seconds || (business.trialExpiresAt instanceof Date ? Math.floor(business.trialExpiresAt.getTime() / 1000) : 0);
+          const result = await invoke('validate_subscription', { 
+            accessLevel: business.accessLevel || 'starter', 
+            trialExpiresAt: expiry 
+          });
+          setIsSubscriptionActiveFromRust(!!result);
+        } catch (e) {
+          console.error("Rust subscription check failed", e);
+        }
+      }
+    };
+    checkRustSubscription();
+  }, [business]);
 
   const value = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
@@ -1296,7 +1528,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     stats: mergedStats,
 
     isSubscriptionActive: business
-      ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
+      ? (
+          (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) &&
+          isSubscriptionActiveFromRust
+        )
       : (isLoading ? true : false)
   }), [
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
@@ -1304,7 +1539,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
     addToCart, removeFromCart, updateQuantity, clearCart, selectCustomer, setDiscount, setPaymentMethod, setAutoPrint, resetPOS,
-    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchReceiptsInRange, fetchMoreReceipts, fetchMoreCustomers, mergedStats
+    impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating, searchCustomers, searchReceipts, fetchReceiptsInRange, fetchMoreReceipts, fetchMoreCustomers, mergedStats, isSubscriptionActiveFromRust
   ]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

@@ -330,7 +330,7 @@ export default function DashboardPage() {
           <SummaryCard
             title="Total Revenue"
             value={`${currencySymbol}${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={DollarSign}
+            icon={currencySymbol}
             description={`${totalReceipts + totalOnlineOrdersCount} total transactions`}
             href="/reports"
           />
@@ -353,7 +353,7 @@ export default function DashboardPage() {
           <SummaryCard
             title="POS Sales"
             value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={ShoppingCart}
+            icon={currencySymbol}
             description={`${totalReceipts} transactions`}
             href="/receipts"
           />
@@ -362,7 +362,7 @@ export default function DashboardPage() {
           <SummaryCard
             title="Online Sales"
             value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={Globe}
+            icon={currencySymbol}
             description={`${totalOnlineOrdersCount} online orders`}
             href="/online-orders"
           />

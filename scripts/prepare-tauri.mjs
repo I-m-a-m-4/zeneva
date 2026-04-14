@@ -11,7 +11,12 @@ const pathsToDelete = [
   'src/app/admin-imamshaffy',
   'src/app/(app)/ai-insights',
   'src/app/(app)/support',
-  'src/app/(app)/inventory/troubleshoot'
+  'src/app/(app)/inventory/troubleshoot',
+  'firestore.rules',
+  'firestore.indexes.json',
+  'firebase.json',
+  'src/firebase/admin.ts',
+  'src/lib/server'
 ];
 
 const foldersToClear = [

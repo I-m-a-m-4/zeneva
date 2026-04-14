@@ -13,8 +13,11 @@ const siteUrl = 'https://zeneva.space';
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
-import { Analytics } from "@vercel/analytics/next";
 import { TauriUpdater } from '@/components/TauriUpdater';
+import { DesktopTitleBar } from '@/components/desktop/TitleBar';
+import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
+import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -106,15 +109,19 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <PWAProvider>
             <POSProvider>
-              <UserActivityTracker />
-              <GlobalAnnouncement />
-              <Loader />
-              <InstallPrompt />
-              <TauriUpdater />
-              <Suspense>
-                <NavigationEvents />
-              </Suspense>
-              {children}
+              <TauriLayoutWrapper>
+                 <UserActivityTracker />
+                 <GlobalAnnouncement />
+                 <Loader />
+                 <InstallPrompt />
+                 <TauriUpdater />
+                 <DesktopTitleBar />
+                 <DesktopLauncher />
+                 <Suspense>
+                   <NavigationEvents />
+                 </Suspense>
+                 {children}
+              </TauriLayoutWrapper>
             </POSProvider>
           </PWAProvider>
         </FirebaseClientProvider>

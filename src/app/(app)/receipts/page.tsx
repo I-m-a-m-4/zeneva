@@ -24,6 +24,7 @@ import { doc, runTransaction } from 'firebase/firestore';
 import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS, CURRENCY_SYMBOLS } from '@/context/pos-context';
+import { useRouter } from 'next/navigation';
 import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -57,6 +58,7 @@ export default function ReceiptsPage() {
   } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = React.useState('');
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
@@ -236,7 +238,7 @@ export default function ReceiptsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem className="cursor-pointer" onSelect={() => window.open(`/receipts/details?id=${receipt.id}`, '_blank')}>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push(`/receipts/details?id=${receipt.id}`)}>
                               <Eye className="mr-2 h-4 w-4" /> View
                             </DropdownMenuItem>
                             {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
