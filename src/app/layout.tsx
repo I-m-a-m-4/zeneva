@@ -14,6 +14,7 @@ import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
 import { Analytics } from "@vercel/analytics/next";
+import { TauriUpdater } from '@/components/TauriUpdater';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -109,6 +110,7 @@ export default function RootLayout({
               <GlobalAnnouncement />
               <Loader />
               <InstallPrompt />
+              <TauriUpdater />
               <Suspense>
                 <NavigationEvents />
               </Suspense>

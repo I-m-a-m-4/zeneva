@@ -55,6 +55,7 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
  */
+export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: FirebaseProviderProps) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>(() => {
     // Optimistic initial state for offline support
     let cachedUser: any = null;
