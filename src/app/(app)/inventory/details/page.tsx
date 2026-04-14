@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Suspense } from 'react';
 import {
     ChevronLeft,
     Upload,
@@ -126,10 +127,10 @@ function EditProductSkeleton() {
     )
 }
 
-export default function EditProductPage() {
+function EditProductContent() {
     const router = useRouter();
-    const params = useParams();
-    const productId = params.id as string;
+    const searchParams = useSearchParams();
+    const productId = searchParams.get('id');
 
     const { toast } = useToast();
     const { currentUserProfile } = usePOS();
@@ -798,5 +799,13 @@ export default function EditProductPage() {
                 </AlertDialogContent>
             </AlertDialog>
         </Form>
+    );
+}
+
+export default function EditProductPage() {
+    return (
+        <Suspense fallback={<EditProductSkeleton />}>
+            <EditProductContent />
+        </Suspense>
     );
 }

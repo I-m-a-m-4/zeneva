@@ -5,6 +5,7 @@ const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
 
 const nextConfig: NextConfig = {
   output: isTauri ? 'export' : undefined,
+  trailingSlash: isTauri ? true : undefined,
   typescript: {
     ignoreBuildErrors: true,
   },

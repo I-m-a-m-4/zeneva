@@ -185,7 +185,7 @@ export default function InvoicesPage() {
                                                     </Button>
                                                 )}
                                                 <Button asChild size="sm" variant="outline" className="h-8">
-                                                    <Link href={`/invoice/${invoice.id}`}>
+                                                    <Link href={`/invoice/details?id=${invoice.id}`}>
                                                         <Eye className="mr-2 h-3.5 w-3.5" /> View
                                                     </Link>
                                                 </Button>

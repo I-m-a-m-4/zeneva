@@ -2,7 +2,8 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 import { usePOS } from '@/context/pos-context';
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
@@ -34,9 +35,17 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 export default function CustomerDetailPage() {
-    const params = useParams();
+    return (
+        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <CustomerDetailContent />
+        </Suspense>
+    );
+}
+
+function CustomerDetailContent() {
+    const searchParams = useSearchParams();
     const router = useRouter();
-    const customerId = params.id as string;
+    const customerId = searchParams.get('id') as string;
     const { toast } = useToast();
 
     const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
@@ -235,7 +244,7 @@ export default function CustomerDetailPage() {
                                                     ) : <Package className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />}
                                                 </div>
                                                 <div>
-                                                    <Link href={`/inventory/${summary.product.id}`} className="font-medium hover:underline">{summary.product.name}</Link>
+                                                    <Link href={`/inventory/details?id=${summary.product.id}`} className="font-medium hover:underline">{summary.product.name}</Link>
                                                     <div className="text-xs text-muted-foreground">{summary.product.sku}</div>
                                                 </div>
                                             </div>

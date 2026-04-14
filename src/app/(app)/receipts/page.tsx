@@ -236,7 +236,7 @@ export default function ReceiptsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem className="cursor-pointer" onSelect={() => window.open(`/receipts/${receipt.id}`, '_blank')}>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => window.open(`/receipts/details?id=${receipt.id}`, '_blank')}>
                               <Eye className="mr-2 h-4 w-4" /> View
                             </DropdownMenuItem>
                             {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (

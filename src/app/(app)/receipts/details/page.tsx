@@ -2,25 +2,22 @@
 import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useParams, notFound, useRouter } from "next/navigation";
+import { useSearchParams, notFound, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
 import * as React from "react";
-import { useRef } from "react";
+import { useRef, Suspense } from "react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
-import { CheckCircle } from "lucide-react";
+import { doc } from "firebase/firestore";
 import type { Receipt } from "@/types";
 import { useBusiness, CURRENCY_SYMBOLS } from "@/context/pos-context";
 import Link from 'next/link';
-import { Separator } from "@/components/ui/separator";
 
-
-export default function ReceiptPage() {
+function ReceiptContent() {
   const { toast } = useToast();
-  const params = useParams();
-  const receiptId = params.id as string;
+  const searchParams = useSearchParams();
+  const receiptId = searchParams.get('id');
 
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
@@ -36,13 +33,13 @@ export default function ReceiptPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
   }
 
-  if (!receipt) {
+  if (!receiptId || !receipt) {
     notFound();
   }
 
   // If this is an invoice, redirect to the invoice detail page
   if (receipt.paymentMethod === 'Invoice') {
-    router.replace(`/invoice/${receipt.id}`);
+    router.replace(`/invoice/details?id=${receipt.id}`);
     return null;
   }
 
@@ -90,8 +87,6 @@ export default function ReceiptPage() {
     });
   };
 
-
-
   const handleShare = async () => {
     const shareData = {
       title: `${isInvoice ? 'Invoice' : 'Receipt'} ${receipt.id.substring(0, 8)}`,
@@ -132,7 +127,6 @@ export default function ReceiptPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 no-print">
-
         <Button asChild variant="outline">
           <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
         </Button>
@@ -147,5 +141,13 @@ export default function ReceiptPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function ReceiptPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <ReceiptContent />
+    </Suspense>
   );
 }

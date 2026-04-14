@@ -320,7 +320,7 @@ export default function CustomersPage() {
                       <TableCell>
                         <div
                           className="font-medium hover:underline cursor-pointer"
-                          onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}
+                          onClick={() => { NProgress.start(); router.push(`/customers/details?id=${customer.id}`); }}
                         >
                           {customer.name}
                         </div>
@@ -339,7 +339,7 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { NProgress.start(); router.push(`/customers/${customer.id}`); }}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { NProgress.start(); router.push(`/customers/details?id=${customer.id}`); }}>
                             <ChevronRight className="h-4 w-4" />
                           </Button>
                         </div>

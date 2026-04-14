@@ -3,9 +3,9 @@ import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Printer, Share2, Loader2, PlusCircle, CheckCircle, ArrowLeft } from "lucide-react";
-import { useParams, notFound, useRouter } from "next/navigation";
+import { useSearchParams, notFound, useRouter } from "next/navigation";
 import * as React from "react";
-import { useRef } from "react";
+import { useRef, Suspense } from "react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -14,10 +14,10 @@ import type { Receipt } from "@/types";
 import { useBusiness, CURRENCY_SYMBOLS } from "@/context/pos-context";
 import Link from 'next/link';
 
-export default function InvoiceDetailPage() {
+function InvoiceContent() {
     const { toast } = useToast();
-    const params = useParams();
-    const invoiceId = params.id as string;
+    const searchParams = useSearchParams();
+    const invoiceId = searchParams.get('id');
     const router = useRouter();
 
     const firestore = useFirestore();
@@ -33,13 +33,13 @@ export default function InvoiceDetailPage() {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Invoice...</span></div>;
     }
 
-    if (!invoice) {
+    if (!invoiceId || !invoice) {
         notFound();
     }
 
     // If this record is NOT an invoice, redirect to receipts
     if (invoice.paymentMethod !== 'Invoice') {
-        router.replace(`/receipts/${invoice.id}`);
+        router.replace(`/receipts/details?id=${invoice.id}`);
         return null;
     }
 
@@ -133,5 +133,13 @@ export default function InvoiceDetailPage() {
                 </Button>
             </div>
         </div>
+    );
+}
+
+export default function InvoiceDetailPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <InvoiceContent />
+        </Suspense>
     );
 }

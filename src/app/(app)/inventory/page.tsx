@@ -754,7 +754,7 @@ function InventoryPageContent() {
                           disabled={(product as any).isOptimistic}
                         />
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/${product.id}`)}>
+                      <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
                         {product.imageUrl ? (
                           <div className="relative h-16 w-16">
                             <Image
@@ -782,7 +782,7 @@ function InventoryPageContent() {
                       </TableCell>
                       <TableCell className="font-medium whitespace-normal">
                         <div className="flex items-center gap-2">
-                          <Link href={(product as any).isOptimistic ? '#' : `/inventory/${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
+                          <Link href={(product as any).isOptimistic ? '#' : `/inventory/details?id=${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
                             {product.name}
                           </Link>
                           {product.type === 'composite' && (
