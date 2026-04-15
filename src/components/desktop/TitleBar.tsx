@@ -61,7 +61,6 @@ export function DesktopTitleBar() {
 
   return (
     <div 
-      data-tauri-drag-region
       className="h-10 w-full bg-background/95 backdrop-blur-md border-b flex items-center justify-between select-none fixed top-0 left-0 z-[9999] no-print shadow-sm"
     >
       <div className="flex items-center gap-2.5 px-4 pointer-events-none" data-tauri-drag-region>
@@ -78,6 +77,8 @@ export function DesktopTitleBar() {
             </div>
          </div>
       </div>
+
+      <div data-tauri-drag-region className="flex-1 h-full cursor-default" />
 
       <div className="flex items-center h-full">
         <button 
