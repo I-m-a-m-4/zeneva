@@ -77,7 +77,7 @@
     background: hsl(var(--background));
   }
  
-  .is-desktop body {
+  body.is-desktop {
      overflow: hidden; /* Prevent native scroll on the body, use internal scroll-areas */
   }
 

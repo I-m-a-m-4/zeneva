@@ -83,7 +83,7 @@ export function DesktopTitleBar() {
          <div className="flex flex-col" data-tauri-drag-region>
             <span className="text-[10px] font-black tracking-[0.25em] text-primary/90 leading-none">ZENEVA</span>
             <div className="flex items-center gap-1.5 mt-0.5">
-               <span className="text-[8px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Desktop v{AppConfig.version || '0.3.3'}</span>
+               <span className="text-[8px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Desktop v{AppConfig.version}</span>
                <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse"></div>
             </div>
          </div>

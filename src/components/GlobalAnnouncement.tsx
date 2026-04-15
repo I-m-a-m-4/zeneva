@@ -79,7 +79,7 @@ export function GlobalAnnouncement() {
                     initial={{ y: -100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -100, opacity: 0 }}
-                    className={`fixed top-0 left-0 right-0 z-[100] ${bgColors[broadcast.type] || 'bg-primary'} text-white shadow-lg`}
+                    className={`fixed top-[var(--tauri-title-height,0)] left-0 right-0 z-[100] ${bgColors[broadcast.type] || 'bg-primary'} text-white shadow-lg`}
                 >
                     <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 overflow-hidden">
