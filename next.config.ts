@@ -96,35 +96,39 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      const WebpackObfuscator = require('webpack-obfuscator');
-      config.plugins.push(
-        new WebpackObfuscator({
-          rotateStringArray: true,
-          stringArray: true,
-          stringArrayThreshold: 0.75,
-          compact: true,
-          controlFlowFlattening: true,
-          controlFlowFlatteningThreshold: 0.75,
-          deadCodeInjection: true,
-          deadCodeInjectionThreshold: 0.4,
-          debugProtection: true,
-          debugProtectionInterval: 4000,
-          disableConsoleOutput: true,
-          identifierNamesGenerator: 'hexadecimal',
-          log: false,
-          renameGlobals: false,
-          selfDefending: true,
-          splitStrings: true,
-          splitStringsChunkLength: 10,
-          unicodeEscapeSequence: false
-        }, [
-          'static/_next/static/chunks/main.js',
-          'static/_next/static/chunks/amp.js'
-        ])
-      );
-    }
+    /*
+    webpack: (config, { dev, isServer }) => {
+      if (!dev && !isServer) {
+        const WebpackObfuscator = require('webpack-obfuscator');
+        config.plugins.push(
+          new WebpackObfuscator({
+            rotateStringArray: true,
+            stringArray: true,
+            stringArrayThreshold: 0.75,
+            compact: true,
+            controlFlowFlattening: true,
+            controlFlowFlatteningThreshold: 0.75,
+            deadCodeInjection: true,
+            deadCodeInjectionThreshold: 0.4,
+            debugProtection: true,
+            debugProtectionInterval: 4000,
+            disableConsoleOutput: true,
+            identifierNamesGenerator: 'hexadecimal',
+            log: false,
+            renameGlobals: false,
+            selfDefending: true,
+            splitStrings: true,
+            splitStringsChunkLength: 10,
+            unicodeEscapeSequence: false
+          }, [
+            'static/_next/static/chunks/main.js',
+            'static/_next/static/chunks/amp.js'
+          ])
+        );
+      }
+      return config;
+    },
+    */
     return config;
   },
 };
