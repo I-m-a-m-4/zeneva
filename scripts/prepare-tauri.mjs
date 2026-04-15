@@ -44,7 +44,12 @@ foldersToClear.forEach(p => {
 
 // Specific stubs for core app dependencies to satisfy imports
 const stubs = [
-    { path: 'src/ai/flows/customer-insights-flow.ts', content: 'export const getCustomerInsights = async () => ({ summary: "AI Insights disabled in desktop build", productSuggestions: [], engagementTactics: [] });' }
+    { path: 'src/ai/flows/customer-insights-flow.ts', content: 'export const getCustomerInsights = async () => ({ summary: "AI Insights disabled in desktop build", productSuggestions: [], engagementTactics: [] });' },
+    { path: 'src/ai/flows/business-analysis-flow.ts', content: 'export const runBusinessAnalysis = async () => ({ summary: "Tactical analysis is optimized for the cloud node.", metrics: {}, recommendations: [] });' },
+    { path: 'src/ai/flows/product-troubleshoot-flow.ts', content: 'export const runProductTroubleshoot = async () => ({ solution: "Please connect to the command center via mobile or web for deeper diagnostics.", steps: [], confidence: 0 });' },
+    { path: 'src/ai/flows/support-chat-flow.ts', content: 'export const runSupportChat = async () => ({ response: "Direct support stream is available via the web terminal.", citations: [], suggestedActions: [] });' },
+    { path: 'src/ai/flows/audit-log-analysis-flow.ts', content: 'export const analyzeAuditLogs = async () => ({ summary: "Security audit stream is encrypted for server-side processing only.", anomalies: [], riskScore: 0 });' },
+    { path: 'src/ai/flows/visual-count-flow.ts', content: 'export const runVisualCount = async () => ({ count: 0, confidence: 0, details: "Hardware-accelerated visual counting requires active telemetry link." });' }
 ];
 
 stubs.forEach(s => {
