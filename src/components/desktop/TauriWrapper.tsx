@@ -13,7 +13,7 @@ export function TauriLayoutWrapper({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className={cn('min-h-screen', isTauri && 'pt-10 transition-[padding] duration-300')}>
+    <div className={cn('min-h-screen bg-background text-foreground', isTauri && 'pt-10 transition-[padding] duration-300')}>
       {children}
     </div>
   );

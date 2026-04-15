@@ -677,7 +677,7 @@ export default function AuthenticatedLayout({
                   </DropdownMenu>
                 </div>
               </header>
-              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll">
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll bg-background">
                 {showSubscriptionBlock ? (
                   <div className="flex h-full min-h-[400px] w-full items-center justify-center p-4">
                     <Card className="w-full max-w-lg border-none shadow-xl bg-gradient-to-br from-background to-muted/50 overflow-hidden animate-in fade-in zoom-in duration-500">
