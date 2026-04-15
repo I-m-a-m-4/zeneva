@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader, ChevronLeft } from "lucide-react";
+import { Loader, ChevronLeft, ShieldCheck } from "lucide-react";
 import React, { useState } from "react";
 import { AppConfig } from "@/lib/config";
+import { motion } from "framer-motion";
 import Image from "next/image";
 
 export default function ForgotPasswordPage() {
@@ -119,17 +120,31 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
       </div>
-      <div className="hidden bg-muted lg:block relative">
+      <div className="hidden bg-slate-900 lg:block relative overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidXNpbmVzcyUyMG1hbmFnZW1lbnR8ZW58MHx8fHwxNzY4NTkyNzUyfDA&ixlib=rb-4.1.0&q=80&w=1080"
-          alt="A modern business management software interface on a laptop."
+          src="/zeneva-forgot-password-premium.png"
+          alt="Tactical Intelligence Background"
           width="1920"
           height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          className="h-full w-full object-cover opacity-90 transition-transform duration-[20000ms] hover:scale-110"
+          priority
         />
-        <div className="absolute bottom-8 left-8 right-8 p-6 bg-black/50 backdrop-blur-md rounded-lg">
-          <h2 className="text-white text-3xl font-bold font-headline">The Operating System for Business</h2>
-          <p className="text-white/80 mt-2 text-lg">Streamline your inventory, maximize your profit, and build lasting customer relationships—all from one powerful platform.</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+        <div className="absolute bottom-12 left-12 right-12 p-10 bg-white/5 backdrop-blur-2xl rounded-[3rem] border border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <h2 className="text-white text-5xl font-medium tracking-tighter font-display">Security First.</h2>
+            <p className="text-white/60 mt-6 text-xl font-dm-sans leading-relaxed max-w-lg">
+              Protecting your business data is our primary mission. Follow the reset instructions sent to your email to regain secure access to your Command Center.
+            </p>
+            <div className="mt-8 flex items-center gap-3 text-orange-500 text-sm font-bold uppercase tracking-[0.2em] bg-orange-500/10 w-fit px-4 py-2 rounded-full border border-orange-500/20">
+               <ShieldCheck className="h-5 w-5" />
+               Tactical Vault Locked
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>

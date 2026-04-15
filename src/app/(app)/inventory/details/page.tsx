@@ -213,21 +213,23 @@ function EditProductContent() {
     };
 
     const onSubmit = async (values: ProductFormValues) => {
-        if (!productDocRef || !product || !currentUserProfile || !firestore || !business) return;
+        if (!product || !currentUserProfile || !business) return;
 
         setIsSaving(true);
         let imageUrl = product?.imageUrl || '';
 
         try {
-            if (imageFile) {
+            // 1. If we have an image, we try to upload it backgrounding if possible, 
+            // but for simplicity here we'll do it sequentially if online.
+            if (imageFile && navigator.onLine) {
                 const formData = new FormData();
                 formData.append('image', imageFile);
                 const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
-                if (!apiKey) throw new Error("ImgBB API key is not configured.");
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
                 const result = await response.json();
-                if (!result.success) throw new Error(result.error?.message || 'Image upload failed.');
-                imageUrl = result.data.url;
+                if (result.success) {
+                    imageUrl = result.data.url;
+                }
             }
 
             const updatedValues = { ...values, imageUrl };
@@ -235,24 +237,25 @@ function EditProductContent() {
                 Object.entries(updatedValues).filter(([_, v]) => v !== undefined)
             );
 
-            await updateDoc(productDocRef, {
-                ...cleanData,
-                updatedAt: serverTimestamp(),
+            // 2. Queue the update instead of direct write
+            addToQueue({
+                type: 'update-product',
+                payload: {
+                    productId: product.id,
+                    values: cleanData
+                }
+            }, `Updating product: ${values.name}`);
+
+            toast({ 
+                variant: 'success', 
+                title: 'Changes Queued', 
+                description: `${values.name} will be updated ${navigator.onLine ? 'momentarily' : 'when connection is restored'}.` 
             });
-
-            // Log audit event (Awaiting to ensure it's written before navigation)
-            await logAuditEvent(firestore, business.id, currentUserProfile, {
-                action: 'product.update',
-                entity: { type: 'Product', id: product.id, name: product.name },
-                details: { changes: Object.keys(values).filter(key => values[key as keyof typeof values] !== product[key as keyof typeof product]) }
-            });
-
-
-            toast({ variant: 'success', title: 'Product Updated', description: `${values.name} has been updated.` });
+            
             router.push('/inventory');
 
         } catch (error: any) {
-            console.error("Failed to update product:", error);
+            console.error("Failed to queue product update:", error);
             toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
             setIsSaving(false);

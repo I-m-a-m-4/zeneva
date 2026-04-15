@@ -91,6 +91,44 @@ export async function syncProductsToOffline(businessId: string, products: any[])
   }
 }
 
+export async function syncProductToOffline(businessId: string, product: any) {
+  const db = await getOfflineDb();
+  if (!db || !product?.id) return;
+  
+  try {
+    await db.execute(
+      'INSERT OR REPLACE INTO products (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
+      [product.id, businessId, JSON.stringify(product)]
+    );
+  } catch (err) {
+    console.error('SQLite Sync Error (Single Product):', err);
+  }
+}
+
+export async function deleteProductFromOffline(productId: string) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    await db.execute('DELETE FROM products WHERE id = $1', [productId]);
+  } catch (err) {
+    console.error('SQLite Delete Error (Product):', err);
+  }
+}
+
+export async function deleteMultipleProductsFromOffline(productIds: string[]) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    for (const id of productIds) {
+      await db.execute('DELETE FROM products WHERE id = $1', [id]);
+    }
+  } catch (err) {
+    console.error('SQLite Delete Error (Multiple Products):', err);
+  }
+}
+
 export async function getCachedProducts(businessId: string) {
   const db = await getOfflineDb();
   if (!db) return [];
@@ -176,6 +214,21 @@ export async function syncReceiptsToOffline(businessId: string, receipts: any[])
   }
 }
 
+export async function syncReceiptToOffline(businessId: string, receipt: any) {
+  const db = await getOfflineDb();
+  if (!db || !receipt?.id) return;
+  
+  try {
+    const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
+    await db.execute(
+      'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
+      [receipt.id, businessId, JSON.stringify(receipt), createdAt]
+    );
+  } catch (err) {
+    console.error('SQLite Sync Error (Single Receipt):', err);
+  }
+}
+
 export async function getCachedReceipts(businessId: string, limit: number = 50) {
   const db = await getOfflineDb();
   if (!db) return [];
@@ -187,7 +240,22 @@ export async function getCachedReceipts(businessId: string, limit: number = 50) 
     );
     return result.map(r => JSON.parse(r.data));
   } catch (err) {
-    console.error('SQLite Retrieval Error (Receipts):', err);
     return [];
+  }
+}
+
+export async function clearAllTables() {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    await db.execute('DELETE FROM products');
+    await db.execute('DELETE FROM customers');
+    await db.execute('DELETE FROM receipts');
+    await db.execute('DELETE FROM business');
+    await db.execute('DELETE FROM sync_metadata');
+    console.log("SQLite: All tables cleared.");
+  } catch (err) {
+    console.error('SQLite Clear Error:', err);
   }
 }

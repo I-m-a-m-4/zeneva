@@ -255,7 +255,7 @@ export default function AuthenticatedLayout({
 
   // --- RBAC Route Guard ---
   React.useEffect(() => {
-    if (isLoading || !currentUserProfile) return;
+    if (isLoading || isUserLoading || !currentUserProfile) return;
 
     const userRole = currentUserProfile.role;
 
@@ -269,7 +269,7 @@ export default function AuthenticatedLayout({
       '/receipts': ['admin', 'manager', 'vendor_operator'],
       '/invoices': ['admin', 'manager'],
       '/reports': ['admin', 'manager'],
-      '/ai-insights': ['admin', 'manager'],
+      '/ai-insights': ['admin', 'manager', 'vendor_operator'],
       '/customers': ['admin', 'manager', 'vendor_operator'],
       '/users': ['admin'],
       '/audit-log': ['admin'],
@@ -438,7 +438,7 @@ export default function AuthenticatedLayout({
                   </div>
                 </Link>
               </SidebarHeader>
-              <SidebarContent className="flex-1 p-2 overflow-hidden">
+              <SidebarContent className="flex-1 p-2 overflow-y-auto custom-scrollbar">
                 <SidebarMenu>
                   {isUserLoading ? (
                     // Show skeletons for the top 5 nav items while loading
@@ -524,7 +524,7 @@ export default function AuthenticatedLayout({
                     {userRole === 'admin' && (
                       <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
                     )}
-                    <DropdownMenuItem>Support</DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/support"><LifeBuoy className="mr-2 h-4 w-4" />Support</Link></DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />

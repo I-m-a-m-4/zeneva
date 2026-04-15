@@ -11,6 +11,9 @@ import { logAuditEvent } from '@/lib/audit';
 import { 
   syncBusinessToOffline, 
   syncProductsToOffline, 
+  syncProductToOffline,
+  deleteProductFromOffline,
+  deleteMultipleProductsFromOffline,
   getCachedProducts, 
   getCachedCustomers,
   syncCustomersToOffline,
@@ -129,12 +132,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  const isImpersonating = !!impersonatedUserId;
+
+  // Effective User ID: Use impersonated ID if set, otherwise real user ID
+  const effectiveUserId = impersonatedUserId || user?.uid;
+
   // Track the last user ID to prevent unnecessary POS resets
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  const isImpersonating = !!impersonatedUserId;
-  // Effective User ID: Use impersonated ID if set, otherwise real user ID
-  const effectiveUserId = impersonatedUserId || user?.uid;
+  useEffect(() => {
+    // Reset if we have a user and they are different from last, or if we go from user to no user
+    if (effectiveUserId !== lastUserId) {
+      if (lastUserId !== null) {
+        console.log("Account Change Detected - Resetting POS State");
+        resetPOS();
+        // Force refresh to clear any cached SWR data if needed
+        setRefreshKey(prev => prev + 1);
+      }
+      setLastUserId(effectiveUserId);
+    }
+  }, [effectiveUserId, lastUserId]);
 
   // --- Centralized Data Fetching ---
   // MODIFIED: Ensure we have an authenticated user before fetching, even if impersonating.
@@ -182,20 +199,73 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
-  // Sync state to hold ALL products found during sync
+  // --- Offline Queue State ---
+  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
+  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedQueue = localStorage.getItem(QUEUED_ACTIONS_KEY);
+      if (savedQueue) {
+        setQueuedActions(JSON.parse(savedQueue));
+      }
+    } catch (e) { console.error("Failed to load offline queue:", e); }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(QUEUED_ACTIONS_KEY, JSON.stringify(queuedActions));
+    } catch (e) { console.error("Failed to save offline queue:", e); }
+  }, [queuedActions]);
+
   const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
 
   const products = useMemo(() => {
     // Merge initial 50 with synced results, prioritizing fresh synced data
-    const merged = [...(initialProducts || [])];
+    let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => {
       if (!existingIds.has(p.id)) merged.push(p);
+      else {
+        // If it exists but synced is newer, update it (though usually initial 50 is fine)
+        const idx = merged.findIndex(m => m.id === p.id);
+        if (idx !== -1) merged[idx] = p;
+      }
     });
+
+    // APPLY QUEUED ACTIONS OPTIMISTICALLY
+    // 1. Deletions
+    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
+    if (deletedIds.size > 0) {
+      merged = merged.filter(p => !deletedIds.has(p.id));
+    }
+
+    // 2. Updates
+    const updates = queuedActions.filter(a => a.type === 'update-product' || a.type === 'bulk-update-products');
+    updates.forEach(action => {
+      if (action.type === 'update-product') {
+        const idx = merged.findIndex(p => p.id === action.payload.productId);
+        if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+      } else if (action.type === 'bulk-update-products') {
+        action.payload.productIds.forEach((id: string) => {
+          const idx = merged.findIndex(p => p.id === id);
+          if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+        });
+      }
+    });
+
+    // 3. Additions (that aren't already in initial/synced)
+    const additions = queuedActions.filter(a => a.type === 'add-product');
+    additions.forEach(action => {
+      if (!merged.find(p => p.id === action.payload.id)) {
+        merged.push({ ...action.payload, isOptimistic: true });
+      }
+    });
+
     return merged;
-  }, [initialProducts, syncedProducts]);
+  }, [initialProducts, syncedProducts, queuedActions]);
 
   // Handle SQLite Redundant Sync
   useEffect(() => {
@@ -280,10 +350,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setIsConfettiActive(true);
   }, []);
 
-  // --- Offline Queue State ---
-  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
-  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
-
   useEffect(() => {
     if (businessId && firestore) {
       getInventoryStats().then(setExtraStats);
@@ -297,21 +363,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       ...extraStats
     } as BusinessStats;
   }, [stats, extraStats]);
-
-  useEffect(() => {
-    try {
-      const savedQueue = localStorage.getItem(QUEUED_ACTIONS_KEY);
-      if (savedQueue) {
-        setQueuedActions(JSON.parse(savedQueue));
-      }
-    } catch (e) { console.error("Failed to load offline queue:", e); }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(QUEUED_ACTIONS_KEY, JSON.stringify(queuedActions));
-    } catch (e) { console.error("Failed to save offline queue:", e); }
-  }, [queuedActions]);
 
   const processQueue = useCallback(async () => {
     if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !currentUserProfile) {
@@ -574,21 +625,80 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
+    const newActionId = uuidv4();
     const newAction: QueuedAction = {
       ...action,
       description,
-      id: uuidv4(),
+      id: newActionId,
       timestamp: Date.now(),
       status: 'pending',
     };
+    
     const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // IMMEDIATE OFFLINE PERSISTENCE (SQLite Hardening)
+    if (isTauri && businessId) {
+      const persistLocally = async () => {
+        try {
+          switch (action.type) {
+            case 'add-product':
+              await syncProductToOffline(businessId, { ...action.payload, id: action.payload.id || newActionId });
+              break;
+            case 'update-product': {
+              const existingProduct = products?.find(p => p.id === action.payload.productId);
+              if (existingProduct) {
+                await syncProductToOffline(businessId, { ...existingProduct, ...action.payload.values });
+              }
+              break;
+            }
+            case 'bulk-update-products': {
+              if (products) {
+                const affectedProducts = products
+                  .filter(p => action.payload.productIds.includes(p.id))
+                  .map(p => ({ ...p, ...action.payload.values }));
+                if (affectedProducts.length > 0) {
+                  await syncProductsToOffline(businessId, affectedProducts);
+                }
+              }
+              break;
+            }
+            case 'delete-product':
+              await deleteMultipleProductsFromOffline(action.payload.productIds);
+              break;
+            case 'complete-sale':
+              await syncReceiptsToOffline(businessId, [{ ...action.payload.receiptData, id: action.payload.receiptData.id || newActionId }]);
+              // Also update local stock for products in the sale
+              if (products) {
+                const stockUpdates = action.payload.productUpdates.map((update: any) => {
+                  const p = products.find(prod => prod.id === update.id);
+                  if (p) return { ...p, stock: update.newStock };
+                  return null;
+                }).filter(Boolean);
+                if (stockUpdates.length > 0) {
+                  await syncProductsToOffline(businessId, stockUpdates);
+                }
+              }
+              break;
+            case 'add-customer':
+              await syncCustomersToOffline(businessId, [{ ...action.payload, id: action.payload.id || newActionId }]);
+              break;
+          }
+        } catch (e) {
+          console.error("Critical: Local SQLite persistence failed for queued action:", e);
+        }
+      };
+      persistLocally();
+    }
+
     toast({
       title: isOnline ? 'Saving...' : 'Action Queued',
       description: isOnline ? `Saving "${description}" in the background.` : `"${description}" will sync when you're online.`
     });
+
     setQueuedActions(prev => [...prev, newAction]);
     return newAction.id;
-  }, [business, toast]);
+  }, [business, businessId, products, toast]);
 
   const updateQueuedAction = useCallback((id: string, updates: Partial<QueuedAction>) => {
     setQueuedActions(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
@@ -661,6 +771,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchReceipts = useCallback(async (term: string) => {
     if (!businessId || !term.trim()) return [];
     const lower = term.toLowerCase().trim();
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
 
     // 1. Local Memory Search (contains synced items)
     if (receipts && receipts.length > 0) {
@@ -670,6 +781,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
         (r as any).receiptNumber?.toLowerCase().includes(lower)
       );
       if (localResults.length > 0) return localResults.slice(0, 20);
+    }
+
+    // On Desktop, we strictly search downloaded/local receipts to ensure performance and offline reliability.
+    if (isTauri) {
+      console.log("Desktop search: No local matches found for", term);
+      return [];
     }
 
     if (!firestore) return [];
@@ -1363,7 +1480,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch { } }, [paymentMethod]);
   useEffect(() => { try { localStorage.setItem(POS_AUTO_PRINT_KEY, String(autoPrint)); } catch { } }, [autoPrint]);
 
-  const resetPOS = useCallback(() => {
+  const resetPOS = useCallback(async () => {
     setCart([]);
     setSelectedCustomer(null);
     setDiscount(0);
@@ -1374,6 +1491,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setSyncedReceipts([]);
     setQueuedActions([]);
     setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
+
+    // Clear local storage
     try {
       localStorage.removeItem(POS_CART_KEY);
       localStorage.removeItem(POS_CUSTOMER_KEY);
@@ -1382,6 +1501,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
       localStorage.removeItem(QUEUED_ACTIONS_KEY);
     } catch { }
+
+    // Clear SQLite if on desktop
+    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+      try {
+        const { clearAllTables } = await import('@/lib/sqlite-sync');
+        await clearAllTables();
+        console.log('SQLite data cleared successfully on account reset/logout.');
+      } catch (err) {
+        console.error('Failed to clear SQLite data:', err);
+      }
+    }
   }, [business]);
 
   // Effect to reset POS state and CLEAR IMPERSONATION when user changes or business changes

@@ -11,7 +11,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "postinstall": "patch-package",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version-up": "node scripts/update-version.js"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

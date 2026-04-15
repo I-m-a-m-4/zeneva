@@ -70,12 +70,13 @@ function ReviewPageContent() {
 
 
     const handleCompleteSale = React.useCallback(() => {
-        if (!firestore || !business || !user || cart.length === 0 || !products || !currentUserProfile) {
+        if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
             setIsCompleting(false);
             return;
         }
 
+        // 1. Validations (Backorder & Operating Hours)
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
             const isService = productFromCache?.categoryType === 'service';
@@ -88,215 +89,148 @@ function ReviewPageContent() {
             }
         }
 
-        setIsCompleting(true);
+        const operatingHours = business.settings?.operatingHours;
+        let isOutsideHours = false;
+        if (operatingHours?.enabled) {
+            const saleDate = backdate ? new Date(backdate) : new Date();
+            const [openH, openM] = operatingHours.openTime.split(':').map(Number);
+            const [closeH, closeM] = operatingHours.closeTime.split(':').map(Number);
+            const nowMinutes = saleDate.getHours() * 60 + saleDate.getMinutes();
+            const openMinutes = openH * 60 + openM;
+            const closeMinutes = closeH * 60 + closeM;
 
-        const newReceiptRef = doc(collection(firestore, 'receipts'));
+            if (closeMinutes < openMinutes) {
+                isOutsideHours = !(nowMinutes >= openMinutes || nowMinutes <= closeMinutes);
+            } else {
+                isOutsideHours = nowMinutes < openMinutes || nowMinutes > closeMinutes;
+            }
 
-        // **OPTIMISTIC UI FIX**: Save a temporary version to sessionStorage
-        // Note: We use a real Date object and convert to ISO string for storage
-        const optimisticReceipt = { ...displayReceipt, id: newReceiptRef.id, createdAt: displayReceipt.createdAt.toISOString() };
-        try {
-            sessionStorage.setItem(`optimistic-receipt-${newReceiptRef.id}`, JSON.stringify(optimisticReceipt));
-        } catch (e) {
-            console.error("Could not save optimistic receipt to session storage", e);
+            if (isOutsideHours && operatingHours.preventSalesOutsideHours && !isAdmin) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Operating Hours Violation',
+                    description: `Sales are not allowed outside of operating hours (${operatingHours.openTime} - ${operatingHours.closeTime}).`
+                });
+                return;
+            }
         }
 
-        (async () => {
-            try {
-                const batch = writeBatch(firestore);
+        setIsCompleting(true);
 
-                let totalCost = 0;
-                const itemsForReceipt = cart.map(cartItem => {
-                    const product = products.find(p => p.id === cartItem.product.id);
-                    const costPrice = product?.costPrice || 0;
-                    const multiplier = cartItem.multiplier || 1;
-                    const baseQuantitySold = cartItem.quantity * multiplier;
+        // 2. Prepare Data for Queue
+        const newReceiptId = uuidv4();
+        let totalCost = 0;
+        const itemsForReceipt = cart.map(cartItem => {
+            const product = products.find(p => p.id === cartItem.product.id);
+            const costPrice = product?.costPrice || 0;
+            totalCost += costPrice * cartItem.quantity;
+            return {
+                productId: cartItem.product.id,
+                name: cartItem.unit ? `${cartItem.product.name} (${cartItem.unit})` : cartItem.product.name,
+                quantity: cartItem.quantity,
+                unit: cartItem.unit || null,
+                multiplier: cartItem.multiplier || 1,
+                price: cartItem.product.price,
+                costPrice: costPrice,
+            };
+        });
 
-                    totalCost += costPrice * cartItem.quantity;
+        const profit = total - totalCost;
+        const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
 
-                    // --- Stock Logic ---
-                    const isService = product?.categoryType === 'service';
-                    if (!isService) {
-                        if (product?.type === 'composite' && product.components) {
-                            // For composite items, decrement EACH component's stock
-                            product.components.forEach(component => {
-                                const componentProduct = products.find(p => p.id === component.productId);
-                                if (componentProduct) {
-                                    const componentRef = doc(firestore, 'products', component.productId);
-                                    const decrementAmount = component.quantity * cartItem.quantity;
-                                    const newCompStock = (componentProduct.stock || 0) - decrementAmount;
-                                    batch.update(componentRef, { stock: newCompStock, updatedAt: serverTimestamp() });
-                                }
-                            });
-                        } else {
-                            // For single items or variants, decrement the product's own stock
-                            const productRef = doc(firestore, 'products', cartItem.product.id);
-                            const newStock = (product?.stock || 0) - baseQuantitySold;
-                            batch.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
-                        }
-                    }
+        const receiptData = {
+            id: newReceiptId,
+            businessId: business.id,
+            receiptNumber: displayReceipt.receiptNumber,
+            items: itemsForReceipt,
+            customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
+            subtotal, tax, discount, total, totalCost, profit, paymentMethod,
+            status,
+            createdAt: backdate ? new Date(backdate) : new Date(),
+            createdBy: user.uid,
+            flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
+        };
 
-                    return {
-                        productId: cartItem.product.id,
-                        name: cartItem.unit ? `${cartItem.product.name} (${cartItem.unit})` : cartItem.product.name,
-                        quantity: cartItem.quantity,
-                        unit: cartItem.unit || null,
-                        multiplier: multiplier,
-                        price: cartItem.product.price,
-                        costPrice: costPrice,
-                    };
-                });
-                const profit = total - totalCost;
+        const productUpdates = cart.map(cartItem => {
+            const product = products.find(p => p.id === cartItem.product.id);
+            const multiplier = cartItem.multiplier || 1;
+            const baseQuantitySold = cartItem.quantity * multiplier;
+            return {
+                id: cartItem.product.id,
+                newStock: (product?.stock || 0) - baseQuantitySold,
+                type: product?.type,
+                components: product?.components
+            };
+        });
 
-                if (selectedCustomer && business.settings?.loyaltyProgramEnabled) {
-                    const customerRef = doc(firestore, 'customers', selectedCustomer.id);
-                    const pointsPerUnit = business.settings.pointsPerUnit || 0;
-                    const pointsEarned = Math.floor(total * pointsPerUnit);
-                    const customerFromContext = customers?.find(c => c.id === selectedCustomer.id);
-                    const currentPoints = customerFromContext?.loyaltyPoints || 0;
-                    batch.update(customerRef, { loyaltyPoints: currentPoints + pointsEarned });
-                }
+        const customerUpdate = selectedCustomer && business.settings?.loyaltyProgramEnabled ? {
+            id: selectedCustomer.id,
+            loyaltyPoints: (selectedCustomer.loyaltyPoints || 0) + Math.floor(total * (business.settings.pointsPerUnit || 0))
+        } : null;
 
-                const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
-
-                // Operating Hours Check
-                const operatingHours = business.settings?.operatingHours;
-                let isOutsideHours = false;
-                if (operatingHours?.enabled) {
-                    const saleDate = backdate ? new Date(backdate) : new Date();
-                    const [openH, openM] = operatingHours.openTime.split(':').map(Number);
-                    const [closeH, closeM] = operatingHours.closeTime.split(':').map(Number);
-                    const nowMinutes = saleDate.getHours() * 60 + saleDate.getMinutes();
-                    const openMinutes = openH * 60 + openM;
-                    const closeMinutes = closeH * 60 + closeM;
-
-                    if (closeMinutes < openMinutes) {
-                        isOutsideHours = !(nowMinutes >= openMinutes || nowMinutes <= closeMinutes);
-                    } else {
-                        isOutsideHours = nowMinutes < openMinutes || nowMinutes > closeMinutes;
-                    }
-
-                    if (isOutsideHours && operatingHours.preventSalesOutsideHours && !isAdmin) {
-                        toast({
-                            variant: 'destructive',
-                            title: 'Operating Hours Violation',
-                            description: `Sales are not allowed outside of operating hours (${operatingHours.openTime} - ${operatingHours.closeTime}).`
-                        });
-                        setIsCompleting(false);
-                        return;
-                    }
-                }
-
-                const receiptData = {
-                    businessId: business.id,
-                    receiptNumber: displayReceipt.receiptNumber,
-                    items: itemsForReceipt,
-                    customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
-                    subtotal, tax, discount, total, totalCost, profit, paymentMethod,
-                    status,
-                    createdAt: backdate ? new Date(backdate) : serverTimestamp(),
-                    createdBy: user.uid,
-                    flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
-                };
-                batch.set(newReceiptRef, receiptData);
-
-                await batch.commit();
-
-                // Log audit event BEFORE navigation to ensure it's recorded
-                await logAuditEvent(firestore, business.id, currentUserProfile, {
-                    action: 'sale.create',
-                    entity: { type: 'Receipt', id: newReceiptRef.id, name: `Receipt ${newReceiptRef.id.substring(0, 8)}` },
-                    details: {
-                        total,
-                        itemCount: cart.length,
-                        customer: selectedCustomer?.name || 'Walk-in',
-                        isBackdated: !!backdate,
-                        backdatedDate: backdate || null,
-                        outsideOperatingHours: isOutsideHours
-                    }
-                });
-
-                // Move navigation at the end
-                if (autoPrint) {
-                    setTimeout(() => {
-                        window.print();
-                        router.push('/sales/pos/select-products');
-                        resetPOS();
-                    }, 500);
-                } else {
-                    router.push('/sales/pos/select-products');
-                    resetPOS();
-                }
-
-                if (navigator.onLine) {
-                    toast({ variant: 'success', title: "Sale Complete!", description: `Receipt has been generated.` });
-                } else {
-                    toast({
-                        variant: 'default',
-                        title: "Sale Queued",
-                        description: "You're offline. This sale is saved locally and will sync automatically.",
-                        duration: 5000,
-                    });
-                }
-
-                // Use the memoized check from the component scope
-                const plan = business.plan;
-                const access = business.accessLevel;
-                const isEmailAllowed = plan === 'business' || access === 'lifetime' || plan === 'pro';
-
-                if (navigator.onLine && isEmailAllowed && shouldSendEmail && selectedCustomer?.email) {
-                    const numberFormat = new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-                    // Create formatted items HTML
-                    const items_html = cart.map(item =>
-                        `<tr>
-                            <td style="padding: 5px; border-bottom: 1px solid #eee;">
-                                <div style="font-weight: bold;">${item.product.name}</div>
-                                <div style="color: #666; font-size: 12px;">${item.quantity} x ${currencySymbol}${numberFormat.format(item.product.price)}</div>
-                            </td>
-                            <td style="padding: 5px; text-align: right; border-bottom: 1px solid #eee;">
-                                ${currencySymbol}${numberFormat.format(item.product.price * item.quantity)}
-                            </td>
-                        </tr>`
-                    ).join('');
-
-                    sendReceiptEmail({
-                        to_email: selectedCustomer.email,
-                        to_name: selectedCustomer.name,
-                        business_name: business.name,
-                        receipt_id: newReceiptRef.id.substring(0, 8),
-                        items_html, // The template MUST use triple curly braces {{{items_html}}} to render this HTML
-                        currency_symbol: currencySymbol,
-                        subtotal: numberFormat.format(subtotal),
-                        tax: numberFormat.format(tax),
-                        discount: numberFormat.format(discount),
-                        total: numberFormat.format(total),
-                        payment_method: paymentMethod,
-                        date: new Date().toLocaleString('en-US', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: 'numeric',
-                            hour12: true
-                        }),
-                    }).then(() => {
-                        toast({ title: 'Email Sent', description: `Receipt sent to ${selectedCustomer.email}.` });
-                    }).catch((emailError: any) => {
-                        const errorMessage = emailError?.message || 'An unknown email error occurred.';
-                        console.error("Email sending failed:", errorMessage);
-                        toast({ variant: 'warning', title: 'Could Not Send Email', description: `Sale completed, but email failed. Reason: ${errorMessage}`, duration: 10000 });
-                    });
-                }
-
-            } catch (error: any) {
-                console.error("Sale completion failed:", error);
-                toast({ variant: 'destructive', title: 'Sale Failed', description: error.message || 'The sale could not be completed. Please try again.', duration: 8000 });
-                setIsCompleting(false); // Re-enable button on failure
+        // 3. ADD TO QUEUE (This is now instant and handles SQLite)
+        addToQueue({
+            type: 'complete-sale',
+            payload: {
+                receiptData: { ...receiptData, createdAt: receiptData.createdAt.toISOString() }, // Stringify date for queue
+                productUpdates,
+                customerUpdate
             }
-        })();
-    }, [firestore, business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, customers, shouldSendEmail, toast]);
+        }, `Recording Sale: ${receiptData.receiptNumber}`);
+
+        // 4. Handle Email Receipt (Try sending immediately if online)
+        if (navigator.onLine && shouldSendEmail && selectedCustomer?.email) {
+            const isEmailAllowed = business.plan === 'business' || business.accessLevel === 'lifetime' || business.plan === 'pro';
+            if (isEmailAllowed) {
+                const numberFormat = new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const items_html = cart.map(item =>
+                    `<tr>
+                        <td style="padding: 5px; border-bottom: 1px solid #eee;">
+                            <div style="font-weight: bold;">${item.product.name}</div>
+                            <div style="color: #666; font-size: 12px;">${item.quantity} x ${currencySymbol}${numberFormat.format(item.product.price)}</div>
+                        </td>
+                        <td style="padding: 5px; text-align: right; border-bottom: 1px solid #eee;">
+                            ${currencySymbol}${numberFormat.format(item.product.price * item.quantity)}
+                        </td>
+                    </tr>`
+                ).join('');
+
+                sendReceiptEmail({
+                    to_email: selectedCustomer.email,
+                    to_name: selectedCustomer.name,
+                    business_name: business.name,
+                    receipt_id: newReceiptId.substring(0, 8),
+                    items_html,
+                    currency_symbol: currencySymbol,
+                    subtotal: numberFormat.format(subtotal),
+                    tax: numberFormat.format(tax),
+                    discount: numberFormat.format(discount),
+                    total: numberFormat.format(total),
+                    payment_method: paymentMethod,
+                    date: new Date().toLocaleString()
+                }).catch(e => console.error("Email failed:", e));
+            }
+        }
+
+        // 5. Cleanup & Navigation
+        if (autoPrint) {
+            setTimeout(() => {
+                window.print();
+                router.push('/sales/pos/select-products');
+                resetPOS();
+            }, 500);
+        } else {
+            router.push('/sales/pos/select-products');
+            resetPOS();
+        }
+
+        toast({
+            variant: navigator.onLine ? 'success' : 'default',
+            title: navigator.onLine ? "Sale Recorded" : "Sale Queued (Offline)",
+            description: navigator.onLine ? `Receipt ${receiptData.receiptNumber} generated.` : "Success! This sale is saved locally and will sync to the cloud automatically.",
+        });
+
+    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
 
     // **Auto-Submit Logic**
     React.useEffect(() => {

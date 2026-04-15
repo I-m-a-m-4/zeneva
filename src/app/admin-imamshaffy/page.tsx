@@ -50,7 +50,6 @@ import {
     XCircle,
     Layers,
     Newspaper,
-    Send,
     UserCog,
     Check,
     Ban,
@@ -82,7 +81,6 @@ import {
     Globe,
     Mail,
     Zap,
-    Radar,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -603,55 +601,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             }))
             .sort((a, b) => b.value - a.value);
 
-        // --- ELITE BEHAVIORAL INTELLIGENCE ---
-        const totalUsers = users?.length || 0;
-        const usersWithBusiness = users?.filter(u => u.businessId).length || 0;
         const businessesWithProducts = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0).length;
         const businessesWithSales = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0).length;
-
-        const behaviorFunnel = [
-            { 
-                stage: 'Node Establishment', 
-                count: totalUsers, 
-                description: 'Initial authentication successful.', 
-                color: 'from-blue-500 to-indigo-600', 
-                dropped: totalUsers - usersWithBusiness,
-                intel: `CRITICAL ATTRITION WARNING: ${totalUsers - usersWithBusiness} authenticated identities (${totalUsers > 0 ? ((totalUsers - usersWithBusiness) / totalUsers * 100).toFixed(1) : 0}% failure) abandoned the pipeline before establishing a business container, directly starving future MRR streams.`
-            },
-            { 
-                stage: 'Architecture Provisioning', 
-                count: usersWithBusiness, 
-                description: 'Business environment virtualized.', 
-                color: 'from-emerald-500 to-teal-600', 
-                dropped: usersWithBusiness - businessesWithProducts,
-                intel: `DORMANT STATE DETECTED: ${usersWithBusiness - businessesWithProducts} nodes exist as hollow shells with ZERO provisioned assets, indicating severe onboarding friction post-creation.`
-            },
-            { 
-                stage: 'Asset Deployment', 
-                count: businessesWithProducts, 
-                description: 'Inventory/Catalog operational.', 
-                color: 'from-amber-500 to-orange-600', 
-                dropped: businessesWithProducts - businessesWithSales,
-                intel: `STALLED ENGAGEMENT: ${businessesWithProducts - businessesWithSales} provisioned nodes are mission-ready but failing to generate checkout velocity. Immediate intervention required.`
-            },
-            { 
-                stage: 'Operational Mission', 
-                count: businessesWithSales, 
-                description: 'Tactical revenue stream active.', 
-                color: 'from-fuchsia-500 to-pink-600', 
-                dropped: 0,
-                intel: `ELITE TIER ACCCESS: These battle-tested nodes are the primary growth engine, actively processing live field data and driving aggregate GMV.`
-            }
-        ];
-
-        // Derived Tactical Intelligence
-        const averageLtv = 12000; // Estimated 12k NGN per user
-        const totalDropouts = totalUsers - businessesWithSales;
-        const revenueOpportunity = totalDropouts * averageLtv;
-        
-        const bottleneck = behaviorFunnel.slice(1).reduce((prev, curr) => 
-            ((curr.dropped || 0) / (behaviorFunnel[behaviorFunnel.indexOf(curr)-1].count || 1)) > 
-            ((prev.dropped || 0) / (behaviorFunnel[behaviorFunnel.indexOf(prev)-1].count || 1)) ? curr : prev, behaviorFunnel[1]);
 
         return {
             totalActiveBusinesses: activeBusinesses.length,
@@ -670,13 +621,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             conversionRate,
             expiringSoonList,
             topLocations,
-            behaviorFunnel,
-            intelligence: {
-                revenueOpportunity,
-                bottleneck: bottleneck.stage,
-                riskFactor: Math.round((totalDropouts / totalUsers) * 100) || 0,
-                prediction: `High conversion friction detected at ${bottleneck.stage} phase.`
-            },
+
             countryData: countryData.map(c => ({
                 ...c,
                 businesses: activeBusinesses.filter(b => (b.settings?.country || 'Pending Onboarding') === c.name)
@@ -1288,124 +1233,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </CardContent>
                     </Card>
                     <div className="mb-8">
-                    <div className="mb-6">
-                        {/* COMPREHENSIVE BEHAVIORAL INTELLIGENCE HEATMAP */}
-                        <Card className="bg-card border-border overflow-hidden relative group shadow-lg">
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
-                            <CardHeader className="relative z-10 border-b border-border/50 pb-8">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <CardTitle className="text-xl font-black text-foreground flex items-center gap-2 tracking-tight">
-                                            <Radar className="h-5 w-5 text-indigo-500 animate-pulse" />
-                                            MISSION BEHAVIORAL HEATMAP
-                                        </CardTitle>
-                                        <CardDescription className="text-muted-foreground font-bold tracking-[0.2em] uppercase text-[9px] mt-1">Intelligence Assessment & Live Attrition Telemetry</CardDescription>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[10px] font-black text-indigo-600/80 uppercase tracking-widest mb-1">Revenue Opportunity</div>
-                                        <div className="text-3xl font-black text-foreground tracking-tighter">₦{platformAnalytics.intelligence.revenueOpportunity.toLocaleString()}</div>
-                                    </div>
-                                </div>
-                            </CardHeader>
 
-                            <CardContent className="relative z-10 pt-10 pb-14 bg-muted/30">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-2">
-                                    {platformAnalytics.behaviorFunnel.map((step, idx) => {
-                                        const isBottleneck = platformAnalytics.intelligence.bottleneck === step.stage;
-                                        return (
-                                            <div key={idx} className={cn(
-                                                "relative p-8 rounded-[2rem] border transition-all duration-500 group bg-card shadow-sm",
-                                                isBottleneck ? "border-rose-500/30 shadow-[0_0_30px_rgba(244,63,94,0.05)] ring-1 ring-rose-500/10" : "border-border hover:border-indigo-500/30 hover:shadow-md"
-                                            )}>
-                                                <div className="flex items-center justify-between mb-8">
-                                                    <div className={cn(
-                                                        "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br border border-white/20",
-                                                        step.color
-                                                    )}>
-                                                        {idx === 0 && <Users className="h-7 w-7 text-white" />}
-                                                        {idx === 1 && <Building className="h-7 w-7 text-white" />}
-                                                        {idx === 2 && <Package className="h-7 w-7 text-white" />}
-                                                        {idx === 3 && <Trophy className="h-7 w-7 text-white" />}
-                                                    </div>
-                                                    {step.dropped > 0 && (
-                                                        <div className="text-right">
-                                                            <div className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Attrition</div>
-                                                            <Badge variant="outline" className="border-rose-500/20 text-rose-600 bg-rose-500/5 px-3 py-1 text-[10px] font-black rounded-lg">
-                                                                -{step.dropped} 
-                                                            </Badge>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="space-y-1.5 mb-6">
-                                                    <div className="text-5xl font-black tracking-tighter text-foreground tabular-nums">{step.count}</div>
-                                                    <div className="text-[11px] font-black uppercase text-indigo-600/80 tracking-widest h-8">{step.stage}</div>
-                                                    <div className="text-[11px] text-muted-foreground leading-relaxed font-medium italic min-h-[3rem]">"{step.intel}"</div>
-                                                </div>
-
-                                                <div className="mt-8 pt-6 border-t border-border/50 space-y-4">
-                                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                        <span>Retention Rate</span>
-                                                        <span className="text-indigo-600 font-bold">{Math.round((step.count / platformAnalytics.totalUsers) * 100)}%</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50 p-0.5">
-                                                        <motion.div 
-                                                            initial={{ width: 0 }}
-                                                            animate={{ width: `${(step.count / platformAnalytics.totalUsers) * 100}%` }}
-                                                            transition={{ duration: 1.5, ease: "easeOut" }}
-                                                            className={cn("h-full rounded-full shadow-lg bg-gradient-to-r", step.color)}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {step.dropped > 0 && (
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        className={cn(
-                                                            "mt-6 w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-xl",
-                                                            isBottleneck 
-                                                                ? "bg-rose-500/10 border-rose-500/20 text-rose-600 hover:bg-rose-500 hover:text-white" 
-                                                                : "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 hover:bg-indigo-500 hover:text-white"
-                                                        )}
-                                                        onClick={() => {
-                                                            (document.querySelector('[value="followups"]') as any)?.click();
-                                                        }}
-                                                    >
-                                                        Initiate Strike <Send className="h-3 w-3 ml-2" />
-                                                    </Button>
-                                                )}
-
-                                                {isBottleneck && (
-                                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                                                        <Badge className="bg-rose-600 border-rose-400 text-[10px] font-black animate-pulse shadow-lg uppercase px-4 py-1 rounded-full">
-                                                            Warning: High Friction
-                                                        </Badge>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                            
-                            <CardFooter className="bg-muted/50 border-t border-border py-6 px-10 flex justify-between items-center">
-                                <div className="flex gap-10 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500 shadow-md animate-pulse" />
-                                        Attrition Factor: {platformAnalytics.intelligence.riskFactor}%
-                                    </div>
-                                    <div className="flex items-center gap-2.5 text-indigo-600/80">
-                                        <Bot className="h-4 w-4" />
-                                        AI RECON: {platformAnalytics.intelligence.prediction}
-                                    </div>
-                                </div>
-                                <div className="text-[10px] font-bold italic text-muted-foreground uppercase tracking-widest">
-                                    *Validated Mission Telemetry
-                                </div>
-                            </CardFooter>
-                        </Card>
-                    </div>
 
                     
                     {/* New Industry & Country Analytics */}

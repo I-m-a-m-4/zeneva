@@ -439,6 +439,14 @@ export default function Home() {
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <div className="mt-6 flex items-center justify-center lg:justify-start gap-4">
+                                    <Link href="/download" className="group flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
+                                        <Monitor className="h-4 w-4" />
+                                        Download Desktop App
+                                        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
+                                    </Link>
+                                </div>
                             </div>
 
                             {/* Right Column: UI Mockups */}

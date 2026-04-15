@@ -22,7 +22,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 export default function OurMissionPage() {
   return (
-    <div className="h-full bg-[#F9F8F6] text-slate-900 font-sans selection:bg-primary/20 overflow-x-hidden">
+    <div className="h-full bg-[#F9F8F6] text-slate-900 font-sans selection:bg-primary/20 overflow-y-auto custom-scrollbar">
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden">

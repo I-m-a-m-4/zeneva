@@ -9,7 +9,7 @@ const OUTPUT_FILE = 'latest.json';
 async function main() {
   try {
     const config = JSON.parse(fs.readFileSync(TAURI_CONFIG_PATH, 'utf8'));
-    const version = config.package.version;
+    const version = config.version || config.package?.version;
     const tagName = `v${version}`;
 
     console.log(`Generating ${OUTPUT_FILE} for version ${version}...`);

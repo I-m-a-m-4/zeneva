@@ -1595,158 +1595,6 @@ function ExecutiveBriefingTab() {
     );
 }
 
-function TroubleshootingTab() {
-    const { products, sales, business } = usePOS();
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [showResults, setShowResults] = useState(false);
-
-    const handleRunCheck = () => {
-        setIsAnalyzing(true);
-        setTimeout(() => {
-            setIsAnalyzing(false);
-            setShowResults(true);
-        }, 1500);
-    };
-
-    const healthChecks = [
-        {
-            title: "Data Connectivity",
-            status: "Connected",
-            icon: Wifi,
-            description: "Synchronizing with cloud and local database.",
-            color: "text-emerald-500"
-        },
-        {
-            title: "Hardware Integration",
-            status: "Online",
-            icon: Terminal,
-            description: "Printer and scanner drivers are ready.",
-            color: "text-emerald-500"
-        },
-        {
-            title: "AI Analysis Engine",
-            status: "Active",
-            icon: Bot,
-            description: "GenAI flows are verified and responsive.",
-            color: "text-emerald-500"
-        }
-    ];
-
-    const commonScenarios = [
-        {
-            title: "Sales not showing in Reports?",
-            description: "Ensure you have clicked 'Complete Order' and have a stable connection. Zen AI will automatically sync pending transactions once online.",
-            icon: Activity
-        },
-        {
-            title: "AI analysis is taking too long?",
-            description: "Large inventory datasets may take up to 30 seconds for Zen AI to process. Check if your product descriptions are detailed for better accuracy.",
-            icon: Loader2
-        },
-        {
-            title: "Offline Mode sync issues?",
-            description: "Zeneva Desktop captures sales offline. If they haven't synced, Zen AI suggests checking the 'Sync Queue' in the top bar.",
-            icon: CloudOff
-        }
-    ];
-
-    return (
-        <div className="space-y-6">
-            <Card className="border-none shadow-sm bg-gradient-to-br from-primary/5 to-background">
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <ShieldQuestion className="h-5 w-5 text-primary" />
-                        <CardTitle>Zen AI Troubleshooter</CardTitle>
-                    </div>
-                    <CardDescription>
-                        Diagnose common issues and get AI-assisted guidance for your business operations.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {!showResults ? (
-                        <div className="text-center py-12 px-4">
-                            <Bot className="h-16 w-16 mx-auto text-primary/20 mb-4 animate-bounce" />
-                            <h3 className="text-lg font-semibold mb-2">Notice anything unusual?</h3>
-                            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
-                                Run a comprehensive diagnostic check across your local data, cloud sync, and hardware integrations.
-                            </p>
-                            <Button onClick={handleRunCheck} disabled={isAnalyzing}>
-                                {isAnalyzing ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Running Diagnostics...
-                                    </>
-                                ) : (
-                                    "Run Diagnostic Check"
-                                )}
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {healthChecks.map((check, i) => (
-                                    <div key={i} className="p-4 rounded-xl border bg-card flex items-start gap-3">
-                                        <div className={cn("p-2 rounded-lg bg-muted", check.color)}>
-                                            <check.icon className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{check.title}</p>
-                                            <p className="font-semibold">{check.status}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{check.description}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <Alert className="bg-primary/5 border-primary/20">
-                                <Activity className="h-4 w-4 text-primary" />
-                                <AlertTitle className="font-semibold">System-wide Health: 100%</AlertTitle>
-                                <AlertDescription>
-                                    Zen AI has verified all critical systems. If you're still experiencing issues, consult the scenarios below.
-                                </AlertDescription>
-                            </Alert>
-
-                            <div className="pt-4">
-                                <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Common Troubleshooting Scenarios</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {commonScenarios.map((scenario, i) => (
-                                        <Card key={i} className="border-muted/60">
-                                            <CardHeader className="p-4 pb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <scenario.icon className="h-4 w-4 text-primary" />
-                                                    <CardTitle className="text-sm font-bold">{scenario.title}</CardTitle>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="p-4 pt-0">
-                                                <p className="text-xs text-muted-foreground leading-relaxed italic">
-                                                    "{scenario.description}"
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                            
-                            <div className="flex justify-center pt-4">
-                                <Button variant="outline" size="sm" onClick={() => setShowResults(false)}>
-                                    Reset Troubleshooter
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-                {showResults && (
-                   <CardFooter className="bg-muted/30 border-t p-4">
-                      <p className="text-xs text-muted-foreground text-center w-full">
-                         Still stuck? <Link href="/support" className="text-primary font-semibold hover:underline">Contact Executive Support</Link>
-                      </p>
-                   </CardFooter>
-                )}
-            </Card>
-        </div>
-    );
-}
-
 export default function AiInsightsPage() {
     const { isLoading: isPosLoading } = usePOS();
     return (
@@ -1767,19 +1615,15 @@ export default function AiInsightsPage() {
                 </div>
             ) : (
                 <Tabs defaultValue="business-performance" className="w-full">
-                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2">
+                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 gap-2">
                         <TabsTrigger value="business-performance">Executive Briefing</TabsTrigger>
                         <TabsTrigger value="product-quality">Inventory Health</TabsTrigger>
-                        <TabsTrigger value="troubleshoot">Troubleshoot</TabsTrigger>
                     </TabsList>
                     <TabsContent value="business-performance" className="pt-6">
                         <ExecutiveBriefingTab />
                     </TabsContent>
                     <TabsContent value="product-quality" className="pt-6">
                         <ProductDataQualityTab />
-                    </TabsContent>
-                    <TabsContent value="troubleshoot" className="pt-6">
-                        <TroubleshootingTab />
                     </TabsContent>
                 </Tabs>
             )}

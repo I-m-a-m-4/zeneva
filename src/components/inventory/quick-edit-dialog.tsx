@@ -62,14 +62,10 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
 
 
   const handleUpdate = async (values: QuickEditFormValues) => {
-    if (!firestore || !product) return;
+    if (!product) return;
     setIsSubmitting(true);
     try {
-      const productRef = doc(firestore, 'products', product.id);
-
-      const dataToUpdate: Partial<QuickEditFormValues> & { updatedAt: any } = {
-        updatedAt: serverTimestamp(),
-      };
+      const dataToUpdate: any = {};
 
       if (canManageProduct) {
         dataToUpdate.price = values.price;
@@ -77,27 +73,25 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         dataToUpdate.stock = values.stock;
       }
 
-      await updateDoc(productRef, dataToUpdate);
-
-      // Log audit event
-      await logAuditEvent(firestore, userProfile.businessId, userProfile, {
-        action: 'product.update',
-        entity: { type: 'Product', id: product.id, name: product.name },
-        details: { price: values.price, stock: values.stock, type: 'Quick Edit' }
-      });
+      addToQueue({
+        type: 'update-product',
+        payload: {
+          productId: product.id,
+          values: dataToUpdate
+        }
+      }, `Quick edit for ${product.name}`);
 
       toast({
         variant: 'success',
-        title: 'Product Updated',
-        description: `${product.name} has been updated.`,
+        title: 'Changes Saved',
+        description: `${product.name} will be updated ${navigator.onLine ? 'momentarily' : 'when you come online'}.`,
       });
       onOpenChange(false);
-      triggerRefresh();
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Update Failed',
-        description: 'Could not update product. Please try again.',
+        description: 'Could not queue product update. Please try again.',
       });
     } finally {
       setIsSubmitting(false);
