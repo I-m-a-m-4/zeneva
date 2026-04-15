@@ -49,5 +49,5 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   }
 
   // If no user is logged in and we are not loading, it's safe to render the auth pages.
-  return <>{children}</>;
+  return <div className="h-screen overflow-y-auto w-full">{children}</div>;
 }

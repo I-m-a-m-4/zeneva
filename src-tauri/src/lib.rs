@@ -57,6 +57,7 @@ pub fn run() {
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
+    .plugin(tauri_plugin_shell::init())
     // FIX: Only intercept close events on Windows to keep app in tray.
     // Previously this was hiding the window on ALL platforms/events
     // causing the window to vanish immediately on launch.
