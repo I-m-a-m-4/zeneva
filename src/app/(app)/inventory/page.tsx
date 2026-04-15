@@ -118,9 +118,26 @@ function ProductRowSkeleton() {
 
 const PRODUCTS_PER_PAGE = 60;
 
+function InventoryPageSkeleton() {
+  return (
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <Skeleton className="h-10 w-full" />
+      <div className="grid grid-cols-1 gap-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </div>
+  );
+}
+
 export default function InventoryPage() {
     return (
-        <React.Suspense fallback={<DashboardSkeleton />}>
+        <React.Suspense fallback={<InventoryPageSkeleton />}>
             <InventoryPageContent />
         </React.Suspense>
     );

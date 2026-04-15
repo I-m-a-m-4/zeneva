@@ -901,23 +901,20 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
-                        <CardDescription>Customize the look and feel of your dashboard.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ThemeSwitcher />
-                    </CardContent>
-                    {isInstallable && (
-                        <CardFooter>
-                            <Button variant="outline" className="w-full" onClick={promptInstall}>
+                {isInstallable && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5 text-primary" />App Installation</CardTitle>
+                            <CardDescription>Install Zeneva on this device for a native experience.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button variant="default" className="w-full" onClick={promptInstall}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Install App
                             </Button>
-                        </CardFooter>
-                    )}
-                </Card>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {isTauri && (
                     <Card className="border-primary/20 bg-primary/5">

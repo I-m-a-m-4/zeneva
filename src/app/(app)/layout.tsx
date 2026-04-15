@@ -41,7 +41,6 @@ import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
-import { ThemeProvider } from '@/components/theme-provider';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -421,11 +420,7 @@ export default function AuthenticatedLayout({
   };
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
-    >
+    <>
       <TooltipProvider>
         <SidebarProvider defaultOpen={true}>
           <div
@@ -820,6 +815,6 @@ export default function AuthenticatedLayout({
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </ThemeProvider>
+    </>
   );
 }
