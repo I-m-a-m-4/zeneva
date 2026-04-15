@@ -1372,12 +1372,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setSyncedProducts([]);
     setSyncedCustomers([]);
     setSyncedReceipts([]);
+    setQueuedActions([]);
+    setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
     try {
       localStorage.removeItem(POS_CART_KEY);
       localStorage.removeItem(POS_CUSTOMER_KEY);
       localStorage.removeItem(POS_DISCOUNT_KEY);
       localStorage.removeItem(POS_TAX_RATE_KEY);
       localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
+      localStorage.removeItem(QUEUED_ACTIONS_KEY);
     } catch { }
   }, [business]);
 
@@ -1390,11 +1393,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
         resetPOS();
         setLastUserId(null);
       } else {
-        // If business ID changed (common during impersonation), reset POS to prevent data leak
-        if (businessId && lastUserId && businessId !== lastUserId) {
+        // If business ID or User ID changed, reset POS to prevent data leak
+        const currentId = businessId || user.uid;
+        if (lastUserId && currentId !== lastUserId) {
+           console.log("[POS Context] User change detected, resetting state...");
            resetPOS();
         }
-        setLastUserId(businessId || user.uid);
+        setLastUserId(currentId);
       }
     }
   }, [user, isUserLoading, resetPOS, setImpersonatedUserId, lastUserId, businessId]);
