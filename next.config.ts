@@ -96,17 +96,32 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  webpack: (config) => {
-    /*
-    if (process.env.NODE_ENV === 'production') {
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
       const WebpackObfuscator = require('webpack-obfuscator');
       config.plugins.push(
         new WebpackObfuscator({
-          // ... settings ...
-        })
+          rotateStringArray: true,
+          stringArray: true,
+          stringArrayThreshold: 0.75,
+          compact: true,
+          identifierNamesGenerator: 'hexadecimal',
+          log: false,
+          renameGlobals: false,
+          selfDefending: true, // Basic self-protection
+          splitStrings: true,
+          splitStringsChunkLength: 5,
+          unicodeEscapeSequence: false,
+          // Disabled settings that break Next.js chunking
+          controlFlowFlattening: false,
+          deadCodeInjection: false,
+          debugProtection: false, // Can cause infinite loops in some webviews
+        }, [
+          'static/_next/static/chunks/main.js',
+          'static/_next/static/chunks/amp.js'
+        ])
       );
     }
-    */
     return config;
   },
 };
