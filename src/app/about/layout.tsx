@@ -11,9 +11,11 @@ export default function AboutLayout({
 }) {
   return (
     <ThemeProvider forcedTheme="light">
-      <MarketingHeader />
-      <main>{children}</main>
-      <MarketingFooter />
+      <div className="h-screen overflow-y-auto w-full">
+        <MarketingHeader />
+        <main>{children}</main>
+        <MarketingFooter />
+      </div>
     </ThemeProvider>
   );
 }
