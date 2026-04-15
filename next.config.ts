@@ -96,6 +96,7 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  assetPrefix: isTauri ? '' : undefined,
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       const WebpackObfuscator = require('webpack-obfuscator');
@@ -108,23 +109,28 @@ const nextConfig: NextConfig = {
           identifierNamesGenerator: 'hexadecimal',
           log: false,
           renameGlobals: false,
-          selfDefending: true, // Basic self-protection
+          selfDefending: true, 
           splitStrings: true,
           splitStringsChunkLength: 5,
           unicodeEscapeSequence: false,
-          // Disabled settings that break Next.js chunking
           controlFlowFlattening: false,
           deadCodeInjection: false,
-          debugProtection: false, // Can cause infinite loops in some webviews
+          debugProtection: false, 
         }, [
           'static/_next/static/chunks/main.js',
-          'static/_next/static/chunks/amp.js'
+          'static/_next/static/chunks/amp.js',
+          'static/_next/static/chunks/framework.js',
+          'static/_next/static/chunks/webpack.js',
+          'static/_next/static/chunks/pages/_app.js',
+          // Exclude dashboard and other heavy dynamic chunks to prevent ChunkLoadErrors
+          'static/_next/static/chunks/[0-9]*.js' 
         ])
       );
     }
     return config;
   },
 };
+
 
 
 const withPWA = require("@ducanh2912/next-pwa").default({
