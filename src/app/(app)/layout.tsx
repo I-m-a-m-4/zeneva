@@ -424,7 +424,7 @@ export default function AuthenticatedLayout({
       <TooltipProvider>
         <SidebarProvider defaultOpen={true}>
           <div
-            className="relative flex h-[100dvh] w-full overflow-hidden"
+            className="relative flex h-full w-full overflow-hidden"
           >
             <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">

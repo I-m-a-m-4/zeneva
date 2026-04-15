@@ -72,7 +72,7 @@ export function DesktopTitleBar() {
   return (
     <div 
       data-tauri-drag-region
-      className="h-10 w-full bg-background border-b flex items-center justify-between select-none fixed top-0 left-0 z-[9999] no-print"
+      className="h-9 w-full bg-background flex items-center justify-between select-none fixed top-0 left-0 z-[9999] no-print"
     >
       <div className="flex items-center gap-2.5 px-4" data-tauri-drag-region>
          {/* Premium Logo Container */}
