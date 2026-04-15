@@ -45,8 +45,6 @@
     }
   },
   "plugins": {
-    "dialog": {},
-    "single-instance": {},
     "updater": {
       "endpoints": [
         "https://github.com/I-m-a-m-4/zeneva/releases/latest/download/latest.json"
