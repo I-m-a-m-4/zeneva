@@ -104,14 +104,13 @@ const nextConfig: NextConfig = {
         new WebpackObfuscator({
           rotateStringArray: true,
           stringArray: true,
-          stringArrayThreshold: 0.75,
+          stringArrayThreshold: 0.5, // Reduced threshold for better stability
           compact: true,
           identifierNamesGenerator: 'hexadecimal',
           log: false,
           renameGlobals: false,
-          selfDefending: true, 
-          splitStrings: true,
-          splitStringsChunkLength: 5,
+          selfDefending: false, // Disabled as it breaks in many minified environments
+          splitStrings: false, // CRITICAL: Disabled to prevent breaking dynamic imports and chunk paths
           unicodeEscapeSequence: false,
           controlFlowFlattening: false,
           deadCodeInjection: false,
@@ -122,6 +121,7 @@ const nextConfig: NextConfig = {
           'static/_next/static/chunks/framework.js',
           'static/_next/static/chunks/webpack.js',
           'static/_next/static/chunks/pages/_app.js',
+          'static/_next/static/chunks/pages/_error.js',
           // Exclude dashboard and other heavy dynamic chunks to prevent ChunkLoadErrors
           'static/_next/static/chunks/[0-9]*.js' 
         ])
