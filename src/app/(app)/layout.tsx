@@ -438,37 +438,35 @@ export default function AuthenticatedLayout({
                   </div>
                 </Link>
               </SidebarHeader>
-              <SidebarContent className="flex-1 p-2">
-                <ScrollArea className="h-full">
-                  <SidebarMenu>
-                    {isUserLoading ? (
-                      // Show skeletons for the top 5 nav items while loading
-                      Array.from({ length: 6 }).map((_, i) => (
-                        <SidebarMenuItem key={`skeleton-nav-${i}`}>
-                          <SidebarMenuButton disabled>
-                            <Skeleton className="h-5 w-5 rounded-md" />
-                            <Skeleton className="h-4 w-24 group-data-[state=collapsed]:hidden" />
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))
-                    ) : (
-                      visibleNavItems.map((link) => (
-                        <SidebarMenuItem key={link.href}>
-                          <SidebarMenuButton
-                            asChild
-                            tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
-                            isActive={isLinkActive(link.href, pathname)}
-                          >
-                            <Link href={link.href}>
-                              <link.icon className="h-5 w-5" />
-                              <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))
-                    )}
-                  </SidebarMenu>
-                </ScrollArea>
+              <SidebarContent className="flex-1 p-2 overflow-hidden">
+                <SidebarMenu>
+                  {isUserLoading ? (
+                    // Show skeletons for the top 5 nav items while loading
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <SidebarMenuItem key={`skeleton-nav-${i}`}>
+                        <SidebarMenuButton disabled>
+                          <Skeleton className="h-5 w-5 rounded-md" />
+                          <Skeleton className="h-4 w-24 group-data-[state=collapsed]:hidden" />
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))
+                  ) : (
+                    visibleNavItems.map((link) => (
+                      <SidebarMenuItem key={link.href}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
+                          isActive={isLinkActive(link.href, pathname)}
+                        >
+                          <Link href={link.href}>
+                            <link.icon className="h-5 w-5" />
+                            <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))
+                  )}
+                </SidebarMenu>
               </SidebarContent>
               <SidebarFooter className="p-2">
                 <SidebarMenu>
