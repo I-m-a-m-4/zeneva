@@ -8,10 +8,12 @@ service cloud.firestore {
     // =================================================================
     
     function isSuperAdmin() {
+      // Use UIDs for maximum reliability and security
       return request.auth != null && 
-             request.auth.token != null &&
-             'email' in request.auth.token &&
-             request.auth.token.email == 'belloimam431@gmail.com';
+             (request.auth.uid == 'jzQgCHzaObeUbeYklTLtQQh03G53' || 
+              (request.auth.token != null && 
+               'email' in request.auth.token && 
+               request.auth.token.email == 'belloimam431@gmail.com'));
     }
 
     match /{allPaths=**} {
@@ -112,7 +114,7 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-       match /onlineOrders/{orderId} {
+      match /onlineOrders/{orderId} {
          allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
          // Allow public to create orders, but restrict updates to staff
          allow create: if true; 
