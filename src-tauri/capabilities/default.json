@@ -7,11 +7,13 @@
   ],
   "permissions": [
     "core:default",
-    "core:window:default",
+    "core:window:allow-all",
+    "core:process:allow-exit",
     "fs:default",
     "sql:default",
     "stronghold:default",
     "updater:default",
+    "shell:default",
     "log:default"
   ]
 }

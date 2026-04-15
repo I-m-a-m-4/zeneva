@@ -511,7 +511,8 @@ export default function AuthenticatedLayout({
                           ) : (
                             <>
                               <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
-                              {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
+                              {hasLifetimeAccess && <Badge className="bg-gradient-to-r from-amber-500 to-orange-600 text-white border-0 shadow-sm animate-pulse-slow">Lifetime</Badge>}
+                              {!hasLifetimeAccess && plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                             </>
                           )}
                         </div>

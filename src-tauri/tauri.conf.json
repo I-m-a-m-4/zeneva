@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.paystack.co; connect-src 'self' https://api.imgbb.com https://js.paystack.co https://api.paystack.co https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://firebasestorage.googleapis.com https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data: https://i.ibb.co https://firebasestorage.googleapis.com;"
+      "csp": "default-src 'self' tauri: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co; connect-src 'self' https: wss:; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
     }
   },
   "bundle": {

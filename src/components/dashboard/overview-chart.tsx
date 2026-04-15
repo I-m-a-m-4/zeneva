@@ -91,7 +91,7 @@ export default function OverviewChart({ receipts, currencySymbol, data }: Overvi
                   cursor={false}
                   content={<ChartTooltipContent indicator="dot" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} />}
                 />
-                <Bar dataKey="totalSales" fill="var(--color-totalSales)" radius={4} />
+                <Bar dataKey="totalSales" fill="#ea580c" radius={4} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>

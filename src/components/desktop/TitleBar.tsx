@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Minus, Square, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppConfig } from '@/lib/config';
@@ -10,66 +10,77 @@ export function DesktopTitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-      setIsTauri(true);
-      
-      const updateMaximized = async () => {
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    // Check if we are in Tauri or Web
+    const checkTauri = async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        if (getCurrentWindow()) {
+          setIsTauri(true);
           const win = getCurrentWindow();
           setIsMaximized(await win.isMaximized());
-        } catch {}
-      };
+        }
+      } catch {
+        // Not in Tauri
+        setIsTauri(false);
+      }
+    };
 
-      updateMaximized();
-      
-      // Listen for resize to update maximized state
-      window.addEventListener('resize', updateMaximized);
-      return () => window.removeEventListener('resize', updateMaximized);
-    }
+    checkTauri();
+    
+    // Listen for resize to update maximized state
+    window.addEventListener('resize', () => {
+       import('@tauri-apps/api/window').then(m => m.getCurrentWindow().isMaximized().then(setIsMaximized)).catch(() => {});
+    });
   }, []);
 
   if (!isTauri) return null;
 
   const handleMinimize = async () => {
+    if (!isTauri) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      getCurrentWindow().minimize();
+      const win = getCurrentWindow();
+      await win.minimize();
     } catch (err) {
       console.error('Minimize failed:', err);
     }
   };
 
   const handleMaximize = async () => {
+    if (!isTauri) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      getCurrentWindow().toggleMaximize();
+      const win = getCurrentWindow();
+      await win.toggleMaximize();
     } catch (err) {
       console.error('Maximize toggle failed:', err);
     }
   };
 
   const handleClose = async () => {
+    if (!isTauri) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      // Hide to tray instead of closing
-      await getCurrentWindow().hide();
+      const win = getCurrentWindow();
+      // Trigger the native close request — Rust intercepts this to hide to tray
+      await win.close();
     } catch (err) {
-      console.error('Close/Hide failed:', err);
+      console.error('Close failed:', err);
     }
   };
 
   return (
     <div 
-      className="h-10 w-full bg-background/95 backdrop-blur-md border-b flex items-center justify-between select-none fixed top-0 left-0 z-[9999] no-print shadow-sm"
+      data-tauri-drag-region
+      className="h-10 w-full bg-background border-b flex items-center justify-between select-none fixed top-0 left-0 z-[9999] no-print"
     >
-      <div className="flex items-center gap-2.5 px-4 pointer-events-none" data-tauri-drag-region>
+      <div className="flex items-center gap-2.5 px-4" data-tauri-drag-region>
          {/* Premium Logo Container */}
          <div className="h-6 w-6 relative">
             <div className="absolute inset-0 bg-primary/20 rounded-lg blur-[2px] animate-pulse"></div>
             <img src={AppConfig.logoIconUrl} alt="Zeneva" className="h-6 w-6 relative z-10 drop-shadow-sm" />
          </div>
-         <div className="flex flex-col">
+         <div className="flex flex-col" data-tauri-drag-region>
             <span className="text-[10px] font-black tracking-[0.25em] text-primary/90 leading-none">ZENEVA</span>
             <div className="flex items-center gap-1.5 mt-0.5">
                <span className="text-[8px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Desktop v{AppConfig.version || '0.3.3'}</span>
@@ -80,7 +91,7 @@ export function DesktopTitleBar() {
 
       <div data-tauri-drag-region className="flex-1 h-full cursor-default" />
 
-      <div className="flex items-center h-full">
+      <div className="flex items-center h-full" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <button 
           onClick={handleMinimize}
           className="h-full w-12 flex items-center justify-center hover:bg-muted/80 transition-all active:scale-95"

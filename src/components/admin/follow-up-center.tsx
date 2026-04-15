@@ -163,17 +163,17 @@ export default function FollowUpCenter({
     {
       name: 'Usage Follow-up',
       subject: 'Are you still using Zeneva?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>I noticed you haven't logged into Zeneva in a while. I'm reaching out to see if you are still using our software for your business, or if you ran into any issues that stopped you from moving forward.<br><br>We're constantly improving Zeneva based on feedback. If it wasn't a good fit, or if there's a feature you felt was missing, I'd love to hear your thoughts so we can make it better.<br><br>If you need help getting back on track, just reply to this email and I'll personally assist you.<br><br>Best,<br>Bime @ Zeneva`
+      body: (name: string) => `Hi ${name || 'there'},<br><br>I noticed you haven't logged into Zeneva in a while. I'm reaching out to see if you are still using our software for your business, or if you ran into any issues that stopped you from moving forward.<br><br>We're constantly improving Zeneva based on feedback. If it wasn't a good fit, or if there's a feature you felt was missing, I'd love to hear your thoughts so we can make it better.<br><br>If you need help getting back on track, just reply to this email and I'll personally assist you.<br><br>Best,<br>Zeneva Team`
     },
     {
       name: 'Onboarding Help',
       subject: 'Need help adding your inventory to Zeneva?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>I see you created an account with Zeneva but haven't added your products yet. I know setting up a new system can take some time, so I wanted to offer my help.<br><br>Do you need any assistance uploading your product list or setting up your initial inventory? I can walk you through the process or even help you import your existing data.<br><br>Just reply to this email and let me know how I can be of assistance.<br><br>Best,<br>Bime @ Zeneva`
+      body: (name: string) => `Hi ${name || 'there'},<br><br>I see you created an account with Zeneva but haven't added your products yet. I know setting up a new system can take some time, so I wanted to offer my help.<br><br>Do you need any assistance uploading your product list or setting up your initial inventory? I can walk you through the process or even help you import your existing data.<br><br>Just reply to this email and let me know how I can be of assistance.<br><br>Best,<br>Zeneva Team`
     },
     {
       name: 'Feedback Request',
       subject: 'How is Zeneva working out for your business?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>You've been using Zeneva for a while now, and I wanted to check in and see how everything is going.<br><br>Is the system doing everything you need it to do? We are currently planning our next set of features, and feedback from active business owners like you is incredibly valuable to us.<br><br>If there's anything you'd like to see improved, or a new feature that would make your life easier, please reply and let me know. I read every single response.<br><br>Best,<br>Bime @ Zeneva`
+      body: (name: string) => `Hi ${name || 'there'},<br><br>You've been using Zeneva for a while now, and I wanted to check in and see how everything is going.<br><br>Is the system doing everything you need it to do? We are currently planning our next set of features, and feedback from active business owners like you is incredibly valuable to us.<br><br>If there's anything you'd like to see improved, or a new feature that would make your life easier, please reply and let me know. I read every single response.<br><br>Best,<br>Zeneva Team`
     }
   ];
 
@@ -338,7 +338,7 @@ export default function FollowUpCenter({
                         </TableCell>
                         <TableCell className="text-[10px] font-mono whitespace-nowrap">
                           {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}
-                          <div className="text-[9px] text-muted-foreground">via Bime@ZENEVA</div>
+                          <div className="text-[9px] text-muted-foreground">via ZENEVA Outreach</div>
                         </TableCell>
                         <TableCell>
                           {log.status === 'opened' || (log.openCount > 0 && log.status === 'sent') ? (

@@ -25,7 +25,7 @@ export default function CategoryPieChart({ products }: CategoryPieChartProps) {
       categoryCounts[categoryKey] = (categoryCounts[categoryKey] || 0) + Math.max(0, product.stock || 0);
     });
 
-    const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--accent))"];
+    const chartColors = ["#f97316", "#0ea5e9", "#10b981", "#8b5cf6", "#f43f5e", "#f59e0b"];
 
     const sortedData = Object.entries(categoryCounts)
       .sort(([, a], [, b]) => b - a)

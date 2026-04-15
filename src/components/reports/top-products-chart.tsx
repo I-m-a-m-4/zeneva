@@ -82,7 +82,7 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
                              <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={8} width={80} interval={0} style={{ fontSize: '12px' }}/>
                              <XAxis type="number" hide />
                              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                             <Bar dataKey="quantity" fill="var(--color-quantity)" radius={4} />
+                             <Bar dataKey="quantity" fill="var(--color-quantity, #f97316)" radius={4} />
                         </BarChart>
                     </ChartContainer>
                 )}

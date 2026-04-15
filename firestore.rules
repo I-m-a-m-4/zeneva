@@ -14,13 +14,17 @@ service cloud.firestore {
              request.auth.token.email == 'belloimam431@gmail.com';
     }
 
+    match /{allPaths=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
     function isUserAuthenticated() {
       return request.auth != null;
     }
 
     function isRequestingUserMemberOf(businessId) {
       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return request.auth != null && exists(userDocPath) && get(userDocPath).data.businessId == businessId;
+      return isSuperAdmin() || (request.auth != null && exists(userDocPath) && get(userDocPath).data.businessId == businessId);
     }
     
     function isRequestingUserAdmin() {
@@ -117,8 +121,7 @@ service cloud.firestore {
       }
 
       match /stats/{statId} {
-        allow read: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
-        allow write: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+        allow read, write: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
       }
     }
 
@@ -165,7 +168,7 @@ service cloud.firestore {
     }
 
     match /receipts/{receiptId} {
-        allow read, list: if (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid)) || isSuperAdmin();
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid));
         allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId));
         allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
     }

@@ -141,9 +141,9 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                                 content={<ChartTooltipContent indicator="line" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString()}`} />}
                             />
                             <Legend verticalAlign="top" height={36}/>
-                            <Line dataKey="revenue" type="monotone" stroke="var(--color-revenue)" strokeWidth={3} dot={false} />
-                            <Line dataKey="profit" type="monotone" stroke="var(--color-profit)" strokeWidth={3} dot={false} />
-                            {hasCostData && <Line dataKey="cost" type="monotone" stroke="var(--color-cost)" strokeDasharray="5 5" strokeWidth={2} dot={false} />}
+                            <Line dataKey="revenue" type="monotone" stroke="var(--color-revenue, #f97316)" strokeWidth={3} dot={false} />
+                            <Line dataKey="profit" type="monotone" stroke="var(--color-profit, #10b981)" strokeWidth={3} dot={false} />
+                            {hasCostData && <Line dataKey="cost" type="monotone" stroke="var(--color-cost, #ef4444)" strokeDasharray="5 5" strokeWidth={2} dot={false} />}
                         </LineChart>
                     </ChartContainer>
                 )}

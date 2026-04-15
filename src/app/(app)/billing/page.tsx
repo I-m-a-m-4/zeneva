@@ -81,14 +81,8 @@ const LifetimeAccessStatus = () => (
 
 function BillingPage() {
   const { user, isUserLoading } = useUser();
-  const { triggerRefresh } = usePOS();
+  const { business: currentBusiness, currentUserProfile: userProfile, isLoading: isPosLoading } = usePOS();
   const firestore = useFirestore();
-
-  const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
-  const { data: userProfile } = useDoc<UserProfile>(userDocRef);
-
-  const businessDocRef = useMemoFirebase(() => (userProfile ? doc(firestore, 'businessInstances', userProfile.businessId) : null), [userProfile, firestore]);
-  const { data: currentBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
   const subscriptionHistoryQuery = useMemoFirebase(() => {
     if (!currentBusiness?.id || !firestore) return null;
@@ -96,14 +90,14 @@ function BillingPage() {
   }, [currentBusiness?.id, firestore]);
   const { data: subscriptionHistory, isLoading: isHistoryLoading } = useCollection<SubscriptionHistory>(subscriptionHistoryQuery);
   
-  const isLoading = isUserLoading || isBusinessLoading || isHistoryLoading;
+  const isLoading = isUserLoading || isPosLoading || isHistoryLoading;
 
   if (isLoading) {
     return <BillingPageSkeleton />;
   }
   
   if (!currentBusiness || !userProfile) {
-    return <BillingPageSkeleton />;
+    return <div className="p-8 text-center text-muted-foreground">Business profile not found. Please refresh or contact support.</div>;
   }
 
   return (

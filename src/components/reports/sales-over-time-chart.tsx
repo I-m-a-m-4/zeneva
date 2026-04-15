@@ -102,7 +102,7 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
                                 }} 
                             />
                             <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString()}`} />} />
-                            <Line dataKey="sales" type="monotone" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
+                            <Line dataKey="sales" type="monotone" stroke="var(--color-sales, #f97316)" strokeWidth={3} dot={false} />
                         </LineChart>
                     </ChartContainer>
                 )}

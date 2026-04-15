@@ -38,7 +38,7 @@ function wrapInTemplate(body: string, trackId: string): string {
       </div>
       
       <div style="margin: 0 30px; padding: 30px 0; border-top: 1px solid #f0f0f0; font-size: 13px; color: #6b7280;">
-        <p style="margin-bottom: 15px;">Talk soon,<br/><strong>Bime from Zeneva</strong></p>
+        <p style="margin-bottom: 15px;">Talk soon,<br/><strong>Zeneva Team</strong></p>
         <p style="margin: 0; font-size: 12px; line-height: 1.5;">
           <strong>Account Executive</strong><br/>
           Zeneva POS & Inventory<br/>
@@ -103,7 +103,7 @@ export async function sendEmail(params: EmailParams & { behaviorContext?: any })
       throw new Error('Resend client not initialized. Check RESEND_API_KEY environment variable.');
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Bime <bime@zeneva.space>';
+    const fromAddress = 'Zeneva <hello@zeneva.space>';
     
     const { data, error } = await resend.emails.send({
       from: fromAddress,
