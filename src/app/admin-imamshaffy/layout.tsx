@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (isUserLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex items-center justify-center min-h-0 h-full bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader className="size-12 animate-spin text-primary" />
           <p className="text-muted-foreground">Authenticating Admin...</p>
@@ -74,13 +74,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Allow login page to render without the admin layout
   if (pathname === '/admin-imamshaffy/login') {
-    return <div className="h-screen overflow-y-auto w-full">{children}</div>;
+    return <div className="h-full overflow-y-auto w-full">{children}</div>;
   }
 
   // Render layout for an authorized admin
   if (user && user.email === ADMIN_EMAIL) {
     return (
-      <div className="flex h-screen w-full flex-col relative overflow-hidden">
+      <div className="flex h-full w-full flex-col relative overflow-hidden">
         <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-10 shrink-0">
           <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">

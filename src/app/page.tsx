@@ -360,8 +360,8 @@ export default function Home() {
 
     return (
         <ThemeProvider forcedTheme="light">
-            <div className="h-screen overflow-y-auto w-full antialiased overflow-x-hidden text-slate-900 bg-[#F9F8F6] relative">
-                <div className="fixed grid-lines w-full h-screen top-0 right-0 left-0 pointer-events-none z-0"></div>
+            <div className="h-full overflow-y-auto w-full antialiased overflow-x-hidden text-slate-900 bg-[#F9F8F6] relative">
+                <div className="fixed grid-lines w-full h-full top-[var(--tauri-title-height,0)] right-0 left-0 pointer-events-none z-0"></div>
                 <div className="relative z-10">
                     <Head>
                         <script

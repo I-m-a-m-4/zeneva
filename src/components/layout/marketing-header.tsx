@@ -39,7 +39,7 @@ export default function MarketingHeader() {
 
   return (
     <>
-      <header className="fixed top-0 z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg h-20">
+      <header className="fixed top-[var(--tauri-title-height,0)] z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg h-20">
         <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0">
@@ -102,7 +102,7 @@ export default function MarketingHeader() {
 
       {/* Mobile Menu Panel */}
       <div className={cn(
-        "md:hidden fixed top-[80px] left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-transform duration-300 ease-in-out",
+        "md:hidden fixed top-[calc(80px+var(--tauri-title-height,0px))] left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-transform duration-300 ease-in-out",
         isMobileMenuOpen ? "translate-y-0" : "-translate-y-full"
       )}>
         <div className="container mx-auto px-6 py-8">

@@ -100,7 +100,7 @@ function AppLoader({ text }: { text: string }) {
   return (
     <div
       suppressHydrationWarning
-      className="fixed inset-0 z-50 flex h-screen w-full items-center justify-center overflow-hidden bg-background"
+      className="fixed inset-0 top-[var(--tauri-title-height,0)] z-50 flex h-full w-full items-center justify-center overflow-hidden bg-background"
     >
       {/* Background decoration to emphasize glassmorphism */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-orange-100 via-background to-background dark:from-orange-950/30 dark:via-background dark:to-background"></div>
@@ -331,7 +331,7 @@ export default function AuthenticatedLayout({
 
   if (currentUserProfile && currentUserProfile.status === 'inactive') {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
+      <div className="flex h-full w-full items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md text-center shadow-lg">
           <CardHeader>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
@@ -355,7 +355,7 @@ export default function AuthenticatedLayout({
 
   if (businessInstance?.status === 'deleted') {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-muted p-4">
+      <div className="flex h-full w-full items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md text-center shadow-lg">
           <CardHeader>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
