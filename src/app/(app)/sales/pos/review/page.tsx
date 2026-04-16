@@ -23,7 +23,7 @@ import { logAuditEvent } from '@/lib/audit';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint, addToQueue } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();

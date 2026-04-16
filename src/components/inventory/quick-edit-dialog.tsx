@@ -35,7 +35,7 @@ type QuickEditFormValues = z.infer<typeof quickEditSchema>;
 export default function QuickEditDialog({ product, userProfile, isOpen, onOpenChange }: QuickEditDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { triggerRefresh } = usePOS();
+  const { triggerRefresh, addToQueue } = usePOS();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
