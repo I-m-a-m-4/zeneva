@@ -116,14 +116,16 @@ const nextConfig: NextConfig = {
           deadCodeInjection: false,
           debugProtection: false, 
         }, [
+          'static/_next/static/chunks/main-*.js',
+          'static/_next/static/chunks/webpack-*.js',
+          'static/_next/static/chunks/framework-*.js',
           'static/_next/static/chunks/main.js',
-          'static/_next/static/chunks/amp.js',
-          'static/_next/static/chunks/framework.js',
           'static/_next/static/chunks/webpack.js',
+          'static/_next/static/chunks/framework.js',
           'static/_next/static/chunks/pages/_app.js',
           'static/_next/static/chunks/pages/_error.js',
-          // Exclude dashboard and other heavy dynamic chunks to prevent ChunkLoadErrors
-          'static/_next/static/chunks/[0-9]*.js' 
+          'static/_next/static/chunks/[0-9]*.js',
+          'static/_next/static/chunks/*-*.js' 
         ])
       );
     }
