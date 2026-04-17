@@ -64,27 +64,6 @@ function ReviewPageContent() {
         createdAt: backdate ? new Date(backdate) : new Date(), // Use a real date for optimistic display
     }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdate]);
 
-    if (!mounted) {
-        return (
-            <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
-            </div>
-        );
-    }
-
-    if (cart.length === 0 && !isCompleting) {
-        return (
-            <div className="text-center">
-                <p>Your cart is empty.</p>
-                <Button asChild variant="link">
-                    <Link href="/sales/pos/select-products">Start a new sale</Link>
-                </Button>
-            </div>
-        )
-    }
-
-
     const handleCompleteSale = React.useCallback(() => {
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
@@ -260,15 +239,32 @@ function ReviewPageContent() {
         }
     }, [isAutoPrompted, isCompleting, cart.length, handleCompleteSale]);
 
-    // FIX: Check plan status but also allow if it's not strictly 'business' for now to debug, 
-    // or at least log why it's failing. 
-    // For now, let's keep the logic but add logging.
     const canSendEmail = React.useMemo(() => {
         const plan = business?.plan;
         const access = business?.accessLevel;
-        const allowed = plan === 'business' || access === 'lifetime' || plan === 'pro'; // Added 'pro' for testing if needed, or check your specific requirements.
+        const allowed = plan === 'business' || access === 'lifetime' || plan === 'pro'; 
         return allowed;
     }, [business]);
+
+    if (!mounted) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
+            </div>
+        );
+    }
+
+    if (cart.length === 0 && !isCompleting) {
+        return (
+            <div className="text-center">
+                <p>Your cart is empty.</p>
+                <Button asChild variant="link">
+                    <Link href="/sales/pos/select-products">Start a new sale</Link>
+                </Button>
+            </div>
+        )
+    }
 
     return (
         <div className="grid md:grid-cols-3 gap-8">
