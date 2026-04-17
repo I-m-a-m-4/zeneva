@@ -347,7 +347,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   const business = useMemo(() => {
-    let base = initialBusiness || offlineBusiness;
+    const base = initialBusiness || offlineBusiness;
     if (!base) return null;
 
     const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
@@ -374,7 +374,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return base;
   }, [initialBusiness, offlineBusiness, queuedActions.length > 0 ? queuedActions.filter(a => a.type === 'update-settings').length : 0]);
 
-  const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
+  // Only fetch sub-collections if the profile is ready and we actually have a business record successfully loaded
+  // This prevents race conditions and permission errors during onboarding/first-load
+  const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
+
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
 
@@ -475,14 +479,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const isLoadingProducts = isLoadingInitialProducts;
 
-  const statsDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [businessId, firestore, refreshKey]);
+  const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: initialStats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
 
   const stats = useMemo(() => {
     return initialStats || offlineStats;
   }, [initialStats, offlineStats]);
 
-  const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const receipts = useMemo(() => {
@@ -496,7 +500,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return merged;
   }, [initialReceipts, syncedReceipts]);
 
-  const customersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const customers = useMemo(() => {
@@ -542,7 +546,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return merged;
   }, [initialCustomers, syncedCustomers, receipts, queuedActions]);
 
-  const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
+  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const calculateLoyaltyPoints = useCallback(async (amount: number) => {
