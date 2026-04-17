@@ -138,6 +138,10 @@ const nextConfig: NextConfig = {
     if (!dev && !isServer) {
       // Obfuscator is currently disabled for stability in v1.0.0
     }
+
+    // Force a clean build by disabling the webpack cache
+    config.cache = false;
+
     return config;
   },
 };
