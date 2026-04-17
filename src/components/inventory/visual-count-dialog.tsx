@@ -21,7 +21,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { visualCount, VisualCountOutput } from '@/ai/flows/visual-count-flow';
+import { runVisualCount as visualCount } from '@/actions/ai-gateway';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
