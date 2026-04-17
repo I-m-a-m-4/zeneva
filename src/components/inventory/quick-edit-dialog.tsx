@@ -28,6 +28,8 @@ const quickEditSchema = z.object({
   price: z.coerce.number().min(0, "Price must be a positive number."),
   costPrice: z.coerce.number().min(0, "Cost price must be positive.").optional(),
   stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+  material: z.string().optional(),
+  variantValue: z.string().optional(),
 });
 
 type QuickEditFormValues = z.infer<typeof quickEditSchema>;
@@ -46,6 +48,8 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
       price: 0,
       costPrice: 0,
       stock: 0,
+      material: '',
+      variantValue: '',
     },
   });
 
@@ -56,6 +60,8 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         price: product.price || 0,
         costPrice: product.costPrice || 0,
         stock: product.stock || 0,
+        material: (product as any).material || '',
+        variantValue: product.variantValue || '',
       });
     }
   }, [product, form]);
@@ -71,6 +77,8 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         dataToUpdate.price = values.price;
         dataToUpdate.costPrice = values.costPrice;
         dataToUpdate.stock = values.stock;
+        dataToUpdate.material = values.material;
+        dataToUpdate.variantValue = values.variantValue;
       }
 
       addToQueue({
@@ -156,6 +164,34 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                 )}
               />
             )}
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="material"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Material / Fabric</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g. Cotton" {...field} disabled={!canManageProduct} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="variantValue"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Size / Variant</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g. XL or 42" {...field} disabled={!canManageProduct} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
             <DialogFooter className='mt-6'>
               <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" size="lg" disabled={isSubmitting || !canManageProduct}>

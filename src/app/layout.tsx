@@ -108,15 +108,15 @@ export default function RootLayout({
       <body className={cn('font-body antialiased bg-background text-foreground')}>
         <FirebaseClientProvider>
           <PWAProvider>
+            <UserActivityTracker />
+            <GlobalAnnouncement />
+            <Loader />
+            <InstallPrompt />
+            <TauriUpdater />
+            <DesktopLauncher />
             <POSProvider>
               <TauriLayoutWrapper>
-                 <UserActivityTracker />
-                 <GlobalAnnouncement />
-                 <Loader />
-                 <InstallPrompt />
-                 <TauriUpdater />
                  <DesktopTitleBar />
-                 <DesktopLauncher />
                  <Suspense>
                    <NavigationEvents />
                  </Suspense>

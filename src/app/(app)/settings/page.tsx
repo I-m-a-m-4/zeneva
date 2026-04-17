@@ -122,7 +122,7 @@ import { usePWA } from '@/context/pwa-context';
 import { useFCM } from '@/hooks/use-fcm';
 
 function SettingsPageContent() {
-    const { business, currentUserProfile, triggerRefresh } = usePOS();
+    const { business, currentUserProfile, triggerRefresh, addToQueue, mutateBusiness } = usePOS();
     const { promptInstall, isInstallable, isAppInstalled } = usePWA();
 
     const { permission, requestPermission, unsubscribe, fcmToken, isLoading: isFcmLoading } = useFCM();
@@ -424,9 +424,30 @@ function SettingsPageContent() {
         }
 
         try {
-            const businessDocRef = doc(firestore, 'businessInstances', business.id);
-            await updateDoc(businessDocRef, finalData);
-            toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
+            if (isTauri) {
+                // Use offline queue for desktop
+                addToQueue({
+                    type: 'update-settings',
+                    payload: finalData,
+                }, `Update ${formName} settings`);
+                
+                toast({ 
+                  variant: "success", 
+                  title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Queued`, 
+                  description: `Settings will be synced when online.` 
+                });
+                
+                // Optimistically update business state in context (if mutateBusiness supports it)
+                if (mutateBusiness) {
+                    // This will be handled by the context's effect on queuedActions
+                    // but we can also call mutateBusiness with the new data for immediate UI update
+                }
+            } else {
+                // Web behavior
+                const businessDocRef = doc(firestore, 'businessInstances', business.id);
+                await updateDoc(businessDocRef, finalData);
+                toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
+            }
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
         } finally {

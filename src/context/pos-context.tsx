@@ -19,6 +19,9 @@ import {
   syncCustomersToOffline,
   syncReceiptsToOffline,
   getCachedReceipts,
+  getCachedBusiness,
+  syncStatsToOffline,
+  getCachedStats,
   getLastSyncMetadata, 
   setLastSyncMetadata 
 } from '@/lib/sqlite-sync';
@@ -140,18 +143,120 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // Track the last user ID to prevent unnecessary POS resets
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Reset if we have a user and they are different from last, or if we go from user to no user
-    if (effectiveUserId !== lastUserId) {
-      if (lastUserId !== null) {
-        console.log("Account Change Detected - Resetting POS State");
-        resetPOS();
-        // Force refresh to clear any cached SWR data if needed
-        setRefreshKey(prev => prev + 1);
+  // --- POS Local States (MOVED UP to prevent TDZ errors) ---
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const savedCart = localStorage.getItem(POS_CART_KEY);
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch { return []; }
+  });
+
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const savedCustomer = localStorage.getItem(POS_CUSTOMER_KEY);
+      return savedCustomer ? JSON.parse(savedCustomer) : null;
+    } catch { return null; }
+  });
+
+  const [taxRate, setTaxRate] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const savedTax = localStorage.getItem(POS_TAX_RATE_KEY);
+      return savedTax ? parseFloat(savedTax) : 0;
+    } catch { return 0; }
+  });
+
+  const [discount, setDiscount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const savedDiscount = localStorage.getItem(POS_DISCOUNT_KEY);
+      return savedDiscount ? parseFloat(savedDiscount) : 0;
+    } catch { return 0; }
+  });
+
+  const [paymentMethod, setPaymentMethod] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'Cash';
+    try {
+      const savedMethod = localStorage.getItem(POS_PAYMENT_METHOD_KEY);
+      return savedMethod || 'Cash';
+    } catch { return 'Cash'; }
+  });
+
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem(POS_AUTO_PRINT_KEY);
+      return saved === null ? true : saved === 'true';
+    } catch { return true; }
+  });
+
+  useEffect(() => { try { localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); } catch { } }, [cart]);
+  useEffect(() => { try { localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); } catch { } }, [selectedCustomer]);
+  useEffect(() => { try { localStorage.setItem(POS_TAX_RATE_KEY, String(taxRate)); } catch { } }, [taxRate]);
+  useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch { } }, [discount]);
+  useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch { } }, [paymentMethod]);
+  useEffect(() => { try { localStorage.setItem(POS_AUTO_PRINT_KEY, String(autoPrint)); } catch { } }, [autoPrint]);
+
+  // --- POS Reset Function (MOVED UP and STABILIZED) ---
+  const resetPOS = useCallback(async () => {
+    setCart([]);
+    setSelectedCustomer(null);
+    setDiscount(0);
+    setTaxRate(0); // Reset to 0, business effect will pick up the correct one
+    setPaymentMethod('Cash');
+    setSyncedProducts([]);
+    setSyncedCustomers([]);
+    setSyncedReceipts([]);
+    setQueuedActions([]);
+    setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
+
+    // Clear local storage
+    try {
+      localStorage.removeItem(POS_CART_KEY);
+      localStorage.removeItem(POS_CUSTOMER_KEY);
+      localStorage.removeItem(POS_DISCOUNT_KEY);
+      localStorage.removeItem(POS_TAX_RATE_KEY);
+      localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
+      localStorage.removeItem(QUEUED_ACTIONS_KEY);
+    } catch { }
+
+    // Clear SQLite if on desktop
+    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+      try {
+        const { clearAllTables } = await import('@/lib/sqlite-sync');
+        await clearAllTables();
+        console.log('SQLite data cleared successfully on account reset/logout.');
+      } catch (err) {
+        console.error('Failed to clear SQLite data:', err);
       }
-      setLastUserId(effectiveUserId);
     }
-  }, [effectiveUserId, lastUserId]);
+  }, []); // Dependencies removed to break infinite loop
+
+  // --- Offline Queue & Sync State ---
+  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
+  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
+  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
+  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(null);
+  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedQueue = localStorage.getItem(QUEUED_ACTIONS_KEY);
+      if (savedQueue) {
+        setQueuedActions(JSON.parse(savedQueue));
+      }
+    } catch (e) { console.error("Failed to load offline queue:", e); }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(QUEUED_ACTIONS_KEY, JSON.stringify(queuedActions));
+    } catch (e) { console.error("Failed to save offline queue:", e); }
+  }, [queuedActions]);
 
   // --- Centralized Data Fetching ---
   // MODIFIED: Ensure we have an authenticated user before fetching, even if impersonating.
@@ -194,33 +299,40 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [toast, firestore, businessId, currentUserProfile, impersonatedUserId]);
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
-  const { data: business, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
+  const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
+
+  const business = useMemo(() => {
+    let base = initialBusiness || offlineBusiness;
+    if (!base) return null;
+
+    // Apply optimistic settings updates
+    const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
+    if (settingsUpdates.length > 0) {
+      let result = { ...base };
+      settingsUpdates.forEach(action => {
+        Object.keys(action.payload).forEach(key => {
+          if (key.includes('.')) {
+            const parts = key.split('.');
+            let current: any = result;
+            for (let i = 0; i < parts.length - 1; i++) {
+              current[parts[i]] = { ...current[parts[i]] };
+              current = current[parts[i]];
+            }
+            current[parts[parts.length - 1]] = action.payload[key];
+          } else {
+            (result as any)[key] = action.payload[key];
+          }
+        });
+      });
+      return result;
+    }
+
+    return base;
+  }, [initialBusiness, offlineBusiness, queuedActions]);
 
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
-  // --- Offline Queue State ---
-  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
-  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
-
-  useEffect(() => {
-    try {
-      const savedQueue = localStorage.getItem(QUEUED_ACTIONS_KEY);
-      if (savedQueue) {
-        setQueuedActions(JSON.parse(savedQueue));
-      }
-    } catch (e) { console.error("Failed to load offline queue:", e); }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(QUEUED_ACTIONS_KEY, JSON.stringify(queuedActions));
-    } catch (e) { console.error("Failed to save offline queue:", e); }
-  }, [queuedActions]);
-
-  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
-  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
-  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
 
   const products = useMemo(() => {
     // Merge initial 50 with synced results, prioritizing fresh synced data
@@ -264,6 +376,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // 4. Stock Reductions from Queued Sales
+    const sales = queuedActions.filter(a => a.type === 'complete-sale');
+    if (sales.length > 0) {
+      sales.forEach(action => {
+        action.payload.items.forEach((item: any) => {
+          const idx = merged.findIndex(p => p.id === item.productId);
+          if (idx !== -1) {
+            merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity };
+          }
+        });
+      });
+    }
+
     return merged;
   }, [initialProducts, syncedProducts, queuedActions]);
 
@@ -285,7 +410,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const isLoadingProducts = isLoadingInitialProducts;
 
   const statsDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [businessId, firestore, refreshKey]);
-  const { data: stats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
+  const { data: initialStats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
+
+  const stats = useMemo(() => {
+    return initialStats || offlineStats;
+  }, [initialStats, offlineStats]);
 
   const receiptsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
@@ -312,16 +441,40 @@ export function POSProvider({ children }: { children: ReactNode }) {
       initialCustomers.forEach(c => { if (!ids.has(c.id)) base.push(c); });
     }
 
+    let merged = [...base];
     if (receipts && receipts.length > 0) {
       const spentMap: Record<string, number> = {};
       receipts.forEach(r => { if (r.customer?.id) spentMap[r.customer.id] = (spentMap[r.customer.id] || 0) + r.total; });
-      return base.map(c => {
+      merged = merged.map(c => {
         const memorySpent = spentMap[c.id] || 0;
         return (memorySpent > (c.totalSpent || 0)) ? { ...c, totalSpent: memorySpent } : c;
       });
     }
-    return base;
-  }, [initialCustomers, syncedCustomers, receipts]);
+
+    // APPLY QUEUED ACTIONS OPTIMISTICALLY
+    // 1. Deletions
+    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
+    if (deletedIds.size > 0) {
+      merged = merged.filter(c => !deletedIds.has(c.id));
+    }
+
+    // 2. Updates
+    const updates = queuedActions.filter(a => a.type === 'update-customer');
+    updates.forEach(action => {
+      const idx = merged.findIndex(c => c.id === action.payload.id);
+      if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+    });
+
+    // 3. Additions
+    const additions = queuedActions.filter(a => a.type === 'add-customer');
+    additions.forEach(action => {
+      if (!merged.find(c => c.id === action.payload.id)) {
+        merged.push({ ...action.payload, isOptimistic: true });
+      }
+    });
+
+    return merged;
+  }, [initialCustomers, syncedCustomers, receipts, queuedActions]);
 
   const onlineOrdersQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
@@ -340,7 +493,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return Math.floor(amount * pointsPerUnit);
   }, [business?.settings?.pointsPerUnit]);
 
-  const isLoading = isUserLoading || (!!user && isProfileLoading) || isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats;
+  const isLoading = isUserLoading || 
+    (!!user && isProfileLoading) || 
+    (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ ? 
+      (!business && isLoadingBusiness) : // On Tauri, only block if we have NO business (online or offline)
+      (isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats)
+    );
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -404,6 +562,43 @@ export function POSProvider({ children }: { children: ReactNode }) {
               details: { source: 'offline-queue' }
             });
             resultData.newId = newCustomerRef.id;
+            break;
+          }
+          case 'update-customer': {
+            const customerRef = doc(firestore, 'customers', action.payload.id);
+            const updates = { ...action.payload.values, updatedAt: serverTimestamp() };
+            if (updates.name) updates.lowercaseName = updates.name.toLowerCase();
+            if (updates.email) updates.lowercaseEmail = updates.email.toLowerCase();
+            batch.update(customerRef, updates);
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'customer.update',
+              entity: { type: 'Customer', id: action.payload.id, name: action.payload.values.name || 'Customer' },
+              details: { changes: Object.keys(action.payload.values), source: 'offline-queue' }
+            });
+            break;
+          }
+          case 'delete-customer': {
+            const customerRef = doc(firestore, 'customers', action.payload.id);
+            batch.delete(customerRef);
+            // Decrement Stats
+            const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+            batch.set(statsRef, { totalCustomers: increment(-1), updatedAt: serverTimestamp() }, { merge: true });
+            
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'customer.delete',
+              entity: { type: 'Customer', id: action.payload.id, name: 'Customer' },
+              details: { source: 'offline-queue' }
+            });
+            break;
+          }
+          case 'update-settings': {
+            const businessDocRef = doc(firestore, 'businessInstances', businessId);
+            batch.update(businessDocRef, { ...action.payload, updatedAt: serverTimestamp() });
+            await logAuditEvent(firestore, businessId, currentUserProfile, {
+              action: 'business.settings_update',
+              entity: { type: 'Business', id: businessId, name: 'Settings' },
+              details: { fields: Object.keys(action.payload), source: 'offline-queue' }
+            });
             break;
           }
           case 'update-product': {
@@ -533,6 +728,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
         switch (action.type) {
           case 'add-customer':
             mutateCustomers((prev: Customer[] | null) => prev ? [...prev, { ...action.payload, id: resValue.newId, createdAt: new Date() as any, updatedAt: new Date() as any }] : null);
+            break;
+          case 'update-customer':
+            mutateCustomers((prev: Customer[] | null) => prev ? prev.map(c => c.id === action.payload.id ? { ...c, ...action.payload.values, updatedAt: new Date() as any } : c) : null);
+            break;
+          case 'delete-customer':
+            mutateCustomers((prev: Customer[] | null) => prev ? prev.filter(c => c.id !== action.payload.id) : null);
+            break;
+          case 'update-settings':
+            mutateBusiness((prev: any) => {
+              if (!prev) return prev;
+              const result = { ...prev };
+              // Simple nested path update (shallow for now as most updates are top-level or handled by UI)
+              Object.keys(action.payload).forEach(key => {
+                if (key.includes('.')) {
+                  const parts = key.split('.');
+                  let current = result;
+                  for (let i = 0; i < parts.length - 1; i++) {
+                    current[parts[i]] = { ...current[parts[i]] };
+                    current = current[parts[i]];
+                  }
+                  current[parts[parts.length - 1]] = action.payload[key];
+                } else {
+                  result[key] = action.payload[key];
+                }
+              });
+              return result;
+            }, { revalidate: false });
             break;
           case 'update-product':
             mutateProducts((prev: Product[] | null) => prev ? prev.map((p: Product) => p.id === action.payload.productId ? { ...p, ...action.payload.values, updatedAt: new Date() as any } : p) : null);
@@ -806,7 +1028,32 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, receipts]);
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 1000) => {
-    if (!businessId || !firestore) return [];
+    if (!businessId) return [];
+    
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    
+    // 1. If on Desktop, prioritize local memory lookup for speed and offline consistency
+    if (isTauri && receipts && receipts.length > 0) {
+      const local = receipts.filter(r => {
+        let rd: Date;
+        if (r.createdAt?.toDate) rd = r.createdAt.toDate();
+        else if (r.createdAt instanceof Date) rd = r.createdAt;
+        else rd = new Date(r.createdAt || 0);
+        return rd >= from && rd <= to;
+      });
+      
+      // If we have local results, return them. Even if partial, it's better than failing.
+      // Usually, syncedReceipts contains up to 2000 items on Tauri.
+      if (local.length > 0) {
+        return local.slice(0, limitCount).sort((a,b) => {
+          const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
+          const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
+          return tb - ta;
+        });
+      }
+    }
+
+    if (!firestore) return [];
     try {
       const q = query(
         collection(firestore, 'receipts'),
@@ -822,7 +1069,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Fetch receipts in range failed:", e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, receipts]);
 
   const fetchMoreReceipts = useCallback(async () => {
     if (!businessId || !firestore || !receipts || receipts.length === 0) return 0;
@@ -1160,9 +1407,32 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const fetchOfflineMetadata = async () => {
+      if (isTauri && businessId) {
+        const [biz, stat] = await Promise.all([
+          getCachedBusiness(businessId),
+          getCachedStats(businessId)
+        ]);
+        if (isMounted) {
+          if (biz) setOfflineBusiness(biz);
+          if (stat) setOfflineStats(stat);
+        }
+      }
+    }
+
+    if (isTauri) fetchOfflineMetadata();
+
     const timer = setTimeout(fetchMegaReceipts, isTauri ? 1000 : 3000);
     return () => { isMounted = false; clearTimeout(timer); };
   }, [businessId, firestore]);
+
+  // Sync Stats to Offline
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri && businessId && initialStats) {
+      syncStatsToOffline(businessId, initialStats);
+    }
+  }, [initialStats, businessId]);
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku || !businessId || !firestore) return null;
@@ -1220,19 +1490,41 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, receipts]);
 
   const fetchMonthlyAnalytics = useCallback(async (monthsCount: number) => {
-    if (!businessId || !firestore) return [];
+    if (!businessId) return [];
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const ranges = Array.from({ length: monthsCount }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (monthsCount - 1 - i));
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start, end, month: monthNames[d.getMonth()] };
+    });
+
+    // Strategy 1: Local Calculation (Tauri/Offline Optimized)
+    if (isTauri && receipts && receipts.length > 0) {
+      const results = ranges.map(({ start, end, month }) => {
+        const filtered = receipts.filter(r => {
+          let rd: Date;
+          if (r.createdAt?.toDate) rd = r.createdAt.toDate();
+          else if (r.createdAt instanceof Date) rd = r.createdAt;
+          else rd = new Date(r.createdAt || 0);
+          return rd >= start && rd <= end;
+        });
+        return {
+          month,
+          revenue: filtered.reduce((sum, r) => sum + r.total, 0),
+          count: filtered.length
+        };
+      });
+      return results;
+    }
+
+    // Strategy 2: Firestore Aggregation (Web/Online Optimized)
+    if (!firestore) return [];
     try {
       const receiptsRef = collection(firestore, 'receipts');
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      
-      const ranges = Array.from({ length: monthsCount }, (_, i) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - (monthsCount - 1 - i));
-        const start = new Date(d.getFullYear(), d.getMonth(), 1);
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-        return { start, end, month: monthNames[d.getMonth()] };
-      });
-
       const results = await Promise.all(ranges.map(async ({ start, end, month }) => {
         const q = query(
           receiptsRef,
@@ -1256,7 +1548,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error('Monthly analytics failed:', e);
       return [];
     }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, receipts]);
 
   const getInventoryStats = useCallback(async () => {
     if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
@@ -1278,7 +1570,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
         lowStockCount: lowStockSnap.data().count || 0
       };
     } catch (e) {
-      console.error('Inventory stats failed:', e);
+      console.error('Inventory stats from Firestore failed, calculating from memory:', e);
+      // FALLBACK: Use products in memory if available
+      if (products && products.length > 0) {
+        return {
+           totalProducts: products.length,
+           totalStockValue: products.reduce((sum, p) => sum + ((p.price || 0) * (p.stock || 0)), 0),
+           lowStockCount: products.filter(p => (p.stock || 0) < 5).length
+        };
+      }
       return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
     }
   }, [businessId, firestore]);
@@ -1424,115 +1724,35 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [queuedActions, isQueueProcessing, processQueue]);
 
-  // POS State
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const savedCart = localStorage.getItem(POS_CART_KEY);
-      return savedCart ? JSON.parse(savedCart) : [];
-    } catch { return []; }
-  });
 
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const savedCustomer = localStorage.getItem(POS_CUSTOMER_KEY);
-      return savedCustomer ? JSON.parse(savedCustomer) : null;
-    } catch { return null; }
-  });
 
-  const [taxRate, setTaxRate] = useState<number>(() => {
-    if (typeof window === 'undefined') return business?.settings?.defaultTaxRate ?? 0;
-    try {
-      const savedTax = localStorage.getItem(POS_TAX_RATE_KEY);
-      return savedTax ? parseFloat(savedTax) : (business?.settings?.defaultTaxRate ?? 0);
-    } catch { return business?.settings?.defaultTaxRate ?? 0; }
-  });
 
-  const [discount, setDiscount] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    try {
-      const savedDiscount = localStorage.getItem(POS_DISCOUNT_KEY);
-      return savedDiscount ? parseFloat(savedDiscount) : 0;
-    } catch { return 0; }
-  });
-
-  const [paymentMethod, setPaymentMethod] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'Cash';
-    try {
-      const savedMethod = localStorage.getItem(POS_PAYMENT_METHOD_KEY);
-      return savedMethod || 'Cash';
-    } catch { return 'Cash'; }
-  });
-
-  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      const saved = localStorage.getItem(POS_AUTO_PRINT_KEY);
-      return saved === null ? true : saved === 'true';
-    } catch { return true; }
-  });
-
-  useEffect(() => { try { localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); } catch { } }, [cart]);
-  useEffect(() => { try { localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); } catch { } }, [selectedCustomer]);
-  useEffect(() => { try { localStorage.setItem(POS_TAX_RATE_KEY, String(taxRate)); } catch { } }, [taxRate]);
-  useEffect(() => { try { localStorage.setItem(POS_DISCOUNT_KEY, String(discount)); } catch { } }, [discount]);
-  useEffect(() => { try { localStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); } catch { } }, [paymentMethod]);
-  useEffect(() => { try { localStorage.setItem(POS_AUTO_PRINT_KEY, String(autoPrint)); } catch { } }, [autoPrint]);
-
-  const resetPOS = useCallback(async () => {
-    setCart([]);
-    setSelectedCustomer(null);
-    setDiscount(0);
-    setTaxRate(business?.settings?.defaultTaxRate ?? 0);
-    setPaymentMethod('Cash');
-    setSyncedProducts([]);
-    setSyncedCustomers([]);
-    setSyncedReceipts([]);
-    setQueuedActions([]);
-    setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
-
-    // Clear local storage
-    try {
-      localStorage.removeItem(POS_CART_KEY);
-      localStorage.removeItem(POS_CUSTOMER_KEY);
-      localStorage.removeItem(POS_DISCOUNT_KEY);
-      localStorage.removeItem(POS_TAX_RATE_KEY);
-      localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
-      localStorage.removeItem(QUEUED_ACTIONS_KEY);
-    } catch { }
-
-    // Clear SQLite if on desktop
-    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-      try {
-        const { clearAllTables } = await import('@/lib/sqlite-sync');
-        await clearAllTables();
-        console.log('SQLite data cleared successfully on account reset/logout.');
-      } catch (err) {
-        console.error('Failed to clear SQLite data:', err);
-      }
-    }
-  }, [business]);
-
-  // Effect to reset POS state and CLEAR IMPERSONATION when user changes or business changes
+  // MOVED: Account change detection and reset logic
   useEffect(() => {
-    if (!isUserLoading) {
-      if (!user) {
+    if (isUserLoading) return;
+
+    if (!user) {
+      if (lastUserId !== null || impersonatedUserId !== null) {
+        console.log("User Logged Out - Clearing POS State & Impersonation");
         setImpersonatedUserId(null);
         sessionStorage.removeItem('zeneva_impersonated_user_id');
         resetPOS();
         setLastUserId(null);
-      } else {
-        // If business ID or User ID changed, reset POS to prevent data leak
-        const currentId = businessId || user.uid;
-        if (lastUserId && currentId !== lastUserId) {
-           console.log("[POS Context] User change detected, resetting state...");
-           resetPOS();
-        }
-        setLastUserId(currentId);
       }
+      return;
     }
-  }, [user, isUserLoading, resetPOS, setImpersonatedUserId, lastUserId, businessId]);
+
+    // Reset if we have a user and they are different from last
+    if (effectiveUserId !== lastUserId) {
+      if (lastUserId !== null) {
+        console.log("Account Change Detected - Resetting POS State");
+        resetPOS();
+        // Force refresh to clear any cached SWR data if needed
+        setRefreshKey(prev => prev + 1);
+      }
+      setLastUserId(effectiveUserId);
+    }
+  }, [effectiveUserId, lastUserId, resetPOS, user, isUserLoading, impersonatedUserId, setImpersonatedUserId]);
 
   useEffect(() => {
     if (business && localStorage.getItem(POS_TAX_RATE_KEY) === null) {
@@ -1546,22 +1766,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     // Unique key for cart item: product.id + unit (if any)
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
+    const isService = product.categoryType === 'service';
 
-    setCart(prev => {
-      const existingItem = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
+    // 1. Find the item in current cart to check stock
+    const existingItem = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
+    const newQuantity = (existingItem?.quantity || 0) + 1;
+    const totalQuantityInBaseUnit = newQuantity * (multiplier || 1);
 
-      if (existingItem) {
-        // Stock check logic - only for non-services
-        const isService = product.categoryType === 'service';
-        const totalQuantityInBaseUnit = (existingItem.quantity + 1) * (multiplier || 1);
-        if (!isService && totalQuantityInBaseUnit > (product.stock || 0)) {
-          toast({
-            title: 'Backorder recorded',
-            description: `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`,
+    // 2. Perform side effects (toast) OUTSIDE of state update
+    if (!isService && totalQuantityInBaseUnit > (product.stock || 0)) {
+        toast({
+            title: existingItem ? 'Backorder recorded' : 'Backorder started',
+            description: existingItem 
+                ? `${product.name} (${unitName || 'Base Unit'}) is now being recorded as a debt/backorder.`
+                : `${product.name} is out of stock. Recording this as a debt.`,
             variant: 'backorder' as any
-          });
-        }
+        });
+    }
 
+    // 3. Update state
+    setCart(prev => {
+      const exists = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
+
+      if (exists) {
         return prev.map(item =>
           (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId
             ? { ...item, quantity: item.quantity + 1 }
@@ -1569,20 +1796,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         );
       } else {
         const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
-
-        const isService = product.categoryType === 'service';
-        if (!isService && (product.stock || 0) <= 0) {
-          toast({
-            title: 'Backorder started',
-            description: `${product.name} is out of stock. Recording this as a debt.`,
-            variant: 'backorder' as any
-          });
-        }
-
         return [...prev, { product: finalProduct, quantity: 1, unit: unitName, multiplier }];
       }
     });
-  }, [toast]);
+  }, [toast, cart]);
 
   const removeFromCart = (cartItemId: string) => setCart(prev => prev.filter(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) !== cartItemId));
 

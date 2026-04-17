@@ -64,20 +64,38 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             }
         }
 
+        if (isSaving) return;
         setIsSaving(true);
         try {
-            await addDoc(collection(firestore, 'customers'), {
+            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+            const newCustomerData = {
                 name,
                 email,
                 phone,
                 code: code.trim().toUpperCase(),
                 businessId,
                 loyaltyPoints: 0,
-                createdAt: serverTimestamp(),
-            });
-            toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
-            triggerRefresh();
-            onCustomerAdded();
+                totalSpent: 0,
+            };
+
+            if (isTauri) {
+                addToQueue({
+                    type: 'add-customer',
+                    payload: newCustomerData,
+                }, `Adding customer: ${name}`);
+                
+                toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
+                triggerRefresh();
+                onCustomerAdded();
+            } else {
+                await addDoc(collection(firestore, 'customers'), {
+                    ...newCustomerData,
+                    createdAt: serverTimestamp(),
+                });
+                toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
+                triggerRefresh();
+                onCustomerAdded();
+            }
         } catch (error) {
             toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
         } finally {

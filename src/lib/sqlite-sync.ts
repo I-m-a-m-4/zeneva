@@ -51,6 +51,12 @@ export async function getOfflineDb() {
         created_at INTEGER,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      
+      CREATE TABLE IF NOT EXISTS stats (
+        id TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     
     return db;
@@ -181,6 +187,46 @@ export async function getCachedCustomers(businessId: string) {
   }
 }
 
+export async function getCachedBusiness(businessId: string) {
+  const db = await getOfflineDb();
+  if (!db) return null;
+  
+  try {
+    const result: any[] = await db.select('SELECT data FROM business WHERE id = $1', [businessId]);
+    return result.length > 0 ? JSON.parse(result[0].data) : null;
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Business):', err);
+    return null;
+  }
+}
+
+export async function syncStatsToOffline(businessId: string, stats: any) {
+  const db = await getOfflineDb();
+  if (!db || !businessId) return;
+  
+  try {
+    await db.execute(
+      'INSERT OR REPLACE INTO stats (id, data, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+      [businessId, JSON.stringify(stats)]
+    );
+  } catch (err) {
+    console.error('SQLite Sync Error (Stats):', err);
+  }
+}
+
+export async function getCachedStats(businessId: string) {
+  const db = await getOfflineDb();
+  if (!db) return null;
+  
+  try {
+    const result: any[] = await db.select('SELECT data FROM stats WHERE id = $1', [businessId]);
+    return result.length > 0 ? JSON.parse(result[0].data) : null;
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Stats):', err);
+    return null;
+  }
+}
+
 export async function syncCustomersToOffline(businessId: string, customers: any[]) {
   const db = await getOfflineDb();
   if (!db) return;
@@ -254,6 +300,7 @@ export async function clearAllTables() {
     await db.execute('DELETE FROM receipts');
     await db.execute('DELETE FROM business');
     await db.execute('DELETE FROM sync_metadata');
+    await db.execute('DELETE FROM stats');
     console.log("SQLite: All tables cleared.");
   } catch (err) {
     console.error('SQLite Clear Error:', err);

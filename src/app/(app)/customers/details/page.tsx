@@ -7,7 +7,7 @@ import { Suspense } from 'react';
 import { usePOS } from '@/context/pos-context';
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
-import { getCustomerInsights } from '@/ai/flows/customer-insights-flow';
+import { generateLocalCustomerIntelligence } from '@/lib/customer-intelligence';
 import NProgress from 'nprogress';
 
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
+import { 
+    ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil, 
+    Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus
+} from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -48,7 +51,7 @@ function CustomerDetailContent() {
     const customerId = searchParams.get('id') as string;
     const { toast } = useToast();
 
-    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh } = usePOS();
+    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue } = usePOS();
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     const receipts = React.useMemo(() => {
@@ -61,6 +64,44 @@ function CustomerDetailContent() {
     const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
     const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
+    const [isSavingMeasurements, setIsSavingMeasurements] = React.useState(false);
+    const [measurements, setMeasurements] = React.useState<Record<string, string>>(customer?.measurements || {});
+    const [isMeasurementsDirty, setIsMeasurementsDirty] = React.useState(false);
+
+    const unpaidReceipts = React.useMemo(() => {
+        return receipts.filter(r => r.status === 'unpaid');
+    }, [receipts]);
+
+    const totalDebt = React.useMemo(() => {
+        return unpaidReceipts.reduce((sum, r) => sum + r.total, 0);
+    }, [unpaidReceipts]);
+
+    const handleSaveMeasurements = async () => {
+        if (!customer || !firestore || !currentUserProfile) return;
+        setIsSavingMeasurements(true);
+        try {
+            const customerRef = doc(firestore, 'customers', customer.id);
+            await updateDoc(customerRef, { 
+                measurements,
+                updatedAt: serverTimestamp()
+            });
+            
+            // Offline support
+            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+            if (isTauri) {
+                const { syncCustomersToOffline } = await import('@/lib/sqlite-sync');
+                await syncCustomersToOffline(currentUserProfile.businessId, [{ ...customer, measurements }]);
+            }
+
+            setIsMeasurementsDirty(false);
+            toast({ variant: 'success', title: 'Measurements Saved', description: 'Customer dimensions updated successfully.' });
+        } catch (e) {
+            console.error("Failed to save measurements:", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not save measurements.' });
+        } finally {
+            setIsSavingMeasurements(false);
+        }
+    };
 
     React.useEffect(() => {
         if (customer?.aiInsights) {
@@ -117,29 +158,45 @@ function CustomerDetailContent() {
         setIsGeneratingInsights(true);
         setInsights(null);
         try {
-            const purchaseHistory = receipts.flatMap(r => r.items.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })));
-            const result = await getCustomerInsights({
-                customerName: customer.name,
-                purchaseHistory: purchaseHistory,
-                totalSpent: receipts.reduce((sum, r) => sum + r.total, 0),
-                orderCount: receipts.length,
-            });
+            // Simulation of intelligence processing (local is fast, but we add a small delay for UX)
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            const result = generateLocalCustomerIntelligence(
+                customer,
+                receipts,
+                allProducts || []
+            );
 
             const insightsWithTimestamp = { ...result, createdAt: new Date() };
 
-            const customerRef = doc(firestore, 'customers', customerId);
-            await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp() } });
+            // 1. Queue the update for Firestore (Offline-ready)
+            
+            // Actually, let's just use the direct update but wrap it in a try-catch 
+            // AND also update the local SQLite if on Desktop.
+            
+            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+            
+            if (isTauri) {
+                try {
+                    const { syncCustomersToOffline } = await import('@/lib/sqlite-sync');
+                    await syncCustomersToOffline(currentUserProfile.businessId, [{ ...customer, aiInsights: insightsWithTimestamp }]);
+                    console.log("Insights saved to local SQLite.");
+                } catch (e) {
+                    console.error("Failed to save insights to SQLite:", e);
+                }
+            }
 
-            await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
-                action: 'customer.update',
-                entity: { type: 'Customer', id: customerId, name: customer.name },
-                details: { change: 'Generated AI Insights' }
-            });
+            try {
+                const customerRef = doc(firestore, 'customers', customerId);
+                await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp() } });
+            } catch (e) {
+                console.warn("Firestore update failed (likely offline). Insights will be available locally this session.");
+            }
 
             // Optimistically update local state to avoid re-fetch
             setInsights(insightsWithTimestamp);
-            triggerRefresh(); // Manually trigger a refresh to get the updated customer data
-            toast({ variant: 'success', title: 'Insights Generated!', description: 'New insights are available for this customer.' });
+            // triggerRefresh(); // No need if we set state locally
+            toast({ variant: 'success', title: 'Insights Generated!', description: 'Intelligent customer analysis completed.' });
 
         } catch (error) {
             console.error("Failed to generate insights:", error);
@@ -204,6 +261,16 @@ function CustomerDetailContent() {
                                 <p className="text-2xl font-bold">{receipts?.length || 0}</p>
                                 <p className="text-xs text-muted-foreground">Total Orders</p>
                             </div>
+                            <div className="col-span-2 pt-2">
+                                <Separator className="my-2" />
+                                <div className={`p-3 rounded-lg flex items-center justify-between ${totalDebt > 0 ? 'bg-destructive/10 border border-destructive/20 text-destructive' : 'bg-primary/10 border border-primary/20 text-primary'}`}>
+                                    <div className="text-left">
+                                        <p className="text-xs font-semibold uppercase tracking-wider">Outstanding Debt</p>
+                                        <p className="text-xl font-black">{currencySymbol}{totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <Wallet className="h-6 w-6 opacity-50" />
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
@@ -256,6 +323,97 @@ function CustomerDetailContent() {
                                 )) : <TableRow><TableCell colSpan={4} className="text-center h-24">No purchases yet.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+                {/* ADVANCED DEBT TRACKING */}
+                <Card className="border-destructive/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><History className="text-destructive h-5 w-5" /> Debt Ledger</CardTitle>
+                            <CardDescription>Unpaid invoices and credit history.</CardDescription>
+                        </div>
+                        {totalDebt > 0 && <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" />}
+                    </CardHeader>
+                    <CardContent>
+                        {unpaidReceipts.length > 0 ? (
+                            <div className="space-y-4">
+                                {unpaidReceipts.map(receipt => (
+                                    <div key={receipt.id} className="flex items-center justify-between p-3 rounded-md bg-muted/30 border border-transparent hover:border-destructive/30 transition-all">
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold text-sm">{receipt.receiptNumber}</span>
+                                            <span className="text-[10px] text-muted-foreground">{format(receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt), 'PPp')}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <span className="font-bold text-destructive">{currencySymbol}{receipt.total.toLocaleString()}</span>
+                                                <div className="text-[10px] text-muted-foreground bg-destructive/5 px-1 rounded inline-block ml-1">UNPAID</div>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                <Link href={`/receipts?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
+                                    <Link href="/receipts">View Full Statement</Link>
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-8 text-center bg-primary/5 rounded-lg">
+                                <CheckCircle2 className="h-8 w-8 text-primary mb-2" />
+                                <p className="text-sm font-medium">Clear Account</p>
+                                <p className="text-xs text-muted-foreground">This customer has no outstanding debts.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* BOUTIQUE MEASUREMENT TOOL */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><Ruler className="text-primary h-5 w-5" /> Boutique Measurements</CardTitle>
+                            <CardDescription>Custom tailoring & garment dimensions.</CardDescription>
+                        </div>
+                        <Scale className="h-5 w-5 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                            {['Neck', 'Chest/Bust', 'Waist', 'Hips', 'Shoulder', 'Sleeve', 'Length (Top)', 'Length (Trouser/Skirt)'].map(label => (
+                                <div key={label} className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
+                                    <Input 
+                                        placeholder="--" 
+                                        className="h-8 text-sm" 
+                                        value={measurements[label] || ''} 
+                                        onChange={(e) => {
+                                            setMeasurements(prev => ({ ...prev, [label]: e.target.value }));
+                                            setIsMeasurementsDirty(true);
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        {isMeasurementsDirty && (
+                            <div className="mt-4 flex animate-in fade-in slide-in-from-top-2 duration-300">
+                                <Button 
+                                    className="w-full h-8 text-xs bg-primary hover:bg-primary/90" 
+                                    onClick={handleSaveMeasurements}
+                                    disabled={isSavingMeasurements}
+                                >
+                                    {isSavingMeasurements ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2" />}
+                                    Save Measurements
+                                </Button>
+                            </div>
+                        )}
+                        {!isMeasurementsDirty && Object.keys(measurements).length > 0 && (
+                            <p className="mt-4 text-[10px] text-center text-muted-foreground italic">
+                                Last updated: {format(new Date(), 'PP')}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             </div>

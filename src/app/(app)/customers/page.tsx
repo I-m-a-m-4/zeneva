@@ -80,6 +80,7 @@ const CUSTOMERS_PER_PAGE = 200;
 export default function CustomersPage() {
   const { 
     customers, 
+    receipts,
     isLoading: isPosLoading, 
     business, 
     currentUserProfile: currentUser, 
@@ -274,6 +275,7 @@ export default function CustomersPage() {
                   <TableHead className="hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
                   <TableHead className="text-right">Total Spent</TableHead>
+                  <TableHead className="text-right text-destructive">Debt</TableHead>
                   <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
@@ -303,12 +305,15 @@ export default function CustomersPage() {
                     </div>
                   </TableHead>
                   <TableHead className="text-right">Total Spent</TableHead>
+                  <TableHead className="text-right text-destructive">Debt</TableHead>
                   <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedCustomers.map((customer) => {
                   const totalSpent = customer.totalSpent ?? 0;
+                  const customerReceipts = (receipts || []).filter(r => r.customer?.id === customer.id && r.status === 'unpaid');
+                  const debt = customerReceipts.reduce((sum, r) => sum + r.total, 0);
                   return (
                     <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
                       <TableCell>
@@ -334,6 +339,9 @@ export default function CustomersPage() {
                       <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
                       <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right text-destructive font-bold">
+                        {debt > 0 ? `${currencySymbol}${debt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>

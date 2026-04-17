@@ -106,7 +106,7 @@ const features = [
 
 export default function DownloadPage() {
   const [activeSlide, setActiveSlide] = useState(0);
-  const version = AppConfig.version || "0.5.1";
+  const version = AppConfig.version || "0.5.8";
   
   const slides = [
     { src: "/herolytics.svg", alt: "Zeneva Dashboard View", label: "Dashboard" },

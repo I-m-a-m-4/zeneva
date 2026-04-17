@@ -141,7 +141,7 @@ export interface OnlineOrder {
 
 export interface QueuedAction {
     id: string;
-    type: 'complete-sale' | 'update-product' | 'add-customer' | 'bulk-update-products' | 'add-product' | 'delete-product';
+    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings';
     description: string;
     payload: any;
     timestamp: number;

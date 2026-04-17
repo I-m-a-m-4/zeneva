@@ -16,9 +16,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
 import type { Customer } from '@/types';
 import { usePOS } from '@/context/pos-context';
+import { Separator } from '@/components/ui/separator';
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
@@ -30,11 +30,12 @@ interface AddCustomerDialogProps {
 export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers }: AddCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { triggerRefresh } = usePOS();
+  const { triggerRefresh, addToQueue } = usePOS();
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
+  const [measurements, setMeasurements] = React.useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = React.useState(false);
 
   const resetForm = () => {
@@ -42,6 +43,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
     setEmail('');
     setPhone('');
     setCode('');
+    setMeasurements({});
     setIsSaving(false);
   };
 
@@ -80,21 +82,43 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
       }
     }
 
+    if (isSaving) return;
     setIsSaving(true);
     try {
-      await addDoc(collection(firestore, 'customers'), {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      const newCustomerData = {
         name,
         email,
         phone,
         code: code.trim().toUpperCase(),
         businessId,
         loyaltyPoints: 0,
-        createdAt: serverTimestamp(),
-      });
-      toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
-      triggerRefresh();
-      onOpenChange(false);
-      resetForm();
+        totalSpent: 0,
+        measurements,
+      };
+
+      if (isTauri) {
+        // Use offline queue for desktop
+        addToQueue({
+          type: 'add-customer',
+          payload: newCustomerData,
+        }, `Adding customer: ${name}`);
+        
+        toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
+        triggerRefresh();
+        onOpenChange(false);
+        resetForm();
+      } else {
+        // Use direct firestore for web
+        await addDoc(collection(firestore, 'customers'), {
+          ...newCustomerData,
+          createdAt: serverTimestamp(),
+        });
+        toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
+        triggerRefresh();
+        onOpenChange(false);
+        resetForm();
+      }
     } catch (error) {
       toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
     } finally {
@@ -135,6 +159,25 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CUST-001" className="col-span-3" />
+            </div>
+
+            <Separator className="col-span-4 my-2" />
+            <div className="col-span-4">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2 block">Boutique Measurements (Tailoring)</Label>
+                <div className="grid grid-cols-2 gap-4 border rounded-md p-4 bg-muted/20">
+                    {['Neck', 'Sleeve', 'Shoulder', 'Chest', 'Waist', 'Hips', 'Length'].map((m) => (
+                        <div key={m} className="space-y-1">
+                            <Label htmlFor={`m-${m}`} className="text-[10px] font-medium">{m}</Label>
+                            <Input 
+                                id={`m-${m}`} 
+                                value={measurements[m] || ''} 
+                                onChange={(e) => setMeasurements(prev => ({ ...prev, [m]: e.target.value }))}
+                                className="h-8 text-xs"
+                                placeholder="--"
+                            />
+                        </div>
+                    ))}
+                </div>
             </div>
           </div>
           <DialogFooter>

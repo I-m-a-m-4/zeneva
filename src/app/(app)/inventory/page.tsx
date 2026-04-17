@@ -166,7 +166,6 @@ function InventoryPageContent() {
     queuedActions
   } = usePOS();
 
-  const [currentPage, setCurrentPage] = React.useState(1);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -187,7 +186,6 @@ function InventoryPageContent() {
   const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
   const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
-  const [isFetchingMore, setIsFetchingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
   const isLoading = isPosLoading || isSearching;
@@ -299,7 +297,7 @@ function InventoryPageContent() {
     // 2. Filter out queued deletions
     let valid = combined.filter(p => !queuedDeletionIds.includes(p.id));
 
-    // 3. Category
+  // 3. Category
     if (categoryFilter !== 'all') {
       valid = valid.filter(p => p.category === categoryFilter);
     }
@@ -334,25 +332,14 @@ function InventoryPageContent() {
     return valid;
   }, [products, searchResults, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
-  // Handle Pagination Locally
   const totalCount = filteredProducts.length;
-  const pagedProducts = React.useMemo(() => {
-    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
-    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
-
-  const pageCount = Math.ceil(totalCount / PRODUCTS_PER_PAGE);
 
   const handleLoadMore = async () => {
-    setIsFetchingMore(true);
     const count = await fetchMoreProducts();
     if (count === 0) setHasMore(false);
-    setIsFetchingMore(false);
   };
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, stockFilter, categoryFilter, sortBy]);
+
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -393,37 +380,45 @@ function InventoryPageContent() {
     setSelectedProductIds([]);
   }
 
-  const handleVisualAddItems = async (items: { name: string; quantity: number }[]) => {
-    if (!business || !items.length) return;
+  const handleVisualAddItems = async (items: any[]) => {
+    if (!business?.id || items.length === 0) return;
+    setIsLoading(true);
 
-    const batch = writeBatch(firestore);
-    const productsRef = collection(firestore, 'businesses', business.id, 'products');
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
 
-    items.forEach(item => {
-      const newDocRef = doc(productsRef);
-      batch.set(newDocRef, {
-        name: item.name,
-        stock: item.quantity,
-        price: 0,
-        costPrice: 0,
-        category: 'Uncategorized',
-        sku: '',
-        barcode: '',
-        description: '',
-        imageUrl: '',
-        lowStockThreshold: 5,
-        trackStock: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    });
+    try {
+        if (isTauri) {
+            items.forEach(item => {
+                const newId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random();
+                addToQueue({
+                    type: 'add-product',
+                    payload: { ...item, id: newId, businessId: business.id }
+                }, `Importing product: ${item.name}`);
+            });
 
-    await batch.commit();
-    triggerRefresh();
-    toast({
-      title: "Success",
-      description: `Added ${items.length} items to inventory.`,
-    });
+            toast({ title: "Import Queued", description: `${items.length} products will be added when online.` });
+            triggerRefresh();
+        } else {
+            const batch = writeBatch(firestore);
+            const productsRef = collection(firestore, 'products');
+            items.forEach(item => {
+                const productRef = doc(productsRef);
+                batch.set(productRef, {
+                    ...item,
+                    businessId: business.id,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+            });
+            await batch.commit();
+            toast({ title: "Import Successful", description: `${items.length} products added.` });
+            triggerRefresh();
+        }
+    } catch (error) {
+        toast({ title: "Import Failed", description: "Could not add products.", variant: 'destructive' });
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleExport = async () => {
@@ -467,7 +462,7 @@ function InventoryPageContent() {
 
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
   return (
-    <div className="flex flex-col h-full w-full pb-16 md:pb-0">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] w-full pb-16 md:pb-0">
       <div className="flex items-center pb-4 gap-4">
         <div className="flex flex-col flex-1">
           <div className="relative flex items-center gap-2">
@@ -726,14 +721,14 @@ function InventoryPageContent() {
             </DropdownMenu>
           </div>
       </div>
-      <Card className="h-full flex flex-col w-full">
+      <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
           <CardTitle>Products</CardTitle>
           <CardDescription>
             Manage your products and view their sales performance.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-grow p-0 overflow-y-auto min-h-[400px]">
+        <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
@@ -762,7 +757,7 @@ function InventoryPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedProducts.map((product) => (
+                  {filteredProducts.map((product) => (
                     <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
                       <TableCell>
                         <Checkbox
@@ -811,6 +806,12 @@ function InventoryPageContent() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                           <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
+                          {((product as any).material || product.variantValue) && (
+                            <span className="text-[10px] flex items-center gap-1 opacity-80">
+                               • {((product as any).material ? (product as any).material : '')} 
+                               {product.variantValue && <Badge variant="secondary" className="text-[8px] h-3 px-1 ml-0.5 font-normal">{product.variantValue}</Badge>}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -877,38 +878,10 @@ function InventoryPageContent() {
           )}
         </CardContent>
         {filteredProducts && filteredProducts.length > 0 && (
-          <CardFooter className="flex flex-col border-t py-4 gap-4">
-            <div className="flex items-center justify-between w-full">
-              <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * PRODUCTS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)}</strong> of <strong>{filteredProducts.length}</strong> products
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  disabled={currentPage <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (currentPage >= pageCount && hasMore && !searchTerm) {
-                      await handleLoadMore();
-                    }
-                    setCurrentPage(p => p + 1);
-                  }}
-                  disabled={(currentPage >= pageCount && !hasMore) || (currentPage >= pageCount && !!searchTerm) || isFetchingMore}
-                >
-                  {isFetchingMore ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : "Next"}
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
+          <CardFooter className="flex items-center justify-between border-t py-4">
+            <div className="text-sm text-muted-foreground">
+              Total <strong>{filteredProducts.length}</strong> products found
             </div>
-
           </CardFooter>
         )}
       </Card>

@@ -23,6 +23,7 @@ import { zenevaSupportChat, type ZenevaSupportChatInput } from '@/ai/flows/suppo
 import AIChat from '@/components/support/ai-chat';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: string[] }[] = [
+  // --- CATEGORY: INSTALLATION & DESKTOP (5) ---
   {
     id: "windows-protection",
     question: "Windows protected your PC? How to install Zeneva",
@@ -53,31 +54,33 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
                     </li>
                 </ol>
             </div>
-            <p className="text-[10px] text-muted-foreground italic mt-3 underline decoration-emerald-500/30 underline-offset-4">Note: We are currently undergoing Microsoft Developer Certification to remove this warning permanently.</p>
         </div>
     )
   },
   {
-    question: "Is the Zeneva Mobile Application ready for production?",
-    tags: ["mobile", "android", "ios", "iphone", "app"],
-    answer: (
-        <div className="space-y-4">
-            <p className="text-sm">Yes. The Zeneva ecosystem includes high-performance mobile apps for **Android and iOS**. These are not just companion apps; they are powerful tools for your business:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                <div className="p-4 rounded-xl bg-muted/50 border border-border/40">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Stock Taking</p>
-                    <p className="text-xs text-muted-foreground">Use your phone's camera as a high-speed barcode scanner to audit stock without a dedicated terminal.</p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/50 border border-border/40">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Live Telemetry</p>
-                    <p className="text-xs text-muted-foreground">Monitor live cashier sales and cash-in-hand totals while you are away from the shop.</p>
-                </div>
-            </div>
-        </div>
-    )
+      question: "What are the minimum system requirements for Zeneva Desktop?",
+      tags: ["system", "requirements", "windows", "mac", "linux"],
+      answer: <p className="text-sm">Zeneva is optimized to run on modest hardware. Minimum: Windows 10/11 (64-bit), 4GB RAM, and 500MB disk space. For the best experience with Zen AI local processing, we recommend 8GB RAM and an SSD.</p>
   },
   {
-    question: "How does the Offline-First synchronization work?",
+      question: "How do I update the desktop application to the latest version?",
+      tags: ["update", "version", "download", "auto-update"],
+      answer: <p className="text-sm">Zeneva checks for updates every time it launches. If a new version (e.g., v0.5.8) is available, you will see a "New Version Available" button in the Top Title Bar. Simply click it to download and relaunch with the latest features.</p>
+  },
+  {
+      question: "Can I run Zeneva on multiple computers at the same time?",
+      tags: ["multi-device", "login", "synced"],
+      answer: <p className="text-sm">Yes. Your subscription allows you to log in on multiple terminals. Every sale made on one computer will synchronize with the others as soon as they are online, giving you a real-time view of your entire store.</p>
+  },
+  {
+      question: "How to fix 'Database Initialization Error' on startup?",
+      tags: ["error", "database", "sqlite", "fix"],
+      answer: <p className="text-sm">This usually happens if the application is prevented from writing to its data folder. Try running Zeneva as an Administrator, or ensure that your Antivirus isn't blocking the `zeneva.db` file in your AppData directory.</p>
+  },
+
+  // --- CATEGORY: OFFLINE & SYNC (5) ---
+  {
+    question: "How exactly does the Offline-First synchronization work?",
     tags: ["offline", "sync", "internet", "data"],
     answer: (
         <div className="space-y-4">
@@ -88,14 +91,14 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
                         <Monitor className="h-5 w-5 text-primary shrink-0 mt-1" />
                         <div>
                             <p className="font-bold text-sm">Edge Computing</p>
-                            <p className="text-xs text-muted-foreground">Every sale is processed in milliseconds on your local chip. No cloud round-trips for basic receipts.</p>
+                            <p className="text-xs text-muted-foreground">Every sale is processed locally on your hardware. Even without internet, your POS is fully functional.</p>
                         </div>
                     </div>
                     <div className="flex gap-3">
                         <Cloud className="h-5 w-5 text-blue-500 shrink-0 mt-1" />
                         <div>
-                            <p className="font-bold text-sm">Delta Syncing</p>
-                            <p className="text-xs text-muted-foreground">As soon as connection is detected, Zeneva pushes only the "changes" to the cloud to save bandwidth.</p>
+                            <p className="font-bold text-sm">Transactional Queueing</p>
+                            <p className="text-xs text-muted-foreground">Actions made offline are queued and processed in exact order once a connection is detected to ensure data integrity.</p>
                         </div>
                     </div>
                 </div>
@@ -104,60 +107,76 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
     )
   },
   {
-    question: "What is Zen AI and how does it maximize my profit?",
-    tags: ["ai", "insight", "business", "profit"],
+      question: "What happens if I make a sale while the internet is completely out?",
+      tags: ["pos", "offline", "sale", "offline-sync"],
+      answer: <p className="text-sm">Nothing changes for your customer. You scan items, accept cash/local payments, and print the receipt exactly as usual. The status bar will show "Offline". Once internet returns, the app will silently upload the receipt in the background.</p>
+  },
+  {
+      question: "How do I know if my data has finished syncing to the cloud?",
+      tags: ["sync", "status", "cloud", "indicator"],
+      answer: <p className="text-sm">Look at the **Connection Badge** in the top-right corner. A rotating loader or a "Syncing..." label indicates data is moving. A green "Online" or "Synced" checkmark means your cloud dashboard is up to date.</p>
+  },
+  {
+      question: "Can I manage my inventory while offline?",
+      tags: ["offline", "inventory", "edit", "add-product"],
+      answer: <p className="text-sm">Yes. You can add new products, update prices, and edit stock levels while offline. These changes are saved to your local SQLite database and will synchronize to your online dashboard once you reconnect.</p>
+  },
+  {
+      question: "Does the search function work when I'm offline?",
+      tags: ["search", "offline-search", "products"],
+      answer: <p className="text-sm">Yes. Zeneva stores your entire product and customer database locally. Searching by name, SKU, or category is just as fast (and sometimes faster) when offline because it queries your local drive directly.</p>
+  },
+
+  // --- CATEGORY: POS & SALES (8) ---
+  {
+    question: "Using barcode scanners for high-speed POS checkouts",
+    tags: ["barcode", "scanner", "pos", "sku"],
     answer: (
-        <div className="space-y-4">
-            <p className="text-sm">Zen AI goes beyond raw numbers. It acts as an **Artificial General Intelligence for your Retail Store**. It looks for patterns that humans often miss.</p>
-            <ul className="space-y-3">
-                <li className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
-                    <Badge variant="outline" className="bg-primary text-primary-foreground border-none text-[10px]">Predictive</Badge>
-                    <span className="text-xs">Tells you which items will run out next week based on current velocity.</span>
-                </li>
-                <li className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
-                    <Badge variant="outline" className="bg-orange-500 text-white border-none text-[10px]">Loss Audit</Badge>
-                    <span className="text-xs">Detects anomalies in inventory vs. sales to prevent leakage or theft.</span>
-                </li>
-            </ul>
+      <div className="space-y-4">
+        <p className="text-sm">Zeneva is optimized for **Zero-Latency Scanning**. Simply connect your USB or Bluetooth scanner. In the POS interface, just scan, and the item is instantly added to the cart.</p>
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs leading-relaxed border border-blue-100 dark:border-blue-800">
+            <strong>Pro Tip:</strong> Ensure your scanner is set to "Keyboard Mode" with a Carriage Return (Enter) suffix enabled.
         </div>
+      </div>
     )
   },
   {
-      question: "Can I manage multiple shops (Outlets) under one account?",
-      tags: ["multi-device", "terminal", "sync", "staff", "outlets"],
-      answer: (
-          <p className="leading-relaxed text-sm">Absolutely. Zeneva is an **Enterprise-Ready architecture**. You can create multiple outlets from your master dashboard and monitor stock transfers, individual shop profits, and staff performance across your entire retail empire from a single login.</p>
-      )
+      question: "How do I perform a split payment (Cash + Card)?",
+      tags: ["payment", "split", "pos", "checkout"],
+      answer: <p className="text-sm">In the Checkout dialog, enter the amount being paid in the first method (e.g., Cash). Clicking the "+" next to the payment field allows you to add a second method for the remaining balance.</p>
   },
   {
-      question: "Is my business data backed up and secure?",
-      tags: ["backup", "security", "data", "cloud"],
-      answer: (
-          <div className="space-y-4">
-            <p className="text-sm">Security is the foundation of Zeneva. We provide **Military-Grade Data Protection**:</p>
-            <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="text-[10px] font-bold p-2 border rounded bg-muted/20">AES-256 Encryption</div>
-                <div className="text-[10px] font-bold p-2 border rounded bg-muted/20">SSL/TLS Transit</div>
-                <div className="text-[10px] font-bold p-2 border rounded bg-muted/20">End-to-End Backups</div>
-                <div className="text-[10px] font-bold p-2 border rounded bg-muted/20">Hardware Locking</div>
-            </div>
-          </div>
-      )
+      question: "Can I save a cart and recall it later (On-Hold Orders)?",
+      tags: ["pos", "hold", "save-cart", "orders"],
+      answer: <p className="text-sm">Yes. Click the **"Pause"** icon in the POS cart. This saves the current items as a 'Pending' order, allowing you to serve the next customer. You can recall it anytime from the 'On-Hold' tab.</p>
+  },
+  {
+      question: "How do I print a duplicate receipt for a past sale?",
+      tags: ["print", "receipt", "history", "duplicate"],
+      answer: <p className="text-sm">Navigate to **Sales History**, locate the transaction, and click the three-dot menu. Select **"Re-print"** to send the receipt back to your thermal printer or download it as a PDF.</p>
   },
   {
       question: "What thermal printers and hardware are supported?",
       tags: ["printer", "receipt", "hardware", "thermal"],
-      answer: (
-          <p className="text-sm">We support **all standard POS hardware**. Whether you have an 80mm high-speed thermal printer or a generic 58mm Bluetooth printer, Zeneva's adaptive printing engine will format receipts perfectly.</p>
-      )
+      answer: <p className="text-sm">We support all standard **ESC/POS** hardware. 80mm high-speed thermal printers are recommended, but 58mm portable Bluetooth printers also work perfectly with our adaptive formatting engine.</p>
   },
   {
       question: "How do I handle returns and partial refunds?",
       tags: ["refund", "return", "sales", "transaction"],
-      answer: (
-          <p className="text-sm">Inside the 'Orders' module, select the transaction. You can perform a **Full Refund** (returning balance to the customer and stock to the shelf) or a **Partial Refund** for specific items in an order.</p>
-      )
+      answer: <p className="text-sm">Inside the 'Receipts' module, select the transaction and click **"Initiate Return"**. You can choose to return specific items (Partial) or the entire order (Full). Stock levels will be auto-corrected.</p>
   },
+  {
+      question: "Can I apply discounts to a whole order or just single items?",
+      tags: ["discount", "pos", "coupon", "price"],
+      answer: <p className="text-sm">Both! You can click on an individual item in the cart to set a specific discount, or use the **"Group Discount"** button at the bottom to apply a percentage or fixed-amount deduction to the entire total.</p>
+  },
+  {
+      question: "How does the POS handle taxes and inclusive/exclusive pricing?",
+      tags: ["tax", "vat", "accounting", "pos"],
+      answer: <p className="text-sm">Under Business Settings, you can configure your tax rate (e.g., VAT 7.5%). You can decide whether your shelf prices already include tax or if tax should be added at the point of sale.</p>
+  },
+
+  // --- CATEGORY: INVENTORY & PRODUCTS (8) ---
   {
       question: "How do I add variation products (e.g., Colors/Sizes)?",
       tags: ["inventory", "product", "variation"],
@@ -166,93 +185,165 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
       )
   },
   {
-    question: "Using barcode scanners for high-speed POS checkouts",
-    tags: ["barcode", "scanner", "pos", "sku"],
-    answer: (
-      <div className="space-y-4">
-        <p className="text-sm">Zeneva is optimized for **Zero-Latency Scanning**. Simply connect your USB or Bluetooth scanner. In the POS interface, just scan, and the item is instantly added to the cart.</p>
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-[10px] leading-relaxed border border-blue-100 dark:border-blue-800">
-            <strong>Pro Tip:</strong> You can also generate and print barcode labels for your own unique products directly from the Zeneva Inventory module.
-        </div>
-      </div>
-    )
+      question: "What is the difference between a Product and a Service?",
+      tags: ["inventory", "service", "stock"],
+      answer: <p className="text-sm">Products are physical items with stock levels that decrement when sold. Services (like "Installation" or "Consulting") have no stock limit and don't require inventory tracking, making them always available for sale.</p>
+  },
+  {
+      question: "How do I bulk import my products from an Excel or CSV file?",
+      tags: ["import", "bulk", "csv", "excel", "inventory"],
+      answer: <p className="text-sm">Go to **Inventory {'->'} Import**. Download our template CSV, fill in your product names, SKUs, and prices, and upload it. Zeneva can process thousands of products in seconds.</p>
   },
   {
     question: "Setting up Low Stock & Expiry Date alerts",
     tags: ["alerts", "inventory", "stock", "expiry"],
-    answer: (
-        <p className="text-sm">Under each product's settings, you can define a **Minimum Stock Level**. Zeneva will proactively alert you when stock falls below this. You can also set **Expiry Date alerts** to notify you weeks before items expire.</p>
-    )
+    answer: <p className="text-sm">Under each product's settings, you can define a **Minimum Stock Level**. Zeneva will proactively alert you when stock falls below this. You can also enable **Expiry Date tracking** for perishable goods.</p>
   },
   {
-    question: "Exporting deep-business insights to Excel/PDF",
-    tags: ["export", "csv", "excel", "data", "reports"],
-    answer: (
-        <p className="text-sm">Every intelligence module in Zeneva has a **"High-Resolution Export"** button. You can download your Sales Journals, Inventory Valuations, and Profit/Loss statements as clean Excel files or presentation-ready PDFs.</p>
-    )
+      question: "Can I track the 'Cost Price' to calculate profit margins?",
+      tags: ["margin", "profit", "cost", "accounting"],
+      answer: <p className="text-sm">Yes. By entering the Cost Price (your buy price) and Selling Price, Zen AI can automatically calculate your **Gross Profit Margin** and show you which items are your biggest money-makers.</p>
   },
   {
-    question: "Multi-Currency and Global Business Settings",
-    tags: ["currency", "price", "settings", "global"],
-    answer: (
-        <p className="text-sm">Navigate to **Settings {'->'} Business Profile**. You can set your base currency (NGN, USD, GHS, KES, etc.), your tax rates (VAT/GST), and your trading hours. These settings synchronize instantly across all your terminals.</p>
-    )
+      question: "How do I perform a stock adjustment or audit (Visual Count)?",
+      tags: ["audit", "stock-take", "adjustment", "inventory"],
+      answer: <p className="text-sm">Use the **Visual Count** feature in the Inventory module. You can scan or select items and enter their actual shelf count. Zeneva will log the difference as a 'Stock Adjustment' in your audit trails.</p>
   },
   {
-    question: "Managing High-Value Rewards & Loyalty Programs",
-    tags: ["loyalty", "points", "customer", "rewards"],
-    answer: (
-        <p className="text-sm">Zeneva includes a powerful **CRM suite**. You can enable loyalty points and set reward thresholds. Customers can then redeem these points for discounts at checkout, driving repeat business.</p>
-    )
+      question: "Does Zeneva support composite products (Bundles/Kits)?",
+      tags: ["bundle", "kit", "composite", "inventory"],
+      answer: <p className="text-sm">Yes. You can create a 'Bundle' product that is linked to multiple other items. When the bundle is sold, the stock levels for all its components are automatically decremented.</p>
   },
   {
-    question: "How do I add staff members and manage their permissions?",
-    tags: ["staff", "users", "permissions", "security"],
+      question: "How to export inventory reports for accounting?",
+      tags: ["export", "accounting", "reports", "excel"],
+      answer: <p className="text-sm">In the Reports module, go to **Inventory Valuation**. You can download a high-fidelity PDF or Excel sheet showing every item you own, its current value, and its total asset worth.</p>
+  },
+
+  // --- CATEGORY: ZEN AI & INTELLIGENCE (4) ---
+  {
+    question: "What is Zen AI and how does it maximize my profit?",
+    tags: ["ai", "insight", "business", "profit"],
     answer: (
-        <div className="space-y-3">
-            <p className="text-sm">Go to **Settings {'->'} Staff Management**. You can invite team members via email and assign them dynamic roles:</p>
-            <ul className="text-xs space-y-2 list-disc list-inside text-muted-foreground">
-                <li><strong className="text-foreground">Cashier:</strong> Only POS access, no reports.</li>
-                <li><strong className="text-foreground">Manager:</strong> Full operations, but no business settings.</li>
-                <li><strong className="text-foreground">Auditor:</strong> Read-only access to all reports.</li>
+        <div className="space-y-4">
+            <p className="text-sm">Zen AI acts as an **Artificial General Intelligence for your Store**. It identifies patterns in your sales that are often hidden.</p>
+            <ul className="space-y-3">
+                <li className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
+                    <Badge variant="outline" className="bg-primary text-primary-foreground border-none text-[10px]">Predictive</Badge>
+                    <span className="text-xs">Tells you which items will run out next week based on purchase velocity.</span>
+                </li>
+                <li className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
+                    <Badge variant="outline" className="bg-emerald-500 text-white border-none text-[10px]">Smart Pricing</Badge>
+                    <span className="text-xs">Suggests price adjustments based on item demand and sales frequency.</span>
+                </li>
             </ul>
         </div>
     )
   },
   {
-    question: "Tracking daily business expenses vs. gross profit",
-    tags: ["finance", "profit", "loss", "expenses"],
-    answer: (
-        <p className="text-sm text-balance">Record your utility bills, salaries, and supply costs in the 'Expenses' module. Zeneva will subtract these from your sales to show you your **True Net Profit** for the day, month, or year.</p>
-    )
+      question: "Can I generate AI insights while I am offline?",
+      tags: ["ai", "offline", "intelligence"],
+      answer: <p className="text-sm">Yes. Zeneva's core intelligence module is deterministic and runs locally on your computer. It analyzes your SQLite data to provide "Customer Intelligence" and "Sales Forecasts" even without internet.</p>
+  },
+  {
+      question: "How do I use 'Report Builder' for custom analysis?",
+      tags: ["reports", "custom", "ai", "builder"],
+      answer: <p className="text-sm">The Report Builder allows you to combine different data points (e.g., Sales by Staff vs. Category). Zen AI can then interpret this data to show you a text-based "Strategic Summary" of your performance.</p>
+  },
+  {
+      question: "Does the AI learn from my specific business habits?",
+      tags: ["ai", "learning", "data"],
+      answer: <p className="text-sm">Zen AI respects your privacy. It analyzes your data locally on your device to build a model of your business's "Sales Velocity". This data is never used to train global models that your competitors could see.</p>
+  },
+
+  // --- CATEGORY: CUSTOMERS & CRM (5) ---
+  {
+    question: "Managing High-Value Rewards & Loyalty Programs",
+    tags: ["loyalty", "points", "customer", "rewards"],
+    answer: <p className="text-sm">Zeneva includes a powerful **CRM suite**. You can enable loyalty points and set reward thresholds (e.g., 1 point per ₦100 spent). Customers can then redeem these for discounts during checkout.</p>
+  },
+  {
+      question: "How do I track 'Store Credit' for my frequent buyers?",
+      tags: ["credit", "customer", "debt", "crm"],
+      answer: <p className="text-sm">In the Customer profile, you can view their 'Wallet'. If a customer overpays or has a refund returned to store credit, it is tracked here and can be selected as a payment method in the POS.</p>
+  },
+  {
+      question: "Can I capture customer phone numbers and emails at checkout?",
+      tags: ["crm", "customer", "data-collection"],
+      answer: <p className="text-sm">Yes. At checkout, you can quickly search for an existing customer or click "+" to add a new one. This allows you to track their purchase history and generate AI segments for them.</p>
+  },
+  {
+      question: "What are 'Customer Segments' and how do I use them?",
+      tags: ["marketing", "segments", "vip", "churn"],
+      answer: <p className="text-sm">Zen AI automatically categorizes your buyers into groups like **"VIP Patrons"** (High spend), **"At-Risk"** (Haven't visited recently), and **"Occasional Buyers"**. This helps you know who to send special offers to.</p>
+  },
+  {
+      question: "Can I manage customer debts (Buy Now Pay Later)?",
+      tags: ["debt", "credit", "sales", "unpaid"],
+      answer: <p className="text-sm">Yes. Zeneva allows you to record an order as 'Unpaid'. It will track the outstanding balance on the customer's profile, and you can record payments against that debt later to balance the books.</p>
+  },
+
+  // --- CATEGORY: SECURITY & MULTI-STORE (5) ---
+  {
+      question: "How do I add staff members and manage their permissions?",
+      tags: ["staff", "users", "permissions", "security"],
+      answer: (
+          <div className="space-y-3">
+              <p className="text-sm">Go to **Settings {'->'} Staff Management**. You can invite team members and assign them roles:</p>
+              <ul className="text-xs space-y-2 list-disc list-inside text-muted-foreground">
+                  <li><strong className="text-foreground">Cashier:</strong> Only POS access, no reports or deleting items.</li>
+                  <li><strong className="text-foreground">Manager:</strong> Full ops, but no business-level settings.</li>
+                  <li><strong className="text-foreground">Auditor:</strong> Read-only access to all financial reports.</li>
+              </ul>
+          </div>
+      )
   },
   {
     question: "Reviewing the Secure Audit Trail & Action Logs",
     tags: ["audit", "logs", "security", "tracking"],
-    answer: (
-        <p className="text-sm">Every critical action in Zeneva—deleting an order, changing a stock amount, or editing a price—is recorded in the **Immutable Audit Log**. This ensures complete accountability for every button pressed on the platform.</p>
-  )
+    answer: <p className="text-sm">Every critical action—deleting an order, changing a price, or editing stock—is recorded in the **Immutable Audit Log**. You can see exactly WHO did WHAT and WHEN they did it.</p>
   },
   {
-    question: "Managing your Zeneva Subscription and Billing",
-    tags: ["billing", "subscription", "pricing", "plan"],
-    answer: (
-        <p className="text-sm">Your subscription is managed under **Settings {'->'} Subscription**. You can upgrade to the 'Pro' or 'Enterprise' plans for advanced features like Multi-Store management and Zen AI Strategic Intelligence.</p>
-    )
+    question: "Is my business data backed up and secure in the cloud?",
+    tags: ["backup", "security", "data", "cloud"],
+    answer: <p className="text-sm">Security is our priority. We use **AES-256 Encryption** for data at rest and SSL/TLS for transit. Every night, a redundant backup is created in the cloud to ensure you never lose a single digit.</p>
   },
   {
-    question: "Resetting your password and enabling MFA security",
-    tags: ["security", "password", "mfa", "login"],
-    answer: (
-        <p className="text-sm">If you've forgotten your password, use the 'Forgot Password' link on the login page. For maximum security, we recommend enabling **Two-Factor Authentication (2FA)** in your profile settings.</p>
-    )
+      question: "Can I manage multiple shops under one account?",
+      tags: ["multi-store", "outlet", "enterprise"],
+      answer: <p className="text-sm">Absolutely. Zeneva is an **Enterprise-Ready architecture**. You can create multiple 'Outlets' and monitor stock transfers, individual shop profits, and total company performance from one master dashboard.</p>
   },
   {
-    question: "Generating Custom Reports and Strategic Forecasts",
-    tags: ["reports", "intelligence", "zen-ai", "strategy"],
-    answer: (
-        <p className="text-sm">While Zeneva comes with 20+ built-in reports, you can use the **Report Builder (Powered by Zen AI)** to create custom views tailored to your specific business needs.</p>
-    )
+      question: "How do I enable Two-Factor Authentication (2FA)?",
+      tags: ["security", "2fa", "mfa", "protection"],
+      answer: <p className="text-sm">Go to **Settings {'->'} My Profile**. You can enable MFA via an Authenticator App (like Google Authenticator). This ensures that even if someone knows your password, they cannot access your business data without your phone.</p>
+  },
+  
+  // --- CATEGORY: BILLING & ACCOUNT (5) ---
+  {
+      question: "How do I upgrade or cancel my Zeneva subscription?",
+      tags: ["billing", "subscription", "upgrade", "cancel"],
+      answer: <p className="text-sm">You can manage your plan under **Settings {'->'} Subscription**. To upgrade, select your preferred plan and follow the secure checkout. To cancel, click 'Downgrade to Starter' or contact support if you wish to close your business instance entirely.</p>
+  },
+  {
+      question: "Will I lose my data if my subscription expires?",
+      tags: ["billing", "data", "expiry", "safety"],
+      answer: <p className="text-sm">No. We never delete your business data without your explicit request. If your subscription expires, your account will move to 'Read-Only' mode until a payment is made, allowing you to still view and export your past records.</p>
+  },
+  {
+      question: "Can I get a custom plan for a large enterprise with 50+ stores?",
+      tags: ["enterprise", "pricing", "custom", "multi-store"],
+      answer: <p className="text-sm">Yes. We offer custom **Zeneva Enterprise** solutions for high-volume retailers. Please contact our Executive Support team via the chat above or email `enterprise@zeneva.ai` for a tailored quote and dedicated account manager.</p>
+  },
+  {
+      question: "How do I change my business name or logo in the app?",
+      tags: ["settings", "branding", "logo", "business-name"],
+      answer: <p className="text-sm">Go to **Settings {'->'} Business Profile**. You can upload your high-resolution logo and change your trading name. These updates will instantly reflect on your printed receipts and online storefront.</p>
+  },
+  {
+      question: "Does Zeneva offer a free trial for the Pro features?",
+      tags: ["trial", "pricing", "pro", "free"],
+      answer: <p className="text-sm">Every new Zeneva account starts with a **14-day Free Trial** of our 'Pro' features (including Zen AI and Multi-User). After the trial, you can choose to subscribe or continue using our 'Starter' plan for free.</p>
   }
 ];
 
@@ -564,8 +655,8 @@ export default function SupportPage() {
                              <Accordion type="single" collapsible className="w-full space-y-2">
                                 {filteredFaqs.length > 0 ? (
                                     filteredFaqs.map((item, index) => (
-                                        <AccordionItem key={index} value={`faq-${index}`} id={item.id} className="border rounded-lg px-4 bg-muted/10 border-transparent hover:border-primary/20 transition-colors">
-                                            <AccordionTrigger className="hover:no-underline font-semibold text-sm text-left">{item.question}</AccordionTrigger>
+                                        <AccordionItem key={index} value={`faq-${index}`} id={item.id} className="border rounded-lg px-4 bg-muted/10 border-transparent hover:border-primary/20 transition-all duration-300">
+                                            <AccordionTrigger className="hover:no-underline hover:underline decoration-primary/50 underline-offset-4 font-semibold text-sm text-left">{item.question}</AccordionTrigger>
                                             <AccordionContent className="prose prose-sm dark:prose-invert max-w-none pb-4">
                                                 {item.answer}
                                                 <div className="flex flex-wrap gap-1 mt-4">
