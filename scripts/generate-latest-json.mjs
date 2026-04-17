@@ -22,46 +22,43 @@ async function main() {
     };
 
     // We assume the artifacts are in src-tauri/target/release/bundle/
-    // This script should be run AFTER the tauri build.
-    // However, on GitHub Actions, the paths might be different or artifacts might be uploaded already.
-    
-    // A better approach for CI is to fetch the release assets after they are uploaded 
-    // or use the local files if they exist.
-    
     const bundleDir = 'src-tauri/target/release/bundle';
+    console.log(`Searching for artifacts in ${path.resolve(bundleDir)}...`);
     
-    // Windows
-    const msiPath = findFile(bundleDir, /\.msi$/);
-    const msiSigPath = findFile(bundleDir, /\.msi\.sig$/);
-    const nsisZipPath = findFile(bundleDir, /\.nsis\.zip$/);
-    const nsisZipSigPath = findFile(bundleDir, /\.nsis\.zip\.sig$/);
-    
-    if (nsisZipPath && nsisZipSigPath) {
-      console.log('Found NSIS Zip artifact:', nsisZipPath);
-      const fileName = path.basename(nsisZipPath);
-      const signature = fs.readFileSync(nsisZipSigPath, 'utf8').trim();
-      latestJson.platforms['windows-x86_64'] = {
-        signature,
-        url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
-      };
-    } else if (msiPath && msiSigPath) {
-      console.log('Found MSI artifact:', msiPath);
-      const fileName = path.basename(msiPath);
-      const signature = fs.readFileSync(msiSigPath, 'utf8').trim();
-      latestJson.platforms['windows-x86_64'] = {
-        signature,
-        url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
-      };
-    } else {
-      console.warn('No Windows artifacts found in', bundleDir);
+    // Windows Patterns (Tauri 2 often uses .nsis.zip or just .zip for updates)
+    const windowsPatterns = [
+        { bin: /\.nsis\.zip$/, sig: /\.nsis\.zip\.sig$/ },
+        { bin: /\.zip$/, sig: /\.zip\.sig$/, exclude: /\.app\.tar\.gz$/ }
+    ];
+
+    let foundWindows = false;
+    for (const pattern of windowsPatterns) {
+        const binPath = findFile(bundleDir, pattern.bin, pattern.exclude);
+        const sigPath = findFile(bundleDir, pattern.sig);
+        
+        if (binPath && sigPath) {
+            console.log(`Found Windows Update artifact: ${binPath}`);
+            const fileName = path.basename(binPath);
+            const signature = fs.readFileSync(sigPath, 'utf8').trim();
+            latestJson.platforms['windows-x86_64'] = {
+                signature,
+                url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
+            };
+            foundWindows = true;
+            break;
+        }
+    }
+
+    if (!foundWindows) {
+        console.warn('CRITICAL: No Windows update artifacts (.zip + .sig) found!');
     }
 
     // MacOS (Universal/Intel/ARM)
-    const dmgPath = findFile(bundleDir, /\.dmg$/);
     const appPath = findFile(bundleDir, /\.app\.tar\.gz$/);
     const appSigPath = findFile(bundleDir, /\.app\.tar\.gz\.sig$/);
 
     if (appPath && appSigPath) {
+        console.log('Found MacOS Update artifact:', appPath);
         const fileName = path.basename(appPath);
         const signature = fs.readFileSync(appSigPath, 'utf8').trim();
         latestJson.platforms['darwin-x86_64'] = {
@@ -75,7 +72,7 @@ async function main() {
     }
 
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(latestJson, null, 2));
-    console.log(`Successfully generated ${OUTPUT_FILE}`);
+    console.log(`Successfully generated ${OUTPUT_FILE} with platforms:`, Object.keys(latestJson.platforms));
     
     // Optional: Upload/Merge if GH_TOKEN is available
     if (process.env.GITHUB_TOKEN) {
@@ -100,12 +97,12 @@ async function main() {
   }
 }
 
-function findFile(dir, pattern) {
+function findFile(dir, pattern, exclude) {
   if (!fs.existsSync(dir)) return null;
   const files = fs.readdirSync(dir, { recursive: true });
   for (const file of files) {
     const fullPath = path.join(dir, file);
-    if (pattern.test(file) && fs.statSync(fullPath).isFile()) {
+    if (pattern.test(file) && (!exclude || !exclude.test(file)) && fs.statSync(fullPath).isFile()) {
       return fullPath;
     }
   }
