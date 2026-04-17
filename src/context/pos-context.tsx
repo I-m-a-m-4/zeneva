@@ -481,6 +481,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const calculateLoyaltyPoints = useCallback(async (amount: number) => {
+    if (!business?.settings?.loyaltyProgramEnabled) return 0;
+    
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     if (isTauri) {
       try {
@@ -492,7 +494,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     const pointsPerUnit = business?.settings?.pointsPerUnit || 0;
     return Math.floor(amount * pointsPerUnit);
-  }, [business?.settings?.pointsPerUnit]);
+  }, [business]);
 
   const isLoading = isUserLoading || 
     (!!user && isProfileLoading) || 
@@ -523,11 +525,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } as BusinessStats;
   }, [stats, extraStats]);
 
-  const calculateLoyaltyPoints = useCallback(async (amount: number) => {
-    if (!business?.settings?.loyaltyProgramEnabled) return 0;
-    const pointsPerCash = business.settings.pointsPerUnit || 0;
-    return Math.floor(amount * pointsPerCash);
-  }, [business]);
 
   const processQueue = useCallback(async () => {
     if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !currentUserProfile) {
