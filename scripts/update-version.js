@@ -26,3 +26,11 @@ if (fs.existsSync(tauriConfPath)) {
   fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
   console.log(`Updated tauri.conf.json to ${newVersion}`);
 }
+// Update src-tauri/Cargo.toml
+const cargoPath = path.join(__dirname, '..', 'src-tauri', 'Cargo.toml');
+if (fs.existsSync(cargoPath)) {
+  let cargo = fs.readFileSync(cargoPath, 'utf8');
+  cargo = cargo.replace(/^version = ".*"/m, `version = "${newVersion}"`);
+  fs.writeFileSync(cargoPath, cargo);
+  console.log(`Updated Cargo.toml to ${newVersion}`);
+}

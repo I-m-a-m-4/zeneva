@@ -98,17 +98,25 @@ const nextConfig: NextConfig = {
   },
   assetPrefix: isTauri ? '' : undefined,
   webpack: (config, { dev, isServer }) => {
-    if (isTauri) {
-      // Force mock server-only/Node.js-heavy libraries that crash the static export
+    // Broad protection: Mock Genkit and Node.js-heavy libraries for ALL client-side bundles
+    // This prevents "ReferenceError: process is not defined" or "Can't resolve 'fs'" in the browser on Vercel
+    if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
         'genkit': false,
         '@genkit-ai/core': false,
+        '@genkit-ai/next': false,
+        '@genkit-ai/google-genai': false,
+        '@genkit-ai/dotprompt': false,
         '@opentelemetry/sdk-node': false,
         '@opentelemetry/api': false,
         'google-auth-library': false,
         '@google-cloud/logging': false,
         '@google-cloud/storage': false,
+        'googleapis': false,
+        'nodemailer': false,
+        'firebase-admin': false,
+        'resend': false,
       };
 
       config.resolve.fallback = {
@@ -126,9 +134,31 @@ const nextConfig: NextConfig = {
         zlib: false,
       };
     }
+
+    // Specialized Tauri mocks and output overrides
+    if (isTauri) {
+      // Any additional Tauri-specific overrides can go here
+    }
     
+    // Protection & Hardening: Enable Obfuscator for production client chunks
     if (!dev && !isServer) {
-      // Obfuscator is currently disabled for stability in v1.0.0
+        try {
+            const WebpackObfuscator = require('webpack-obfuscator');
+            config.plugins.push(
+                new WebpackObfuscator({
+                    rotateStringArray: true,
+                    stringArray: true,
+                    stringArrayThreshold: 0.75,
+                    unicodeEscapeSequence: false, // Set to false for better performance/stability
+                }, [
+                    'static/chunks/app/_not-found*.js',
+                    'static/chunks/main-*.js',
+                    'static/chunks/webpack-*.js'
+                ])
+            );
+        } catch (e) {
+            console.warn("[Build] WebpackObfuscator could not be initialized, skipping obfuscation.");
+        }
     }
     return config;
   },
