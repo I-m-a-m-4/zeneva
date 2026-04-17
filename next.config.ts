@@ -98,39 +98,37 @@ const nextConfig: NextConfig = {
   },
   assetPrefix: isTauri ? '' : undefined,
   webpack: (config, { dev, isServer }) => {
+    if (isTauri) {
+      // Force mock server-only/Node.js-heavy libraries that crash the static export
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'genkit': false,
+        '@genkit-ai/core': false,
+        '@opentelemetry/sdk-node': false,
+        '@opentelemetry/api': false,
+        'google-auth-library': false,
+        '@google-cloud/logging': false,
+        '@google-cloud/storage': false,
+      };
+
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        os: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        child_process: false,
+        http: false,
+        https: false,
+        stream: false,
+        zlib: false,
+      };
+    }
+    
     if (!dev && !isServer) {
-      /* 
-      const WebpackObfuscator = require('webpack-obfuscator');
-      config.plugins.push(
-        new WebpackObfuscator({
-          rotateStringArray: true,
-          stringArray: true,
-          stringArrayThreshold: 0.6, 
-          stringArrayEncoding: [], // Disabled encoding to fix URI malformed error
-          stringArrayWrappersCount: 1,
-          stringArrayWrappersType: 'function',
-          compact: true,
-          identifierNamesGenerator: 'hexadecimal',
-          log: false,
-          renameGlobals: false,
-          selfDefending: false, 
-          debugProtection: false, 
-          debugProtectionInterval: 0,
-          disableConsoleOutput: true,
-        }, [
-          'static/_next/static/chunks/main-*.js',
-          'static/_next/static/chunks/webpack-*.js',
-          'static/_next/static/chunks/framework-*.js',
-          'static/_next/static/chunks/main.js',
-          'static/_next/static/chunks/webpack.js',
-          'static/_next/static/chunks/framework.js',
-          'static/_next/static/chunks/pages/_app.js',
-          'static/_next/static/chunks/pages/_error.js',
-          'static/_next/static/chunks/[0-9]*.js',
-          'static/_next/static/chunks/*-*.js' 
-        ])
-      );
-      */
+      // Obfuscator is currently disabled for stability in v1.0.0
     }
     return config;
   },
