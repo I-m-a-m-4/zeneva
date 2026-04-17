@@ -15,7 +15,12 @@ let cachedFlow: any = null;
 async function getFlow() {
   if (cachedFlow) return cachedFlow;
 
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-export') {
+    return async () => ({ summary: 'Build Mode', productSuggestions: [], engagementTactics: [] });
+  }
+
   const { ai } = await import('@/ai/genkit');
+
   const { CustomerInsightsInputSchema, CustomerInsightsOutputSchema } = await import('./customer-insights-types');
 
   const prompt = ai.definePrompt({

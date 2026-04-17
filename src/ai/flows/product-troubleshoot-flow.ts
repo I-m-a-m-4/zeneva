@@ -33,7 +33,13 @@ let cachedFlow: any = null;
 async function getFlow() {
   if (cachedFlow) return cachedFlow;
 
+  // Build-time circuit breaker
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-export') {
+    return async () => ({ suggestions: [] });
+  }
+
   // DYNAMIC IMPORTS ONLY (Build Safety)
+
   const { ai } = await import('@/ai/genkit');
   const { z } = await import('genkit');
 

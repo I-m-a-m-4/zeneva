@@ -15,7 +15,21 @@ let cachedFlow: any = null;
 async function getFlow() {
   if (cachedFlow) return cachedFlow;
 
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-export') {
+      return async () => ({
+          businessHealth: { score: 100, status: 'Healthy', summary: 'Build Mode' },
+          stockRecommendations: [],
+          smartMerchandising: [],
+          slowInventoryRecovery: [],
+          pricingStrategy: [],
+          customerSegments: [],
+          irresistibleOffers: [],
+          seoStrategy: { blogFocus: '', headlines: [] }
+      });
+  }
+
   const { ai } = await import('@/ai/genkit');
+
   const { BusinessAnalysisInputSchema, BusinessAnalysisOutputSchema } = await import('./business-analysis-types');
 
   const prompt = ai.definePrompt({

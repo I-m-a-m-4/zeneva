@@ -2,9 +2,15 @@
 let instance: any = null;
 
 export const getAI = async () => {
+  // Hard guard against build-time execution
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-export') {
+    return {} as any;
+  }
+
   if (!instance) {
     const { genkit } = await import('genkit');
     const { googleAI } = await import('@genkit-ai/google-genai');
+
     
     instance = genkit({
       plugins: [googleAI()],
