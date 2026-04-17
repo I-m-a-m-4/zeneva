@@ -539,7 +539,7 @@ export default function AuthenticatedLayout({
               <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
                 <BusinessHealthIndicator />
-                <Badge variant="outline" className="text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>
+                {typeof window !== 'undefined' && <Badge variant="outline" className="text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>}
                 <div className="flex-1" />
                 <div className="flex items-center gap-1 md:gap-2 ml-auto">
                   <QueueStatus />
