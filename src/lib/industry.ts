@@ -83,6 +83,22 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
 };
 
 export function getIndustryConfig(industry?: string): IndustryConfig {
-    const key = (industry?.toLowerCase() || 'default') as IndustryType;
-    return INDUSTRY_CONFIGS[key] || INDUSTRY_CONFIGS.default;
+    if (!industry) return INDUSTRY_CONFIGS.default;
+    
+    const normalized = industry.toLowerCase();
+    
+    if (normalized.includes('fashion') || normalized.includes('apparel') || normalized.includes('boutique')) {
+        return INDUSTRY_CONFIGS.boutique;
+    }
+    if (normalized.includes('health') || normalized.includes('beauty') || normalized.includes('pharmacy') || normalized.includes('medical')) {
+        return INDUSTRY_CONFIGS.pharmacy;
+    }
+    if (normalized.includes('food') || normalized.includes('beverage') || normalized.includes('restaurant') || normalized.includes('cafe')) {
+        return INDUSTRY_CONFIGS.restaurant;
+    }
+    if (normalized.includes('grocery') || normalized.includes('supermarket') || normalized.includes('bakery')) {
+        return INDUSTRY_CONFIGS.grocery;
+    }
+    
+    return INDUSTRY_CONFIGS.default;
 }
