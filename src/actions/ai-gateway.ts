@@ -13,34 +13,33 @@ async function stealthImport(path: string) {
     const module = await import(/* webpackIgnore: true */ path);
     return module;
   } catch (e) {
-    // Fallback if webpackIgnore isn't enough - use a more radical dynamic approach
-    // This looks like a regular import to TS but is hidden from the Next.js tracer via variable indirection
+    // indirection to hide from tracer
     const flowModule = await import(`${path}`);
     return flowModule;
   }
 }
 
 export async function runBusinessAnalysis(input: any) {
-  const { businessAnalysis } = await stealthImport('@/ai/flows/business-analysis-flow');
+  const { businessAnalysis } = await stealthImport('@/_ai/flows/business-analysis-flow');
   return businessAnalysis(input);
 }
 
 export async function runCustomerInsights(input: any) {
-  const { getCustomerInsights } = await stealthImport('@/ai/flows/customer-insights-flow');
+  const { getCustomerInsights } = await stealthImport('@/_ai/flows/customer-insights-flow');
   return getCustomerInsights(input);
 }
 
 export async function runProductTroubleshoot(input: any) {
-  const { productTroubleshoot } = await stealthImport('@/ai/flows/product-troubleshoot-flow');
+  const { productTroubleshoot } = await stealthImport('@/_ai/flows/product-troubleshoot-flow');
   return productTroubleshoot(input);
 }
 
 export async function runSupportChat(input: any) {
-  const { zenevaSupportChat } = await stealthImport('@/ai/flows/support-chat-flow');
+  const { zenevaSupportChat } = await stealthImport('@/_ai/flows/support-chat-flow');
   return zenevaSupportChat(input);
 }
 
 export async function runVisualCount(input: any) {
-  const { visualCount } = await stealthImport('@/ai/flows/visual-count-flow');
+  const { visualCount } = await stealthImport('@/_ai/flows/visual-count-flow');
   return visualCount(input);
 }
