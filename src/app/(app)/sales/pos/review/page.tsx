@@ -34,6 +34,8 @@ function ReviewPageContent() {
     const [backdate, setBackdate] = React.useState('');
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
+    const hasPrintedRef = React.useRef(false);
+    const checkoutStartedRef = React.useRef(false);
 
     // Hydration fix
     const [mounted, setMounted] = React.useState(false);
@@ -65,11 +67,15 @@ function ReviewPageContent() {
     }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdate]);
 
     const handleCompleteSale = React.useCallback(() => {
+        if (checkoutStartedRef.current) return;
+        
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
             setIsCompleting(false);
             return;
         }
+
+        checkoutStartedRef.current = true;
 
         // 1. Validations (Backorder & Operating Hours)
         for (const cartItem of cart) {
@@ -208,13 +214,14 @@ function ReviewPageContent() {
         }
 
         // 5. Cleanup & Navigation
-        if (autoPrint) {
+        if (autoPrint && !hasPrintedRef.current) {
+            hasPrintedRef.current = true;
             setTimeout(() => {
                 window.print();
                 router.push('/sales/pos/select-products');
                 resetPOS();
             }, 500);
-        } else {
+        } else if (!autoPrint) {
             router.push('/sales/pos/select-products');
             resetPOS();
         }
