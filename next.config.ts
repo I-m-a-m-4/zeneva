@@ -99,6 +99,7 @@ const nextConfig: NextConfig = {
   assetPrefix: isTauri ? '' : undefined,
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
+      /* 
       const WebpackObfuscator = require('webpack-obfuscator');
       config.plugins.push(
         new WebpackObfuscator({
@@ -113,11 +114,6 @@ const nextConfig: NextConfig = {
           log: false,
           renameGlobals: false,
           selfDefending: false, 
-          splitStrings: false, 
-          unicodeEscapeSequence: false, 
-          controlFlowFlattening: true, 
-          controlFlowFlatteningThreshold: 0.5,
-          deadCodeInjection: false, 
           debugProtection: false, 
           debugProtectionInterval: 0,
           disableConsoleOutput: true,
@@ -134,6 +130,7 @@ const nextConfig: NextConfig = {
           'static/_next/static/chunks/*-*.js' 
         ])
       );
+      */
     }
     return config;
   },
