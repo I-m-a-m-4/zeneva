@@ -4,14 +4,6 @@ import type { NextConfig } from 'next';
 const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['lucide-react'],
-  serverExternalPackages: [
-    'genkit', 
-    '@genkit-ai/core', 
-    '@genkit-ai/google-genai', 
-    '@opentelemetry/sdk-node', 
-    '@opentelemetry/api'
-  ],
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
   typescript: {
@@ -138,10 +130,6 @@ const nextConfig: NextConfig = {
     if (!dev && !isServer) {
       // Obfuscator is currently disabled for stability in v1.0.0
     }
-
-    // Force a clean build by disabling the webpack cache
-    config.cache = false;
-
     return config;
   },
 };

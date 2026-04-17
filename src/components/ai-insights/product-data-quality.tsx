@@ -1,6 +1,7 @@
 
 "use client";
 
+import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
 import type { Product, AISuggestions } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
