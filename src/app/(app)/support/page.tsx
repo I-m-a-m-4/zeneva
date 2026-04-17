@@ -369,7 +369,8 @@ function ZenAIChatBot() {
 
         try {
             const response = await zenevaSupportChat({ query: input });
-            const aiMessage: Message = { sender: 'ai', text: response.answer };
+            const aiText = response.answer || (response as any).response || "I'm sorry, I couldn't process that request.";
+            const aiMessage: Message = { sender: 'ai', text: aiText };
             setMessages(prev => [...prev, aiMessage]);
         } catch (error) {
             console.error("AI chat error:", error);
@@ -587,10 +588,10 @@ export default function SupportPage() {
             <PageTitle title="Help & Support" subtitle="Find answers to your questions and get assistance." />
             
             <Accordion type="multiple" defaultValue={['faq']} className="w-full space-y-6">
-                <Card className="border-none shadow-premium transition-shadow group overflow-hidden">
-                    <AccordionItem value="ai-chat" className="border-b-0">
+                <AccordionItem value="ai-chat" className="border-none">
+                    <Card className="shadow-premium transition-shadow group overflow-hidden">
                         <AccordionTrigger className="p-6 text-lg hover:no-underline group-data-[state=open]:bg-primary/5">
-                             <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                     <Bot className="h-6 w-6" />
                                 </div>
@@ -603,13 +604,13 @@ export default function SupportPage() {
                         <AccordionContent className="p-6 pt-0">
                             <ZenAIChatBot />
                         </AccordionContent>
-                    </AccordionItem>
-                </Card>
+                    </Card>
+                </AccordionItem>
                 
-                <Card className="border-none shadow-premium transition-shadow group overflow-hidden">
-                     <AccordionItem value="human-support" className="border-b-0">
+                <AccordionItem value="human-support" className="border-none">
+                    <Card className="shadow-premium transition-shadow group overflow-hidden">
                         <AccordionTrigger className="p-6 text-lg hover:no-underline group-data-[state=open]:bg-primary/5">
-                             <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                                     <MessageSquare className="h-6 w-6" />
                                 </div>
@@ -628,11 +629,11 @@ export default function SupportPage() {
                                 <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
                             )}
                         </AccordionContent>
-                    </AccordionItem>
-                </Card>
+                    </Card>
+                </AccordionItem>
 
-                <Card className="border-none shadow-premium">
-                    <AccordionItem value="faq" className="border-b-0">
+                <AccordionItem value="faq" className="border-none">
+                    <Card className="shadow-premium transition-shadow group overflow-hidden">
                         <AccordionTrigger className="p-6 text-lg hover:no-underline">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
@@ -655,7 +656,7 @@ export default function SupportPage() {
                              <Accordion type="single" collapsible className="w-full space-y-2">
                                 {filteredFaqs.length > 0 ? (
                                     filteredFaqs.map((item, index) => (
-                                        <AccordionItem key={index} value={`faq-${index}`} id={item.id} className="border rounded-lg px-4 bg-muted/10 border-transparent transition-all duration-300">
+                                        <AccordionItem key={index} value={`faq-${index}`} className="border rounded-lg px-4 bg-muted/10 border-transparent transition-all duration-300">
                                             <AccordionTrigger className="hover:no-underline hover:underline decoration-black underline-offset-2 font-semibold text-sm text-left">{item.question}</AccordionTrigger>
                                             <AccordionContent className="prose prose-sm dark:prose-invert max-w-none pb-4">
                                                 {item.answer}
@@ -674,8 +675,8 @@ export default function SupportPage() {
                                 )}
                             </Accordion>
                         </AccordionContent>
-                    </AccordionItem>
-                </Card>
+                    </Card>
+                </AccordionItem>
             </Accordion>
         </div>
     );
