@@ -10,7 +10,8 @@ import { useRef, Suspense } from "react";
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Receipt } from "@/types";
-import { useBusiness, CURRENCY_SYMBOLS } from "@/context/pos-context";
+import { useBusiness } from "@/context/pos-context";
+import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import Link from 'next/link';
 
 function ReceiptContent() {
@@ -26,11 +27,16 @@ function ReceiptContent() {
   const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
   const router = useRouter();
-  const receiptContentRef = useRef<HTMLDivElement>(null);
+    const receiptContentRef = useRef<HTMLDivElement>(null);
+    const [mounted, setMounted] = React.useState(false);
 
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
-  }
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted || isLoading) {
+        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
+    }
 
   if (!receiptId || !receipt) {
     notFound();

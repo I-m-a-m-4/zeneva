@@ -29,14 +29,16 @@ import {
   removeActionFromOfflineQueue
 } from '@/lib/sqlite-sync';
 
-// Define localStorage keys
-const POS_CART_KEY = 'zeneva-pos-cart';
-const POS_CUSTOMER_KEY = 'zeneva-pos-customer';
-const POS_TAX_RATE_KEY = 'zeneva-pos-tax-rate';
-const POS_DISCOUNT_KEY = 'zeneva-pos-discount';
-const POS_PAYMENT_METHOD_KEY = 'zeneva-pos-payment-method';
-const POS_AUTO_PRINT_KEY = 'zeneva-pos-auto-print';
-const QUEUED_ACTIONS_KEY = 'zeneva-queued-actions';
+import { 
+  POS_CART_KEY, 
+  POS_CUSTOMER_KEY, 
+  POS_TAX_RATE_KEY, 
+  POS_DISCOUNT_KEY, 
+  POS_PAYMENT_METHOD_KEY, 
+  POS_AUTO_PRINT_KEY, 
+  QUEUED_ACTIONS_KEY,
+  CURRENCY_SYMBOLS
+} from '@/lib/constants';
 
 interface POSContextType {
   // Business Data
@@ -1960,11 +1962,8 @@ export const useBusiness = () => {
     throw new Error('useBusiness must be used within a POSProvider');
   }
   return context.business;
-}
-
-export const CURRENCY_SYMBOLS: Record<string, string> = {
-  'NGN': '₦',
-  'USD': '$',
 };
+
+
 
 
