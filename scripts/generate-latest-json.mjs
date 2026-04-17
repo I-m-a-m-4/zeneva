@@ -33,14 +33,27 @@ async function main() {
     // Windows
     const msiPath = findFile(bundleDir, /\.msi$/);
     const msiSigPath = findFile(bundleDir, /\.msi\.sig$/);
+    const nsisZipPath = findFile(bundleDir, /\.nsis\.zip$/);
+    const nsisZipSigPath = findFile(bundleDir, /\.nsis\.zip\.sig$/);
     
-    if (msiPath && msiSigPath) {
+    if (nsisZipPath && nsisZipSigPath) {
+      console.log('Found NSIS Zip artifact:', nsisZipPath);
+      const fileName = path.basename(nsisZipPath);
+      const signature = fs.readFileSync(nsisZipSigPath, 'utf8').trim();
+      latestJson.platforms['windows-x86_64'] = {
+        signature,
+        url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
+      };
+    } else if (msiPath && msiSigPath) {
+      console.log('Found MSI artifact:', msiPath);
       const fileName = path.basename(msiPath);
       const signature = fs.readFileSync(msiSigPath, 'utf8').trim();
       latestJson.platforms['windows-x86_64'] = {
         signature,
         url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
       };
+    } else {
+      console.warn('No Windows artifacts found in', bundleDir);
     }
 
     // MacOS (Universal/Intel/ARM)

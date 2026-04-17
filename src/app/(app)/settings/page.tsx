@@ -392,7 +392,7 @@ function SettingsPageContent() {
             toast({
                 variant: 'destructive',
                 title: "Update Check Failed",
-                description: "The update server is currently unreachable or no metadata file was found. This usually happens if no new version has been published to the update channel yet.",
+                description: error instanceof Error ? error.message : "The update server is currently unreachable or no metadata file was found. This usually happens if no new version has been published to the update channel yet.",
             });
         } finally {
             setIsCheckingUpdates(false);
