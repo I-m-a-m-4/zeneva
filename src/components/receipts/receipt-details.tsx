@@ -18,7 +18,7 @@ const Watermark = ({ businessName }: { businessName: string }) => (
     </div>
 );
 
-const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
+const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
     ({ receipt, business, currencySymbol = '₦', isInvoice = false }, ref) => {
         const businessName = business?.name || 'Your Business';
         const businessAddress = business?.address || '';
@@ -207,7 +207,7 @@ const ReceiptDetails = React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
             </div>
         );
     }
-);
+));
 ReceiptDetails.displayName = "ReceiptDetails";
 
 export default ReceiptDetails;

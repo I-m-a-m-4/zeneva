@@ -432,7 +432,7 @@ export default function AuthenticatedLayout({
           <div
             className="relative flex h-full w-full overflow-hidden"
           >
-            <Confetti trigger={isConfettiActive} onComplete={() => setIsConfettiActive(false)} />
+            <Confetti trigger={isConfettiActive} onComplete={React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive])} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
               <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
                 <Link href="/dashboard" className="flex items-center justify-center h-12 w-full">

@@ -230,8 +230,9 @@ function ReviewPageContent() {
             description: navigator.onLine ? `Receipt ${receiptData.receiptNumber} generated.` : "Success! This sale is saved locally and will sync to the cloud automatically.",
         });
         
-        // Ensure we reset the state to avoid button being stuck if navigation is slow
-        setIsCompleting(false);
+        // Note: We don't set isCompleting(false) here if redirect is happening
+        // to prevent the auto-submit useEffect from re-firing.
+        // It will be reset when the component unmounts or POS is reset.
 
     }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
 
