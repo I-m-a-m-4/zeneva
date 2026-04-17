@@ -381,12 +381,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const sales = queuedActions.filter(a => a.type === 'complete-sale');
     if (sales.length > 0) {
       sales.forEach(action => {
-        action.payload.items.forEach((item: any) => {
-          const idx = merged.findIndex(p => p.id === item.productId);
-          if (idx !== -1) {
-            merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity };
-          }
-        });
+        const items = action.payload.receiptData?.items || action.payload.items;
+        if (Array.isArray(items)) {
+          items.forEach((item: any) => {
+            const idx = merged.findIndex(p => p.id === item.productId);
+            if (idx !== -1) {
+              merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity };
+            }
+          });
+        }
       });
     }
 
