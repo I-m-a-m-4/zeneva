@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -143,6 +143,11 @@ export default function AuthenticatedLayout({
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
   const [isNotificationsExpanded, setIsNotificationsExpanded] = React.useState(false);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Helper: resolve a navigation link for each notification
   const getNotificationLink = React.useCallback((notif: any): string => {
@@ -539,7 +544,7 @@ export default function AuthenticatedLayout({
               <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
                 <BusinessHealthIndicator />
-                {typeof window !== 'undefined' && <Badge variant="outline" className="text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>}
+                {isMounted && <Badge variant="outline" className="text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>}
                 <div className="flex-1" />
                 <div className="flex items-center gap-1 md:gap-2 ml-auto">
                   <QueueStatus />

@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { 
     ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil, 
-    Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus
+    Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus, ChevronRight
 } from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { Separator } from '@/components/ui/separator';
