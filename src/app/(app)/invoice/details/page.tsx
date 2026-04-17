@@ -6,8 +6,7 @@ import { Download, Printer, Share2, Loader2, PlusCircle, CheckCircle, ArrowLeft 
 import { useSearchParams, notFound, useRouter } from "next/navigation";
 import * as React from "react";
 import { useRef, Suspense } from "react";
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import type { Receipt } from "@/types";
@@ -50,6 +49,11 @@ function InvoiceContent() {
     const handleDownload = async () => {
         if (receiptContentRef.current) {
             toast({ title: "Generating PDF...", description: "Please wait while we prepare your document." });
+            
+            // Dynamic imports to prevent SSR/Build errors
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
             const canvas = await html2canvas(receiptContentRef.current, {
                 scale: 2,
                 useCORS: true,

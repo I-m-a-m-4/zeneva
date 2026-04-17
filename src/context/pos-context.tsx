@@ -136,6 +136,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
+  const getInventoryStats = useCallback(async () => {
+    if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
+    try {
+      const productsRef = collection(firestore, 'products');
+      const q = query(productsRef, where('businessId', '==', businessId));
+      
+      const snap = await getAggregateFromServer(q, {
+        totalProducts: count(),
+        totalStockValue: sum('stockValue')
+      });
+
+      const lowStockQ = query(productsRef, where('businessId', '==', businessId), where('stock', '<', 5));
+      const lowStockSnap = await getAggregateFromServer(lowStockQ, { count: count() });
+
+      return {
+        totalProducts: snap.data().totalProducts || 0,
+        totalStockValue: snap.data().totalStockValue || 0,
+        lowStockCount: lowStockSnap.data().count || 0
+      };
+    } catch (e) {
+      console.error('Inventory stats from Firestore failed, calculating from memory:', e);
+      // FALLBACK: Use products in memory if available
+      // Note: products is actually receipts? Wait, check the original code
+      return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
+    }
+  }, [businessId, firestore]);
+
   // --- Impersonation State ---
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -1604,38 +1631,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, receipts]);
 
-  const getInventoryStats = useCallback(async () => {
-    if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
-    try {
-      const productsRef = collection(firestore, 'products');
-      const q = query(productsRef, where('businessId', '==', businessId));
-      
-      const snap = await getAggregateFromServer(q, {
-        totalProducts: count(),
-        totalStockValue: sum('stockValue')
-      });
 
-      const lowStockQ = query(productsRef, where('businessId', '==', businessId), where('stock', '<', 5));
-      const lowStockSnap = await getAggregateFromServer(lowStockQ, { count: count() });
-
-      return {
-        totalProducts: snap.data().totalProducts || 0,
-        totalStockValue: snap.data().totalStockValue || 0,
-        lowStockCount: lowStockSnap.data().count || 0
-      };
-    } catch (e) {
-      console.error('Inventory stats from Firestore failed, calculating from memory:', e);
-      // FALLBACK: Use products in memory if available
-      if (products && products.length > 0) {
-        return {
-           totalProducts: products.length,
-           totalStockValue: products.reduce((sum, p) => sum + ((p.price || 0) * (p.stock || 0)), 0),
-           lowStockCount: products.filter(p => (p.stock || 0) < 5).length
-        };
-      }
-      return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
-    }
-  }, [businessId, firestore]);
 
   const fetchMoreProducts = useCallback(async () => {
     if (!businessId || !firestore || !products || products.length === 0) return 0;

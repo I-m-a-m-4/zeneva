@@ -6,8 +6,7 @@ import { useSearchParams, notFound, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
 import * as React from "react";
 import { useRef, Suspense } from "react";
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Receipt } from "@/types";
@@ -52,6 +51,11 @@ function ReceiptContent() {
   const handleDownload = async () => {
     if (receiptContentRef.current) {
       toast({ title: "Generating PDF...", description: "Please wait while we prepare your document." });
+      
+      // Dynamic imports to prevent SSR/Build errors
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
       const canvas = await html2canvas(receiptContentRef.current, {
         scale: 2,
         useCORS: true,
