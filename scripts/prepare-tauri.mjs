@@ -44,6 +44,7 @@ foldersToClear.forEach(p => {
 
 // Specific stubs for core app dependencies to satisfy imports
 const stubs = [
+    { path: 'src/ai/genkit.ts', content: 'export const ai = {}; export const getAI = () => ({});' },
     { path: 'src/ai/flows/customer-insights-flow.ts', content: 'export const getCustomerInsights = async () => ({ summary: "AI Insights disabled in desktop build", productSuggestions: [], engagementTactics: [] });' },
     { path: 'src/ai/flows/business-analysis-flow.ts', content: 'export const businessAnalysis = async () => ({ summary: "Tactical analysis is optimized for the cloud node.", metrics: {}, recommendations: [] });' },
     { path: 'src/ai/flows/product-troubleshoot-flow.ts', content: 'export const productTroubleshoot = async () => ({ solution: "Please connect to the command center via mobile or web for deeper diagnostics.", steps: [], confidence: 0 });' },
