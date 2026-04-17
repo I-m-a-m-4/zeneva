@@ -1,52 +1,64 @@
+
 'use server';
 
 /**
  * @fileOverview An AI agent for troubleshooting product inventory data.
- *
- * - productTroubleshoot - A function that analyzes inventory data and provides suggestions for improvement.
- * - ProductTroubleshootInput - The input type for the productTroubleshoot function.
- * - ProductTroubleshootOutput - The return type for the productTroubleshoot function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+// NO TOP-LEVEL GENKIT IMPORTS ALLOWED (To fix build-time ReferenceErrors)
 
-const ProductSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  price: z.number().optional(),
-  category: z.string().optional(),
-  sku: z.string().optional(),
-});
+export type Product = {
+  id: string;
+  name: string;
+  description?: string;
+  price?: number;
+  category?: string;
+  sku?: string;
+};
 
-export type Product = z.infer<typeof ProductSchema>;
+export type ProductTroubleshootInput = {
+  products: Product[];
+};
 
-const ProductTroubleshootInputSchema = z.object({
-  products: z.array(ProductSchema).describe('The list of products to troubleshoot.'),
-});
-
-export type ProductTroubleshootInput = z.infer<typeof ProductTroubleshootInputSchema>;
-
-// NEW: Define a schema for a single suggestion
-const SuggestionSchema = z.object({
-  title: z.string().describe('A short, actionable title for the suggestion.'),
-  description: z.string().describe('A brief explanation of the issue and how to fix it (2-3 sentences max).'),
-  severity: z.enum(['High', 'Medium', 'Low']).describe('The priority of the suggestion.'),
-});
-
-// NEW: Update the output schema to be an array of structured suggestions
-const ProductTroubleshootOutputSchema = z.object({
-  suggestions: z.array(SuggestionSchema).describe('A list of the top 3-5 most critical suggestions for improving product data.'),
-});
-
-
-export type ProductTroubleshootOutput = z.infer<typeof ProductTroubleshootOutputSchema>;
+export type ProductTroubleshootOutput = {
+  suggestions: {
+    title: string;
+    description: string;
+    severity: 'High' | 'Medium' | 'Low';
+  }[];
+};
 
 let cachedFlow: any = null;
 
-function getFlow() {
+async function getFlow() {
   if (cachedFlow) return cachedFlow;
+
+  // DYNAMIC IMPORTS ONLY (Build Safety)
+  const { ai } = await import('@/ai/genkit');
+  const { z } = await import('genkit');
+
+  const ProductSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    price: z.number().optional(),
+    category: z.string().optional(),
+    sku: z.string().optional(),
+  });
+
+  const ProductTroubleshootInputSchema = z.object({
+    products: z.array(ProductSchema).describe('The list of products to troubleshoot.'),
+  });
+
+  const SuggestionSchema = z.object({
+    title: z.string().describe('A short, actionable title for the suggestion.'),
+    description: z.string().describe('A brief explanation of the issue and how to fix it (2-3 sentences max).'),
+    severity: z.enum(['High', 'Medium', 'Low']).describe('The priority of the suggestion.'),
+  });
+
+  const ProductTroubleshootOutputSchema = z.object({
+    suggestions: z.array(SuggestionSchema).describe('A list of the top 3-5 most critical suggestions for improving product data.'),
+  });
 
   const prompt = ai.definePrompt({
     name: 'productTroubleshootPrompt',
@@ -74,7 +86,7 @@ Product Data:
       inputSchema: ProductTroubleshootInputSchema,
       outputSchema: ProductTroubleshootOutputSchema,
     },
-    async input => {
+    async (input: any) => {
       const {output} = await prompt(input);
       return output!;
     }
@@ -84,7 +96,6 @@ Product Data:
 }
 
 export async function productTroubleshoot(input: ProductTroubleshootInput): Promise<ProductTroubleshootOutput> {
-  const flow = getFlow();
+  const flow = await getFlow();
   return flow(input);
 }
-

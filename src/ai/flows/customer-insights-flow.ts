@@ -3,23 +3,20 @@
 
 /**
  * @fileOverview An AI agent for generating customer relationship insights.
- *
- * - getCustomerInsights - A function that analyzes customer data and provides suggestions.
  */
 
-import { ai } from '@/ai/genkit';
 import { 
-    CustomerInsightsInputSchema, 
-    CustomerInsightsOutputSchema, 
     type CustomerInsightsInput, 
     type CustomerInsightsOutput 
 } from './customer-insights-types';
 
-
 let cachedFlow: any = null;
 
-function getFlow() {
+async function getFlow() {
   if (cachedFlow) return cachedFlow;
+
+  const { ai } = await import('@/ai/genkit');
+  const { CustomerInsightsInputSchema, CustomerInsightsOutputSchema } = await import('./customer-insights-types');
 
   const prompt = ai.definePrompt({
     name: 'customerInsightsPrompt',
@@ -51,7 +48,7 @@ Your response MUST be structured according to the output schema. Keep all text c
       inputSchema: CustomerInsightsInputSchema,
       outputSchema: CustomerInsightsOutputSchema,
     },
-    async (input) => {
+    async (input: any) => {
       const { output } = await prompt(input);
       return output!;
     }
@@ -61,7 +58,6 @@ Your response MUST be structured according to the output schema. Keep all text c
 }
 
 export async function getCustomerInsights(input: CustomerInsightsInput): Promise<CustomerInsightsOutput> {
-  const flow = getFlow();
+  const flow = await getFlow();
   return flow(input);
 }
-

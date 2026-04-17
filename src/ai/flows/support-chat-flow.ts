@@ -3,29 +3,31 @@
 
 /**
  * @fileOverview A simple support chat bot for Zeneva.
- *
- * - zenevaSupportChat - A function that answers user questions.
- * - ZenevaSupportChatInput - Input type.
- * - ZenevaSupportChatOutput - Output type.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+export type ZenevaSupportChatInput = {
+  query: string;
+};
 
-const ZenevaSupportChatInputSchema = z.object({
-  query: z.string().describe('The user\'s question about the Zeneva app.'),
-});
-export type ZenevaSupportChatInput = z.infer<typeof ZenevaSupportChatInputSchema>;
-
-const ZenevaSupportChatOutputSchema = z.object({
-  answer: z.string().describe('The AI\'s helpful response.'),
-});
-export type ZenevaSupportChatOutput = z.infer<typeof ZenevaSupportChatOutputSchema>;
+export type ZenevaSupportChatOutput = {
+  answer: string;
+};
 
 let cachedFlow: any = null;
 
-function getFlow() {
+async function getFlow() {
   if (cachedFlow) return cachedFlow;
+
+  const { ai } = await import('@/ai/genkit');
+  const { z } = await import('genkit');
+
+  const ZenevaSupportChatInputSchema = z.object({
+    query: z.string().describe('The user\'s question about the Zeneva app.'),
+  });
+
+  const ZenevaSupportChatOutputSchema = z.object({
+    answer: z.string().describe('The AI\'s helpful response.'),
+  });
 
   const prompt = ai.definePrompt({
     name: 'zenevaSupportPrompt',
@@ -78,7 +80,7 @@ Your Answer:`,
       inputSchema: ZenevaSupportChatInputSchema,
       outputSchema: ZenevaSupportChatOutputSchema,
     },
-    async (input) => {
+    async (input: any) => {
       const {output} = await prompt(input);
       return output!;
     }
@@ -88,6 +90,6 @@ Your Answer:`,
 }
 
 export async function zenevaSupportChat(input: ZenevaSupportChatInput): Promise<ZenevaSupportChatOutput> {
-  const flow = getFlow();
+  const flow = await getFlow();
   return flow(input);
 }

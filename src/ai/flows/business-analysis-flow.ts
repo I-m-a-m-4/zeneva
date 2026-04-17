@@ -3,22 +3,20 @@
 
 /**
  * @fileOverview A proactive AI OS for retail decisions.
- *
- * - businessAnalysis - Analyzes sales, inventory, and time-based data to provide predictive insights.
  */
 
-import { ai } from '@/ai/genkit';
 import {
-  BusinessAnalysisInputSchema,
-  BusinessAnalysisOutputSchema,
   type BusinessAnalysisInput,
   type BusinessAnalysisOutput,
 } from './business-analysis-types';
 
 let cachedFlow: any = null;
 
-function getFlow() {
+async function getFlow() {
   if (cachedFlow) return cachedFlow;
+
+  const { ai } = await import('@/ai/genkit');
+  const { BusinessAnalysisInputSchema, BusinessAnalysisOutputSchema } = await import('./business-analysis-types');
 
   const prompt = ai.definePrompt({
     name: 'businessAnalysisPrompt',
@@ -103,7 +101,7 @@ Your entire response MUST be a single, valid JSON object that strictly follows t
       inputSchema: BusinessAnalysisInputSchema,
       outputSchema: BusinessAnalysisOutputSchema,
     },
-    async (input) => {
+    async (input: any) => {
       const { output } = await prompt(input);
       return output!;
     }
@@ -116,17 +114,14 @@ export async function businessAnalysis(
   input: BusinessAnalysisInput
 ): Promise<BusinessAnalysisOutput> {
   try {
-    console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
-    const flow = getFlow();
+    const flow = await getFlow();
     const result = await flow(input);
-    console.log("Business Analysis AI Flow completed successfully.");
     return result;
   } catch (error: any) {
     console.error("CRITICAL ERROR in Business Analysis AI Flow:", error);
     if (error.message?.includes('token')) {
-      throw new Error("The dataset is too large for the AI to process. We are working on further optimizing the data summaries.");
+      throw new Error("The dataset is too large for the AI to process.");
     }
-    throw new Error("Zen AI is currently over-leveraged or encountered a processing error. Please try again in a few seconds.");
+    throw new Error("Zen AI processing error. Please try again.");
   }
 }
-

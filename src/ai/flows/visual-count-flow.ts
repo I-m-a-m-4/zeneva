@@ -1,29 +1,37 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+export type VisualCountInput = {
+    imageBase64: string;
+};
 
-const VisualCountInputSchema = z.object({
-    imageBase64: z.string().describe('The base64 encoded image of the products to count.'),
-});
-
-const InventoryItemSchema = z.object({
-    name: z.string().describe('The name of the product identified.'),
-    count: z.number().describe('The quantity of this product found in the image.'),
-});
-
-const VisualCountOutputSchema = z.object({
-    items: z.array(InventoryItemSchema).describe('List of items identified and their counts.'),
-});
-
-export type VisualCountInput = z.infer<typeof VisualCountInputSchema>;
-export type VisualCountOutput = z.infer<typeof VisualCountOutputSchema>;
+export type VisualCountOutput = {
+    items: {
+        name: string;
+        count: number;
+    }[];
+};
 
 let cachedFlow: any = null;
 
-function getFlow() {
+async function getFlow() {
   if (cachedFlow) return cachedFlow;
+
+  const { ai } = await import('@/ai/genkit');
+  const { z } = await import('genkit');
+
+  const VisualCountInputSchema = z.object({
+      imageBase64: z.string().describe('The base64 encoded image of the products to count.'),
+  });
+
+  const InventoryItemSchema = z.object({
+      name: z.string().describe('The name of the product identified.'),
+      count: z.number().describe('The quantity of this product found in the image.'),
+  });
+
+  const VisualCountOutputSchema = z.object({
+      items: z.array(InventoryItemSchema).describe('List of items identified and their counts.'),
+  });
 
   const prompt = ai.definePrompt({
       name: 'visualCountPrompt',
@@ -44,7 +52,7 @@ function getFlow() {
           inputSchema: VisualCountInputSchema,
           outputSchema: VisualCountOutputSchema,
       },
-      async (input) => {
+      async (input: any) => {
           const { output } = await prompt({
               imageBase64: input.imageBase64
           });
@@ -57,6 +65,6 @@ function getFlow() {
 }
 
 export async function visualCount(input: VisualCountInput): Promise<VisualCountOutput> {
-    const flow = getFlow();
+    const flow = await getFlow();
     return flow(input);
 }
