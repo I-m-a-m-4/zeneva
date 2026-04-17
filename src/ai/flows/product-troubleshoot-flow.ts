@@ -43,16 +43,16 @@ const ProductTroubleshootOutputSchema = z.object({
 
 export type ProductTroubleshootOutput = z.infer<typeof ProductTroubleshootOutputSchema>;
 
-export async function productTroubleshoot(input: ProductTroubleshootInput): Promise<ProductTroubleshootOutput> {
-  return productTroubleshootFlow(input);
-}
+let cachedFlow: any = null;
 
-const prompt = ai.definePrompt({
-  name: 'productTroubleshootPrompt',
-  input: {schema: ProductTroubleshootInputSchema},
-  output: {schema: ProductTroubleshootOutputSchema},
-  // NEW: Updated prompt for more concise, structured, and budget-friendly output
-  prompt: `You are an expert e-commerce optimization AI. Your task is to analyze a list of product data and provide a concise list of the top 3-5 most critical suggestions for improvement.
+function getFlow() {
+  if (cachedFlow) return cachedFlow;
+
+  const prompt = ai.definePrompt({
+    name: 'productTroubleshootPrompt',
+    input: {schema: ProductTroubleshootInputSchema},
+    output: {schema: ProductTroubleshootOutputSchema},
+    prompt: `You are an expert e-commerce optimization AI. Your task is to analyze a list of product data and provide a concise list of the top 3-5 most critical suggestions for improvement.
 
 For each suggestion, provide:
 1.  A short, actionable title.
@@ -66,16 +66,25 @@ Product Data:
 - Name: {{name}}, Price: {{price}}, Category: {{category}}, Description: {{description}}
 {{/each}}
 `,
-});
+  });
 
-const productTroubleshootFlow = ai.defineFlow(
-  {
-    name: 'productTroubleshootFlow',
-    inputSchema: ProductTroubleshootInputSchema,
-    outputSchema: ProductTroubleshootOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+  cachedFlow = ai.defineFlow(
+    {
+      name: 'productTroubleshootFlow',
+      inputSchema: ProductTroubleshootInputSchema,
+      outputSchema: ProductTroubleshootOutputSchema,
+    },
+    async input => {
+      const {output} = await prompt(input);
+      return output!;
+    }
+  );
+
+  return cachedFlow;
+}
+
+export async function productTroubleshoot(input: ProductTroubleshootInput): Promise<ProductTroubleshootOutput> {
+  const flow = getFlow();
+  return flow(input);
+}
+

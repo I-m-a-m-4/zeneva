@@ -15,28 +15,16 @@ import {
   type BusinessAnalysisOutput,
 } from './business-analysis-types';
 
-export async function businessAnalysis(
-  input: BusinessAnalysisInput
-): Promise<BusinessAnalysisOutput> {
-  try {
-    console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
-    const result = await businessAnalysisFlow(input);
-    console.log("Business Analysis AI Flow completed successfully.");
-    return result;
-  } catch (error: any) {
-    console.error("CRITICAL ERROR in Business Analysis AI Flow:", error);
-    if (error.message?.includes('token')) {
-      throw new Error("The dataset is too large for the AI to process. We are working on further optimizing the data summaries.");
-    }
-    throw new Error("Zen AI is currently over-leveraged or encountered a processing error. Please try again in a few seconds.");
-  }
-}
+let cachedFlow: any = null;
 
-const prompt = ai.definePrompt({
-  name: 'businessAnalysisPrompt',
-  input: { schema: BusinessAnalysisInputSchema },
-  output: { schema: BusinessAnalysisOutputSchema },
-  prompt: `You are Zen AI, a world-class strategic advisor and Operating System for a retail business. Your goal is to maximize profit and eliminate guesswork by providing predictive, data-driven intelligence. You are direct, insightful, and always focused on generating tangible value for the business owner.
+function getFlow() {
+  if (cachedFlow) return cachedFlow;
+
+  const prompt = ai.definePrompt({
+    name: 'businessAnalysisPrompt',
+    input: { schema: BusinessAnalysisInputSchema },
+    output: { schema: BusinessAnalysisOutputSchema },
+    prompt: `You are Zen AI, a world-class strategic advisor and Operating System for a retail business. Your goal is to maximize profit and eliminate guesswork by providing predictive, data-driven intelligence. You are direct, insightful, and always focused on generating tangible value for the business owner.
 
 **Your Core Task:**
 Analyze the provided business data to generate a structured JSON object strictly conforming to the output schema. Your insights MUST be predictive, actionable, and comprehensive. You will use historical sales, demand velocity, customer behavior, seasonality, and product relationships in your analysis.
@@ -107,16 +95,38 @@ Analyze the provided business data to generate a structured JSON object strictly
 
 Your entire response MUST be a single, valid JSON object that strictly follows the output schema. Be thorough and strategic.
 `,
-});
+  });
 
-const businessAnalysisFlow = ai.defineFlow(
-  {
-    name: 'businessAnalysisFlow',
-    inputSchema: BusinessAnalysisInputSchema,
-    outputSchema: BusinessAnalysisOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    return output!;
+  cachedFlow = ai.defineFlow(
+    {
+      name: 'businessAnalysisFlow',
+      inputSchema: BusinessAnalysisInputSchema,
+      outputSchema: BusinessAnalysisOutputSchema,
+    },
+    async (input) => {
+      const { output } = await prompt(input);
+      return output!;
+    }
+  );
+
+  return cachedFlow;
+}
+
+export async function businessAnalysis(
+  input: BusinessAnalysisInput
+): Promise<BusinessAnalysisOutput> {
+  try {
+    console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
+    const flow = getFlow();
+    const result = await flow(input);
+    console.log("Business Analysis AI Flow completed successfully.");
+    return result;
+  } catch (error: any) {
+    console.error("CRITICAL ERROR in Business Analysis AI Flow:", error);
+    if (error.message?.includes('token')) {
+      throw new Error("The dataset is too large for the AI to process. We are working on further optimizing the data summaries.");
+    }
+    throw new Error("Zen AI is currently over-leveraged or encountered a processing error. Please try again in a few seconds.");
   }
-);
+}
+
