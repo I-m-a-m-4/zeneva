@@ -53,7 +53,7 @@ function CustomerDetailContent() {
     const customerId = searchParams.get('id') as string;
     const { toast } = useToast();
 
-    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue } = usePOS();
+    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business } = usePOS();
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     const receipts = React.useMemo(() => {
