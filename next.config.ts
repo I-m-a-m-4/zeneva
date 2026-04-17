@@ -104,17 +104,24 @@ const nextConfig: NextConfig = {
         new WebpackObfuscator({
           rotateStringArray: true,
           stringArray: true,
-          stringArrayThreshold: 0.5, // Reduced threshold for better stability
+          stringArrayThreshold: 0.8, 
+          stringArrayEncoding: ['base64', 'rc4'], // High encryption for strings
+          stringArrayWrappersCount: 3,
+          stringArrayWrappersType: 'function',
           compact: true,
           identifierNamesGenerator: 'hexadecimal',
           log: false,
           renameGlobals: false,
-          selfDefending: false, // Disabled as it breaks in many minified environments
-          splitStrings: false, // CRITICAL: Disabled to prevent breaking dynamic imports and chunk paths
-          unicodeEscapeSequence: false,
-          controlFlowFlattening: false,
-          deadCodeInjection: false,
-          debugProtection: false, 
+          selfDefending: false, 
+          splitStrings: false, 
+          unicodeEscapeSequence: true,
+          controlFlowFlattening: true, // SCRAMBLES LOGIC
+          controlFlowFlatteningThreshold: 0.5,
+          deadCodeInjection: true, // INJECTS JUNK CODE
+          deadCodeInjectionThreshold: 0.2,
+          debugProtection: true, // BLOCKS DEVTOOLS
+          debugProtectionInterval: 2500,
+          disableConsoleOutput: true,
         }, [
           'static/_next/static/chunks/main-*.js',
           'static/_next/static/chunks/webpack-*.js',

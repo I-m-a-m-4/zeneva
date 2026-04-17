@@ -91,9 +91,15 @@ const moreNavLinks: { href: string; icon: React.ElementType; label: string; role
 // Helper component for full-screen loading
 function AppLoader({ text }: { text: string }) {
   const [mounted, setMounted] = React.useState(false);
+  const [progress, setProgress] = React.useState(0);
 
   React.useEffect(() => {
     setMounted(true);
+    // Simulated progress for secondary loaders
+    const interval = setInterval(() => {
+      setProgress(prev => (prev < 90 ? prev + (Math.random() * 15) : prev));
+    }, 400);
+    return () => clearInterval(interval);
   }, []);
 
   if (!mounted) return null;
@@ -101,17 +107,34 @@ function AppLoader({ text }: { text: string }) {
   return (
     <div
       suppressHydrationWarning
-      className="fixed inset-0 top-[var(--tauri-title-height,0)] z-50 flex h-full w-full items-center justify-center overflow-hidden bg-background"
+      className="fixed inset-0 top-[var(--tauri-title-height,0)] z-[100] flex h-full w-full items-center justify-center overflow-hidden bg-background"
     >
-      {/* Background decoration to emphasize glassmorphism */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-orange-100 via-background to-background dark:from-orange-950/30 dark:via-background dark:to-background"></div>
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-3xl"></div>
+      {/* Ambient Background Accents */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px]" />
 
-      {/* Minimal Container without Glassmorphism Box */}
-      <div className="relative flex flex-col items-center justify-center p-8 z-10">
-        <Loader className="h-10 w-10 animate-spin text-primary" />
-        <p className="mt-4 text-sm font-medium text-foreground animate-pulse font-body">{text}</p>
+      {/* Content Container */}
+      <div className="relative flex flex-col items-center justify-center max-w-xs w-full p-8 z-10 text-center">
+        <div className="relative mb-8">
+           <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+           <Loader className="h-10 w-10 animate-spin text-primary relative" />
+        </div>
+        
+        <div className="w-full space-y-4">
+          <div className="relative h-1 w-full bg-muted rounded-full overflow-hidden">
+             <div 
+               className="absolute inset-y-0 left-0 bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(249,115,22,0.3)]"
+               style={{ width: `${progress}%` }}
+             />
+          </div>
+          <p className="text-xs font-semibold text-foreground/70 uppercase tracking-[0.2em] animate-pulse">
+            {text}
+          </p>
+        </div>
       </div>
+      
+      {/* Texture */}
+      <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
     </div>
   );
 }

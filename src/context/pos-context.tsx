@@ -23,7 +23,10 @@ import {
   syncStatsToOffline,
   getCachedStats,
   getLastSyncMetadata, 
-  setLastSyncMetadata 
+  setLastSyncMetadata,
+  saveActionToOfflineQueue,
+  getOfflineQueue,
+  removeActionFromOfflineQueue
 } from '@/lib/sqlite-sync';
 
 // Define localStorage keys
@@ -123,7 +126,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // --- UI State ---
+  const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
@@ -404,6 +412,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return merged;
   }, [initialProducts, syncedProducts, queuedActions]);
 
+  // Load Offline Queue on Startup (Tauri Hardening)
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    if (isTauri && isMounted) {
+      const loadQueue = async () => {
+        const offlineQueue = await getOfflineQueue();
+        if (offlineQueue.length > 0) {
+          console.log(`[SQLite Sync] Restored ${offlineQueue.length} items from offline queue.`);
+          setQueuedActions(prev => {
+             const existingIds = new Set(prev.map(a => a.id));
+             const unique = offlineQueue.filter(a => !existingIds.has(a.id));
+             return [...prev, ...unique];
+          });
+        }
+      };
+      loadQueue();
+    }
+  }, [isMounted]);
+
   // Handle SQLite Redundant Sync
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -508,7 +535,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [business?.id, business?.settings?.loyaltyProgramEnabled, business?.settings?.pointsPerUnit]);
 
   const isLoading = isUserLoading || 
-    (!!user && isProfileLoading) || 
+    (!!user && !isProfileReady) || // Bridge the gap between auth and profile loading
     (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ ? 
       (!business && isLoadingBusiness) : // On Tauri, only block if we have NO business (online or offline)
       (isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats)
@@ -833,6 +860,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
           }
         }
       });
+      // Clean up SQLite Queue for successful items
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      if (isTauri) {
+          successfulIds.forEach(id => removeActionFromOfflineQueue(id as string));
+      }
+
       return newQueue.filter(a => !successfulIds.has(a.id));
     });
 
@@ -925,6 +958,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
               await syncCustomersToOffline(businessId, [{ ...action.payload, id: action.payload.id || newActionId }]);
               break;
           }
+          // --- Hardened Persistence: Save the actual queue item ---
+          await saveActionToOfflineQueue(newAction);
         } catch (e) {
           console.error("Critical: Local SQLite persistence failed for queued action:", e);
         }

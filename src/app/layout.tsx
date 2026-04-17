@@ -7,9 +7,6 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
 import { POSProvider } from '@/context/pos-context';
-
-const siteUrl = 'https://zeneva.space';
-
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
@@ -18,6 +15,10 @@ import { DesktopTitleBar } from '@/components/desktop/TitleBar';
 import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
 import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { Analytics } from '@vercel/analytics/react';
+import { PWAProvider } from '@/context/pwa-context';
+import { SplashScreen } from '@/components/shared/splash-screen';
+
+const siteUrl = 'https://zeneva.space';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -88,9 +89,6 @@ const jsonLd = {
   ]
 };
 
-
-import { PWAProvider } from '@/context/pwa-context';
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -106,6 +104,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased bg-background text-foreground')}>
+        <SplashScreen />
         <FirebaseClientProvider>
           <PWAProvider>
             <UserActivityTracker />

@@ -57,6 +57,15 @@ export async function getOfflineDb() {
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id TEXT PRIMARY KEY,
+        action_type TEXT,
+        payload TEXT,
+        description TEXT,
+        timestamp INTEGER,
+        status TEXT DEFAULT 'pending'
+      );
     `);
     
     return db;
@@ -287,6 +296,51 @@ export async function getCachedReceipts(businessId: string, limit: number = 50) 
     return result.map(r => JSON.parse(r.data));
   } catch (err) {
     return [];
+  }
+}
+
+export async function saveActionToOfflineQueue(action: any) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    await db.execute(
+      'INSERT OR REPLACE INTO sync_queue (id, action_type, payload, description, timestamp, status) VALUES ($1, $2, $3, $4, $5, $6)',
+      [action.id, action.type, JSON.stringify(action.payload), action.description, action.timestamp, action.status]
+    );
+  } catch (err) {
+    console.error('SQLite Queue Save Error:', err);
+  }
+}
+
+export async function getOfflineQueue() {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  
+  try {
+    const result: any[] = await db.select('SELECT * FROM sync_queue WHERE status != $1 ORDER BY timestamp ASC', ['synced']);
+    return result.map(r => ({
+      id: r.id,
+      type: r.action_type,
+      payload: JSON.parse(r.payload),
+      description: r.description,
+      timestamp: r.timestamp,
+      status: r.status
+    }));
+  } catch (err) {
+    console.error('SQLite Queue Retrieval Error:', err);
+    return [];
+  }
+}
+
+export async function removeActionFromOfflineQueue(actionId: string) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    await db.execute('DELETE FROM sync_queue WHERE id = $1', [actionId]);
+  } catch (err) {
+    console.error('SQLite Queue Delete Error:', err);
   }
 }
 

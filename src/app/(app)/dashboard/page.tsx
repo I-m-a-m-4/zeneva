@@ -99,7 +99,8 @@ export default function DashboardPage() {
   const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);
   const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
-  const isLoading = isPosLoading || isFetchingBatch;
+  const isLoading = isPosLoading; // Primary connection loading only
+  const isUpdating = isFetchingBatch; // Secondary background update state
 
   const dashboardData = React.useMemo(() => {
     const inventoryItems = products || [];

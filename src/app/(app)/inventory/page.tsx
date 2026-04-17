@@ -462,8 +462,8 @@ function InventoryPageContent() {
 
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] w-full pb-16 md:pb-0">
-      <div className="flex items-center pb-4 gap-4">
+    <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
+      <div className="flex items-center pt-1 pb-4 gap-4">
         <div className="flex flex-col flex-1">
           <div className="relative flex items-center gap-2">
             <div className="relative flex-1 group">
@@ -848,6 +848,13 @@ function InventoryPageContent() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
                               <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onSelect={() => { setSelectedProductIds([product.id]); setIsDeleteDialogOpen(true); }} 
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete Product
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
