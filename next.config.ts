@@ -104,23 +104,22 @@ const nextConfig: NextConfig = {
         new WebpackObfuscator({
           rotateStringArray: true,
           stringArray: true,
-          stringArrayThreshold: 0.8, 
-          stringArrayEncoding: ['base64', 'rc4'], // High encryption for strings
-          stringArrayWrappersCount: 3,
+          stringArrayThreshold: 0.75, 
+          stringArrayEncoding: ['base64'], // Base64 is more stable than rc4 for data URIs
+          stringArrayWrappersCount: 2,
           stringArrayWrappersType: 'function',
           compact: true,
           identifierNamesGenerator: 'hexadecimal',
           log: false,
           renameGlobals: false,
-          selfDefending: false, 
-          splitStrings: false, 
-          unicodeEscapeSequence: true,
-          controlFlowFlattening: true, // SCRAMBLES LOGIC
+          selfDefending: true, 
+          splitStrings: true, 
+          unicodeEscapeSequence: false, // Disabling this fixes most 'URI malformed' errors
+          controlFlowFlattening: true, 
           controlFlowFlatteningThreshold: 0.5,
-          deadCodeInjection: true, // INJECTS JUNK CODE
-          deadCodeInjectionThreshold: 0.2,
-          debugProtection: true, // BLOCKS DEVTOOLS
-          debugProtectionInterval: 2500,
+          deadCodeInjection: false, // Dead code injection can sometimes cause logic issues
+          debugProtection: true, 
+          debugProtectionInterval: 4000,
           disableConsoleOutput: true,
         }, [
           'static/_next/static/chunks/main-*.js',
