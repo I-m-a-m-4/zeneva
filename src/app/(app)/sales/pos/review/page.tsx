@@ -35,22 +35,18 @@ function ReviewPageContent() {
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
 
-    if (cart.length === 0 && !isCompleting) {
-        return (
-            <div className="text-center">
-                <p>Your cart is empty.</p>
-                <Button asChild variant="link">
-                    <Link href="/sales/pos/select-products">Start a new sale</Link>
-                </Button>
-            </div>
-        )
-    }
+    // Hydration fix
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => { setMounted(true); }, []);
+
+    // Memoize the receipt number so it doesn't change on every render
+    const stableReceiptNumber = React.useMemo(() => `rec-${uuidv4().split('-')[0]}`, []);
 
     // Create a temporary receipt object for display before saving
-    const displayReceipt = {
+    const displayReceipt = React.useMemo(() => ({
         id: 'temp-id',
         businessId: business?.id || 'temp-biz-id',
-        receiptNumber: `rec-${uuidv4().split('-')[0]}`,
+        receiptNumber: stableReceiptNumber,
         items: cart.map(item => ({
             productId: item.product.id,
             name: item.product.name,
@@ -66,7 +62,27 @@ function ReviewPageContent() {
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
         status: (paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid')) as 'pending' | 'unpaid' | 'paid',
         createdAt: backdate ? new Date(backdate) : new Date(), // Use a real date for optimistic display
-    };
+    }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdate]);
+
+    if (!mounted) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
+            </div>
+        );
+    }
+
+    if (cart.length === 0 && !isCompleting) {
+        return (
+            <div className="text-center">
+                <p>Your cart is empty.</p>
+                <Button asChild variant="link">
+                    <Link href="/sales/pos/select-products">Start a new sale</Link>
+                </Button>
+            </div>
+        )
+    }
 
 
     const handleCompleteSale = React.useCallback(() => {
