@@ -22,11 +22,16 @@ export default function PaymentPage() {
 
     const handleNext = () => {
         setIsNavigating(true);
+        // Added a timeout safeguard to prevent the button from being stuck if navigation is slow
+        const timer = setTimeout(() => setIsNavigating(false), 5000);
+        
         if (autoPrint) {
             router.push('/sales/pos/review?auto=true');
         } else {
             router.push('/sales/pos/review');
         }
+        
+        return () => clearTimeout(timer);
     };
 
     return (

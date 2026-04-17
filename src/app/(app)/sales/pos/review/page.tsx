@@ -229,6 +229,9 @@ function ReviewPageContent() {
             title: navigator.onLine ? "Sale Recorded" : "Sale Queued (Offline)",
             description: navigator.onLine ? `Receipt ${receiptData.receiptNumber} generated.` : "Success! This sale is saved locally and will sync to the cloud automatically.",
         });
+        
+        // Ensure we reset the state to avoid button being stuck if navigation is slow
+        setIsCompleting(false);
 
     }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
 

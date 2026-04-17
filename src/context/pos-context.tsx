@@ -523,6 +523,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } as BusinessStats;
   }, [stats, extraStats]);
 
+  const calculateLoyaltyPoints = useCallback(async (amount: number) => {
+    if (!business?.settings?.loyaltyProgramEnabled) return 0;
+    const pointsPerCash = business.settings.pointsPerUnit || 0;
+    return Math.floor(amount * pointsPerCash);
+  }, [business]);
+
   const processQueue = useCallback(async () => {
     if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !currentUserProfile) {
       return;
@@ -656,9 +662,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
               };
 
               if (business?.settings?.loyaltyProgramEnabled) {
-                const pointsEarned = await calculateLoyaltyPoints(receiptData.total);
-                updates.loyaltyPoints = increment(pointsEarned);
-                resultData.pointsEarned = pointsEarned;
+                try {
+                  const pointsEarned = await calculateLoyaltyPoints(receiptData.total);
+                  updates.loyaltyPoints = increment(pointsEarned);
+                  resultData.pointsEarned = pointsEarned;
+                } catch (le) {
+                  console.error("Loyalty update failed, skipping to ensure sale records:", le);
+                }
               }
 
               batch.update(customerRef, updates);
