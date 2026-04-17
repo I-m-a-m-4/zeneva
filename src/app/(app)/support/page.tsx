@@ -655,8 +655,8 @@ export default function SupportPage() {
                              <Accordion type="single" collapsible className="w-full space-y-2">
                                 {filteredFaqs.length > 0 ? (
                                     filteredFaqs.map((item, index) => (
-                                        <AccordionItem key={index} value={`faq-${index}`} id={item.id} className="border rounded-lg px-4 bg-muted/10 border-transparent hover:border-primary/20 transition-all duration-300">
-                                            <AccordionTrigger className="hover:no-underline hover:underline decoration-primary/50 underline-offset-4 font-semibold text-sm text-left">{item.question}</AccordionTrigger>
+                                        <AccordionItem key={index} value={`faq-${index}`} id={item.id} className="border rounded-lg px-4 bg-muted/10 border-transparent transition-all duration-300">
+                                            <AccordionTrigger className="hover:no-underline hover:underline decoration-black underline-offset-2 font-semibold text-sm text-left">{item.question}</AccordionTrigger>
                                             <AccordionContent className="prose prose-sm dark:prose-invert max-w-none pb-4">
                                                 {item.answer}
                                                 <div className="flex flex-wrap gap-1 mt-4">
