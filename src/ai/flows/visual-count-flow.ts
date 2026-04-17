@@ -1,5 +1,8 @@
 
-'use server';
+/**
+ * @fileOverview Visual product counting.
+ */
+
 
 export type VisualCountInput = {
     imageBase64: string;

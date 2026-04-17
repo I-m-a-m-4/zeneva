@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 
-import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
+import { runProductTroubleshoot as productTroubleshoot } from "@/actions/ai-gateway";
 import type { Product, AISuggestions } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

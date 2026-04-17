@@ -1,9 +1,8 @@
 
-'use server';
-
 /**
  * @fileOverview An AI agent for generating customer relationship insights.
  */
+
 
 import { 
     type CustomerInsightsInput, 

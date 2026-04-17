@@ -1,9 +1,8 @@
 
-'use server';
-
 /**
  * @fileOverview A simple support chat bot for Zeneva.
  */
+
 
 export type ZenevaSupportChatInput = {
   query: string;

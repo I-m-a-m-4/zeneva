@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 
-import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
+import { runBusinessAnalysis as businessAnalysis } from "@/actions/ai-gateway";
 import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance, IrresistibleOffer, BlogHeadline, ContentPlanner } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";

@@ -1,9 +1,7 @@
-
-'use server';
-
 /**
  * @fileOverview An AI agent for troubleshooting product inventory data.
  */
+
 
 // NO TOP-LEVEL GENKIT IMPORTS ALLOWED (To fix build-time ReferenceErrors)
 
