@@ -306,7 +306,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let base = initialBusiness || offlineBusiness;
     if (!base) return null;
 
-    // Apply optimistic settings updates
     const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
     if (settingsUpdates.length > 0) {
       let result = { ...base };
@@ -329,7 +328,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
 
     return base;
-  }, [initialBusiness, offlineBusiness, queuedActions]);
+  }, [initialBusiness, offlineBusiness, queuedActions.length > 0 ? queuedActions.filter(a => a.type === 'update-settings').length : 0]);
 
   const productsQuery = useMemoFirebase(() => (businessId ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [businessId, firestore, refreshKey]);
   const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
@@ -402,7 +401,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (isTauri && businessId && products && products.length > 0) {
       syncProductsToOffline(businessId, products);
     }
-  }, [products, businessId]);
+  }, [products.length, businessId]); // Only sync when length changes to avoid loops
 
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -497,7 +496,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     const pointsPerUnit = business?.settings?.pointsPerUnit || 0;
     return Math.floor(amount * pointsPerUnit);
-  }, [business]);
+  }, [business?.id, business?.settings?.loyaltyProgramEnabled, business?.settings?.pointsPerUnit]);
 
   const isLoading = isUserLoading || 
     (!!user && isProfileLoading) || 
@@ -1860,8 +1859,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
     };
-    checkRustSubscription();
-  }, [business]);
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri && business) {
+      checkRustSubscription();
+    }
+  }, [business?.id, business?.accessLevel, business?.trialExpiresAt?.seconds]);
 
   const value = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user, firestore,

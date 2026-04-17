@@ -236,11 +236,12 @@ function ReviewPageContent() {
     }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
 
     // **Auto-Submit Logic**
+    // We only want to trigger this ONCE when auto-prompted
     React.useEffect(() => {
-        if (isAutoPrompted && !isCompleting && cart.length > 0 && products) {
+        if (isAutoPrompted && !isCompleting && cart.length > 0) {
             handleCompleteSale();
         }
-    }, [isAutoPrompted, isCompleting, cart.length, products, handleCompleteSale]);
+    }, [isAutoPrompted, isCompleting, cart.length, handleCompleteSale]);
 
     // FIX: Check plan status but also allow if it's not strictly 'business' for now to debug, 
     // or at least log why it's failing. 
