@@ -111,6 +111,7 @@ interface POSContextType {
 
   // Subscription State
   isSubscriptionActive: boolean;
+  firestore: any;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -1853,7 +1854,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [business]);
 
   const value = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user, firestore,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
@@ -1886,7 +1887,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         )
       : (isLoading ? true : false)
   }), [
-    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user, firestore,
     cart, selectedCustomer, subtotal, tax, taxRate, discount, total, paymentMethod, autoPrint, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions, updateQueuedAction, addProductWithImage, removeFromQueue,
