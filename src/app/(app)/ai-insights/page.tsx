@@ -1,6 +1,9 @@
 
 "use client";
 
+export const dynamic = 'force-dynamic';
+
+
 import { businessAnalysis } from "@/ai/flows/business-analysis-flow";
 import type { BusinessAnalysisOutput, SmartStockRecommendation, RevenueOpportunity, SmartMerchandising, SlowMovingInventory, Product, Customer, CustomerSegment, PricingRecommendation, BusinessInstance, IrresistibleOffer, BlogHeadline, ContentPlanner } from "@/types";
 import { Button } from "@/components/ui/button";
