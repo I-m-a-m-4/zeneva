@@ -14,8 +14,6 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -45,6 +43,7 @@ import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
+
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
