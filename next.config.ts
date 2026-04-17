@@ -98,6 +98,18 @@ const nextConfig: NextConfig = {
   },
   assetPrefix: isTauri ? '' : undefined,
   webpack: (config, { dev, isServer }) => {
+    if (isServer) {
+        // Treat Node-heavy libraries as externals to prevent build-time initialization crashes
+        config.externals = [
+            ...(Array.isArray(config.externals) ? config.externals : []),
+            'genkit',
+            '@genkit-ai/core',
+            '@genkit-ai/google-genai',
+            '@opentelemetry/sdk-node',
+            '@opentelemetry/api'
+        ];
+    }
+
     if (isTauri) {
       // Force mock server-only/Node.js-heavy libraries that crash the static export
       config.resolve.alias = {
