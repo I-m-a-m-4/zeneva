@@ -392,9 +392,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return base;
   }, [initialBusiness, offlineBusiness, queuedActions.length > 0 ? queuedActions.filter(a => a.type === 'update-settings').length : 0]);
 
-  // Only fetch sub-collections if the profile is ready and we actually have a business record successfully loaded
-  // This prevents race conditions and permission errors during onboarding/first-load
-  const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
+
 
 
 
