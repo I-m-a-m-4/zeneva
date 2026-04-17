@@ -16,6 +16,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { Product, UserProfile } from '@/types';
 import { usePOS } from '@/context/pos-context';
+import { getIndustryConfig } from '@/lib/industry';
 
 interface QuickEditDialogProps {
   product: Product | null;
@@ -30,6 +31,13 @@ const quickEditSchema = z.object({
   stock: z.coerce.number().int("Stock must be a whole number.").min(0),
   material: z.string().optional(),
   variantValue: z.string().optional(),
+  baseUnit: z.string().optional(),
+  dosage: z.string().optional(),
+  manufacturer: z.string().optional(),
+  weightVolume: z.string().optional(),
+  brand: z.string().optional(),
+  packaging: z.string().optional(),
+  spiceLevel: z.string().optional(),
 });
 
 type QuickEditFormValues = z.infer<typeof quickEditSchema>;
@@ -37,8 +45,10 @@ type QuickEditFormValues = z.infer<typeof quickEditSchema>;
 export default function QuickEditDialog({ product, userProfile, isOpen, onOpenChange }: QuickEditDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { triggerRefresh, addToQueue } = usePOS();
+  const { triggerRefresh, addToQueue, business } = usePOS();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const industryConfig = getIndustryConfig(business?.settings?.industry);
+
 
   const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
@@ -50,6 +60,13 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
       stock: 0,
       material: '',
       variantValue: '',
+      baseUnit: '',
+      dosage: '',
+      manufacturer: '',
+      weightVolume: '',
+      brand: '',
+      packaging: '',
+      spiceLevel: '',
     },
   });
 
@@ -62,6 +79,13 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         stock: product.stock || 0,
         material: (product as any).material || '',
         variantValue: product.variantValue || '',
+        baseUnit: product.baseUnit || '',
+        dosage: (product as any).dosage || '',
+        manufacturer: (product as any).manufacturer || '',
+        weightVolume: (product as any).weightVolume || '',
+        brand: (product as any).brand || '',
+        packaging: (product as any).packaging || '',
+        spiceLevel: (product as any).spiceLevel || '',
       });
     }
   }, [product, form]);
@@ -79,6 +103,13 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         dataToUpdate.stock = values.stock;
         dataToUpdate.material = values.material;
         dataToUpdate.variantValue = values.variantValue;
+        dataToUpdate.baseUnit = values.baseUnit;
+        dataToUpdate.dosage = values.dosage;
+        dataToUpdate.manufacturer = values.manufacturer;
+        dataToUpdate.weightVolume = values.weightVolume;
+        dataToUpdate.brand = values.brand;
+        dataToUpdate.packaging = values.packaging;
+        dataToUpdate.spiceLevel = values.spiceLevel;
       }
 
       addToQueue({
@@ -164,33 +195,36 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                 )}
               />
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 border-t pt-4">
                 <FormField
                     control={form.control}
-                    name="material"
+                    name="baseUnit"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Material / Fabric</FormLabel>
+                        <FormLabel>Measurement Unit</FormLabel>
                         <FormControl>
-                            <Input placeholder="e.g. Cotton" {...field} disabled={!canManageProduct} />
+                            <Input placeholder={industryConfig.defaultUnit} {...field} disabled={!canManageProduct} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                 />
-                <FormField
-                    control={form.control}
-                    name="variantValue"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Size / Variant</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g. XL or 42" {...field} disabled={!canManageProduct} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                {industryConfig.productFields.map((fieldDef) => (
+                    <FormField
+                        key={fieldDef.key}
+                        control={form.control}
+                        name={fieldDef.key as any}
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>{fieldDef.label}</FormLabel>
+                            <FormControl>
+                                <Input placeholder={fieldDef.placeholder} {...field} disabled={!canManageProduct} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ))}
             </div>
             <DialogFooter className='mt-6'>
               <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>

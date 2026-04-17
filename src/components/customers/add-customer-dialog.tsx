@@ -19,6 +19,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { usePOS } from '@/context/pos-context';
 import { Separator } from '@/components/ui/separator';
+import { getIndustryConfig } from '@/lib/industry';
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
@@ -37,6 +38,9 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   const [code, setCode] = React.useState('');
   const [measurements, setMeasurements] = React.useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = React.useState(false);
+  const { business } = usePOS();
+  const industryConfig = getIndustryConfig(business?.settings?.industry);
+
 
   const resetForm = () => {
     setName('');
@@ -163,9 +167,9 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
 
             <Separator className="col-span-4 my-2" />
             <div className="col-span-4">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2 block">Boutique Measurements (Tailoring)</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2 block">{industryConfig.label} Data</Label>
                 <div className="grid grid-cols-2 gap-4 border rounded-md p-4 bg-muted/20">
-                    {['Neck', 'Sleeve', 'Shoulder', 'Chest', 'Waist', 'Hips', 'Length'].map((m) => (
+                    {industryConfig.measurementLabels.map((m) => (
                         <div key={m} className="space-y-1">
                             <Label htmlFor={`m-${m}`} className="text-[10px] font-medium">{m}</Label>
                             <Input 

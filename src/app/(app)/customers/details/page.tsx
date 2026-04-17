@@ -9,6 +9,7 @@ import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
 import { generateLocalCustomerIntelligence } from '@/lib/customer-intelligence';
 import NProgress from 'nprogress';
+import { getIndustryConfig } from '@/lib/industry';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -376,14 +377,14 @@ function CustomerDetailContent() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
-                            <CardTitle className="flex items-center gap-2"><Ruler className="text-primary h-5 w-5" /> Boutique Measurements</CardTitle>
-                            <CardDescription>Custom tailoring & garment dimensions.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Ruler className="text-primary h-5 w-5" /> {getIndustryConfig(business?.settings?.industry).label} Data</CardTitle>
+                            <CardDescription>Specific metrics for your industry type.</CardDescription>
                         </div>
                         <Scale className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                            {['Neck', 'Chest/Bust', 'Waist', 'Hips', 'Shoulder', 'Sleeve', 'Length (Top)', 'Length (Trouser/Skirt)'].map(label => (
+                            {getIndustryConfig(business?.settings?.industry).measurementLabels.map(label => (
                                 <div key={label} className="space-y-1">
                                     <label className="text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
                                     <Input 

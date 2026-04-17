@@ -828,7 +828,7 @@ function InventoryPageContent() {
                         </Badge>
                       </TableCell>
                       {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                      {canManageStock && <TableCell className="hidden md:table-cell">{product.stock || 0}</TableCell>}
+                      {canManageStock && <TableCell className="hidden md:table-cell">{product.stock || 0} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span></TableCell>}
                       <TableCell className="text-right pr-6">
                         <DropdownMenu 
                           open={openMenuId === product.id} 
