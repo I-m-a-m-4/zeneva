@@ -201,39 +201,48 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { try { localStorage.setItem(POS_AUTO_PRINT_KEY, String(autoPrint)); } catch { } }, [autoPrint]);
 
   // --- POS Reset Function (MOVED UP and STABILIZED) ---
+  // --- POS Reset Function (STABILIZED) ---
+  // This resets the current shopping state but keeps shared data and queue intact.
   const resetPOS = useCallback(async () => {
     setCart([]);
     setSelectedCustomer(null);
     setDiscount(0);
-    setTaxRate(0); // Reset to 0, business effect will pick up the correct one
+    setTaxRate(0); 
     setPaymentMethod('Cash');
-    setSyncedProducts([]);
-    setSyncedCustomers([]);
-    setSyncedReceipts([]);
-    setQueuedActions([]);
-    setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
-
-    // Clear local storage
+    
+    // Only clear current sale storage
     try {
       localStorage.removeItem(POS_CART_KEY);
       localStorage.removeItem(POS_CUSTOMER_KEY);
       localStorage.removeItem(POS_DISCOUNT_KEY);
       localStorage.removeItem(POS_TAX_RATE_KEY);
       localStorage.removeItem(POS_PAYMENT_METHOD_KEY);
+    } catch { }
+  }, []);
+
+  // --- Nuclear Reset (For logout/account change) ---
+  const nuclearReset = useCallback(async () => {
+    await resetPOS();
+    setSyncedProducts([]);
+    setSyncedCustomers([]);
+    setSyncedReceipts([]);
+    setQueuedActions([]);
+    setExtraStats({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
+
+    try {
       localStorage.removeItem(QUEUED_ACTIONS_KEY);
     } catch { }
 
-    // Clear SQLite if on desktop
     if (typeof window !== 'undefined' && (window as any).__TAURI__) {
       try {
         const { clearAllTables } = await import('@/lib/sqlite-sync');
         await clearAllTables();
-        console.log('SQLite data cleared successfully on account reset/logout.');
+        console.log('SQLite data cleared successfully on nuclear reset.');
       } catch (err) {
         console.error('Failed to clear SQLite data:', err);
       }
     }
-  }, []); // Dependencies removed to break infinite loop
+  }, [resetPOS]);
 
   // --- Offline Queue & Sync State ---
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
@@ -1743,10 +1752,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     if (!user) {
       if (lastUserId !== null || impersonatedUserId !== null) {
-        console.log("User Logged Out - Clearing POS State & Impersonation");
+        console.log("User Logged Out - Clearing All Data");
         setImpersonatedUserId(null);
         sessionStorage.removeItem('zeneva_impersonated_user_id');
-        resetPOS();
+        nuclearReset();
         setLastUserId(null);
       }
       return;
