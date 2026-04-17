@@ -165,6 +165,8 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
               <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CUST-001" className="col-span-3" />
             </div>
 
+            {industryConfig.label !== 'General Retail' && (
+            <>
             <Separator className="col-span-4 my-2" />
             <div className="col-span-4">
                 <Label className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2 block">{industryConfig.label} Data</Label>
@@ -183,6 +185,8 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
                     ))}
                 </div>
             </div>
+            </>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

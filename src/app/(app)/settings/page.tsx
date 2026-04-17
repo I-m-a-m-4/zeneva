@@ -448,6 +448,10 @@ function SettingsPageContent() {
                 await updateDoc(businessDocRef, finalData);
                 toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
             }
+            
+            // Force a re-fetch of business data to update all industry-specific UI components
+            triggerRefresh();
+            if (mutateBusiness) mutateBusiness();
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
         } finally {

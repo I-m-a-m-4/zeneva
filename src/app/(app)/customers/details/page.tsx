@@ -373,7 +373,8 @@ function CustomerDetailContent() {
                     </CardContent>
                 </Card>
 
-                {/* BOUTIQUE MEASUREMENT TOOL */}
+                {/* INDUSTRY SPECIFIC DATA TOOL */}
+                {getIndustryConfig(business?.settings?.industry).label !== 'General Retail' && (
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
@@ -418,21 +419,22 @@ function CustomerDetailContent() {
                         )}
                     </CardContent>
                 </Card>
+                )}
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary" /> Zen AI Customer Insights</CardTitle>
-                    <CardDescription>Generate an AI-powered summary and suggestions for this customer.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary" /> Customer Analytics & Performance</CardTitle>
+                    <CardDescription>Generate an intelligent summary and suggestions based on this customer's behavior.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {!insights && !isGeneratingInsights && (
                         <div className="text-center p-8 border-2 border-dashed rounded-lg">
-                            <p className="font-medium">Ready for some AI magic?</p>
-                            <p className="text-sm text-muted-foreground mb-4">Analyze this customer's purchase history to get actionable insights.</p>
+                            <p className="font-medium">Ready for Data Analysis?</p>
+                            <p className="text-sm text-muted-foreground mb-4">Analyze this customer's purchase history to get actionable business insights.</p>
                             <Button onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
                                 {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Generate Insights
+                                Generate Analysis
                             </Button>
                         </div>
                     )}
@@ -442,7 +444,7 @@ function CustomerDetailContent() {
                     {insights && (
                         <div className="space-y-6">
                             <div>
-                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> AI Summary</h3>
+                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> Business Summary</h3>
                                 <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: insights.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></div>
                             </div>
                             <Separator />
