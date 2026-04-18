@@ -33,7 +33,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
@@ -232,8 +232,8 @@ export default function AuthenticatedLayout({
       ...(adminNotifications || []).map(n => ({ ...n, read: true, isGlobal: true }))
     ];
     combined.sort((a, b) => {
-      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+      const dateA = safeToDate(a.createdAt);
+      const dateB = safeToDate(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
     return combined.slice(0, 20);
@@ -616,7 +616,7 @@ export default function AuthenticatedLayout({
                                         </p>
                                         <p className="text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
                                         <p className="text-[10px] text-muted-foreground/60 mt-1">
-                                          {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
+                                          {notif.createdAt ? formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true }) : ''}
                                         </p>
                                       </div>
                                     </Link>

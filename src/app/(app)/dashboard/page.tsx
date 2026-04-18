@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -114,22 +115,7 @@ export default function DashboardPage() {
 
     const filterByDate = (item: { createdAt?: any }) => {
       if (!item.createdAt) return false;
-      let itemDate: Date;
-      
-      // Handle various formats (Firestore Timestamp, Date, Number, Object)
-      if (typeof item.createdAt.toDate === 'function') {
-        itemDate = item.createdAt.toDate();
-      } else if (item.createdAt instanceof Date) {
-        itemDate = item.createdAt;
-      } else if (item.createdAt && typeof item.createdAt === 'object' && item.createdAt.seconds !== undefined) {
-        itemDate = new Date(item.createdAt.seconds * 1000);
-      } else if (typeof item.createdAt === 'number' || typeof item.createdAt === 'string') {
-        itemDate = new Date(item.createdAt);
-      } else {
-        // Fallback for objects that aren't timestamps (e.g. from local storage)
-        const possibleDate = new Date(item.createdAt);
-        itemDate = isNaN(possibleDate.getTime()) ? new Date(0) : possibleDate;
-      }
+      const itemDate = safeToDate(item.createdAt);
       
       if (isNaN(itemDate.getTime())) return false;
 

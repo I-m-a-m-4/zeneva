@@ -39,6 +39,7 @@ import {
   QUEUED_ACTIONS_KEY,
   CURRENCY_SYMBOLS
 } from '@/lib/constants';
+import { safeToDate } from '@/lib/utils';
 
 interface POSContextType {
   // Business Data
@@ -137,18 +138,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const isImpersonating = !!impersonatedUserId;
   const effectiveUserId = impersonatedUserId || user?.uid;
-
-  // --- Date Helper ---
-  const safeToDate = (timestamp: any): Date => {
-    if (!timestamp) return new Date(0);
-    if (timestamp instanceof Date) return timestamp;
-    if (typeof timestamp.toDate === 'function') return timestamp.toDate();
-    if (timestamp.seconds !== undefined) return new Date(timestamp.seconds * 1000);
-    if (typeof timestamp === 'number') return new Date(timestamp);
-    if (typeof timestamp === 'string') return new Date(timestamp);
-    const date = new Date(timestamp);
-    return isNaN(date.getTime()) ? new Date(0) : date;
-  };
 
   // --- UI State ---
   const [isMounted, setIsMounted] = useState(false);
@@ -298,8 +287,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
 
     return merged.sort((a, b) => {
-      const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0));
-      const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0));
+      const ta = safeToDate(a.createdAt).getTime() / 1000;
+      const tb = safeToDate(b.createdAt).getTime() / 1000;
       return tb - ta;
     });
   }, [initialReceipts, syncedReceipts, queuedActions]);
@@ -927,7 +916,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addToQueue = useCallback((action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => {
     // Subscription Safeguard
     const isSubscriptionActive = business
-      ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date()))
+      ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now()))
       : (isLoading ? true : false);
 
     if (!isSubscriptionActive) {
@@ -1948,7 +1937,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     isSubscriptionActive: business
       ? (
-          (business.accessLevel === 'lifetime' || (business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date())) &&
+          (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) &&
           isSubscriptionActiveFromRust
         )
       : (isLoading ? true : false)
