@@ -127,6 +127,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // --- Impersonation State (TOP LEVEL) ---
+  const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('zeneva_impersonated_user_id');
+    }
+    return null;
+  });
+
+  const isImpersonating = !!impersonatedUserId;
+  const effectiveUserId = impersonatedUserId || user?.uid;
+
   // --- UI State ---
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
@@ -137,6 +148,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
+
+  // --- Centralized Data Fetching (MOVED UP to prevent ReferenceErrors) ---
+  const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
+  const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+
+  // isProfileReady should be true if we have a user and a profile, and the profile matches our EFFECTIVE user ID.
+  const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
+  const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
   const getInventoryStats = useCallback(async () => {
     if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
@@ -165,18 +184,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore]);
 
-  // --- Impersonation State ---
-  const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('zeneva_impersonated_user_id');
-    }
-    return null;
-  });
-
-  const isImpersonating = !!impersonatedUserId;
-
-  // Effective User ID: Use impersonated ID if set, otherwise real user ID
-  const effectiveUserId = impersonatedUserId || user?.uid;
+  // Track the last user ID to prevent unnecessary POS resets
 
   // Track the last user ID to prevent unnecessary POS resets
   const [lastUserId, setLastUserId] = useState<string | null>(null);
@@ -305,15 +313,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch (e) { console.error("Failed to save offline queue:", e); }
   }, [queuedActions]);
 
-  // --- Centralized Data Fetching ---
-  // MODIFIED: Ensure we have an authenticated user before fetching, even if impersonating.
-  const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
-  const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
-
-  // MODIFIED: isProfileReady should be true if we have a user and a profile, and the profile matches our EFFECTIVE user ID.
-  const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
-
-  const businessId = isProfileReady ? currentUserProfile.businessId : null;
+  // --- Impersonation Helpers ---
 
   const impersonateUser = useCallback((userId: string) => {
     // Log the impersonation event before switching context
