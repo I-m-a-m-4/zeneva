@@ -37,7 +37,6 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
-  const [measurements, setMeasurements] = React.useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = React.useState(false);
   const { business } = usePOS();
   const industryConfig = getIndustryConfig(business?.settings?.industry);
@@ -48,7 +47,6 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
     setEmail('');
     setPhone('');
     setCode('');
-    setMeasurements({});
     setIsSaving(false);
   };
 
@@ -99,7 +97,6 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         businessId,
         loyaltyPoints: 0,
         totalSpent: 0,
-        measurements,
       };
 
       if (isTauri) {

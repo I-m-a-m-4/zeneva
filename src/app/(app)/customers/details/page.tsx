@@ -372,54 +372,6 @@ function CustomerDetailContent() {
                         )}
                     </CardContent>
                 </Card>
-
-                {/* INDUSTRY SPECIFIC DATA TOOL */}
-                {getIndustryConfig(business?.settings?.industry).label !== 'General Retail' && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div>
-                            <CardTitle className="flex items-center gap-2"><Ruler className="text-primary h-5 w-5" /> {getIndustryConfig(business?.settings?.industry).label} Data</CardTitle>
-                            <CardDescription>Specific metrics for your industry type.</CardDescription>
-                        </div>
-                        <Scale className="h-5 w-5 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                            {getIndustryConfig(business?.settings?.industry).measurementLabels.map(label => (
-                                <div key={label} className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
-                                    <Input 
-                                        placeholder="--" 
-                                        className="h-8 text-sm" 
-                                        value={measurements[label] || ''} 
-                                        onChange={(e) => {
-                                            setMeasurements(prev => ({ ...prev, [label]: e.target.value }));
-                                            setIsMeasurementsDirty(true);
-                                        }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        {isMeasurementsDirty && (
-                            <div className="mt-4 flex animate-in fade-in slide-in-from-top-2 duration-300">
-                                <Button 
-                                    className="w-full h-8 text-xs bg-primary hover:bg-primary/90" 
-                                    onClick={handleSaveMeasurements}
-                                    disabled={isSavingMeasurements}
-                                >
-                                    {isSavingMeasurements ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2" />}
-                                    Save Measurements
-                                </Button>
-                            </div>
-                        )}
-                        {!isMeasurementsDirty && Object.keys(measurements).length > 0 && (
-                            <p className="mt-4 text-[10px] text-center text-muted-foreground italic">
-                                Last updated: {format(new Date(), 'PP')}
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-                )}
             </div>
 
             <Card>

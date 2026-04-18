@@ -35,7 +35,6 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
-  const [measurements, setMeasurements] = React.useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -44,7 +43,6 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
       setEmail(customer.email);
       setPhone(customer.phone || '');
       setCode(customer.code || '');
-      setMeasurements(customer.measurements || {});
     }
   }, [customer]);
 
@@ -64,7 +62,6 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
         email,
         phone,
         code: code.trim().toUpperCase(),
-        measurements,
       };
       
       addToQueue({
@@ -110,25 +107,6 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span></Label>
               <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CUST-001" className="col-span-3" />
-            </div>
-
-            <Separator className="col-span-4 my-2" />
-            <div className="col-span-4">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2 block">Boutique Measurements (Tailoring)</Label>
-                <div className="grid grid-cols-2 gap-4 border rounded-md p-4 bg-muted/20">
-                    {['Neck', 'Sleeve', 'Shoulder', 'Chest', 'Waist', 'Hips', 'Length'].map((m) => (
-                        <div key={m} className="space-y-1">
-                            <Label htmlFor={`m-${m}`} className="text-[10px] font-medium">{m}</Label>
-                            <Input 
-                                id={`m-${m}`} 
-                                value={measurements[m] || ''} 
-                                onChange={(e) => setMeasurements(prev => ({ ...prev, [m]: e.target.value }))}
-                                className="h-8 text-xs"
-                                placeholder="--"
-                            />
-                        </div>
-                    ))}
-                </div>
             </div>
           </div>
           <DialogFooter>
