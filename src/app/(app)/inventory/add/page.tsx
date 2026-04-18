@@ -214,6 +214,9 @@ export default function AddProductPage() {
   };
 
   const onSubmit = async (values: ProductFormValues) => {
+    if (isSaving) return;
+    setIsSaving(true);
+
     if (!userProfile || !firestore || !business || !products) {
       toast({ variant: 'destructive', title: 'Error', description: 'Session data not found. Please refresh.' });
       return;
