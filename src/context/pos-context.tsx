@@ -273,6 +273,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   }, [initialReceipts, syncedReceipts]);
 
+  const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);
+
   const customers = useMemo(() => {
     let base = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
     if (base.length === syncedCustomers.length && initialCustomers) {
