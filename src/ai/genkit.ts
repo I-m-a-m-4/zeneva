@@ -13,9 +13,9 @@ export const getAI = () => {
   return instance;
 };
 
-// Legacy export for compatibility, but now uses the lazy internal instance
+// Lazy proxy for AI instance
 export const ai = new Proxy({} as any, {
-  get: (_, prop) => {
+  get: (target, prop) => {
     const aiInstance = getAI();
     return (aiInstance as any)[prop];
   }

@@ -6,6 +6,7 @@ const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
 const nextConfig: NextConfig = {
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
+  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage'],
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -141,7 +142,7 @@ const nextConfig: NextConfig = {
     }
     
     // Protection & Hardening: Enable Obfuscator for production client chunks
-    if (!dev && !isServer) {
+    if (false && !dev && !isServer) {
         try {
             const WebpackObfuscator = require('webpack-obfuscator');
             config.plugins.push(
