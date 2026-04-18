@@ -91,9 +91,11 @@ function CustomerDetailContent() {
             lastPurchase: Date;
         }> = {};
 
-        receipts.forEach(receipt => {
+        (receipts || []).forEach(receipt => {
+            if (!receipt) return;
             const purchaseDate = safeToDate(receipt.createdAt);
-            receipt.items?.forEach(item => {
+            (receipt.items || []).forEach(item => {
+                if (!item || !item.productId) return;
                 const productInfo = allProducts.find(p => p.id === item.productId);
                 if (!productInfo) return;
 
@@ -106,8 +108,8 @@ function CustomerDetailContent() {
                     };
                 }
 
-                productMap[item.productId].totalQuantity += item.quantity;
-                productMap[item.productId].totalRevenue += item.price * item.quantity;
+                productMap[item.productId].totalQuantity += (item.quantity || 0);
+                productMap[item.productId].totalRevenue += (item.price || 0) * (item.quantity || 0);
                 if (purchaseDate > productMap[item.productId].lastPurchase) {
                     productMap[item.productId].lastPurchase = purchaseDate;
                 }

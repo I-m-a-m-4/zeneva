@@ -1209,7 +1209,7 @@ function ExecutiveBriefingTab() {
             });
 
             // Increment order count once per receipt for each unique product
-            const uniqueProductIdsInSale = new Set(sale.items?.map(i => i.productId) || []);
+            const uniqueProductIdsInSale = new Set((sale.items || []).map(i => i.productId).filter(Boolean));
             uniqueProductIdsInSale.forEach(pid => {
                 if (productSales[pid]) {
                     productSales[pid].orderCount += 1;
@@ -1292,14 +1292,16 @@ function ExecutiveBriefingTab() {
             // 1. Calculate Per-Product Metrics
             const productSummaryMap: Record<string, { revenue: number, units: number, orders: number }> = {};
             recentSales.forEach(sale => {
-                const uniqueInSale = new Set(sale.items?.map(i => i.productId) || []);
+                if (!sale) return;
+                const uniqueInSale = new Set((sale.items || []).map(i => i.productId).filter(Boolean));
                 uniqueInSale.forEach(pid => {
                     if (!productSummaryMap[pid]) productSummaryMap[pid] = { revenue: 0, units: 0, orders: 0 };
                     productSummaryMap[pid].orders++;
                 });
-                sale.items?.forEach(item => {
+                (sale.items || []).forEach(item => {
+                    if (!item || !item.productId) return;
                     if (!productSummaryMap[item.productId]) productSummaryMap[item.productId] = { revenue: 0, units: 0, orders: 0 };
-                    productSummaryMap[item.productId].revenue += (item.price || 0) * (item.quantity || 0);
+                    productSummaryMap[item.productId].revenue += ((item.price || 0) * (item.quantity || 0));
                     productSummaryMap[item.productId].units += (item.quantity || 0);
                 });
             });
@@ -1326,12 +1328,14 @@ function ExecutiveBriefingTab() {
             // 3. Daily Aggregates (Top 30 Days)
             const dailyMap: Record<string, { revenue: number, orders: number, cats: Record<string, number> }> = {};
             recentSales.forEach(sale => {
+                if (!sale) return;
                 const d = safeToDate(sale.createdAt);
                 const dStr = format(d, 'yyyy-MM-dd');
                 if (!dailyMap[dStr]) dailyMap[dStr] = { revenue: 0, orders: 0, cats: {} };
                 dailyMap[dStr].revenue += (sale.total || 0);
                 dailyMap[dStr].orders++;
-                sale.items?.forEach(item => {
+                (sale.items || []).forEach(item => {
+                    if (!item || !item.productId) return;
                     const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
                     dailyMap[dStr].cats[cat] = (dailyMap[dStr].cats[cat] || 0) + ((item.price || 0) * (item.quantity || 0));
                 });
@@ -1344,8 +1348,10 @@ function ExecutiveBriefingTab() {
             // 4. Category Performance Breakdown
             const categoryMap: Record<string, { revenue: number, units: number, customers: Set<string> }> = {};
             recentSales.forEach(sale => {
-                const cId = 'customer' in sale && sale.customer ? sale.customer.id : 'Guest';
-                sale.items?.forEach(item => {
+                if (!sale) return;
+                const cId = ('customer' in sale && sale.customer?.id) ? sale.customer.id : 'Guest';
+                (sale.items || []).forEach(item => {
+                    if (!item || !item.productId) return;
                     const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
                     if (!categoryMap[cat]) categoryMap[cat] = { revenue: 0, units: 0, customers: new Set() };
                     categoryMap[cat].revenue += ((item.price || 0) * (item.quantity || 0));
@@ -1404,11 +1410,11 @@ function ExecutiveBriefingTab() {
             const productInput = products.map(p => {
                 const stats = productSummaryMap[p.id] || { revenue: 0, units: 0, orders: 0 };
                 return {
-                    id: p.id, name: p.name, price: p.price, costPrice: p.costPrice || 0,
-                    stock: p.stock || 0, category: p.category, orderCount: stats.orders,
+                    id: p.id, name: p.name || 'Unknown', price: p.price || 0, costPrice: p.costPrice || 0,
+                    stock: p.stock || 0, category: p.category || 'Uncategorized', orderCount: stats.orders || 0,
                 };
             }).sort((a, b) => (productSummaryMap[b.id]?.revenue || 0) - (productSummaryMap[a.id]?.revenue || 0))
-                .slice(0, 100); // Only send top 100 products to avoid context bloat
+                .slice(0, 100); 
 
             // 6. Optimized Customer Sampling
             const recentCustomerIds = new Set(recentSales.map(sale => 'customer' in sale && sale.customer ? sale.customer.id : null).filter(Boolean));

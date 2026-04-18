@@ -16,11 +16,13 @@ export function generateLocalCustomerIntelligence(
     // Aggregation of purchased items
     const itemMap: Record<string, { quantity: number, name: string }> = {};
     receipts.forEach(r => {
+        if (!r || !Array.isArray(r.items)) return;
         r.items.forEach(item => {
+            if (!item || !item.productId) return;
             if (!itemMap[item.productId]) {
-                itemMap[item.productId] = { quantity: 0, name: item.name };
+                itemMap[item.productId] = { quantity: 0, name: item.name || 'Unknown Product' };
             }
-            itemMap[item.productId].quantity += item.quantity;
+            itemMap[item.productId].quantity += (item.quantity || 0);
         });
     });
 
@@ -41,10 +43,12 @@ export function generateLocalCustomerIntelligence(
     // Calculate category preferences
     const categoryMap: Record<string, number> = {};
     receipts.forEach(r => {
+        if (!r || !Array.isArray(r.items)) return;
         r.items.forEach(item => {
+            if (!item || !item.productId) return;
             const p = allProducts.find(prod => prod.id === item.productId);
             if (p?.category) {
-                categoryMap[p.category] = (categoryMap[p.category] || 0) + item.quantity;
+                categoryMap[p.category] = (categoryMap[p.category] || 0) + (item.quantity || 0);
             }
         });
     });
