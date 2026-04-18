@@ -225,7 +225,7 @@ function CustomerDetailContent() {
                     <CardContent className="text-center flex-grow">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <p className="text-2xl font-bold">{currencySymbol}{totalSpent.toLocaleString()}</p>
+                                <p className="text-2xl font-bold">{currencySymbol}{(totalSpent || 0).toLocaleString()}</p>
                                 <p className="text-xs text-muted-foreground">Total Spent</p>
                             </div>
                             <div>
@@ -237,7 +237,7 @@ function CustomerDetailContent() {
                                 <div className={`p-3 rounded-lg flex items-center justify-between ${totalDebt > 0 ? 'bg-destructive/10 border border-destructive/20 text-destructive' : 'bg-primary/10 border border-primary/20 text-primary'}`}>
                                     <div className="text-left">
                                         <p className="text-xs font-semibold uppercase tracking-wider">Outstanding Debt</p>
-                                        <p className="text-xl font-black">{currencySymbol}{totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                        <p className="text-xl font-black">{currencySymbol}{(totalDebt || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                     </div>
                                     <Wallet className="h-6 w-6 opacity-50" />
                                 </div>
@@ -287,9 +287,9 @@ function CustomerDetailContent() {
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-center">{summary.totalQuantity}</TableCell>
-                                        <TableCell className="text-right">{currencySymbol}{summary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                        <TableCell className="text-right">{format(summary.lastPurchase, 'PP')}</TableCell>
+                                        <TableCell className="text-center">{summary.totalQuantity || 0}</TableCell>
+                                        <TableCell className="text-right">{currencySymbol}{(summary.totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                        <TableCell className="text-right">{summary.lastPurchase ? format(summary.lastPurchase, 'PP') : 'N/A'}</TableCell>
                                     </TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center h-24">No purchases yet.</TableCell></TableRow>}
                             </TableBody>
@@ -319,7 +319,7 @@ function CustomerDetailContent() {
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
-                                                <span className="font-bold text-destructive">{currencySymbol}{receipt.total.toLocaleString()}</span>
+                                                <span className="font-bold text-destructive">{currencySymbol}{(receipt.total || 0).toLocaleString()}</span>
                                                 <div className="text-[10px] text-muted-foreground bg-destructive/5 px-1 rounded inline-block ml-1">UNPAID</div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
@@ -366,7 +366,7 @@ function CustomerDetailContent() {
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> Business Summary</h3>
-                                <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: insights.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></div>
+                                <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: (insights.summary || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></div>
                             </div>
                             <Separator />
                             <div>

@@ -409,8 +409,8 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const [isSending, setIsSending] = React.useState(false);
 
     const threadQuery = useMemoFirebase(
-        () => firestore ? query(collection(firestore, 'supportThreads'), where('userId', '==', userProfile.id)) : null,
-        [firestore, userProfile.id]
+        () => (firestore && userProfile?.id) ? query(collection(firestore, 'supportThreads'), where('userId', '==', userProfile.id)) : null,
+        [firestore, userProfile?.id]
     );
     
     const { data: threads, isLoading: isLoadingThreads } = useCollection<SupportThread>(threadQuery);
