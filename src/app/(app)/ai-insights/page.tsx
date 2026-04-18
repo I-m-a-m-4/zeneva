@@ -15,7 +15,7 @@ import { formatDistanceToNow, subDays, format } from "date-fns";
 import PageTitle from "@/components/shared/page-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, safeToDate } from "@/lib/utils";
 import FeatureGate from "@/components/shared/feature-gate";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";

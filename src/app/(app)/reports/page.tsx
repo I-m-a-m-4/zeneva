@@ -12,6 +12,7 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays } from 'date-fns';
 import TopCustomersList from '@/components/reports/top-customers-list';
+import { safeToDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';

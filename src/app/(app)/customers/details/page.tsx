@@ -37,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { logAuditEvent } from '@/lib/audit';
 import Image from 'next/image';
 import Link from 'next/link';
+import { safeToDate } from '@/lib/utils';
 
 export default function CustomerDetailPage() {
     return (
