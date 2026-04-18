@@ -172,6 +172,37 @@ export default function AuthenticatedLayout({
     setIsMounted(true);
   }, []);
 
+  // --- Helpers & Hooks (Above early returns to avoid Rule of Hooks violations) ---
+  
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    signOut(getAuth())
+      .then(() => {
+        // No need to redirect here. The auth listener will handle it.
+      })
+      .catch((error) => {
+        toast({
+          variant: "destructive",
+          title: "Logout Failed",
+          description: "An unexpected error occurred. Please try again.",
+        });
+        setIsLoggingOut(false);
+      });
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name?.trim()) return "";
+    const names = name.trim().split(' ').filter(Boolean);
+    if (names.length > 1) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    if (names.length === 1) {
+      return names[0][0].toUpperCase();
+    }
+    return "";
+  };
+  const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
+
   // Helper: resolve a navigation link for each notification
   const getNotificationLink = React.useCallback((notif: any): string => {
     if (notif.link) return notif.link;
@@ -252,22 +283,7 @@ export default function AuthenticatedLayout({
     }
   }, [currentUserProfile, userNotifications, firestore, toast]);
 
-
-  const handleLogout = () => {
-    setIsLoggingOut(true);
-    signOut(getAuth())
-      .then(() => {
-        // No need to redirect here. The auth listener will handle it.
-      })
-      .catch((error) => {
-        toast({
-          variant: "destructive",
-          title: "Logout Failed",
-          description: "An unexpected error occurred. Please try again.",
-        });
-        setIsLoggingOut(false);
-      });
-  };
+  const handleConfettiComplete = React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive]);
 
   React.useEffect(() => {
     // If loading is complete and there's no authenticated user, redirect to login.
@@ -282,17 +298,15 @@ export default function AuthenticatedLayout({
     }
   }, [isLoading, currentUserProfile, pathname, router]);
 
-  // --- RBAC Route Guard ---
+  // RBAC Route Guard
   React.useEffect(() => {
     if (isLoading || isUserLoading || !currentUserProfile) return;
 
     const userRole = currentUserProfile.role;
-
-    // Define explicit permissions for routes
     const ROUTE_PERMISSIONS: Record<string, string[]> = {
       '/dashboard': ['admin', 'manager', 'vendor_operator'],
       '/inventory': ['admin', 'manager', 'vendor_operator'],
-      '/sales': ['admin', 'manager', 'vendor_operator'], // Covers POS
+      '/sales': ['admin', 'manager', 'vendor_operator'],
       '/storefront': ['admin'],
       '/online-orders': ['admin', 'manager'],
       '/receipts': ['admin', 'manager', 'vendor_operator'],
@@ -308,9 +322,6 @@ export default function AuthenticatedLayout({
       '/achievements': ['admin', 'manager', 'vendor_operator'],
     };
 
-    // Find the matching permission rule for the current path
-    // We sort keys by length descending to match specific paths first (e.g. /settings/profile vs /settings)
-    // currently we only have top-level keys but this is good practice.
     const protectedRoute = Object.keys(ROUTE_PERMISSIONS)
       .sort((a, b) => b.length - a.length)
       .find(route => pathname.startsWith(route));
@@ -318,7 +329,6 @@ export default function AuthenticatedLayout({
     if (protectedRoute) {
       const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
       if (!allowedRoles.includes(userRole)) {
-        console.warn(`Access denied to ${pathname} for role ${userRole}. Redirecting to app.`);
         toast({
           variant: "destructive",
           title: "Access Denied",
@@ -327,20 +337,9 @@ export default function AuthenticatedLayout({
         router.replace('/sales/pos/select-products');
       }
     }
-  }, [pathname, currentUserProfile, isLoading, router, toast]);
+  }, [pathname, currentUserProfile, isLoading, isUserLoading, router, toast]);
 
-  const getInitials = (name?: string) => {
-    if (!name?.trim()) return "";
-    const names = name.trim().split(' ').filter(Boolean);
-    if (names.length > 1) {
-      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-    }
-    if (names.length === 1) {
-      return names[0][0].toUpperCase();
-    }
-    return "";
-  };
-  const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
+  // --- End of Hooks ---
 
   if (isLoggingOut) {
     return <AppLoader text="Logging out..." />;
@@ -455,7 +454,7 @@ export default function AuthenticatedLayout({
           <div
             className="relative flex h-full w-full overflow-hidden"
           >
-            <Confetti trigger={isConfettiActive} onComplete={React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive])} />
+            <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
               <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
                 <Link href="/dashboard" className="flex items-center justify-center h-12 w-full">
