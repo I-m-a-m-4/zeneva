@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: () => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { triggerRefresh, customers } = usePOS();
+    const { triggerRefresh, customers, addToQueue } = usePOS();
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [phone, setPhone] = React.useState('');
