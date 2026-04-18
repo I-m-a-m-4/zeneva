@@ -547,19 +547,22 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
                  <div className="space-y-4">
                     {isLoadingMessages && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
-                    {messages?.map(msg => (
-                        <div key={msg.id} className={`flex items-start gap-3 ${msg.senderId === userProfile.id ? 'justify-end' : 'justify-start'}`}>
-                             {msg.senderId !== userProfile.id && (
-                                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                    <AvatarFallback><Bot /></AvatarFallback>
-                                </Avatar>
-                            )}
-                             <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${msg.senderId === userProfile.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                <p className="text-sm">{msg.text}</p>
-                                <p className="text-xs opacity-70 mt-1 text-right">{safeFormatDate(msg.createdAt)}</p>
-                             </div>
-                        </div>
-                    ))}
+                    {(messages || []).map(msg => {
+                        if (!msg || !msg.id) return null;
+                        return (
+                            <div key={msg.id} className={`flex items-start gap-3 ${msg.senderId === userProfile.id ? 'justify-end' : 'justify-start'}`}>
+                                 {msg.senderId !== userProfile.id && (
+                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                                        <AvatarFallback><Bot /></AvatarFallback>
+                                    </Avatar>
+                                )}
+                                 <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${msg.senderId === userProfile.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                    <p className="text-sm">{msg.text || ''}</p>
+                                    <p className="text-xs opacity-70 mt-1 text-right">{safeFormatDate(msg.createdAt)}</p>
+                                 </div>
+                            </div>
+                        );
+                    })}
                  </div>
             </ScrollArea>
             <div className="mt-4 flex w-full items-center gap-2">

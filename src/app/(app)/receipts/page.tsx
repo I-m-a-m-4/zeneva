@@ -76,15 +76,15 @@ export default function ReceiptsPage() {
 
   const displayedReceipts = React.useMemo(() => {
     if (!receipts) return [];
-    let filtered = receipts.filter(r => r.paymentMethod !== 'Invoice');
+    let filtered = receipts.filter(r => r && r.paymentMethod !== 'Invoice');
     
     if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
       filtered = filtered.filter(r => 
-        r.id.toLowerCase().includes(lower) || 
+        (r.id || '').toLowerCase().includes(lower) || 
         (r.customer?.name || '').toLowerCase().includes(lower) ||
         (r.paymentMethod || '').toLowerCase().includes(lower) ||
-        r.total.toString().includes(lower)
+        (r.total || 0).toString().includes(lower)
       );
     }
     return filtered;
@@ -97,7 +97,18 @@ export default function ReceiptsPage() {
     setIsFetchingMore(false);
   };
 
-  const isLoading = isPosLoading;
+    const safeFormatDate = (val: any) => {
+        if (!val) return 'N/A';
+        try {
+            const date = safeToDate(val);
+            if (isNaN(date.getTime())) return 'N/A';
+            return format(date, 'PP');
+        } catch (e) {
+            return 'N/A';
+        }
+    };
+
+    const isLoading = isPosLoading;
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;
@@ -224,11 +235,11 @@ export default function ReceiptsPage() {
                 <TableBody>
                   {displayedReceipts.map((receipt: Receipt) => (
                     <TableRow key={receipt.id}>
-                      <TableCell className="font-medium">{receipt.id.substring(0, 8)}...</TableCell>
+                      <TableCell className="font-medium">{(receipt.id || '').substring(0, 8)}...</TableCell>
                       <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
-                      <TableCell>{receipt.createdAt?.toDate ? format(receipt.createdAt.toDate(), 'PP') : (receipt.createdAt ? format(new Date(receipt.createdAt), 'PP') : 'N/A')}</TableCell>
-                      <TableCell>{receipt.paymentMethod}</TableCell>
-                      <TableCell className="text-right">{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell>{safeFormatDate(receipt.createdAt)}</TableCell>
+                      <TableCell>{receipt.paymentMethod || 'N/A'}</TableCell>
+                      <TableCell className="text-right">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

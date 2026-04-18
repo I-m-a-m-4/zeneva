@@ -31,13 +31,15 @@ export default function OverviewChart({ receipts, currencySymbol, data }: Overvi
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
 
-    receipts.forEach(receipt => {
-      const date = receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
+    (receipts || []).forEach(receipt => {
+      if (!receipt) return;
+      const date = safeToDate(receipt.createdAt);
+      if (isNaN(date.getTime())) return;
+      
       const year = date.getFullYear();
-
       if (year === currentYear) {
         const monthName = monthNames[date.getMonth()];
-        monthlySales[monthName] = (monthlySales[monthName] || 0) + receipt.total;
+        monthlySales[monthName] = (monthlySales[monthName] || 0) + (receipt.total || 0);
       }
     });
 

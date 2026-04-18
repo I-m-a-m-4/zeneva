@@ -153,30 +153,34 @@ export default function DashboardPage() {
     let productUnitsSold = 0;
 
     filteredReceipts.forEach(receipt => {
-      receipt.items?.forEach(item => {
+      if (!receipt || !Array.isArray(receipt.items)) return;
+      receipt.items.forEach(item => {
+        if (!item || !item.productId) return;
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
-        itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;
+        itemSalesCount[name] = (itemSalesCount[name] || 0) + (item.quantity || 0);
         if (product) {
           if (product.categoryType === 'service') {
-            serviceUnitsSold += item.quantity;
+            serviceUnitsSold += (item.quantity || 0);
           } else {
-            productUnitsSold += item.quantity;
+            productUnitsSold += (item.quantity || 0);
           }
         }
       });
     });
 
     filteredOnlineOrders.forEach(order => {
-      order.items?.forEach(item => {
+      if (!order || !Array.isArray(order.items)) return;
+      order.items.forEach(item => {
+        if (!item || !item.productId) return;
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
-        itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;
+        itemSalesCount[name] = (itemSalesCount[name] || 0) + (item.quantity || 0);
         if (product) {
           if (product.categoryType === 'service') {
-            serviceUnitsSold += item.quantity;
+            serviceUnitsSold += (item.quantity || 0);
           } else {
-            productUnitsSold += item.quantity;
+            productUnitsSold += (item.quantity || 0);
           }
         }
       });
