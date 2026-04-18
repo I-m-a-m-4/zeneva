@@ -183,7 +183,7 @@ export default function AdminLoginPage() {
           height="1080"
           quality={100}
           priority
-          className="h-full w-full object-cover transform transition-transform duration-[30s] ease-in-out hover:scale-110"
+          className="h-full w-full object-cover transform transition-transform [transition-duration:30s] ease-in-out hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
         <div className="absolute bottom-12 left-12 right-12 p-0 bg-transparent">

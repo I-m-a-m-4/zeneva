@@ -126,7 +126,7 @@ export default function ForgotPasswordPage() {
           alt="Tactical Intelligence Background"
           width="1920"
           height="1080"
-          className="h-full w-full object-cover opacity-90 transition-transform duration-[20000ms] hover:scale-110"
+          className="h-full w-full object-cover opacity-90 transition-transform [transition-duration:20s] hover:scale-110"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
