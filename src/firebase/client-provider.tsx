@@ -2,8 +2,8 @@
 
 import React, { type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
-// Import the singleton instances directly
-import { firebaseApp, auth, firestore } from '@/firebase'; 
+// Import the singleton instances from the instance file to avoid circular dependencies
+import { firebaseApp, auth, firestore } from './instance'; 
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
