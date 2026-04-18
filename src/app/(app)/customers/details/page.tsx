@@ -9,7 +9,6 @@ import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
 import { generateLocalCustomerIntelligence } from '@/lib/customer-intelligence';
 import NProgress from 'nprogress';
-import { getIndustryConfig } from '@/lib/industry';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -23,7 +22,6 @@ import {
     Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus, ChevronRight
 } from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
-import { Separator } from '@/components/ui/separator';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -67,7 +65,7 @@ function CustomerDetailContent() {
     const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
     const [isSavingMeasurements, setIsSavingMeasurements] = React.useState(false);
-    const [measurements, setMeasurements] = React.useState<Record<string, string>>(customer?.measurements || {});
+
     const [isMeasurementsDirty, setIsMeasurementsDirty] = React.useState(false);
 
     const unpaidReceipts = React.useMemo(() => {

@@ -19,7 +19,6 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
 import type { Customer } from '@/types';
-import { Separator } from '@/components/ui/separator';
 
 interface EditCustomerDialogProps {
   isOpen: boolean;

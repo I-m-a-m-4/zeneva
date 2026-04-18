@@ -18,7 +18,6 @@ import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { usePOS } from '@/context/pos-context';
-import { Separator } from '@/components/ui/separator';
 import { getIndustryConfig } from '@/lib/industry';
 import { Loader2 } from 'lucide-react';
 
@@ -38,8 +37,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
-  const { business } = usePOS();
-  const industryConfig = getIndustryConfig(business?.settings?.industry);
+
 
 
   const resetForm = () => {
