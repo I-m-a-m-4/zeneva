@@ -15,9 +15,18 @@ const hasConfig = !!firebaseConfig.apiKey;
 
 // Check if Firebase has already been initialized
 if (!getApps().length) {
-  // During static build, we might not have the API key. 
-  // We initialize with a dummy if needed to prevent crashing the build worker.
-  firebaseApp = initializeApp(firebaseConfig.apiKey ? firebaseConfig : { ...firebaseConfig, apiKey: 'dummy-key-for-build' });
+  const isProduction = process.env.NODE_ENV === 'production';
+  const configToUse = firebaseConfig.apiKey ? firebaseConfig : { ...firebaseConfig, apiKey: 'dummy-key-for-build' };
+  
+  if (configToUse.apiKey === 'dummy-key-for-build' && !isServer) {
+    if (isProduction) {
+      console.error("CRITICAL: Firebase initialized with dummy key in PRODUCTION. Authentication will fail.");
+    } else {
+      console.warn("Firebase initialized with dummy key. Auth will not work.");
+    }
+  }
+  
+  firebaseApp = initializeApp(configToUse);
 } else {
   firebaseApp = getApp();
 }
