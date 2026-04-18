@@ -105,7 +105,7 @@ function ProductDetailModal({ product, isOpen, onOpenChange, currencySymbol }: {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 bg-muted/50 rounded-lg">
                             <p className="text-xs text-muted-foreground">Revenue</p>
-                            <p className="text-lg font-bold">{currencySymbol}{product.revenue.toLocaleString()}</p>
+                            <p className="text-lg font-bold">{currencySymbol}{(product.revenue || 0).toLocaleString()}</p>
                         </div>
                         <div className="p-3 bg-muted/50 rounded-lg">
                             <p className="text-xs text-muted-foreground">Units Sold</p>
@@ -428,15 +428,15 @@ function OfferDetailModal({ offer, allProducts, isOpen, onOpenChange, currencySy
                     <div className="grid grid-cols-3 gap-4 text-center">
                         <div className="p-2 bg-muted/50 rounded-lg">
                             <p className="text-xs text-muted-foreground">Original Total</p>
-                            <p className="font-bold text-lg line-through">{currencySymbol}{offer.originalTotalPrice.toLocaleString()}</p>
+                            <p className="font-bold text-lg line-through">{currencySymbol}{(offer.originalTotalPrice || 0).toLocaleString()}</p>
                         </div>
                         <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
                             <p className="text-xs text-primary/80">Bundle Price</p>
-                            <p className="font-bold text-lg text-primary">{currencySymbol}{offer.suggestedBundlePrice.toLocaleString()}</p>
+                            <p className="font-bold text-lg text-primary">{currencySymbol}{(offer.suggestedBundlePrice || 0).toLocaleString()}</p>
                         </div>
                         <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg border border-green-200 dark:border-green-800">
                             <p className="text-xs text-green-700 dark:text-green-300">You Save</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-400">{currencySymbol}{offer.savings.toLocaleString()}</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-400">{currencySymbol}{(offer.savings || 0).toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -460,7 +460,7 @@ function RevenueOpportunityModal({ opportunity, product, isOpen, onOpenChange, c
                     </div>
                     <div className="p-3 bg-destructive/10 rounded-lg text-center border border-destructive/20">
                         <p className="text-xs text-destructive/80">Estimated Lost Revenue</p>
-                        <p className="text-2xl font-bold text-destructive">{currencySymbol}{opportunity.lostRevenue.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-destructive">{currencySymbol}{(opportunity.lostRevenue || 0).toLocaleString()}</p>
                     </div>
                     <div>
                         <p className="text-sm font-semibold">Reason</p>
@@ -496,7 +496,7 @@ function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currenc
                     <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 bg-amber-500/10 rounded-lg text-center border border-amber-500/20">
                             <p className="text-xs text-amber-600/80">Capital Locked</p>
-                            <p className="text-2xl font-bold text-amber-600">{currencySymbol}{item.capitalLocked.toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-amber-600">{currencySymbol}{(item.capitalLocked || 0).toLocaleString()}</p>
                         </div>
                         <div className="p-3 bg-muted/50 rounded-lg text-center">
                             <p className="text-xs text-muted-foreground">Days Unsold</p>
@@ -505,7 +505,7 @@ function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currenc
                     </div>
                     <div>
                         <p className="text-sm font-semibold">Recovery Suggestion</p>
-                        <p className="text-sm text-foreground bg-muted/50 p-2 rounded-md" dangerouslySetInnerHTML={{ __html: item.suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                        <p className="text-sm text-foreground bg-muted/50 p-2 rounded-md" dangerouslySetInnerHTML={{ __html: (item.suggestion || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
                     </div>
                 </div>
                 <DialogFooter>
@@ -531,8 +531,8 @@ function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, c
                         <Image src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300`} alt={product.name} fill className="object-cover" />
                     </div>
                     <div className="p-4 bg-muted/50 rounded-lg text-center">
-                        <p className="text-sm">Change from <s className="text-muted-foreground">{currencySymbol}{recommendation.currentPrice.toLocaleString()}</s> to</p>
-                        <p className="text-3xl font-bold text-green-600">{currencySymbol}{recommendation.suggestedPrice.toLocaleString()}</p>
+                        <p className="text-sm">Change from <s className="text-muted-foreground">{currencySymbol}{(recommendation.currentPrice || 0).toLocaleString()}</s> to</p>
+                        <p className="text-3xl font-bold text-green-600">{currencySymbol}{(recommendation.suggestedPrice || 0).toLocaleString()}</p>
                     </div>
                     <div>
                         <p className="text-sm font-semibold">Strategy: <strong className="text-primary">{recommendation.strategy}</strong></p>
@@ -551,7 +551,7 @@ function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, c
 
 const PredictiveDebtInsightCard = ({ products, currencySymbol }: { products: Product[], currencySymbol: string }) => {
     const debtProducts = useMemo(() => products?.filter(p => (p.stock || 0) < 0) || [], [products]);
-    const totalDebtValue = useMemo(() => debtProducts.reduce((acc, p) => acc + (Math.abs(p.stock || 0) * p.price), 0), [debtProducts]);
+    const totalDebtValue = useMemo(() => debtProducts.reduce((acc, p) => acc + (Math.abs(p.stock || 0) * (p.price || 0)), 0), [debtProducts]);
 
     if (debtProducts.length === 0) return null;
 
@@ -575,7 +575,7 @@ const PredictiveDebtInsightCard = ({ products, currencySymbol }: { products: Pro
                         <p className="text-sm">
                             You have <span className="font-bold">{debtProducts.length}</span> products with negative stock.
                             Restocking these items would satisfy current customer "debts" and immediately realize
-                            <span className="font-bold text-lg ml-1">{currencySymbol}{totalDebtValue.toLocaleString()}</span> in revenue.
+                            <span className="font-bold text-lg ml-1">{currencySymbol}{(totalDebtValue || 0).toLocaleString()}</span> in revenue.
                         </p>
                         <div className="flex gap-2 mt-4">
                             <Button size="sm" variant="default" asChild>
@@ -618,8 +618,8 @@ const TopPerformingProductsCard = ({ products, onProductClick, currencySymbol }:
                                 </div>
                                 <div className="p-3 flex-grow flex flex-col">
                                     <h4 className="text-sm font-semibold line-clamp-2">{p.name}</h4>
-                                    <p className="text-lg font-bold text-primary mt-1">{currencySymbol}{p.revenue.toLocaleString()}</p>
-                                    <p className="text-xs text-muted-foreground">{p.unitsSold} units · {p.orderCount} orders</p>
+                                    <p className="text-lg font-bold text-primary mt-1">{currencySymbol}{(p.revenue || 0).toLocaleString()}</p>
+                                    <p className="text-xs text-muted-foreground">{p.unitsSold || 0} units · {p.orderCount || 0} orders</p>
                                     <Badge variant="secondary" className="mt-2 text-xs w-full text-center block whitespace-normal h-auto line-clamp-2">{p.insight}</Badge>
                                 </div>
                             </Card>
@@ -722,7 +722,7 @@ const ProductPerformanceCard = ({ products, analysis, searchTerm, onSearchChange
                                             <TableCell className="text-center font-medium">{p.unitsSold}</TableCell>
                                             <TableCell className="text-right font-bold text-lg">
                                                 <span className="text-muted-foreground text-xs font-normal mr-1">{currencySymbol}</span>
-                                                {p.revenue.toLocaleString()}
+                                                {(p.revenue || 0).toLocaleString()}
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -900,8 +900,8 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                                         <p className="text-xs text-muted-foreground italic mt-4">"{offer.marketingPitch}"</p>
                                                     </CardContent>
                                                     <CardFooter className="p-3 pt-0 flex justify-end items-baseline gap-2">
-                                                        <span className="text-sm text-muted-foreground line-through">{currencySymbol}{offer.originalTotalPrice.toLocaleString()}</span>
-                                                        <span className="text-lg font-bold text-primary">{currencySymbol}{offer.suggestedBundlePrice.toLocaleString()}</span>
+                                                        <span className="text-sm text-muted-foreground line-through">{currencySymbol}{(offer.originalTotalPrice || 0).toLocaleString()}</span>
+                                                        <span className="text-lg font-bold text-primary">{currencySymbol}{(offer.suggestedBundlePrice || 0).toLocaleString()}</span>
                                                     </CardFooter>
                                                 </Card>
                                             </button>
@@ -930,7 +930,7 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                                         </div>
                                                     </CardHeader>
                                                     <CardContent className="p-3 pt-0 flex-grow">
-                                                        <p className="text-destructive text-sm font-semibold">Lost Revenue: {currencySymbol}{opp.lostRevenue.toLocaleString()}</p>
+                                                        <p className="text-destructive text-sm font-semibold">Lost Revenue: {currencySymbol}{(opp.lostRevenue || 0).toLocaleString()}</p>
                                                         <p className="text-xs text-muted-foreground">Reason: {opp.reason}</p>
                                                     </CardContent>
                                                     <CardFooter className="p-3 pt-0">
@@ -992,11 +992,11 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                                         </div>
                                                     </CardHeader>
                                                     <CardContent className="p-3 pt-0 flex-grow">
-                                                        <p className="text-destructive text-sm font-semibold">Capital Locked: {currencySymbol}{item.capitalLocked.toLocaleString()}</p>
+                                                        <p className="text-destructive text-sm font-semibold">Capital Locked: {currencySymbol}{(item.capitalLocked || 0).toLocaleString()}</p>
                                                         <p className="text-xs text-muted-foreground">Unsold for {item.daysUnsold} days</p>
                                                     </CardContent>
                                                     <CardFooter className="p-3 pt-0">
-                                                        <p className="text-xs bg-muted/50 p-2 rounded-md"><strong className="text-primary">Suggestion:</strong> <span dangerouslySetInnerHTML={{ __html: item.suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /></p>
+                                                        <p className="text-xs bg-muted/50 p-2 rounded-md"><strong className="text-primary">Suggestion:</strong> <span dangerouslySetInnerHTML={{ __html: (item.suggestion || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /></p>
                                                     </CardFooter>
                                                 </Card>
                                             </button>
@@ -1027,7 +1027,7 @@ const StrategicInsightsAccordion = ({ opportunities, merchandising, slowMoving, 
                                                     <CardContent className="p-3 pt-0 flex-grow space-y-2">
                                                         <p className="text-sm font-semibold">Strategy: <strong className="text-primary">{item.strategy}</strong></p>
                                                         <p className="text-sm">
-                                                            Change price from <s className="text-muted-foreground">{currencySymbol}{item.currentPrice.toLocaleString()}</s> to <strong className="text-green-600">{currencySymbol}{item.suggestedPrice.toLocaleString()}</strong>
+                                                            Change price from <s className="text-muted-foreground">{currencySymbol}{(item.currentPrice || 0).toLocaleString()}</s> to <strong className="text-green-600">{currencySymbol}{(item.suggestedPrice || 0).toLocaleString()}</strong>
                                                         </p>
                                                         <p className="text-xs text-muted-foreground italic">"{item.reasoning}"</p>
                                                     </CardContent>

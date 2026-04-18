@@ -326,22 +326,22 @@ export default function DashboardPage() {
         {!isOperator && (
           <SummaryCard
             title="Total Revenue"
-            value={`${currencySymbol}${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${currencySymbol}${(totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={currencySymbol}
-            description={`${totalReceipts + totalOnlineOrdersCount} total transactions`}
+            description={`${(totalReceipts || 0) + (totalOnlineOrdersCount || 0)} total transactions`}
             href="/reports"
           />
         )}
         <SummaryCard
           title="Units Sold"
-          value={totalUnitsSold.toLocaleString()}
+          value={(totalUnitsSold || 0).toLocaleString()}
           icon={ShoppingBag}
-          description={`${productUnitsSold.toLocaleString()} products, ${serviceUnitsSold.toLocaleString()} services`}
+          description={`${(productUnitsSold || 0).toLocaleString()} products, ${(serviceUnitsSold || 0).toLocaleString()} services`}
           href="/reports"
         />
         <SummaryCard
           title="New Customers"
-          value={newCustomersCount.toLocaleString()}
+          value={(newCustomersCount || 0).toLocaleString()}
           icon={Users}
           description="Signed up in this period"
           href="/customers"
@@ -349,26 +349,26 @@ export default function DashboardPage() {
         {!isOperator && (
           <SummaryCard
             title="POS Sales"
-            value={`${currencySymbol}${totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${currencySymbol}${(totalSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={currencySymbol}
-            description={`${totalReceipts} transactions`}
+            description={`${(totalReceipts || 0)} transactions`}
             href="/receipts"
           />
         )}
         {!isOperator && (
           <SummaryCard
             title="Online Sales"
-            value={`${currencySymbol}${totalOnlineSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${currencySymbol}${(totalOnlineSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={currencySymbol}
-            description={`${totalOnlineOrdersCount} online orders`}
+            description={`${(totalOnlineOrdersCount || 0)} online orders`}
             href="/online-orders"
           />
         )}
         <SummaryCard
           title="Low Stock Alerts"
-          value={lowStockItems}
+          value={(lowStockItems || 0).toLocaleString()}
           icon={AlertCircle}
-          description={lowStockItems > 0 ? `${lowStockItems} items needing attention` : "All stock levels healthy"}
+          description={(lowStockItems || 0) > 0 ? `${lowStockItems} items needing attention` : "All stock levels healthy"}
           href="/inventory"
         />
         {debtItemsCount > 0 && (
@@ -433,7 +433,7 @@ export default function DashboardPage() {
               <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
                 <div>
                   <p className="text-sm text-muted-foreground">Quantity in Hand</p>
-                  <p className="text-2xl font-bold">{totalStock.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">{(totalStock || 0).toLocaleString()}</p>
                 </div>
                 <Archive className="h-8 w-8 text-primary" />
               </div>
