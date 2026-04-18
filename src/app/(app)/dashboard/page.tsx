@@ -115,14 +115,24 @@ export default function DashboardPage() {
     const filterByDate = (item: { createdAt?: any }) => {
       if (!item.createdAt) return false;
       let itemDate: Date;
-      if (item.createdAt.toDate) {
+      
+      // Handle various formats (Firestore Timestamp, Date, Number, Object)
+      if (typeof item.createdAt.toDate === 'function') {
         itemDate = item.createdAt.toDate();
       } else if (item.createdAt instanceof Date) {
         itemDate = item.createdAt;
-      } else {
+      } else if (item.createdAt && typeof item.createdAt === 'object' && item.createdAt.seconds !== undefined) {
+        itemDate = new Date(item.createdAt.seconds * 1000);
+      } else if (typeof item.createdAt === 'number' || typeof item.createdAt === 'string') {
         itemDate = new Date(item.createdAt);
+      } else {
+        // Fallback for objects that aren't timestamps (e.g. from local storage)
+        const possibleDate = new Date(item.createdAt);
+        itemDate = isNaN(possibleDate.getTime()) ? new Date(0) : possibleDate;
       }
       
+      if (isNaN(itemDate.getTime())) return false;
+
       if (fromDate && !toDate) { // single day selection
         return isWithinInterval(itemDate, { start: startOfDay(fromDate), end: endOfDay(fromDate) });
       }
@@ -140,16 +150,16 @@ export default function DashboardPage() {
     const uniqueSkus = inventoryItems.filter(item => item.categoryType !== 'service').length;
     const lowStockItems = inventoryItems.filter(item => item.categoryType !== 'service' && (item.stock || 0) <= (item.lowStockThreshold || 0)).length;
 
-    const totalSalesValue = filteredReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
+    const totalSalesValue = filteredReceipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0);
     const totalReceiptsCount = filteredReceipts.length;
 
-    const totalOnlineSalesValue = filteredOnlineOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalOnlineSalesValue = filteredOnlineOrders.reduce((sum, order) => sum + (order.total || 0), 0);
     const totalOnlineOrdersCount = filteredOnlineOrders.length;
 
-    const totalRevenue = totalSalesValue + totalOnlineSalesValue;
+    const totalRevenue = (totalSalesValue || 0) + (totalOnlineSalesValue || 0);
 
-    const posUnitsSold = filteredReceipts.reduce((sum, r) => sum + r.items.reduce((q: number, i: { quantity: number }) => q + i.quantity, 0), 0);
-    const onlineUnitsSold = filteredOnlineOrders.reduce((sum, o) => sum + o.items.reduce((q: number, i: { quantity: number }) => q + i.quantity, 0), 0);
+    const posUnitsSold = filteredReceipts.reduce((sum, r) => sum + (r.items?.reduce((q: number, i: any) => q + (i.quantity || 0), 0) || 0), 0);
+    const onlineUnitsSold = filteredOnlineOrders.reduce((sum, o) => sum + (o.items?.reduce((q: number, i: any) => q + (i.quantity || 0), 0) || 0), 0);
     const totalUnitsSold = posUnitsSold + onlineUnitsSold;
 
     const itemSalesCount: Record<string, number> = {};

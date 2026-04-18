@@ -138,6 +138,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const isImpersonating = !!impersonatedUserId;
   const effectiveUserId = impersonatedUserId || user?.uid;
 
+  // --- Date Helper ---
+  const safeToDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date(0);
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp.toDate === 'function') return timestamp.toDate();
+    if (timestamp.seconds !== undefined) return new Date(timestamp.seconds * 1000);
+    if (typeof timestamp === 'number') return new Date(timestamp);
+    if (typeof timestamp === 'string') return new Date(timestamp);
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? new Date(0) : date;
+  };
+
   // --- UI State ---
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
@@ -263,15 +275,34 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const receipts = useMemo(() => {
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
+    
+    // Add synced receipts
     syncedReceipts.forEach(r => {
       if (!existingIds.has(r.id)) merged.push(r);
     });
+
+    // OPTIMISTICALLY ADD QUEUED SALES
+    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
+    const existingQueueIds = new Set(merged.map(r => r.id));
+    
+    queuedSales.forEach(action => {
+      const receipt = action.payload.receiptData;
+      if (receipt && !existingIds.has(receipt.id) && !existingQueueIds.has(receipt.id)) {
+        merged.push({
+          ...receipt,
+          isOptimistic: true,
+          // Ensure createdAt is a Date for sorting/filtering if it's just a raw timestamp
+          createdAt: receipt.createdAt || new Date(action.timestamp)
+        });
+      }
+    });
+
     return merged.sort((a, b) => {
-      const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
-      const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
+      const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0));
+      const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0));
       return tb - ta;
     });
-  }, [initialReceipts, syncedReceipts]);
+  }, [initialReceipts, syncedReceipts, queuedActions]);
 
   const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);
 
@@ -504,6 +535,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
       loadQueue();
     }
   }, [isMounted]);
+
+  // Sync when coming back online
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Network back online, triggering sync...');
+      processQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [processQueue]);
 
   // Handle SQLite Redundant Sync
   useEffect(() => {
@@ -1097,10 +1138,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // 1. If on Desktop, prioritize local memory lookup for speed and offline consistency
     if (isTauri && receipts && receipts.length > 0) {
       const local = receipts.filter(r => {
-        let rd: Date;
-        if (r.createdAt?.toDate) rd = r.createdAt.toDate();
-        else if (r.createdAt instanceof Date) rd = r.createdAt;
-        else rd = new Date(r.createdAt || 0);
+        const rd = safeToDate(r.createdAt);
         return rd >= from && rd <= to;
       });
       
@@ -1520,10 +1558,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // For dashboard and reports, we can calculate these locally with 100% accuracy for recent ranges.
     if (receipts && receipts.length > 0) {
       const filtered = receipts.filter(r => {
-        let rd: Date;
-        if (r.createdAt?.toDate) rd = r.createdAt.toDate();
-        else if (r.createdAt instanceof Date) rd = r.createdAt;
-        else rd = new Date(r.createdAt || 0);
+        const rd = safeToDate(r.createdAt);
         return rd >= from && rd <= to;
       });
       return {
@@ -1568,10 +1603,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (isTauri && receipts && receipts.length > 0) {
       const results = ranges.map(({ start, end, month }) => {
         const filtered = receipts.filter(r => {
-          let rd: Date;
-          if (r.createdAt?.toDate) rd = r.createdAt.toDate();
-          else if (r.createdAt instanceof Date) rd = r.createdAt;
-          else rd = new Date(r.createdAt || 0);
+          const rd = safeToDate(r.createdAt);
           return rd >= start && rd <= end;
         });
         return {
