@@ -536,15 +536,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [isMounted]);
 
-  // Sync when coming back online
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('Network back online, triggering sync...');
-      processQueue();
-    };
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [processQueue]);
 
   // Handle SQLite Redundant Sync
   useEffect(() => {
@@ -1917,6 +1908,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
       checkRustSubscription();
     }
   }, [business?.id, business?.accessLevel, business?.trialExpiresAt?.seconds]);
+
+  // Sync when coming back online (Moved here to avoid TDZ error)
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Network back online, triggering sync...');
+      processQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [processQueue]);
 
   const value = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading, isUserLoading, user, firestore,
