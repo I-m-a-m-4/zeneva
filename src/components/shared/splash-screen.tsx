@@ -13,8 +13,13 @@ export function SplashScreen() {
   useEffect(() => {
     setMounted(true);
     
-    // Check if we are in Tauri environment
-    const isTauriEnv = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    // Robust check for Tauri environment
+    const isTauriEnv = typeof window !== 'undefined' && (
+      (window as any).__TAURI__ || 
+      (window as any).__TAURI_INTERNALS__ || 
+      (window as any).__TAURI_METADATA__ || 
+      (typeof (window as any).rpc !== 'undefined')
+    );
     setIsTauri(!!isTauriEnv);
 
     // Only run the loading simulation if in Tauri
