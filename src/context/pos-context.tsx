@@ -173,16 +173,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
 
   const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
+  const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: initialStats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
 
   const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialReceipts, isLoading: isLoadingInitialReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
+  const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
+  const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
   const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
   const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
@@ -520,7 +520,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [business]);
 
-  const isLoadingProducts = isLoadingInitialProducts;
 
 
 
@@ -547,7 +546,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     (!!user && !isProfileReady) || // Bridge the gap between auth and profile loading
     (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ ? 
       (!business && isLoadingBusiness) : // On Tauri, only block if we have NO business (online or offline)
-      (isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingInitialCustomers || isLoadingOnlineOrders || isLoadingStats)
+      (isLoadingBusiness || isLoadingProducts || isLoadingReceipts || isLoadingCustomers || isLoadingOnlineOrders || isLoadingStats)
     );
 
   const triggerRefresh = useCallback(() => {
