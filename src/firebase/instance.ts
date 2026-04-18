@@ -7,31 +7,51 @@ import { getFirestore, enableMultiTabIndexedDbPersistence, type Firestore } from
 
 // --- Singleton Initialization ---
 let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
 
-// Check if Firebase has already been initialized to prevent errors in Fast Refresh environments.
+const isServer = typeof window === 'undefined';
+const hasConfig = !!firebaseConfig.apiKey;
+
+// Check if Firebase has already been initialized
 if (!getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
+  // During static build, we might not have the API key. 
+  // We initialize with a dummy if needed to prevent crashing the build worker.
+  firebaseApp = initializeApp(firebaseConfig.apiKey ? firebaseConfig : { ...firebaseConfig, apiKey: 'dummy-key-for-build' });
 } else {
   firebaseApp = getApp();
 }
 
-const auth: Auth = getAuth(firebaseApp);
+// Safely initialize Auth
+try {
+  auth = getAuth(firebaseApp);
+} catch (e) {
+  // Fallback for build time
+  auth = {} as Auth;
+}
+
+// Safely initialize Firestore
+try {
+  firestore = getFirestore(firebaseApp);
+} catch (e) {
+  // Fallback for build time
+  firestore = {} as Firestore;
+}
 
 // Explicitly set persistence to LOCAL (persists across sessions/tabs)
-if (typeof window !== 'undefined') {
+if (!isServer && hasConfig) {
   setPersistence(auth, browserLocalPersistence)
     .catch((err) => console.error("Firebase Auth persistence error:", err));
 }
-const firestore: Firestore = getFirestore(firebaseApp);
 
 // Enable persistence only on the client-side.
-if (typeof window !== 'undefined') {
+if (!isServer && hasConfig) {
   enableMultiTabIndexedDbPersistence(firestore)
     .catch((err) => {
       if (err.code === 'failed-precondition') {
-        // This is an expected error when multiple tabs are open.
+        // Expected error when multiple tabs are open.
       } else if (err.code === 'unimplemented') {
-        // The browser does not support all of the features required to enable persistence.
+        // Browser does not support persistence.
       }
     });
 }
