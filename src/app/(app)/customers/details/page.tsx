@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -64,9 +65,6 @@ function CustomerDetailContent() {
     const [customerToDelete, setCustomerToDelete] = React.useState<Customer | null>(null);
     const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
     const [isDeleting, setIsDeleting] = React.useState(false);
-    const [isSavingMeasurements, setIsSavingMeasurements] = React.useState(false);
-
-    const [isMeasurementsDirty, setIsMeasurementsDirty] = React.useState(false);
 
     const unpaidReceipts = React.useMemo(() => {
         return receipts.filter(r => r.status === 'unpaid');
@@ -75,33 +73,6 @@ function CustomerDetailContent() {
     const totalDebt = React.useMemo(() => {
         return unpaidReceipts.reduce((sum, r) => sum + r.total, 0);
     }, [unpaidReceipts]);
-
-    const handleSaveMeasurements = async () => {
-        if (!customer || !firestore || !currentUserProfile) return;
-        setIsSavingMeasurements(true);
-        try {
-            const customerRef = doc(firestore, 'customers', customer.id);
-            await updateDoc(customerRef, { 
-                measurements,
-                updatedAt: serverTimestamp()
-            });
-            
-            // Offline support
-            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-            if (isTauri) {
-                const { syncCustomersToOffline } = await import('@/lib/sqlite-sync');
-                await syncCustomersToOffline(currentUserProfile.businessId, [{ ...customer, measurements }]);
-            }
-
-            setIsMeasurementsDirty(false);
-            toast({ variant: 'success', title: 'Measurements Saved', description: 'Customer dimensions updated successfully.' });
-        } catch (e) {
-            console.error("Failed to save measurements:", e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not save measurements.' });
-        } finally {
-            setIsSavingMeasurements(false);
-        }
-    };
 
     React.useEffect(() => {
         if (customer?.aiInsights) {
