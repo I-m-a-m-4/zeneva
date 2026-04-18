@@ -330,8 +330,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore]);
 
   // Track the last user ID to prevent unnecessary POS resets
-
-  // Track the last user ID to prevent unnecessary POS resets
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
   // --- POS Local States (MOVED UP to prevent TDZ errors) ---
@@ -482,54 +480,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setRefreshKey(prev => prev + 1);
   }, [toast, firestore, businessId, currentUserProfile, impersonatedUserId]);
 
-  const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
-  const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
-  // Grouping all business-level queries at the top to ensure stable hook order (Fixes React Error #310)
-  const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
-
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
-
-  const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialStats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
-
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
-
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
-
-  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
-
-  const business = useMemo(() => {
-    const base = initialBusiness || offlineBusiness;
-    if (!base) return null;
-
-    const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
-    if (settingsUpdates.length > 0) {
-      let result = { ...base };
-      settingsUpdates.forEach(action => {
-        Object.keys(action.payload).forEach(key => {
-          if (key.includes('.')) {
-            const parts = key.split('.');
-            let current: any = result;
-            for (let i = 0; i < parts.length - 1; i++) {
-              current[parts[i]] = { ...current[parts[i]] };
-              current = current[parts[i]];
-            }
-            current[parts[parts.length - 1]] = action.payload[key];
-          } else {
-            (result as any)[key] = action.payload[key];
-          }
-        });
-      });
-      return result;
-    }
-
-    return base;
-  }, [initialBusiness, offlineBusiness, queuedActions.length > 0 ? queuedActions.filter(a => a.type === 'update-settings').length : 0]);
 
 
 
