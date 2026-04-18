@@ -149,6 +149,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
+  // --- Sync & Offline State (MOVED UP to prevent ReferenceErrors) ---
+  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
+  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
+  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
+  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(null);
+  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
+
   // --- Centralized Data Fetching (MOVED UP to prevent ReferenceErrors) ---
   const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
@@ -156,6 +165,142 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // isProfileReady should be true if we have a user and a profile, and the profile matches our EFFECTIVE user ID.
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
+
+  // --- Initial Data Subscriptions ---
+  const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
+  const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
+
+  const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
+
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const { data: initialProducts, isLoading: isLoadingInitialProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
+
+  const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const { data: initialStats, isLoading: isLoadingStats } = useDoc<BusinessStats>(statsDocRef);
+
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const { data: initialReceipts, isLoading: isLoadingInitialReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
+
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const { data: initialCustomers, isLoading: isLoadingInitialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
+
+  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const { data: onlineOrders, isLoading: isLoadingOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
+
+  // --- Synchronized States (MOVED UP) ---
+  const business = useMemo(() => {
+    const base = initialBusiness || offlineBusiness;
+    if (!base) return null;
+    const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
+    if (settingsUpdates.length > 0) {
+      let result = { ...base };
+      settingsUpdates.forEach(action => {
+        Object.keys(action.payload).forEach(key => {
+          if (key.includes('.')) {
+            const parts = key.split('.');
+            let current: any = result;
+            for (let i = 0; i < parts.length - 1; i++) {
+              current[parts[i]] = { ...current[parts[i]] };
+              current = current[parts[i]];
+            }
+            current[parts[parts.length - 1]] = action.payload[key];
+          } else {
+            (result as any)[key] = action.payload[key];
+          }
+        });
+      });
+      return result;
+    }
+    return base;
+  }, [initialBusiness, offlineBusiness, queuedActions.length > 0 ? queuedActions.filter(a => a.type === 'update-settings').length : 0]);
+
+  const products = useMemo(() => {
+    let merged = [...(initialProducts || [])];
+    const existingIds = new Set(merged.map(p => p.id));
+    syncedProducts.forEach(p => {
+      if (!existingIds.has(p.id)) merged.push(p);
+      else {
+        const idx = merged.findIndex(m => m.id === p.id);
+        if (idx !== -1) merged[idx] = p;
+      }
+    });
+
+    // APPLY QUEUED ACTIONS OPTIMISTICALLY
+    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
+    if (deletedIds.size > 0) merged = merged.filter(p => !deletedIds.has(p.id));
+
+    const updates = queuedActions.filter(a => a.type === 'update-product' || a.type === 'bulk-update-products');
+    updates.forEach(action => {
+      if (action.type === 'update-product') {
+        const idx = merged.findIndex(p => p.id === action.payload.productId);
+        if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+      } else if (action.type === 'bulk-update-products') {
+        action.payload.productIds.forEach((id: string) => {
+          const idx = merged.findIndex(p => p.id === id);
+          if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+        });
+      }
+    });
+
+    const additions = queuedActions.filter(a => a.type === 'add-product');
+    additions.forEach(action => {
+      if (!merged.find(p => p.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true });
+    });
+
+    const sales = queuedActions.filter(a => a.type === 'complete-sale');
+    sales.forEach(action => {
+      const items = action.payload.receiptData?.items || action.payload.items;
+      if (Array.isArray(items)) {
+        items.forEach((item: any) => {
+          const idx = merged.findIndex(p => p.id === item.productId);
+          if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity };
+        });
+      }
+    });
+    return merged;
+  }, [initialProducts, syncedProducts, queuedActions]);
+
+  const receipts = useMemo(() => {
+    let merged = [...(initialReceipts || [])];
+    const existingIds = new Set(merged.map(r => r.id));
+    syncedReceipts.forEach(r => {
+      if (!existingIds.has(r.id)) merged.push(r);
+    });
+    return merged.sort((a, b) => {
+      const ta = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
+      const tb = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
+      return tb - ta;
+    });
+  }, [initialReceipts, syncedReceipts]);
+
+  const customers = useMemo(() => {
+    let base = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
+    if (base.length === syncedCustomers.length && initialCustomers) {
+      const ids = new Set(base.map(c => c.id));
+      initialCustomers.forEach(c => { if (!ids.has(c.id)) base.push(c); });
+    }
+    let merged = [...base];
+    if (receipts && receipts.length > 0) {
+      const spentMap: Record<string, number> = {};
+      receipts.forEach(r => { if (r.customer?.id) spentMap[r.customer.id] = (spentMap[r.customer.id] || 0) + r.total; });
+      merged = merged.map(c => {
+        const memorySpent = spentMap[c.id] || 0;
+        return (memorySpent > (c.totalSpent || 0)) ? { ...c, totalSpent: memorySpent } : c;
+      });
+    }
+    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
+    if (deletedIds.size > 0) merged = merged.filter(c => !deletedIds.has(c.id));
+    const updates = queuedActions.filter(a => a.type === 'update-customer');
+    updates.forEach(action => {
+      const idx = merged.findIndex(c => c.id === action.payload.id);
+      if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+    });
+    const additions = queuedActions.filter(a => a.type === 'add-customer');
+    additions.forEach(action => {
+      if (!merged.find(c => c.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true });
+    });
+    return merged;
+  }, [initialCustomers, syncedCustomers, receipts, queuedActions]);
 
   const getInventoryStats = useCallback(async () => {
     if (!businessId || !firestore) return { totalProducts: 0, totalStockValue: 0, lowStockCount: 0 };
@@ -289,15 +434,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [resetPOS]);
 
-  // --- Offline Queue & Sync State ---
-  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
-  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
-  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
-  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
-  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
-  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(null);
-  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
-
+  // --- Offline Persistence Effects ---
   useEffect(() => {
     try {
       const savedQueue = localStorage.getItem(QUEUED_ACTIONS_KEY);
@@ -498,48 +635,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
 
-  const customers = useMemo(() => {
-    let base = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
-    
-    if (base.length === syncedCustomers.length && initialCustomers) {
-      const ids = new Set(base.map(c => c.id));
-      initialCustomers.forEach(c => { if (!ids.has(c.id)) base.push(c); });
-    }
-
-    let merged = [...base];
-    if (receipts && receipts.length > 0) {
-      const spentMap: Record<string, number> = {};
-      receipts.forEach(r => { if (r.customer?.id) spentMap[r.customer.id] = (spentMap[r.customer.id] || 0) + r.total; });
-      merged = merged.map(c => {
-        const memorySpent = spentMap[c.id] || 0;
-        return (memorySpent > (c.totalSpent || 0)) ? { ...c, totalSpent: memorySpent } : c;
-      });
-    }
-
-    // APPLY QUEUED ACTIONS OPTIMISTICALLY
-    // 1. Deletions
-    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
-    if (deletedIds.size > 0) {
-      merged = merged.filter(c => !deletedIds.has(c.id));
-    }
-
-    // 2. Updates
-    const updates = queuedActions.filter(a => a.type === 'update-customer');
-    updates.forEach(action => {
-      const idx = merged.findIndex(c => c.id === action.payload.id);
-      if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
-    });
-
-    // 3. Additions
-    const additions = queuedActions.filter(a => a.type === 'add-customer');
-    additions.forEach(action => {
-      if (!merged.find(c => c.id === action.payload.id)) {
-        merged.push({ ...action.payload, isOptimistic: true });
-      }
-    });
-
-    return merged;
-  }, [initialCustomers, syncedCustomers, receipts, queuedActions]);
 
 
 
