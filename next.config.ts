@@ -6,7 +6,10 @@ const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
 const nextConfig: NextConfig = {
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
-  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage'],
+  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],
+  experimental: {
+    serverMinification: false,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

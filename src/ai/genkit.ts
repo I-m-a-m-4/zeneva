@@ -16,22 +16,12 @@ const getAI = () => {
   return _instance;
 };
 
-// Use a property-based export to avoid TDZ issues in minified code
-export const ai = {} as any;
+// High-durability factory functions to ensure 'this' binding and lazy-init safety
+export const ai = {
+  defineFlow: (...args: any[]) => getAI().defineFlow(...args),
+  definePrompt: (...args: any[]) => getAI().definePrompt(...args),
+  run: (...args: any[]) => getAI().run(...args),
+} as any;
 
-Object.defineProperty(ai, 'defineFlow', {
-  get: () => getAI().defineFlow,
-  enumerable: true
-});
-
-Object.defineProperty(ai, 'definePrompt', {
-  get: () => getAI().definePrompt,
-  enumerable: true
-});
-
-Object.defineProperty(ai, 'run', {
-  get: () => getAI().run,
-  enumerable: true
-});
 
 
