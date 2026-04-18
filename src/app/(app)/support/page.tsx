@@ -429,12 +429,27 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         [firestore, thread]
     );
 
+    const safeFormatDate = (val: any) => {
+        if (!val) return '';
+        try {
+            if (val instanceof Date) return formatDistanceToNow(val, { addSuffix: true });
+            if (typeof val.toDate === 'function') return formatDistanceToNow(val.toDate(), { addSuffix: true });
+            if (val.seconds) return formatDistanceToNow(new Date(val.seconds * 1000), { addSuffix: true });
+            return '';
+        } catch (e) {
+            return '';
+        }
+    };
+
     const { data: messages, isLoading: isLoadingMessages } = useCollection<SupportMessage>(messagesQuery);
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
      React.useEffect(() => {
         if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight });
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+                scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+            }
         }
     }, [messages]);
 
@@ -541,7 +556,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             )}
                              <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${msg.senderId === userProfile.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                                 <p className="text-sm">{msg.text}</p>
-                                <p className="text-xs opacity-70 mt-1 text-right">{msg.createdAt ? formatDistanceToNow(msg.createdAt.toDate(), { addSuffix: true }) : ''}</p>
+                                <p className="text-xs opacity-70 mt-1 text-right">{safeFormatDate(msg.createdAt)}</p>
                              </div>
                         </div>
                     ))}
