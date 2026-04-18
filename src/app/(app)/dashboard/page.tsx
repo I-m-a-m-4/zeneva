@@ -153,7 +153,7 @@ export default function DashboardPage() {
     let productUnitsSold = 0;
 
     filteredReceipts.forEach(receipt => {
-      receipt.items.forEach(item => {
+      receipt.items?.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
         itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;
@@ -168,7 +168,7 @@ export default function DashboardPage() {
     });
 
     filteredOnlineOrders.forEach(order => {
-      order.items.forEach(item => {
+      order.items?.forEach(item => {
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
         itemSalesCount[name] = (itemSalesCount[name] || 0) + item.quantity;

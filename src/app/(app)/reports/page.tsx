@@ -125,7 +125,7 @@ export default function ReportsDashboard() {
         const uniqueProductIds = new Set<string>();
 
         targetReceipts.forEach(r => {
-            r.items.forEach(i => {
+            r.items?.forEach(i => {
                 uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
                 if (product?.categoryType === 'service') {

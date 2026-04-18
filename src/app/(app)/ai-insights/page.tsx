@@ -66,7 +66,7 @@ const GenerateBriefingCTA = ({ analysis, handleGenerateAnalysis, isPending }: { 
         {analysis?.createdAt && (
             <p className="text-xs text-muted-foreground">
                 Last generated:{" "}
-                {formatDistanceToNow(analysis.createdAt.toDate ? analysis.createdAt.toDate() : new Date(analysis.createdAt), { addSuffix: true })}
+                {formatDistanceToNow(safeToDate(analysis.createdAt), { addSuffix: true })}
             </p>
         )}
         <Button variant={analysis ? "outline" : "default"} onClick={handleGenerateAnalysis} disabled={isPending}>
@@ -1187,7 +1187,7 @@ function ExecutiveBriefingTab() {
         const allSales = [...(receipts || []), ...(onlineOrders || [])];
         const thirtyDaysAgo = subDays(new Date(), 30);
         const recentSales = allSales.filter(s => {
-            const saleDate = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+            const saleDate = safeToDate(s.createdAt);
             return saleDate >= thirtyDaysAgo;
         });
 
@@ -1196,20 +1196,20 @@ function ExecutiveBriefingTab() {
         const productSales: Record<string, { name: string; revenue: number; unitsSold: number; orderCount: number; salesTimestamps: Date[] }> = {};
 
         recentSales.forEach(sale => {
-            const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
+            const saleDate = safeToDate(sale.createdAt);
 
             // Use a Set to count unique orders per product
-            sale.items.forEach(item => {
+            sale.items?.forEach(item => {
                 if (!productSales[item.productId]) {
                     productSales[item.productId] = { name: item.name, revenue: 0, unitsSold: 0, orderCount: 0, salesTimestamps: [] };
                 }
-                productSales[item.productId].revenue += item.price * item.quantity;
-                productSales[item.productId].unitsSold += item.quantity;
+                productSales[item.productId].revenue += (item.price || 0) * (item.quantity || 0);
+                productSales[item.productId].unitsSold += (item.quantity || 0);
                 productSales[item.productId].salesTimestamps.push(saleDate);
             });
 
             // Increment order count once per receipt for each unique product
-            const uniqueProductIdsInSale = new Set(sale.items.map(i => i.productId));
+            const uniqueProductIdsInSale = new Set(sale.items?.map(i => i.productId) || []);
             uniqueProductIdsInSale.forEach(pid => {
                 if (productSales[pid]) {
                     productSales[pid].orderCount += 1;
@@ -1281,23 +1281,23 @@ function ExecutiveBriefingTab() {
             const sixtyDaysAgo = subDays(new Date(), 60);
             const allSales = [...(receipts || []), ...(onlineOrders || [])];
             const recentSales = allSales.filter(s => {
-                const saleDate = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+                const saleDate = safeToDate(s.createdAt);
                 return saleDate >= sixtyDaysAgo;
             }).sort((a, b) => { // Sort descending by date
-                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                const dateA = safeToDate(a.createdAt);
+                const dateB = safeToDate(b.createdAt);
                 return dateB.getTime() - dateA.getTime();
             });
 
             // 1. Calculate Per-Product Metrics
             const productSummaryMap: Record<string, { revenue: number, units: number, orders: number }> = {};
             recentSales.forEach(sale => {
-                const uniqueInSale = new Set(sale.items.map(i => i.productId));
+                const uniqueInSale = new Set(sale.items?.map(i => i.productId) || []);
                 uniqueInSale.forEach(pid => {
                     if (!productSummaryMap[pid]) productSummaryMap[pid] = { revenue: 0, units: 0, orders: 0 };
                     productSummaryMap[pid].orders++;
                 });
-                sale.items.forEach(item => {
+                sale.items?.forEach(item => {
                     if (!productSummaryMap[item.productId]) productSummaryMap[item.productId] = { revenue: 0, units: 0, orders: 0 };
                     productSummaryMap[item.productId].revenue += (item.price || 0) * (item.quantity || 0);
                     productSummaryMap[item.productId].units += (item.quantity || 0);
@@ -1326,12 +1326,12 @@ function ExecutiveBriefingTab() {
             // 3. Daily Aggregates (Top 30 Days)
             const dailyMap: Record<string, { revenue: number, orders: number, cats: Record<string, number> }> = {};
             recentSales.forEach(sale => {
-                const d = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
+                const d = safeToDate(sale.createdAt);
                 const dStr = format(d, 'yyyy-MM-dd');
                 if (!dailyMap[dStr]) dailyMap[dStr] = { revenue: 0, orders: 0, cats: {} };
                 dailyMap[dStr].revenue += (sale.total || 0);
                 dailyMap[dStr].orders++;
-                sale.items.forEach(item => {
+                sale.items?.forEach(item => {
                     const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
                     dailyMap[dStr].cats[cat] = (dailyMap[dStr].cats[cat] || 0) + ((item.price || 0) * (item.quantity || 0));
                 });
@@ -1345,7 +1345,7 @@ function ExecutiveBriefingTab() {
             const categoryMap: Record<string, { revenue: number, units: number, customers: Set<string> }> = {};
             recentSales.forEach(sale => {
                 const cId = 'customer' in sale && sale.customer ? sale.customer.id : 'Guest';
-                sale.items.forEach(item => {
+                sale.items?.forEach(item => {
                     const cat = products?.find(p => p.id === item.productId)?.category || 'Uncategorized';
                     if (!categoryMap[cat]) categoryMap[cat] = { revenue: 0, units: 0, customers: new Set() };
                     categoryMap[cat].revenue += ((item.price || 0) * (item.quantity || 0));
@@ -1373,11 +1373,11 @@ function ExecutiveBriefingTab() {
             }).filter(Boolean);
 
             const last30DaysSales = recentSales.filter(s => {
-                const date = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+                const date = safeToDate(s.createdAt);
                 return date >= subDays(new Date(), 30);
             });
             const prev30DaysSales = recentSales.filter(s => {
-                const date = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+                const date = safeToDate(s.createdAt);
                 return date >= subDays(new Date(), 60) && date < subDays(new Date(), 30);
             });
 
@@ -1390,7 +1390,7 @@ function ExecutiveBriefingTab() {
                 const cId = c.id;
                 const lastOrder = allSales.find(s => 'customer' in s && s.customer?.id === cId);
                 if (!lastOrder) return false;
-                const lastOrderDate = lastOrder.createdAt?.toDate ? lastOrder.createdAt.toDate() : new Date(lastOrder.createdAt);
+                const lastOrderDate = safeToDate(lastOrder.createdAt);
                 return lastOrderDate < subDays(new Date(), 30); // Risk if no order in 30 days
             }).length;
 

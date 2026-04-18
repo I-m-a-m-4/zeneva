@@ -91,8 +91,8 @@ function CustomerDetailContent() {
         }> = {};
 
         receipts.forEach(receipt => {
-            const purchaseDate = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
-            receipt.items.forEach(item => {
+            const purchaseDate = safeToDate(receipt.createdAt);
+            receipt.items?.forEach(item => {
                 const productInfo = allProducts.find(p => p.id === item.productId);
                 if (!productInfo) return;
 
@@ -315,7 +315,7 @@ function CustomerDetailContent() {
                                     <div key={receipt.id} className="flex items-center justify-between p-3 rounded-md bg-muted/30 border border-transparent hover:border-destructive/30 transition-all">
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-sm">{receipt.receiptNumber}</span>
-                                            <span className="text-[10px] text-muted-foreground">{format(receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt), 'PPp')}</span>
+                                            <span className="text-[10px] text-muted-foreground">{format(safeToDate(receipt.createdAt), 'PPp')}</span>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
