@@ -86,16 +86,20 @@ export default function BlogLandingPage() {
 
   return (
     <ThemeProvider forcedTheme="light">
-      <div className="min-h-screen bg-white selection:bg-slate-900 selection:text-white">
-        <MarketingHeader />
-        
-        <main className="min-h-screen">
-          {/* Hero Section with Interactive Grid Pattern */}
-          <section className="relative flex items-center justify-center px-6 pt-40 pb-20 md:py-48 overflow-hidden bg-transparent">
-            <InteractiveGrid />
-            <div className="aura-background"></div>
-            
-            <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
+      <div className="min-h-screen selection:bg-slate-900 selection:text-white bg-[#F9F8F6] relative">
+        <div className="fixed inset-0 grid-lines w-full h-full top-[var(--tauri-title-height,0)] pointer-events-none z-0"></div>
+        <div className="relative z-10">
+          <MarketingHeader />
+          
+          <main className="min-h-screen">
+            {/* Hero Section with Interactive Grid Pattern */}
+            <section className="relative flex items-center justify-center px-6 pt-48 pb-20 md:py-56 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 z-0">
+                <InteractiveGrid />
+                <div className="aura-background"></div>
+              </div>
+              
+              <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <Sparkles className="h-4 w-4 text-slate-900 fill-slate-900" />
                 <span className="text-sm font-semibold tracking-tight text-slate-900 uppercase">Strategic Intelligence</span>
@@ -248,6 +252,7 @@ export default function BlogLandingPage() {
         
         <MarketingFooter />
       </div>
-    </ThemeProvider>
-  );
+    </div>
+  </ThemeProvider>
+);
 }
