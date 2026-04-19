@@ -4,6 +4,7 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { 
   getDoc, 
   doc, 

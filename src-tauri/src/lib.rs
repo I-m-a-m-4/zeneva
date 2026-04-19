@@ -92,6 +92,8 @@ pub fn run() {
                     match event.id.as_ref() {
                         "quit" => {
                             println!("Zeneva: Quit requested from tray.");
+
+                            
                             std::process::exit(0);
                         }
                         "show" => {

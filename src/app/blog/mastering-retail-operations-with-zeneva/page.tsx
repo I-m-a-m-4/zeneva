@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import MarketingHeader from '@/components/layout/marketing-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { 
   ChevronRight,
   Clock,
