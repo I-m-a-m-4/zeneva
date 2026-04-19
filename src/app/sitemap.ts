@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
+import { adminFirestore } from '@/firebase/admin';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://zeneva.space';
 
   // Core pages
@@ -20,17 +21,30 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === '' ? 1 : 0.8,
   }));
 
-  // Note: For dynamic blog posts, you would fetch slugs from Firestore here.
-  // Example (commented out as it requires server-side firebase admin setup):
-  /*
-  const posts = await getBlogPosts();
-  const blogRoutes = posts.map(post => ({
-    url: `${baseUrl}/blog/${post.slug}`,
-    lastModified: post.updatedAt,
-    priority: 0.6,
-  }));
-  return [...routes, ...blogRoutes];
-  */
+  try {
+    // Fetch dynamic blog posts
+    if (adminFirestore) {
+      const blogSnapshot = await adminFirestore
+        .collection('blogPosts')
+        .where('published', '==', true)
+        .get();
+
+      const blogRoutes = blogSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const slug = data.slug || doc.id;
+        return {
+          url: `${baseUrl}/blog/${slug}`,
+          lastModified: data.updatedAt?.toDate() || new Date(),
+          changeFrequency: 'monthly' as const,
+          priority: 0.6,
+        };
+      });
+
+      return [...routes, ...blogRoutes];
+    }
+  } catch (error) {
+    console.error('Sitemap blog fetch error:', error);
+  }
 
   return routes;
 }
