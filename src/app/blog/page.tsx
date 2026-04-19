@@ -73,6 +73,13 @@ export default function BlogLandingPage() {
 
   const { data: posts, isLoading } = useCollection<BlogPost>(blogQuery);
 
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const postsPerPage = 20;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   const filteredPosts = React.useMemo(() => {
     if (!posts) return [];
     if (!searchQuery.trim()) return posts;
@@ -83,6 +90,13 @@ export default function BlogLandingPage() {
       post.content.toLowerCase().includes(q)
     );
   }, [posts, searchQuery]);
+
+  const paginatedPosts = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * postsPerPage;
+    return filteredPosts.slice(startIndex, startIndex + postsPerPage);
+  }, [filteredPosts, currentPage]);
+
+  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
 
   return (
     <ThemeProvider forcedTheme="light">
@@ -156,8 +170,8 @@ export default function BlogLandingPage() {
             <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'flex flex-col gap-6'}`}>
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => <BlogCardSkeleton key={i} />)
-              ) : filteredPosts.length > 0 ? (
-                filteredPosts.map((post) => (
+              ) : paginatedPosts.length > 0 ? (
+                paginatedPosts.map((post) => (
                   <Link 
                     key={post.id} 
                     href={`/blog/${post.slug || post.id}`}
@@ -213,15 +227,42 @@ export default function BlogLandingPage() {
               )}
             </div>
             
-            {/* Pagination Placeholder */}
-            {!isLoading && filteredPosts.length > 0 && (
-              <div className="mt-20 flex items-center justify-center gap-2">
-                <Button variant="outline" disabled className="rounded-xl border-slate-200 text-slate-400">Previous</Button>
-                <Button className="rounded-xl bg-slate-950 text-white hover:bg-slate-800 h-10 w-10 p-0">1</Button>
-                <Button variant="outline" disabled className="rounded-xl border-slate-200 text-slate-400">Next</Button>
+            {/* Pagination */}
+            {!isLoading && filteredPosts.length > postsPerPage && (
+              <div className="mt-20 flex items-center justify-center gap-4">
+                <Button 
+                  variant="outline" 
+                  disabled={currentPage === 1} 
+                  onClick={() => {
+                    setCurrentPage(prev => Math.max(1, prev - 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="rounded-xl border-slate-200 text-slate-900 font-bold uppercase tracking-widest text-[10px] h-12 px-6"
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Page</span>
+                  <span className="h-10 w-10 flex border border-slate-200 items-center justify-center rounded-xl bg-white text-slate-950 font-black text-sm">{currentPage}</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">of {totalPages}</span>
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  disabled={currentPage === totalPages} 
+                  onClick={() => {
+                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="rounded-xl border-slate-200 text-slate-900 font-bold uppercase tracking-widest text-[10px] h-12 px-6"
+                >
+                  Next
+                </Button>
               </div>
             )}
           </div>
+
 
           {/* Newsletter Section */}
           <section className="bg-slate-50 py-24 mb-0">

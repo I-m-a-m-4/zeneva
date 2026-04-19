@@ -15,7 +15,9 @@ import {
   Zap,
   Shield,
   BarChart3,
-  Users
+  Users,
+  Instagram,
+  ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -271,8 +273,33 @@ export default function MasteringZenevaPage() {
                     </ol>
                  </div>
 
-                 <div className="pt-10 border-t border-slate-100">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Related</p>
+                  <div className="pt-10 border-t border-slate-100">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Follow Mission</p>
+                    <Link 
+                      href="https://instagram.com/zeneva_hq" 
+                      target="_blank"
+                      className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white border border-transparent hover:border-slate-200 transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3">
+                         <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-purple-600 to-orange-500 p-[2px]">
+                            <div className="h-full w-full rounded-[10px] bg-white flex items-center justify-center">
+                               <Instagram className="h-5 w-5 text-slate-900" />
+                            </div>
+                         </div>
+                         <div>
+                            <p className="text-xs font-black text-slate-950 uppercase tracking-tighter">@zeneva_hq</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Follow Tactical Feed</p>
+                         </div>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-slate-500 font-medium">Join 2.5k+ retailers getting daily growth tactics and operational insights on the gram.</p>
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-950 uppercase tracking-widest group-hover:gap-2 transition-all">
+                        Follow Now <ArrowRight className="h-3 w-3" />
+                      </div>
+                    </Link>
+                  </div>
+
+                  <div className="pt-10 border-t border-slate-100">
+                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Related</p>
                     <div className="flex flex-col gap-8">
                        <Link href="/blog" className="group block">
                           <h4 className="text-sm font-bold leading-snug text-slate-600 group-hover:text-slate-900 transition-colors mb-2">
