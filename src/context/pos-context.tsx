@@ -427,8 +427,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleOnline = () => processQueue();
     window.addEventListener('online', handleOnline);
+    
+    // Auto-trigger processQueue when actions are added if online
+    if (navigator.onLine && queuedActions.some(a => a.status === 'pending') && !isQueueProcessing) {
+      processQueue();
+    }
+
     return () => window.removeEventListener('online', handleOnline);
-  }, [processQueue]);
+  }, [processQueue, queuedActions, isQueueProcessing]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), [cart]);
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);

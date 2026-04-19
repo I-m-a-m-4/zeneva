@@ -504,7 +504,7 @@ function InventoryPageContent() {
           )}
         </div>
         <div className="hidden md:flex items-center gap-2">
-            {selectedProductIds.length > 0 && (
+            {selectedProductIds.length > 0 && canManageStock && (
               <>
                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
                   <Edit className="h-3.5 w-3.5" />
@@ -610,7 +610,7 @@ function InventoryPageContent() {
 
           {/* Mobile Actions Modal/Menu */}
           <div className="flex md:hidden items-center gap-2">
-            {selectedProductIds.length > 0 && (
+            {selectedProductIds.length > 0 && canManageStock && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="default" size="sm" className="h-9 px-3 gap-2">
@@ -839,23 +839,30 @@ function InventoryPageContent() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => router.push(`/inventory/${product.id}`)}>
-                              <Edit className="mr-2 h-4 w-4" /> Full Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
-                              <Edit className="mr-2 h-4 w-4" /> Quick Edit
-                            </DropdownMenuItem>
+                            {canManageStock && (
+                              <>
+                                <DropdownMenuItem onSelect={() => router.push(`/inventory/${product.id}`)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Full Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Quick Edit
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
                               <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onSelect={() => { setSelectedProductIds([product.id]); setIsDeleteDialogOpen(true); }} 
-                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete Product
-                            </DropdownMenuItem>
+                            {canManageStock && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onSelect={() => { setSelectedProductIds([product.id]); setIsDeleteDialogOpen(true); }} 
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete Product
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
