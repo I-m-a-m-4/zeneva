@@ -469,23 +469,12 @@ export default function SelectProductsPage() {
                                 </div>
                             )}
 
-                            {!searchTerm && hasMore && (
-                                <div className="mt-8 flex justify-center pb-24">
-                                    <Button 
-                                        variant="outline" 
-                                        onClick={handleLoadMore} 
-                                        disabled={isFetchingMore}
-                                        className="gap-2"
-                                    >
-                                        {isFetchingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-                                        Load More Products
-                                    </Button>
-                                </div>
-                            )}
+                            {/* Pagination removed as per user request for full catalog search */}
                         </>
                     )}
                 </div>
             </div>
+
 
             {/* Desktop Cart */}
             <div className="hidden md:block">
