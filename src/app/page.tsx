@@ -302,7 +302,7 @@ export default function Home() {
             },
             {
                 "@type": "WebPage",
-                "@id": "https://www.zeneva.vercel.app"
+                "@id": "https://zeneva.space"
             },
             {
                 "@type": "FAQPage",
