@@ -839,6 +839,7 @@ function InventoryPageContent() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                             {canManageStock && (
                               <>
                                 <DropdownMenuItem onSelect={() => router.push(`/inventory/${product.id}`)}>
