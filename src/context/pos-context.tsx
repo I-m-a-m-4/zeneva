@@ -560,9 +560,54 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const fetchMonthlyAnalytics = useCallback(async (monthCount: number = 12) => {
-    if (!businessId) return [];
+    if (!businessId || !firestore) return [];
     
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
+    // 1. If Online, fetch precise aggregates from Firestore
+    if (isOnline) {
+      try {
+        const months = [];
+        const now = new Date();
+        const currentYear = now.getFullYear();
+
+        // We fetch for all months of the current year up to now
+        const monthPromises = [];
+        for (let i = 0; i <= now.getMonth(); i++) {
+          const startDate = new Date(currentYear, i, 1);
+          const endDate = new Date(currentYear, i + 1, 0, 23, 59, 59, 999);
+          
+          const q = query(
+            collection(firestore, "receipts"),
+            where("businessId", "==", businessId),
+            where("createdAt", ">=", startDate),
+            where("createdAt", "<=", endDate)
+          );
+          
+          monthPromises.push(getAggregateFromServer(q, {
+            revenue: sum('total')
+          }).then(snap => ({
+            month: `${currentYear}-${String(i + 1).padStart(2, '0')}`,
+            revenue: snap.data().revenue || 0
+          })));
+        }
+
+        const results = await Promise.all(monthPromises);
+        
+        // Update SQLite cache in background
+        if (isTauri) {
+          // We'd normally have a specialized sync for this, but let's just return for now
+          // getMonthlyRevenue already exists but it's based on local receipts.
+        }
+
+        return results.sort((a,b) => b.month.localeCompare(a.month));
+      } catch (err) {
+        console.error("Firestore Aggregate Fetch Failed:", err);
+      }
+    }
+
+    // 2. Fallback to SQLite (Last 12 months among synced receipts)
     if (isTauri) {
       try {
         const res = await getMonthlyRevenue(businessId, monthCount);
@@ -572,7 +617,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Fallback to receipts in state if Firestore is not available/slow
+    // 3. Fallback to receipts in state (volatile)
     if (receipts && receipts.length > 0) {
       const monthly: Record<string, number> = {};
       receipts.forEach(r => {
@@ -584,7 +629,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     
     return [];
-  }, [businessId, receipts]);
+  }, [businessId, firestore, receipts]);
+
 
   const value: POSContextType = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading: isUserLoading || (!!user && !isProfileReady), isUserLoading, user, firestore,
