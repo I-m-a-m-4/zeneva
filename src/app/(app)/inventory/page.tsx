@@ -853,18 +853,9 @@ function InventoryPageContent() {
                             <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
                               <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
                             </DropdownMenuItem>
-                            {canManageStock && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onSelect={() => { setSelectedProductIds([product.id]); setIsDeleteDialogOpen(true); }} 
-                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" /> Delete Product
-                                </DropdownMenuItem>
-                              </>
-                            )}
                           </DropdownMenuContent>
+
+
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>

@@ -242,14 +242,18 @@ export default function CustomersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {selectedCustomerIds.length > 0 && (
-                <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Delete ({selectedCustomerIds.length})
-                  </span>
-                </Button>
-              )}
+              {(() => {
+                const visibleSelectedCount = selectedCustomerIds.filter(id => displayedList.some(c => c.id === id)).length;
+                return visibleSelectedCount > 0 && (
+                  <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                      Delete ({visibleSelectedCount})
+                    </span>
+                  </Button>
+                );
+              })()}
+
               <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

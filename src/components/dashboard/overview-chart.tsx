@@ -78,7 +78,9 @@ export default function OverviewChart({ receipts, currencySymbol, data }: Overvi
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
+                  interval={0}
                 />
+
                 <YAxis
                   tickLine={false}
                   axisLine={false}

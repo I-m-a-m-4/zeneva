@@ -282,6 +282,7 @@ export default function AddProductPage() {
 
       // 4. Navigate immediately
       toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
+      setIsSaving(false);
       router.push('/inventory');
 
     } catch (error: any) {
@@ -289,6 +290,7 @@ export default function AddProductPage() {
       toast({ variant: 'destructive', title: 'Save Failed', description: error.message || "Could not save the product." });
       setIsSaving(false);
     }
+
   };
 
   return (

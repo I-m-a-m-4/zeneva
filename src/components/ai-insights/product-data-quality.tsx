@@ -78,7 +78,7 @@ function IssueDetailsDialog({
           <div className="space-y-2 pr-4">
             {issue.items.map((product) => (
               <Link
-                href={`/inventory/${product.id}`}
+                href={`/inventory/details?id=${product.id}`}
                 key={product.id}
                 className="block p-3 rounded-md border hover:bg-muted"
                 onClick={() => onOpenChange(false)}
