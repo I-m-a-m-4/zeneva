@@ -472,6 +472,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencyCode = business?.settings?.currency || 'NGN';
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
+  const fetchMonthlyAnalytics = useCallback(async (monthCount: number = 12) => {
+    if (!businessId) return [];
+    
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri) {
+      try {
+        const res = await getMonthlyRevenue(businessId, monthCount);
+        if (res && res.length > 0) return res;
+      } catch (err) {
+        console.error("SQLite Monthly Fetch Failed:", err);
+      }
+    }
+
+    // Fallback to receipts in state if Firestore is not available/slow
+    if (receipts && receipts.length > 0) {
+      const monthly: Record<string, number> = {};
+      receipts.forEach(r => {
+        const date = safeToDate(r.createdAt);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthly[key] = (monthly[key] || 0) + (r.total || 0);
+      });
+      return Object.entries(monthly).map(([month, revenue]) => ({ month, revenue })).sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+    }
+    
+    return [];
+  }, [businessId, receipts]);
+
   const value: POSContextType = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading: isUserLoading || (!!user && !isProfileReady), isUserLoading, user, firestore,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
@@ -485,35 +512,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     searchCustomers, searchCustomersByField: async () => [], searchReceipts: async () => [],
     fetchReceiptsInRange: async () => [], searchProducts, searchProductsByField: async () => [],
     fetchDetailedAnalytics, 
-    fetchMonthlyAnalytics: useCallback(async (monthCount: number = 12) => {
-      if (!businessId) return [];
-      
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-      if (isTauri) {
-        try {
-          const res = await getMonthlyRevenue(businessId, monthCount);
-          if (res && res.length > 0) return res;
-        } catch (err) {
-          console.error("SQLite Monthly Fetch Failed:", err);
-        }
-      }
-
-      // Fallback to receipts in state if Firestore is not available/slow
-      if (receipts && receipts.length > 0) {
-        const monthly: Record<string, number> = {};
-        receipts.forEach(r => {
-          const date = safeToDate(r.createdAt);
-          const key = \`\${date.getFullYear()}-\${String(date.getMonth() + 1).padStart(2, '0')}\`;
-          monthly[key] = (monthly[key] || 0) + (r.total || 0);
-        });
-        return Object.entries(monthly).map(([month, revenue]) => ({ month, revenue })).sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
-      }
-      
-      return [];
-    }, [businessId, receipts]),
+    fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
     stats, isSubscriptionActive: true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, isProfileReady]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }
