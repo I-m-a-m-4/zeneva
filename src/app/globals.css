@@ -178,7 +178,7 @@
   }
 
   .tauri-window header {
-    background-color: hsl(var(--background)) !important;
+    /* Background handled by component logic */
   }
 
   /* Light mode background standardisation */
