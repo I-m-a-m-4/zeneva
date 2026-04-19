@@ -229,13 +229,20 @@ export default function DashboardPage() {
   const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
 
   React.useEffect(() => {
-    // Fetch monthly stats for current year (last 12 months)
     let isMounted = true;
     const fetchHistory = async () => {
       try {
         const res = await fetchMonthlyAnalytics(12);
         if (isMounted) {
-            setMonthlyStats(res.map(m => ({ month: m.month, totalSales: m.revenue })));
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            setMonthlyStats(res.map(m => {
+              let label = m.month;
+              if (label.includes('-')) {
+                const monthIdx = parseInt(label.split('-')[1]) - 1;
+                label = months[monthIdx] || label;
+              }
+              return { month: label, totalSales: m.revenue };
+            }));
         }
       } catch (err) {
         console.error("Dashboard history fetch failed:", err);
@@ -244,6 +251,7 @@ export default function DashboardPage() {
     fetchHistory();
     return () => { isMounted = false; };
   }, [fetchMonthlyAnalytics]);
+
 
   React.useEffect(() => {
     if (date?.from && date?.to) {

@@ -79,10 +79,12 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             };
 
             if (isTauri) {
+                const tempId = `temp-${Date.now()}`;
                 addToQueue({
                     type: 'add-customer',
-                    payload: newCustomerData,
+                    payload: { ...newCustomerData, id: tempId },
                 }, `Adding customer: ${name}`);
+
                 
                 toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
                 triggerRefresh();

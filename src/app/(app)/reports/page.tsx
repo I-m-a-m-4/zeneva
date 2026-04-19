@@ -181,9 +181,23 @@ export default function ReportsDashboard() {
         if (date?.from && date?.to) {
             const fetchBatch = async () => {
                 setIsFetchingBatch(true);
-                const res = await fetchReceiptsInRange(date.from!, date.to!, 5000);
-                setReportBatchReceipts(res);
-                setIsFetchingBatch(false);
+                const timeout = setTimeout(() => {
+                    if (isFetchingBatch) {
+                        toast({ 
+                            title: 'Loading Data...', 
+                            description: 'It is taking a bit longer. If you are offline, we are showing your local synchronized data.',
+                            variant: 'default'
+                        });
+                    }
+                }, 4000);
+                
+                try {
+                    const res = await fetchReceiptsInRange(date.from!, date.to!, 5000);
+                    setReportBatchReceipts(res);
+                } finally {
+                    clearTimeout(timeout);
+                    setIsFetchingBatch(false);
+                }
             };
             fetchBatch();
         }
@@ -192,10 +206,19 @@ export default function ReportsDashboard() {
     React.useEffect(() => {
         const fetchHistory = async () => {
              const res = await fetchMonthlyAnalytics(12);
-             setMonthlyStats(res.map(m => ({ month: m.month, sales: m.revenue, totalSales: m.revenue })));
+             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+             setMonthlyStats(res.map(m => {
+                 let label = m.month;
+                 if (label.includes('-')) {
+                     const monthIdx = parseInt(label.split('-')[1]) - 1;
+                     label = monthNames[monthIdx] || label;
+                 }
+                 return { month: label, sales: m.revenue, totalSales: m.revenue };
+             }));
         }
         fetchHistory();
     }, [fetchMonthlyAnalytics]);
+
 
 
     const finalReportData = React.useMemo(() => {
