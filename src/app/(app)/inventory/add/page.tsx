@@ -262,33 +262,26 @@ export default function AddProductPage() {
         ...values,
         id: newProductId,
         businessId: userProfile.businessId,
-        // imageUrl will be handled by context
       };
 
       // Remove undefined values
       const cleanData = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
 
-      // 2. Call context function (fire and forget)
-      // We don't await the result of the *entire* process, just the initial queueing.
-      // addProductWithImage returns Promise<void> but the initial queueing is sync/fast.
-      // Actually, addProductWithImage is async because of the nature of async functions, 
-      // but the critical part (addToQueue) happens synchronously at the start.
-      // So we can await it safely as it returns quickly, or just not await.
-      // Better to await to ensure it's at least started.
-
-      await addProductWithImage({
+      // 2. Call context function (Fast/Sync initial queueing)
+      addProductWithImage({
         ...cleanData,
         stock: cleanData.stock ?? 0,
       }, imageFile);
 
-      // 3. Log Audit Event (Awaiting to ensure it's written before navigation)
-      await logAuditEvent(firestore, business.id, userProfile, {
+      // 3. Log Audit Event (Non-blocking)
+      logAuditEvent(firestore, business.id, userProfile, {
         action: 'product.create',
         entity: { type: 'Product', id: newProductId, name: values.name },
         details: { price: values.price, stock: values.stock || 0, sku: values.sku }
-      });
+      }).catch(err => console.warn("Audit log background failed:", err));
 
       // 4. Navigate immediately
+      toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
       router.push('/inventory');
 
     } catch (error: any) {

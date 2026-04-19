@@ -235,16 +235,28 @@ export default function DashboardPage() {
         const res = await fetchMonthlyAnalytics(12);
         if (isMounted) {
             const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            setMonthlyStats(res.map(m => {
+            
+            // Map existing data
+            const dataMap: Record<string, number> = {};
+            res.forEach(m => {
               let label = m.month;
               if (label.includes('-')) {
                 const monthIdx = parseInt(label.split('-')[1]) - 1;
                 label = months[monthIdx] || label;
               }
-              return { month: label, totalSales: m.revenue };
+              dataMap[label] = m.revenue;
+            });
+
+            // Ensure all 12 months are present
+            const paddedStats = months.map(m => ({
+              month: m,
+              totalSales: dataMap[m] || 0
             }));
+
+            setMonthlyStats(paddedStats);
         }
       } catch (err) {
+
         console.error("Dashboard history fetch failed:", err);
       }
     };

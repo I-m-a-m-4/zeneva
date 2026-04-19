@@ -207,15 +207,26 @@ export default function ReportsDashboard() {
         const fetchHistory = async () => {
              const res = await fetchMonthlyAnalytics(12);
              const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-             setMonthlyStats(res.map(m => {
+             
+             const dataMap: Record<string, number> = {};
+             res.forEach(m => {
                  let label = m.month;
                  if (label.includes('-')) {
-                     const monthIdx = parseInt(label.split('-')[1]) - 1;
-                     label = monthNames[monthIdx] || label;
+                    const monthIdx = parseInt(label.split('-')[1]) - 1;
+                    label = monthNames[monthIdx] || label;
                  }
-                 return { month: label, sales: m.revenue, totalSales: m.revenue };
+                 dataMap[label] = m.revenue;
+             });
+
+             const paddedStats = monthNames.map(m => ({
+                 month: m,
+                 sales: dataMap[m] || 0,
+                 totalSales: dataMap[m] || 0
              }));
+
+             setMonthlyStats(paddedStats);
         }
+
         fetchHistory();
     }, [fetchMonthlyAnalytics]);
 
