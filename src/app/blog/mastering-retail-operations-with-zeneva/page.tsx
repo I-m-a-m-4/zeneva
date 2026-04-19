@@ -19,6 +19,12 @@ import {
   Instagram,
   ArrowRight
 } from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import Link from 'next/link';
 import { ThemeProvider } from '@/components/theme-provider';
 import { useToast } from '@/hooks/use-toast';
@@ -180,6 +186,44 @@ export default function MasteringZenevaPage() {
 
                 <h2 id="generational" className="scroll-mt-32">Building a Generational Enterprise</h2>
                 <p>Zeneva is not just about managing today&apos;s sales; it&apos;s about building a business that lasts. By creating structured, repeatable, and data-driven processes, you turn your shop into a system. A system can be scaled, it can be passed down, and it can be audited by investors. Whether your goal is a family legacy or a multi-billion Naira exit, Zeneva provides the operational rigor required of a world-class enterprise.</p>
+
+                {/* FAQ Section */}
+                <div className="mt-24 pt-20 border-t border-slate-100">
+                  <h3 className="text-2xl md:text-3xl font-black text-slate-950 mb-10 tracking-tight">Frequently Asked Questions</h3>
+                  <Accordion type="multiple" className="w-full">
+                    {[
+                      {
+                        question: "How does Zeneva track profit automatically?",
+                        answer: "Zeneva links every transaction to your product cost and sales price in real-time. Our system calculates your gross and net margins instantly across all outlets, so you always know exactly how much profit you've made today."
+                      },
+                      {
+                        question: "What makes Zeneva different from other inventory tools?",
+                        answer: "Most tools report the past. Zeneva predicts the future. Zen AI analyzes demand patterns and recommends exact stock decisions to maximize profit and reduce wastage."
+                      },
+                      {
+                        question: "Does Zeneva work without internet?",
+                        answer: "Yes. The Zeneva POS works fully offline. All transactions are queued and synced automatically once connectivity returns—ensuring no sales are ever lost even in low-signal areas."
+                      },
+                      {
+                        question: "Can I manage multiple shops from one account?",
+                        answer: "Absolutely. Zeneva was built for enterprise scale. You can monitor stock levels, sales, and staff across 50+ locations from a single high-fidelity dashboard."
+                      },
+                      {
+                        question: "How accurate are the Zen AI predictions?",
+                        answer: "Zen AI improves continuously using your historical sales, time-based demand, and customer behavior. Accuracy typically reaches over 94% after just 30 days of consistent data."
+                      }
+                    ].map((item, index) => (
+                      <AccordionItem key={index} value={`item-${index}`} className="border-slate-100">
+                        <AccordionTrigger className="text-left font-bold text-slate-900 hover:text-orange-600 transition-colors py-6">
+                          {item.question}
+                        </AccordionTrigger>
+                        <AccordionContent className="text-slate-600 text-lg leading-relaxed pb-6">
+                          {item.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </div>
               </div>
 
               {/* Share */}
