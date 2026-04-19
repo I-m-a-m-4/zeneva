@@ -184,6 +184,21 @@ Exchange rate fluctuations and fuel price shifts mean your margins are under con
 ## Section 8: Scaling the Invisible
 The most dangerous part of growing from 1 store to 5 is the "Invisible Loss"—the details that slip through your fingers because you can't be everywhere at once. Zeneva acts as your remote eyes. Through detailed staff performance analytics and automated stock alerts, you scale your presence without having to scale your time. You manage by exception, focusing only where the system identifies a variance.
 
+## Section 9: Data Sovereignty in the Cloud Age
+As your business grows, your data becomes its most valuable asset. Who owns that data? In legacy systems, your data is often locked in proprietary formats that are difficult to extract or analyze. Zeneva ensures your digital sovereignty. All your transaction histories, customer profiles, and audit logs are yours to command. We provide the high-performance infrastructure to store it, but the intelligence belongs to you. This is the foundation of modern business intelligence: having a clean, accessible data set that can be used for secondary analysis or year-on-year growth comparisons.
+
+## Section 10: The Cost of Hesitation (Opportunity Loss)
+Retail markets move fast; the Nigerian market moves in real-time. The cost of not knowing your stock-out rate is not just a missed sale—it's a lost customer. When a customer finds their favorite item missing once, they might wait. If it happens twice, they find a new store. Zeneva eliminates this hesitation by automating your reorder points. You move from defensive, reactive buying to offensive, proactive market capture. Every day you operate without high-fidelity insights is a day your competitors are gaining on your market share.
+
+## Section 11: Bridging the Digital Divide (Staff Training)
+A common concern for Nigerian business owners is the technical barrier for staff. We built Zeneva to be "Zero-Training Ready." The interface is as intuitive as a smartphone app, reducing the onboarding time for new cashiers from days to hours. But more importantly, the system acts as a silent mentor, enforcing best practices—like proper stock logging and customer profile creation—without constant manual supervision. This is how you bridge the gap between unskilled labor and high-performance retail execution.
+
+## Section 12: The Liquidity Trap (Cash-in-Stock)
+Many retailers feel "broke" despite having full shelves. This is the liquidity trap. You have millions of Naira tied up in products that aren't moving. Zeneva's velocity tracking identifies your "dead weight" instantly. By marking down slow-moving items and doubling down on high-velocity SKUs, you unlock the cash trapped on your shelves. This liquidity is what funds your second, third, and tenth location. Efficiency in stock is efficiency in cash flow.
+
+## Section 13: Building a Generational Enterprise
+Zeneva is not just about managing today's sales; it's about building a business that lasts. By creating structured, repeatable, and data-driven processes, you turn your shop into a system. A system can be scaled, it can be passed down, and it can be audited by investors. Whether your goal is a family legacy or a multi-billion Naira exit, Zeneva provides the operational rigor required of a world-class enterprise.
+
 ## Success Metrics to Track
 
 | Metric | Target | Strategic Impact |
