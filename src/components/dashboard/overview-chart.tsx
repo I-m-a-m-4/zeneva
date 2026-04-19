@@ -53,8 +53,9 @@ export default function OverviewChart({ receipts, currencySymbol, data }: Overvi
   const noData = chartData.every(d => d.totalSales === 0);
 
   return (
-    <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
+    <Card className="shadow-md transition-all duration-300">
       <CardHeader>
+
         <CardTitle>Sales Overview</CardTitle>
         <CardDescription>Monthly sales performance for the current year.</CardDescription>
       </CardHeader>

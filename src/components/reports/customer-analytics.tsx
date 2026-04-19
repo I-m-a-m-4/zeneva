@@ -176,7 +176,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                                     >
                                         <TableCell>
-                                            <Link href={`/customers/${c.id}`} className="flex items-center gap-2">
+                                            <Link href={`/customers/details?id=${c.id}`} className="flex items-center gap-2">
                                                 <Avatar className="h-8 w-8">
                                                     <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
                                                 </Avatar>

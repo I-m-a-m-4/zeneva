@@ -480,6 +480,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     return () => window.removeEventListener('online', handleOnline);
   }, [processQueue, queuedActions, isQueueProcessing]);
+  
+  // SQLite Continuity Sync
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri && businessId) {
+      if (products && products.length > 0) import('@/lib/sqlite-sync').then(m => m.syncProductsToOffline(businessId, products));
+      if (customers && customers.length > 0) import('@/lib/sqlite-sync').then(m => m.syncCustomersToOffline(businessId, customers));
+      if (receipts && receipts.length > 0) import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
+      if (business) import('@/lib/sqlite-sync').then(m => m.syncBusinessToOffline(business));
+      if (stats) import('@/lib/sqlite-sync').then(m => m.syncStatsToOffline(businessId, stats));
+    }
+  }, [businessId, products, customers, receipts, business, stats]);
+
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), [cart]);
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
@@ -500,7 +513,41 @@ export function POSProvider({ children }: { children: ReactNode }) {
     triggerRefresh();
   }, [toast, nuclearReset, triggerRefresh]);
 
+  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 500) => {
+    if (!businessId || !firestore) return [];
+    
+    try {
+      const q = query(
+        collection(firestore, 'receipts'),
+        where('businessId', '==', businessId),
+        where('createdAt', '>=', from),
+        where('createdAt', '<=', to),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      
+      const snap = await getDocs(q);
+      const receipts = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+      
+      // Sync these to offline for future use
+      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
+      }
+      
+      return receipts;
+    } catch (err) {
+      console.error("Fetch Receipts In Range Failed:", err);
+      // Fallback to local receipts if available
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        return getCachedReceipts(businessId, limitCount);
+      }
+      return [];
+    }
+  }, [businessId, firestore]);
+
   const currencyCode = business?.settings?.currency || 'NGN';
+
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const fetchMonthlyAnalytics = useCallback(async (monthCount: number = 12) => {
@@ -542,10 +589,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField: async () => [], searchReceipts: async () => [],
-    fetchReceiptsInRange: async () => [], searchProducts, searchProductsByField: async () => [],
+    fetchReceiptsInRange, searchProducts, searchProductsByField: async () => [],
     fetchDetailedAnalytics, 
     fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
+
     stats, isSubscriptionActive: true
   }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady]);
 

@@ -18,7 +18,9 @@ import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import ProfitLossChart from '@/components/reports/profit-loss-chart';
+import OverviewChart from '@/components/dashboard/overview-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
+
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
 
@@ -190,10 +192,11 @@ export default function ReportsDashboard() {
     React.useEffect(() => {
         const fetchHistory = async () => {
              const res = await fetchMonthlyAnalytics(12);
-             setMonthlyStats(res.map(m => ({ month: m.month, sales: m.revenue })));
+             setMonthlyStats(res.map(m => ({ month: m.month, sales: m.revenue, totalSales: m.revenue })));
         }
         fetchHistory();
     }, [fetchMonthlyAnalytics]);
+
 
     const finalReportData = React.useMemo(() => {
         if (!reportData) return null;
@@ -309,7 +312,7 @@ export default function ReportsDashboard() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                             <div className="lg:col-span-3">
-                                <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
                             </div>
                             <div className="lg:col-span-2">
                                 <TopProductsChart receipts={deepReceipts} />
@@ -318,12 +321,23 @@ export default function ReportsDashboard() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                             <div className="lg:col-span-3">
+                                <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                            </div>
+                            <div className="lg:col-span-2">
                                 <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                            <div className="lg:col-span-3">
+                                <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
                             </div>
                             <div className="lg:col-span-2">
                                 <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
                             </div>
                         </div>
+
+
 
                         <FeatureGate
                             requiredPlan="business"
