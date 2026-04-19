@@ -61,17 +61,8 @@ pub fn run() {
     // FIX: Only intercept close events on Windows to keep app in tray.
     // Previously this was hiding the window on ALL platforms/events
     // causing the window to vanish immediately on launch.
-    .on_window_event(|window, event| {
-        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            #[cfg(target_os = "windows")]
-            {
-                // Only hide to tray — don't actually close
-                api.prevent_close();
-                let _ = window.hide();
-                println!("Zeneva: Window hidden to tray (close intercepted).");
-            }
-        }
-    })
+    // Removed: Intercepting close events on Windows to keep app in tray.
+    // The user prefers the application to quit fully on 'X' to ensure a clean state upon restart.
     .setup(|app| {
         println!("Zeneva: Entering setup...");
 

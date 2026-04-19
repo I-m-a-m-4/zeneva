@@ -194,6 +194,7 @@ const features = [
 export default function Home() {
     const [email, setEmail] = useState('');
     const { toast } = useToast();
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
     const form = useRef<HTMLFormElement>(null);
     const [isSending, setIsSending] = useState(false);
     const router = useRouter();
@@ -1010,7 +1011,23 @@ export default function Home() {
                                 <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
                                     Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
                                 </p>
+                            </div>
 
+                            <div className="flex justify-center mb-12">
+                                <div className="inline-flex items-center p-1 bg-neutral-100/80 border border-neutral-200 rounded-xl">
+                                    <button
+                                        onClick={() => setBillingCycle('monthly')}
+                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        Monthly
+                                    </button>
+                                    <button
+                                        onClick={() => setBillingCycle('yearly')}
+                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'yearly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        Yearly
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -1043,8 +1060,15 @@ export default function Home() {
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
 
                                     <div className="mt-4">
-                                        <span className="text-4xl font-bold tracking-tight">₦10,000</span>
-                                        <span className="text-base font-medium text-slate-500">/mo</span>
+                                        <span className="text-4xl font-bold tracking-tight">
+                                            {billingCycle === 'monthly' ? '₦10,000' : '₦100,000'}
+                                        </span>
+                                        <span className="text-base font-medium text-slate-500">
+                                            {billingCycle === 'monthly' ? '/mo' : '/year'}
+                                        </span>
+                                        {billingCycle === 'yearly' && (
+                                            <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2 animate-bounce">2 Months Free!</div>
+                                        )}
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
@@ -1068,8 +1092,15 @@ export default function Home() {
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
                                     <div className="mt-4">
-                                        <span className="text-4xl font-bold tracking-tight">₦30,000</span>
-                                        <span className="text-base font-medium text-slate-500">/mo</span>
+                                        <span className="text-4xl font-bold tracking-tight">
+                                            {billingCycle === 'monthly' ? '₦30,000' : '₦300,000'}
+                                        </span>
+                                        <span className="text-base font-medium text-slate-500">
+                                            {billingCycle === 'monthly' ? '/mo' : '/year'}
+                                        </span>
+                                        {billingCycle === 'yearly' && (
+                                            <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2">Save ₦60,000!</div>
+                                        )}
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & users</li>

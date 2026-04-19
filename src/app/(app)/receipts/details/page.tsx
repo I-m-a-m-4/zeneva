@@ -10,7 +10,7 @@ import { useRef, Suspense } from "react";
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Receipt } from "@/types";
-import { useBusiness } from "@/context/pos-context";
+import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import Link from 'next/link';
 
@@ -18,12 +18,12 @@ function ReceiptContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const receiptId = searchParams.get('id');
+  const { queuedActions, business } = usePOS();
 
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
-  const { data: receipt, isLoading } = useDoc<Receipt>(receiptRef);
+  const { data: firestoreReceipt, isLoading } = useDoc<Receipt>(receiptRef);
 
-  const business = useBusiness();
   const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
   const router = useRouter();
@@ -34,7 +34,15 @@ function ReceiptContent() {
         setMounted(true);
     }, []);
 
-    if (!mounted || isLoading) {
+    const receipt = React.useMemo(() => {
+        if (firestoreReceipt) return firestoreReceipt;
+        if (!receiptId) return null;
+        const action = queuedActions.find(a => a.type === 'complete-sale' && a.payload.receiptData.id === receiptId);
+        if (action) return action.payload.receiptData;
+        return null;
+    }, [firestoreReceipt, receiptId, queuedActions]);
+
+    if (!mounted || (isLoading && !receipt)) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
     }
 

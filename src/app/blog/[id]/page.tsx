@@ -11,7 +11,8 @@ import {
   query, 
   where, 
   limit, 
-  orderBy 
+  orderBy,
+  getDocs
 } from 'firebase/firestore';
 import { 
   useFirestore, 
@@ -35,7 +36,11 @@ import {
   BookOpen,
   ChevronRight,
   TrendingUp,
-  MessageCircle
+  MessageCircle,
+  Clock,
+  Briefcase,
+  ExternalLink,
+  ChevronLeft
 } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -53,13 +58,13 @@ export default function BlogPostDetailPage() {
   const [post, setPost] = React.useState<BlogPost | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // Fetch related posts (same author or latest)
+  // Fetch related posts
   const relatedQuery = useMemoFirebase(
     () => query(
       collection(firestore, 'blogPosts'),
       where('published', '==', true),
       orderBy('createdAt', 'desc'),
-      limit(4)
+      limit(6)
     ),
     [firestore]
   );
@@ -77,15 +82,13 @@ export default function BlogPostDetailPage() {
         if (docSnap.exists() && docSnap.data().published) {
           setPost({ id: docSnap.id, ...docSnap.data() } as BlogPost);
         } else {
-          // Try fetching by slug if ID fails (common for SEO links)
+          // Slug lookup
           const slugQuery = query(
             collection(firestore, 'blogPosts'), 
             where('slug', '==', id),
             where('published', '==', true),
             limit(1)
           );
-          // Wait, using getDocs here since it's a one-off
-          const { getDocs } = await import('firebase/firestore');
           const slugSnap = await getDocs(slugQuery);
           if (!slugSnap.empty) {
             const d = slugSnap.docs[0];
@@ -96,25 +99,17 @@ export default function BlogPostDetailPage() {
         }
       } catch (error) {
         console.error("Error fetching blog post:", error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Could not load the tactical intelligence report.'
-        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPost();
-  }, [firestore, id, router, toast]);
+  }, [firestore, id, router]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    toast({
-      title: 'Link Copied',
-      description: 'Tactical link added to clipboard.'
-    });
+    toast({ title: 'Link Copied', description: 'Article link added to clipboard.' });
   };
 
   if (isLoading) {
@@ -122,13 +117,10 @@ export default function BlogPostDetailPage() {
       <div className="min-h-screen bg-white">
         <MarketingHeader />
         <main className="pt-40 container mx-auto px-6">
-          <Skeleton className="h-4 w-24 mb-6" />
-          <Skeleton className="h-12 w-3/4 mb-10" />
-          <Skeleton className="aspect-video w-full rounded-3xl mb-12" />
-          <div className="max-w-3xl mx-auto space-y-6">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
+          <div className="max-w-4xl mx-auto space-y-8">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="aspect-video w-full rounded-[2.5rem]" />
           </div>
         </main>
       </div>
@@ -139,143 +131,111 @@ export default function BlogPostDetailPage() {
 
   return (
     <ThemeProvider forcedTheme="light">
-      <div className="min-h-screen bg-white selection:bg-orange-100 selection:text-orange-900">
+      <div className="min-h-screen bg-white selection:bg-slate-900 selection:text-white">
         <MarketingHeader />
         
-        <main className="pt-32 pb-24">
-          <div className="container mx-auto px-6">
-            {/* Back to Blog */}
-            <Link 
-              href="/blog" 
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-orange-600 transition-colors mb-12 group"
-            >
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-              Back to Intel Archive
-            </Link>
+        <main className="min-h-screen">
+          <div className="mx-auto max-w-6xl px-6 pb-16 pt-32 sm:px-6 sm:pb-24 sm:pt-40 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12 lg:pb-24 lg:pt-20 xl:gap-16">
+            <article className="min-w-0">
+               {/* Breadcrumbs */}
+              <nav className="mb-8 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                <Link href="/blog" className="hover:text-slate-900 transition-colors">Blog</Link>
+                <span className="text-slate-300">/</span>
+                <span className="truncate">{post.title}</span>
+              </nav>
 
-            {/* Header */}
-            <div className="max-w-4xl mx-auto mb-16">
-              <div className="flex items-center gap-3 mb-6">
-                <Badge className="bg-orange-100 text-orange-700 border-none px-4 py-1 rounded-full uppercase text-[10px] tracking-widest font-bold">
-                  Strategic Analysis
-                </Badge>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                  <Calendar className="h-4 w-4" />
-                  {post.createdAt ? format(post.createdAt.toDate(), 'PPP') : 'Active Intel'}
-                </div>
-              </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-8 leading-[1.1]">
-                {post.title}
-              </h1>
-              
-              <div className="flex flex-wrap items-center justify-between gap-6 py-8 border-y border-border/40">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center border-2 border-orange-200">
-                    <User className="h-6 w-6 text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900 uppercase tracking-wide">{post.authorName}</p>
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-tighter">Chief Tactical Analyst</p>
-                  </div>
-                </div>
+              <header className="mb-10">
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 mb-6 leading-[1.15]">
+                   {post.title}
+                </h1>
                 
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase mr-2 tracking-widest">Share Intel</p>
-                  <Button onClick={copyLink} variant="outline" size="icon" className="rounded-full h-10 w-10 hover:bg-orange-50 hover:text-orange-600">
-                    <LinkIcon className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="rounded-full h-10 w-10 hover:bg-orange-50 hover:text-orange-600">
-                    <Twitter className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="rounded-full h-10 w-10 hover:bg-orange-50 hover:text-orange-600">
-                    <Linkedin className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Featured Image */}
-            <div className="aspect-[21/9] w-full rounded-[3rem] overflow-hidden mb-20 shadow-2xl relative border border-border/20">
-              <img 
-                src={post.imageUrl || '/images/blog-placeholder.jpg'} 
-                alt={post.title}
-                className="object-cover w-full h-full"
-              />
-              <div className="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-[3rem]" />
-            </div>
-
-            {/* Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 max-w-7xl mx-auto">
-              {/* Sidebar */}
-              <aside className="lg:col-span-3 hidden lg:block sticky top-32 h-fit">
-                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/50">
-                   <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Mission Goals</h4>
-                   <p className="text-sm text-slate-600 leading-relaxed italic border-l-2 border-orange-400 pl-4">
-                     {post.excerpt || "Decrypting market patterns to provide a definitive advantage for high-velocity retail operations."}
-                   </p>
-                   <div className="mt-8 pt-6 border-t border-slate-200">
-                      <Button variant="outline" className="w-full justify-start gap-3 rounded-xl hover:bg-orange-500 hover:text-white transition-all group">
-                        <MessageCircle className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                        Join Discussion
-                      </Button>
+                <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                   <div className="flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5" />
+                      <span>{post.category || 'Operational Mastery'}</span>
+                   </div>
+                   <span className="text-slate-200">•</span>
+                   <time dateTime={post.createdAt ? post.createdAt.toDate().toISOString() : ''}>
+                     {post.createdAt ? format(post.createdAt.toDate(), 'MMMM d, yyyy') : 'Recently'}
+                   </time>
+                   <span className="text-slate-200">•</span>
+                   <div className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>{Math.ceil(post.content.length / 1000) + 3} MIN READ</span>
                    </div>
                 </div>
-              </aside>
+              </header>
 
-              {/* Main Text */}
-              <div className="lg:col-span-6">
-                <article className="prose prose-orange prose-lg max-w-none prose-headings:font-black prose-headings:tracking-tighter prose-p:text-slate-600 prose-p:leading-relaxed prose-strong:text-slate-900 prose-img:rounded-3xl prose-img:shadow-lg">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {post.content}
-                  </ReactMarkdown>
-                </article>
-
-                <div className="mt-20 pt-10 border-t border-border/40">
-                   <div className="flex items-center gap-4 p-8 rounded-3xl bg-orange-50 border border-orange-200/50">
-                      <TrendingUp className="h-8 w-8 text-orange-500 shrink-0" />
-                      <div>
-                        <h4 className="font-bold text-slate-900">Was this insight helpful?</h4>
-                        <p className="text-sm text-slate-600">Our analysts refine their strategy based on your direct feedback.</p>
-                      </div>
-                      <div className="ml-auto flex gap-2">
-                        <Button variant="ghost" className="rounded-full hover:bg-white text-lg">👍</Button>
-                        <Button variant="ghost" className="rounded-full hover:bg-white text-lg">👎</Button>
-                      </div>
-                   </div>
-                </div>
+              {/* Main Content Area */}
+              <div className="prose prose-slate max-w-none 
+                prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
+                prose-p:text-slate-600 prose-p:text-lg prose-p:leading-relaxed prose-p:mb-8
+                prose-strong:text-slate-900 prose-strong:font-bold
+                prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-a:transition-all
+                prose-blockquote:border-l-2 prose-blockquote:border-slate-200 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-slate-500
+                prose-img:rounded-3xl prose-img:shadow-sm
+                prose-hr:border-slate-100 prose-hr:my-16
+                prose-table:border-collapse prose-th:text-left prose-th:font-bold prose-th:text-slate-900 prose-th:pb-4 prose-td:py-4 prose-td:border-t prose-td:border-slate-100
+              ">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {post.content}
+                </ReactMarkdown>
               </div>
 
-              {/* Ad/CTA Sidebar */}
-              <aside className="lg:col-span-3 space-y-8">
-                <div className="p-8 rounded-[2rem] bg-slate-900 text-white relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/20 blur-3xl" />
-                   <h4 className="font-bold text-xl mb-4 relative z-10">Deploy Zeneva.</h4>
-                   <p className="text-slate-400 text-sm mb-6 relative z-10">Stop guessing. Use real-time intelligence to drive your business.</p>
-                   <Button asChild className="w-full bg-white text-slate-900 hover:bg-orange-500 hover:text-white transition-all rounded-xl relative z-10 font-bold">
-                     <Link href="/signup">Get Started Free</Link>
-                   </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pl-2">Next Intelligence</h4>
-                  {relatedPosts?.filter(p => p.id !== post.id).slice(0, 3).map(p => (
-                    <Link 
-                      key={p.id} 
-                      href={`/blog/${p.id}`}
-                      className="group flex gap-4 p-2 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
-                    >
-                      <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-border/40">
-                         <img src={p.imageUrl || '/images/blog-placeholder.jpg'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                      </div>
-                      <div className="flex flex-col justify-center">
-                        <h5 className="text-xs font-bold line-clamp-2 leading-tight group-hover:text-orange-600 transition-colors uppercase tracking-tight">{p.title}</h5>
-                        <p className="text-[10px] text-muted-foreground mt-1 font-mono">{p.createdAt ? format(p.createdAt.toDate(), 'MMM d') : 'Pending'}</p>
-                      </div>
+              {/* Share */}
+              <div className="mt-24 pt-10 border-t border-slate-100 flex items-center justify-between">
+                 <div className="flex items-center gap-6">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Share</span>
+                    <div className="flex gap-4">
+                      <button onClick={copyLink} className="text-slate-400 hover:text-slate-900 transition-colors">
+                        <Share2 className="h-4 w-4" />
+                      </button>
+                      <button className="text-slate-400 hover:text-slate-900 transition-colors">
+                        <Twitter className="h-4 w-4" />
+                      </button>
+                    </div>
+                 </div>
+                 
+                 <Button asChild variant="link" className="text-slate-400 hover:text-slate-900 p-0 h-auto text-[11px] font-bold uppercase tracking-widest no-underline">
+                    <Link href="/blog" className="flex items-center gap-2">
+                      <ChevronLeft className="h-3 w-3" />
+                      All articles
                     </Link>
-                  ))}
-                </div>
-              </aside>
-            </div>
+                 </Button>
+              </div>
+            </article>
+
+            {/* Sidebar / On this page */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-40 space-y-12">
+                 <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">On this page</p>
+                    <div className="space-y-4">
+                       <p className="text-sm font-medium text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-4">
+                         {post.excerpt || "Strategic breakdown of mission-critical retail operations."}
+                       </p>
+                    </div>
+                 </div>
+
+                 <div className="pt-10 border-t border-slate-100">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Related</p>
+                    <div className="flex flex-col gap-8">
+                       {relatedPosts?.filter(p => p.id !== post.id).slice(0, 3).map(p => (
+                         <Link key={p.id} href={`/blog/${p.id}`} className="group block">
+                            <h4 className="text-sm font-bold leading-snug text-slate-600 group-hover:text-slate-900 transition-colors mb-2">
+                               {p.title}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                               <span>{p.createdAt ? format(p.createdAt.toDate(), 'MMM d') : 'Recent'}</span>
+                               <span>·</span>
+                               <span>{Math.ceil(p.content.length / 1000) + 1} MIN</span>
+                            </div>
+                         </Link>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+            </aside>
           </div>
         </main>
         

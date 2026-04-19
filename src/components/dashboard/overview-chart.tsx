@@ -9,6 +9,7 @@ import { BarChart, XAxis, YAxis, Bar, CartesianGrid, ResponsiveContainer } from 
 import type { ChartConfig } from "@/components/ui/chart";
 import { TrendingUp, Bot } from "lucide-react";
 import type { Receipt } from '@/types';
+import { safeToDate } from '@/lib/utils';
 
 const chartConfig = {
   totalSales: {

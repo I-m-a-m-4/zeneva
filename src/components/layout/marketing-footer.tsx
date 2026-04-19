@@ -31,9 +31,16 @@ export default function MarketingFooter() {
   };
 
   return (
-    <footer id="contact" className="bg-stone-950 w-full max-w-none gap-x-4 gap-y-4">
-      <div className="overflow-hidden max-w-7xl mx-auto relative gap-x-4 gap-y-4 bg-stone-200">
-        <div className="z-10 sm:p-12 md:p-16 bg-stone-950 pt-12 pr-8 pb-8 pl-8 relative">
+    <footer id="contact" className="bg-stone-950 w-full relative">
+      {/* Curvy Top Border */}
+      <div className="absolute top-0 left-0 w-full overflow-hidden leading-[0] -translate-y-[calc(100%-2px)]">
+        <svg viewBox="0 0 100 20" preserveAspectRatio="none" className="relative block w-full h-[30px] md:h-[50px] fill-stone-950">
+          <path d="M0,20 L0,11 Q6.25,3 12.5,11 Q18.75,19 25,11 Q31.25,3 37.5,11 Q43.75,19 50,11 Q56.25,3 62.5,11 Q68.75,19 75,11 Q81.25,3 87.5,11 Q93.75,19 100,11 L100,20 Z"></path>
+        </svg>
+      </div>
+
+      <div className="overflow-hidden max-w-7xl mx-auto relative bg-stone-950">
+        <div className="z-10 sm:p-12 md:p-16 pt-12 pr-8 pb-8 pl-8 relative">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pb-12 border-b border-white/10">
             <div className="lg:col-span-4 gap-x-2 gap-y-2">
               <div className="flex cursor-pointer mb-8 gap-x-2 gap-y-2 items-center">

@@ -6,8 +6,8 @@ let _instance: any = null;
 const getAI = () => {
   if (!_instance) {
     _instance = genkit({
-      plugins: [googleAI()],
-      model: 'googleai/gemini-1.5-flash',
+      plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
+      model: 'googleai/gemini-2.0-flash',
       telemetry: {
         disable: true
       }

@@ -20,9 +20,17 @@ export default function MarketingHeader() {
   const { toast } = useToast();
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const [isScrolled, setIsScrolled] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
+    
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleLogout = () => {
@@ -46,7 +54,12 @@ export default function MarketingHeader() {
 
   return (
     <>
-      <header className="fixed top-[var(--tauri-title-height,0)] z-50 w-full border-b border-orange-200/80 bg-orange-50/80 backdrop-blur-lg h-20">
+      <header className={cn(
+        "fixed top-[var(--tauri-title-height,0)] z-50 w-full transition-all duration-300 h-20",
+        isScrolled 
+          ? "bg-white/90 border-b border-slate-100 backdrop-blur-md" 
+          : "bg-transparent border-none backdrop-blur-none"
+      )}>
         <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0">

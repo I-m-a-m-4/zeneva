@@ -13,7 +13,11 @@ import {
   Newspaper,
   TrendingUp,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  LayoutGrid,
+  List,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { 
   useFirestore, 
@@ -35,10 +39,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeProvider } from '@/components/theme-provider';
+import { InteractiveGrid } from '@/components/interactive-grid';
 
 function BlogCardSkeleton() {
   return (
-    <div className="group rounded-3xl border border-border/40 bg-card overflow-hidden h-full">
+    <div className="group rounded-3xl border border-slate-200 bg-white overflow-hidden h-full shadow-sm">
       <Skeleton className="aspect-video w-full" />
       <div className="p-6 space-y-4">
         <Skeleton className="h-4 w-24" />
@@ -55,6 +60,7 @@ function BlogCardSkeleton() {
 export default function BlogLandingPage() {
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   
   const blogQuery = useMemoFirebase(
     () => query(
@@ -70,210 +76,173 @@ export default function BlogLandingPage() {
   const filteredPosts = React.useMemo(() => {
     if (!posts) return [];
     if (!searchQuery.trim()) return posts;
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     return posts.filter(post => 
-      post.title.toLowerCase().includes(query) || 
-      post.excerpt?.toLowerCase().includes(query) ||
-      post.content.toLowerCase().includes(query)
+      post.title.toLowerCase().includes(q) || 
+      post.excerpt?.toLowerCase().includes(q) ||
+      post.content.toLowerCase().includes(q)
     );
   }, [posts, searchQuery]);
 
-  const featuredPost = posts?.[0];
-  const remainingPosts = filteredPosts.filter(p => p.id !== featuredPost?.id);
-
   return (
     <ThemeProvider forcedTheme="light">
-      <div className="min-h-screen bg-[#fafafa] selection:bg-orange-100 selection:text-orange-900">
+      <div className="min-h-screen bg-white selection:bg-slate-900 selection:text-white">
         <MarketingHeader />
         
-        <main className="pt-32 pb-24">
-          {/* Hero Section */}
-          <section className="container mx-auto px-6 mb-20 text-center">
-            <Badge variant="outline" className="mb-4 py-1 px-4 rounded-full border-orange-200 bg-orange-50 text-orange-700 font-dm-sans">
-              Zeneva Insights & Intelligence
-            </Badge>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-slate-900 to-slate-600">
-              The Retail Evolution <br className="hidden md:block" /> Start Here.
-            </h1>
-            <p className="max-w-2xl mx-auto text-lg text-muted-foreground mb-10">
-              Strategic intelligence, market tactical shifts, and expert guides on mastering the art of modern commerce with the Zeneva ecosystem.
-            </p>
+        <main className="min-h-screen">
+          {/* Hero Section with Interactive Grid Pattern */}
+          <section className="relative flex items-center justify-center px-6 pt-40 pb-20 md:py-48 overflow-hidden bg-transparent">
+            <InteractiveGrid />
+            <div className="aura-background"></div>
             
-            <div className="max-w-xl mx-auto relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <Input 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tactics, guides, or updates..." 
-                className="pl-12 h-14 rounded-2xl border-border/40 bg-white shadow-sm focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-lg"
-              />
+            <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <Sparkles className="h-4 w-4 text-slate-900 fill-slate-900" />
+                <span className="text-sm font-semibold tracking-tight text-slate-900 uppercase">Strategic Intelligence</span>
+              </div>
+              
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tight leading-[0.95] text-slate-950">
+                The Zeneva <span className="text-slate-500">Blog</span>
+              </h1>
+              
+              <p className="text-lg md:text-2xl text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed">
+                Expert insights, tactical guides, and industry reports for the modern retail era.
+              </p>
             </div>
           </section>
 
-          {/* Featured Post */}
-          {!searchQuery && featuredPost && !isLoading && (
-            <section className="container mx-auto px-6 mb-24">
-              <div className="group relative rounded-[2.5rem] border border-border/40 bg-white shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500">
-                <div className="grid grid-cols-1 lg:grid-cols-2">
-                  <div className="relative aspect-video lg:aspect-auto overflow-hidden">
-                    <img 
-                      src={featuredPost.imageUrl || '/images/blog-placeholder.jpg'} 
-                      alt={featuredPost.title}
-                      className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent lg:hidden" />
-                  </div>
-                  <div className="p-8 lg:p-16 flex flex-col justify-center">
-                    <div className="flex items-center gap-3 mb-6">
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none px-4 py-1 rounded-full">
-                        Featured Strategy
-                      </Badge>
-                      <span className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {featuredPost.createdAt ? format(featuredPost.createdAt.toDate(), 'PPP') : 'Secret Intel'}
-                      </span>
-                    </div>
-                    <h2 className="text-3xl lg:text-5xl font-bold mb-6 tracking-tight group-hover:text-orange-600 transition-colors">
-                      {featuredPost.title}
-                    </h2>
-                    <p className="text-lg text-muted-foreground mb-8 line-clamp-3 leading-relaxed">
-                      {featuredPost.excerpt || "Dive deep into the latest strategic shifts in the retail landscape. This high-fidelity guide breaks down tactical advantages for modern businesses."}
-                    </p>
-                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-border/40">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-border/40">
-                          <User className="h-5 w-5 text-slate-500" />
-                        </div>
-                        <span className="font-medium text-slate-700">{featuredPost.authorName}</span>
-                      </div>
-                      <Button asChild variant="ghost" className="rounded-full group/btn hover:bg-orange-50 hover:text-orange-600">
-                        <Link href={`/blog/${featuredPost.id}`}>
-                          Read Article <ArrowRight className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
+          <div className="mx-auto max-w-6xl px-6 pb-24 pt-12">
+            {/* Search and Filters */}
+            <div className="flex flex-col md:flex-row items-center gap-4 mb-12">
+              <div className="relative flex-1 w-full max-w-2xl group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-slate-950 transition-colors" />
+                <input 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search tactics, articles, or updates..." 
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-base text-slate-950 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition-all shadow-sm"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 ml-auto">
+                <div className="inline-flex p-1 bg-slate-100 rounded-xl" role="group">
+                  <button 
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-950' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    <LayoutGrid className="h-5 w-5" />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-950' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    <List className="h-5 w-5" />
+                  </button>
                 </div>
-              </div>
-            </section>
-          )}
-
-          {/* Posts Grid */}
-          <section className="container mx-auto px-6">
-            <div className="flex items-center justify-between mb-12">
-              <div className="flex items-center gap-3">
-                <Newspaper className="h-6 w-6 text-orange-600" />
-                <h3 className="text-2xl font-bold">Latest Tactical Intelligence</h3>
-              </div>
-              <div className="hidden sm:flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="rounded-full bg-slate-100/50">All</Button>
-                <Button variant="ghost" size="sm" className="rounded-full">Strategy</Button>
-                <Button variant="ghost" size="sm" className="rounded-full">Product</Button>
-                <Button variant="ghost" size="sm" className="rounded-full">Intelligence</Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
+            <div className="flex items-center justify-between mb-8">
+               <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest">
+                 Showing {filteredPosts.length} articles
+               </p>
+            </div>
+
+            {/* Posts Grid/List */}
+            <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'flex flex-col gap-6'}`}>
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => <BlogCardSkeleton key={i} />)
               ) : filteredPosts.length > 0 ? (
-                remainingPosts.length > 0 ? (
-                  remainingPosts.map((post) => (
-                    <Link 
-                      key={post.id} 
-                      href={`/blog/${post.id}`}
-                      className="group flex flex-col rounded-3xl border border-border/40 bg-white shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
-                    >
-                      <div className="relative aspect-[16/10] overflow-hidden">
-                        <img 
-                          src={post.imageUrl || '/images/blog-placeholder.jpg'} 
-                          alt={post.title}
-                          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
-                        />
-                        <div className="absolute top-4 left-4">
-                          <Badge className="bg-white/90 backdrop-blur-md text-slate-900 border-none shadow-sm capitalize">
-                            Strategy
+                filteredPosts.map((post) => (
+                  <Link 
+                    key={post.id} 
+                    href={`/blog/${post.slug || post.id}`}
+                    className={`group relative flex ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-slate-200 bg-white shadow-sm hover:shadow-2xl hover:border-slate-300 transition-all duration-500 overflow-hidden`}
+                  >
+                    <div className={`${viewMode === 'grid' ? 'aspect-[16/10]' : 'aspect-video md:w-80'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
+                      {/* Gradient replaces the image for a cleaner, more focused look */}
+                    </div>
+                    
+                    <div className="flex flex-col flex-1 p-8">
+                       <div className="flex items-center gap-3 mb-4">
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-900 border-none px-3 py-0.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
+                            Category
                           </Badge>
-                        </div>
-                      </div>
-                      <div className="p-8 flex flex-col flex-1">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 font-mono font-medium uppercase tracking-wider">
-                          <Calendar className="h-3 w-3" />
-                          {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently Added'}
-                        </div>
-                        <h4 className="text-xl font-bold mb-4 line-clamp-2 leading-tight group-hover:text-orange-600 transition-colors">
-                          {post.title}
-                        </h4>
-                        <p className="text-muted-foreground text-sm line-clamp-3 mb-6 leading-relaxed">
-                          {post.excerpt || "Unlocking the potential of modern retail through data-driven decisions and tactical execution."}
-                        </p>
-                        <div className="mt-auto pt-6 border-t border-border/40 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-border/20">
-                                <User className="h-4 w-4 text-slate-400" />
-                             </div>
-                             <span className="text-xs font-semibold text-slate-600">{post.authorName}</span>
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                             <Clock className="h-3 w-3" />
+                             <span>{Math.ceil(post.content.length / 1000) + 2} MIN READ</span>
                           </div>
-                          <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                ) : !searchQuery && featuredPost ? (
-                  // If only featured post exists and no search query
-                  <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-border/60">
-                     <BookOpen className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-                     <p className="text-muted-foreground">Stay tuned for more strategic updates.</p>
-                  </div>
-                ) : (
-                  <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-border/60">
-                     <Search className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-                     <h4 className="text-xl font-bold mb-2">No intelligence found.</h4>
-                     <p className="text-muted-foreground text-sm max-w-xs mx-auto">We couldn't find any articles matching your search query. Try another keyword.</p>
-                     <Button variant="ghost" onClick={() => setSearchQuery('')} className="mt-6 text-orange-600">
-                        Clear Search
-                     </Button>
-                  </div>
-                )
+                       </div>
+                       
+                       <h2 className="text-xl md:text-2xl font-black leading-tight tracking-tight text-slate-950 group-hover:text-slate-600 transition-colors mb-4 line-clamp-2">
+                         {post.title}
+                       </h2>
+                       
+                       <p className="text-slate-500 text-sm md:text-base leading-relaxed line-clamp-3 mb-8 font-medium">
+                         {post.excerpt || "Unlock the potential of your retail business with our strategic breakdown and tactical execution guides."}
+                       </p>
+                       
+                       <div className="mt-auto pt-6 border-t border-slate-100 flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-950 uppercase tracking-tighter">{post.authorName}</span>
+                            <span className="text-slate-300">·</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                              {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                            </span>
+                         </div>
+                         <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
+                       </div>
+                    </div>
+                  </Link>
+                ))
               ) : (
-                <div className="col-span-full py-40 text-center bg-white rounded-[3rem] border border-dashed border-border/60">
-                  <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <TrendingUp className="h-10 w-10 text-orange-400" />
+                <div className="col-span-full py-32 text-center">
+                  <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 mb-6">
+                    <Search className="h-10 w-10 text-slate-300" />
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">The Archive is Empty.</h3>
-                  <p className="text-muted-foreground max-w-sm mx-auto">Our analysts are currently crafting new high-fidelity tactical guides. Check back shortly.</p>
+                  <h3 className="text-2xl font-bold text-slate-950 mb-2">No intelligence found.</h3>
+                  <p className="text-slate-500 max-w-sm mx-auto font-medium">We couldn't find any articles matching your search criteria. Try a different tactical keyword.</p>
+                  <Button onClick={() => setSearchQuery('')} className="mt-8 rounded-xl bg-slate-950 text-white hover:bg-slate-800">
+                    Clear Search
+                  </Button>
                 </div>
               )}
             </div>
-          </section>
-
-          {/* Newsletter / CTA */}
-          <section className="container mx-auto px-6 mt-32">
-            <div className="bg-[#1e293b] rounded-[3rem] p-8 md:p-16 relative overflow-hidden text-center text-white">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2" />
-              
-              <div className="relative z-10 max-w-2xl mx-auto">
-                <h3 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight">
-                  Get Battle-Tested Insights <br /> Direct to Your Inbox.
-                </h3>
-                <p className="text-slate-400 text-lg mb-10">
-                  Join 5,000+ retail leaders who receive our weekly breakdown of market tactical shifts and Zeneva platform Mastery.
-                </p>
-                <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-                  <Input 
-                    placeholder="Enter your email" 
-                    className="h-14 bg-white/5 border-white/10 text-white placeholder:text-slate-500 rounded-2xl focus:ring-orange-500/50"
-                  />
-                  <Button className="h-14 px-8 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25">
-                    Subscribe
-                  </Button>
-                </form>
-                <p className="mt-6 text-xs text-slate-500 font-medium">
-                  Zero Spam. Tactical Intelligence Only. Unsubscribe anytime.
-                </p>
+            
+            {/* Pagination Placeholder */}
+            {!isLoading && filteredPosts.length > 0 && (
+              <div className="mt-20 flex items-center justify-center gap-2">
+                <Button variant="outline" disabled className="rounded-xl border-slate-200 text-slate-400">Previous</Button>
+                <Button className="rounded-xl bg-slate-950 text-white hover:bg-slate-800 h-10 w-10 p-0">1</Button>
+                <Button variant="outline" disabled className="rounded-xl border-slate-200 text-slate-400">Next</Button>
               </div>
-            </div>
+            )}
+          </div>
+
+          {/* Newsletter Section */}
+          <section className="bg-slate-50 py-24 mb-0">
+             <div className="container mx-auto px-6">
+                <div className="max-w-4xl mx-auto rounded-[3rem] bg-white border border-slate-200 p-8 md:p-16 shadow-sm text-center">
+                   <h3 className="text-3xl md:text-5xl font-black tracking-tight text-slate-950 mb-6">
+                      Stay Tactical. <br /> Stay Informed.
+                   </h3>
+                   <p className="text-slate-500 text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto">
+                      Join 5,000+ retail leaders who receive our weekly breakdown of market tactical shifts and Zeneva platform Mastery.
+                   </p>
+                   <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+                      <input 
+                        placeholder="you@company.com" 
+                        className="h-14 flex-1 rounded-2xl border border-slate-200 bg-slate-50/50 px-6 font-medium text-slate-950 outline-none focus:ring-4 focus:ring-slate-100 transition-all"
+                      />
+                      <Button className="h-14 px-8 rounded-2xl bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all">
+                        Subscribe
+                      </Button>
+                   </form>
+                   <p className="mt-6 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                     Mission-critical intelligence only. No spam.
+                   </p>
+                </div>
+             </div>
           </section>
         </main>
         

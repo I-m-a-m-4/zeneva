@@ -1,300 +1,358 @@
 'use client';
 
-import {
-  TrendingUp,
-  Target,
-  Zap,
-  ShieldCheck,
-  BrainCircuit,
-  Users,
-  ArrowRight,
-  Database,
-  Layers,
-  Sparkles,
-  Bot,
-  Check,
-  Search,
-  ShoppingCart,
-  Store
-} from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'iconify-icon': any;
+    }
+  }
+}
+
 export default function OurMissionPage() {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  const checkScroll = () => {
+    if (railRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = railRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, []);
+
+  const scroll = (direction: number) => {
+    if (railRef.current) {
+      railRef.current.scrollBy({ left: direction * 540, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="h-full bg-[#F9F8F6] text-slate-900 font-sans selection:bg-primary/20 overflow-y-auto custom-scrollbar">
-
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden">
-        <div className="aura-background"></div>
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10">
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
-              <Sparkles className="w-3 h-3" />
-              Our Mission
-            </span>
-            <h1 className="text-5xl lg:text-7xl font-medium tracking-tighter font-display text-slate-900 mb-6 leading-[0.95]">
-              Turning Retail Data Into <span className="text-slate-400 relative inline-block">Clear Decisions.
-                <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
-              </span>
-            </h1>
-            <p className="text-xl text-slate-600 font-normal leading-relaxed mb-8 max-w-lg">
-              Retail businesses don’t fail because owners don’t work hard. <br className="hidden md:block" />
-              They fail because they’re forced to operate without clarity.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/signup">
-                <Button size="lg" className="rounded-full px-8 h-12 text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-105 transition-all">
-                  Join the Mission
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          {/* abstract visual */}
-          <div className="relative h-[400px] lg:h-[500px] bg-white rounded-3xl border border-slate-100 shadow-2xl p-8 flex flex-col justify-center items-center overflow-hidden">
-            <div className="absolute inset-0 bg-slate-50/50 pattern-bg opacity-50"></div>
-            <div className="relative z-10 text-center space-y-6 max-w-xs">
-              <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto shadow-xl ring-4 ring-white">
-                <Bot className="w-10 h-10 text-primary animate-pulse" />
-              </div>
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-sm font-medium text-slate-600 flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-red-500"></span> Stockout Warning: Rice (50kg)
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-sm font-medium text-slate-600 flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Recommended Order: 25 Units
-                </div>
-              </div>
-            </div>
-
-            {/* Decorative elements */}
-            <div className="absolute top-10 left-10 w-16 h-16 bg-blue-500/10 rounded-full blur-xl animate-pulse"></div>
-            <div className="absolute bottom-10 right-10 w-24 h-24 bg-primary/10 rounded-full blur-xl animate-pulse delay-700"></div>
-          </div>
+    <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden">
+      {/* Background with Spline Embed */}
+      <div 
+        className="aura-background-component top-0 w-full h-screen -z-10 fixed" 
+        data-alpha-mask="20" 
+        style={{ 
+          maskImage: 'linear-gradient(to bottom, transparent, white 0%, white 80%, transparent)', 
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent, white 0%, white 80%, transparent)' 
+        }}
+      >
+        <div className="spline-container absolute top-0 left-0 w-full h-full -z-10 opacity-40">
+          <iframe 
+            src="https://my.spline.design/thresholddarkambientui-v0gkZCfi6zXm69kE0wccy70f" 
+            frameBorder="0" 
+            width="100%" 
+            height="100%"
+            title="Spline Background"
+          ></iframe>
         </div>
-      </section>
+      </div>
 
-      {/* The Problem Section */}
-      <section className="py-24 px-6 bg-white border-y border-slate-100 relative">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-light tracking-tight text-slate-900 mb-6 font-display">The Clarity Gap</h2>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Every day, store owners make dozens of decisions. Most are made reactively — based on instinct, incomplete data, or problems that have already happened.
-            </p>
+      <main className="z-10 pt-24 relative font-geist">
+        {/* Hero */}
+        <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6">
+          <div className="inline-flex gap-2 text-xs text-neutral-600 bg-neutral-100 border-neutral-200 border rounded-full mr-auto ml-auto pt-1.5 pr-3 pb-1.5 pl-3 items-center backdrop-blur-sm">
+            {mounted && <iconify-icon icon="solar:stars-linear" class="h-3.5 w-3.5 text-primary" />}
+            <span className="font-geist text-neutral-900 font-semibold">AI-Powered Retail Intelligence</span>
+            <span className="mx-1 h-1 w-1 rounded-full bg-neutral-300"></span>
+            <span className="text-neutral-500 font-geist">Decisions, Not Dashboards</span>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
-            {[
-              { icon: ShoppingCart, text: "What to restock", color: "text-blue-500", bg: "bg-blue-50" },
-              { icon: Zap, text: "What to discount", color: "text-amber-500", bg: "bg-amber-50" },
-              { icon: TrendingUp, text: "What to promote", color: "text-emerald-500", bg: "bg-emerald-50" },
-              { icon: ShieldCheck, text: "What to stop buying", color: "text-red-500", bg: "bg-red-50" }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-4 p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:border-slate-200 transition-colors">
-                <div className={`p-2.5 rounded-xl ${item.bg} ${item.color}`}>
-                  <item.icon className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-slate-900">{item.text}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <p className="text-2xl font-medium text-slate-900 inline-block relative">
-              <span className="relative z-10">Zeneva exists to change that.</span>
-              <span className="absolute bottom-1 left-0 w-full h-3 bg-primary/20 -z-0"></span>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Zen AI Exists */}
-      <section className="py-24 px-6 bg-[#F9F8F6]">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display text-slate-900 mb-8">Why Zen AI Exists</h2>
-              <div className="prose prose-lg text-slate-600 leading-relaxed">
-                <p className="mb-6">
-                  Zen AI was built to solve a specific problem: <strong className="text-slate-900">Retail businesses generate massive amounts of data, but almost none of it turns into usable judgment.</strong>
-                </p>
-                <ul className="space-y-4 list-none pl-0 mb-8">
-                  <li className="flex items-center gap-3 text-slate-800 font-medium">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Sales happen.
-                  </li>
-                  <li className="flex items-center gap-3 text-slate-800 font-medium">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Inventory moves.
-                  </li>
-                  <li className="flex items-center gap-3 text-slate-800 font-medium">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div> Customers buy and leave.
-                  </li>
-                </ul>
-                <p className="mb-4">Yet the system never tells the owner:</p>
-                <div className="space-y-3 font-semibold text-slate-900 pl-4 border-l-2 border-primary">
-                  <p>What does this mean?</p>
-                  <p>What should I do next?</p>
-                  <p>Where am I silently losing money?</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/5 rounded-[40px] transform rotate-3"></div>
-              <div className="relative bg-white p-8 lg:p-12 rounded-[40px] shadow-xl border border-slate-100">
-                <h3 className="text-2xl font-bold text-slate-900 mb-8">Our Core Belief</h3>
-                <div className="space-y-8">
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-                      <BrainCircuit className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-slate-900">Foresight, not hindsight</h4>
-                      <p className="text-slate-500 text-sm mt-1">Predicting problems before they happen.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-pink-600 shrink-0">
-                      <Target className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-slate-900">Decisions, not dashboards</h4>
-                      <p className="text-slate-500 text-sm mt-1">Actionable steps, not just charts.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
-                      <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-slate-900">Prevention, not post-mortems</h4>
-                      <p className="text-slate-500 text-sm mt-1">Stopping losses at the source.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* What Zen AI Actually Does */}
-      <section className="py-24 px-6 bg-slate-900 text-white relative overflow-hidden">
-        {/* Background Gradients */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
-          <div className="absolute top-1/2 left-1/4 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600 rounded-full blur-[100px]"></div>
-        </div>
-
-        <div className="max-w-6xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <span className="text-primary font-bold tracking-wider uppercase text-sm mb-4 block">Capabilities</span>
-            <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display mb-8">What Zen AI Actually Does</h2>
-            <div className="flex flex-wrap justify-center gap-3">
-              {["Not a chatbot", "Not generic analytics", "Not surface-level reporting"].map((tag, i) => (
-                <span key={i} className="px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm font-medium text-slate-300">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary mb-6">
-                <Zap className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">From Data to Decisions</h3>
-              <ul className="space-y-3 text-slate-300 text-sm">
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> What is selling — and why</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> What will sell next — and when</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-primary mt-0.5" /> Where revenue is being lost</li>
-              </ul>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 mb-6">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">Preventing Lost Sales</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                A customer walking out because a product is unavailable is a system failure. Zen AI prevents that.
-              </p>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-colors">
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 mb-6">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">Freeing Trapped Capital</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                Turns dead stock into working capital by recommending:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {['Discount', 'Bundle', 'Exit'].map(action => (
-                  <span key={action} className="text-xs px-2 py-1 bg-white/10 rounded text-white">{action}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Built For Real Conditions */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-5xl font-medium tracking-tight font-display text-slate-900">Built for Real Retail Conditions</h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="p-10 rounded-[32px] bg-[#F9F8F6] border border-slate-100 flex flex-col items-start min-h-[300px] hover:shadow-lg transition-shadow">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-700 mb-6">
-                <Database className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Offline-First Foundation</h3>
-              <p className="text-slate-600 text-lg leading-relaxed">
-                Sales continue without internet. Transactions queue automatically. Zen AI never loses context.
-              </p>
-            </div>
-            <div className="p-10 rounded-[32px] bg-[#F9F8F6] border border-slate-100 flex flex-col items-start min-h-[300px] hover:shadow-lg transition-shadow">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-700 mb-6">
-                <Layers className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Unified Intelligence</h3>
-              <p className="text-slate-600 text-lg leading-relaxed">
-                POS, inventory, CRM, and storefront all feed into one shared data layer. No silos. No conflicting numbers.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* The Vision CTA */}
-      <section className="py-32 px-6 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-primary/5 pattern-bg opacity-30"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <span className="text-sm font-bold text-primary tracking-widest uppercase mb-6 block">The Long-Term Vision</span>
-          <h2 className="text-4xl lg:text-6xl font-medium tracking-tighter font-display text-slate-900 mb-8 leading-tight">
-            Retail decisions effectively proactive. <br />
-            <span className="text-slate-400">Sales losses visible before they happen.</span>
-          </h2>
-          <p className="text-xl text-slate-600 mb-12 max-w-2xl mx-auto font-light">
-            We are building a future where business owners spend time on strategy, not firefighting.
+          <h1 
+            className="md:text-7xl lg:text-8xl text-5xl font-medium tracking-tighter font-jakarta mt-6 pt-2 pb-2 drop-shadow-lg leading-tight" 
+            style={{ 
+              maskImage: 'linear-gradient(150deg, transparent, black 30%, black 50%, transparent)', 
+              WebkitMaskImage: 'linear-gradient(150deg, transparent, black 30%, black 50%, transparent)' 
+            }}
+          >
+            Turning Retail Data Into Clear Decisions
+          </h1>
+          <p className="mt-5 text-base md:text-lg text-neutral-600 max-w-2xl mx-auto font-geist">
+            Zeneva unifies your entire inventory, sales, and customer data into a single, proactive AI intelligence layer. Never operate in the dark again.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button size="lg" className="rounded-full px-10 h-14 text-lg shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-105">
+          <div className="flex flex-col sm:flex-row gap-3 mt-8 items-center justify-center">
+            <Link href="/signup" className="codepen-button-aura">
+              <span>
+                {mounted && <iconify-icon icon="solar:user-plus-linear" class="w-5 h-5 mx-1" />}
                 Join the Mission
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
+              </span>
+            </Link>
+            <Link href="/download" className="border border-neutral-200 inline-flex items-center gap-2 hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-900 font-geist bg-neutral-50 rounded-full pt-3 pr-5 pb-3 pl-5 backdrop-blur-sm">
+              {mounted && <iconify-icon icon="solar:play-circle-linear" class="h-4 w-4 text-primary" />}
+              Watch Video
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
 
+        {/* Logo Cloud - Retailers */}
+        <section className="md:mt-32 max-w-7xl mt-24 mr-auto ml-auto pt-16 pr-6 pb-6 pl-6 relative">
+          <div className="text-center">
+            <p className="uppercase text-sm font-medium text-neutral-400 tracking-wide font-geist">
+              Empowering fast-growing retail businesses
+            </p>
+          </div>
+          <div className="overflow-hidden mt-10 relative">
+            <div 
+              style={{ 
+                maskImage: 'linear-gradient(to right, transparent, white 15%, white 85%, transparent)', 
+                WebkitMaskImage: 'linear-gradient(to right, transparent, white 15%, white 85%, transparent)' 
+              }}
+            >
+              <div className="flex gap-6 will-change-transform animate-marquee-left opacity-30">
+                <div className="flex gap-12 shrink-0 items-center">
+                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">BOUTIQUES</span>
+                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">SUPERMARKETS</span>
+                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">PHARMACIES</span>
+                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">GADGET STORES</span>
+                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">LUXURY RETAIL</span>
+                </div>
+                <div className="flex gap-12 shrink-0 items-center">
+                   <span className="text-2xl font-bold text-white/20 font-jakarta">BOUTIQUES</span>
+                   <span className="text-2xl font-bold text-white/20 font-jakarta">SUPERMARKETS</span>
+                   <span className="text-2xl font-bold text-white/20 font-jakarta">PHARMACIES</span>
+                   <span className="text-2xl font-bold text-white/20 font-jakarta">GADGET STORES</span>
+                   <span className="text-2xl font-bold text-white/20 font-jakarta">LUXURY RETAIL</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Intelligent Inventory */}
+        <section className="sm:px-6 sm:mt-24 md:mt-32 max-w-7xl mt-16 mr-auto ml-auto pr-4 pl-4 relative">
+          <div className="max-w-7xl mr-auto ml-auto">
+            <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+              {/* Diagram */}
+              <div 
+                className="bg-[url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/5aa83035-c72b-4cb5-9937-66ce103b64ef_1600w.webp')] bg-cover rounded-[36px] pt-5 pr-5 pb-5 pl-5 relative aspect-square lg:aspect-auto" 
+                style={{ 
+                  maskImage: 'linear-gradient(130deg, transparent, black 10%, black 70%, transparent)', 
+                  WebkitMaskImage: 'linear-gradient(130deg, transparent, black 10%, black 70%, transparent)' 
+                }}
+              >
+                <article className="group relative overflow-hidden transition-shadow hover:shadow-md bg-white/80 border-neutral-200 border rounded-3xl shadow-xl backdrop-blur-xl h-full">
+                  <div className="sm:p-10 p-6 flex flex-col h-full">
+                    <div className="flex items-center justify-between gap-4 mb-6">
+                      <h3 className="text-2xl font-semibold tracking-tight text-neutral-900 font-jakarta">Intelligent Inventory</h3>
+                      <span className="inline-flex items-center gap-2 text-xs text-neutral-600 bg-neutral-100 border border-neutral-200 rounded-full px-2.5 py-1 backdrop-blur-sm">
+                        {mounted && <iconify-icon icon="solar:stars-linear" class="text-primary h-4 w-4" />}
+                        Zen AI Engine
+                      </span>
+                    </div>
+
+                    {/* Illustration */}
+                    <div className="relative flex-1 rounded-2xl bg-neutral-50 ring-1 ring-inset ring-neutral-200 mb-8 overflow-hidden min-h-[200px]">
+                      <div className="absolute inset-0 p-6 flex flex-col gap-3">
+                         <div className="bg-white border border-neutral-200 p-4 rounded-xl flex items-center justify-between shadow-sm">
+                            <span className="text-sm font-medium text-neutral-700">Automatic Restock Alert</span>
+                            <span className="text-xs text-primary font-bold">Recommended</span>
+                         </div>
+                         <div className="bg-white border border-emerald-500/20 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                            <div className="h-10 w-10 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                               {mounted && <iconify-icon icon="solar:ticker-star-linear" class="text-emerald-500 h-5 w-5" />}
+                            </div>
+                            <div className="flex-1">
+                               <p className="text-sm font-medium text-neutral-800">Top Performer: Luxury Silk Scarf</p>
+                               <p className="text-xs text-neutral-500">Sell rate: +45% this week</p>
+                            </div>
+                         </div>
+                         <div className="bg-white border border-amber-500/20 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                            <div className="h-10 w-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                               {mounted && <iconify-icon icon="solar:plain-linear" class="text-amber-500 h-5 w-5" />}
+                            </div>
+                            <div className="flex-1">
+                               <p className="text-sm font-medium text-neutral-800">Dead Capital: Vintage Belt</p>
+                               <p className="text-xs text-neutral-500">Suggestion: Bundle or Discount</p>
+                            </div>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-lg font-semibold text-neutral-900 tracking-tight font-jakarta">Foresight, Not Hindsight</h4>
+                        <p className="mt-2 text-sm text-neutral-600 font-geist">Predict potential stockouts before they happen, ensuring you never lose a sale due to empty shelves.</p>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold tracking-tight text-neutral-900 font-jakarta">Capital Optimization</h4>
+                        <p className="mt-2 text-sm text-neutral-600 font-geist">Automatically identify dead stock and convert trapped capital back into cash flow with smart exit strategies.</p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              {/* Copy & stats */}
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h3 className="sm:text-5xl text-4xl font-medium text-neutral-900 tracking-tight font-jakarta">Proactive Retail Intelligence</h3>
+                  <p className="mt-6 text-lg text-neutral-600 font-geist">Retail businesses generate massive amounts of data, but almost none of it turns into usable judgment. Zeneva changes that balance.</p>
+                </div>
+
+                <div className="border-t border-white/10 pt-8 mt-4">
+                  <div className="grid gap-8">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
+                        {mounted && <iconify-icon icon="solar:bolt-linear" class="text-primary w-5 h-5" />}
+                      </div>
+                      <div>
+                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Instant Visibility</h4>
+                         <p className="text-sm text-neutral-500 mt-1">See your entire business health across all locations in one beautiful, real-time dashboard.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
+                        {mounted && <iconify-icon icon="solar:shield-check-linear" class="text-primary w-5 h-5" />}
+                      </div>
+                      <div>
+                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Offline Resilience</h4>
+                         <p className="text-sm text-neutral-500 mt-1">Market conditions aren't perfect. Your POS should be. Zeneva works 100% offline and syncs when back online.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-neutral-200 pt-8 mt-4 flex items-center justify-between">
+                   <div>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">45,000+</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Transactions processed</p>
+                   </div>
+                   <div className="h-10 w-px bg-neutral-200"></div>
+                   <div>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">100%</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Data durability guarantee</p>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials */}
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-16 sm:mt-24 md:mt-40 relative" id="testimonials">
+          <div className="sm:p-10 p-6 border-neutral-200 bg-neutral-50/50 rounded-3xl relative backdrop-blur-lg border">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+              <h2 className="text-3xl sm:text-6xl lg:text-7xl leading-none text-neutral-900 tracking-tighter font-jakarta font-medium">Voices of Victory.</h2>
+              <span className="hidden sm:block w-px bg-neutral-200 h-12"></span>
+              <p className="text-base text-neutral-600 tracking-tight">Retailers who gained clarity through Zeneva.</p>
+            </div>
+            
+            <div className="relative mt-10 h-[400px]">
+              <div 
+                className="overflow-hidden h-full rounded-2xl relative" 
+                style={{ 
+                  maskImage: 'linear-gradient(90deg, transparent, white 10%, white 90%, transparent)', 
+                  WebkitMaskImage: 'linear-gradient(90deg, transparent, white 10%, white 90%, transparent)' 
+                }}
+              >
+                <div 
+                  className="flex gap-6 overflow-x-auto scroll-smooth px-10 absolute inset-0 items-center hide-scrollbar" 
+                  ref={railRef}
+                  onScroll={checkScroll}
+                >
+                   <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md -rotate-1 shadow-xl flex-shrink-0">
+                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
+                      "Zeneva stopped being just a POS and started being a partner. It told me exactly which luxury silks to stop ordering and where I was losing money on belts."
+                    </p>
+                    <div className="mt-8 flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">BI</div>
+                      <div>
+                        <div className="text-base font-semibold text-neutral-900">Bello Imam</div>
+                        <div className="text-xs text-neutral-500">Founder, High-End Fashion Boutique</div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md rotate-1 shadow-xl flex-shrink-0">
+                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
+                      "The offline first approach saved us during network blackouts. We didn't lose a single sale, and everything synced perfectly the moment we got back online."
+                    </p>
+                    <div className="mt-8 flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center font-bold text-blue-500">FS</div>
+                      <div>
+                        <div className="text-base font-semibold text-neutral-900">Faith Stella</div>
+                        <div className="text-xs text-neutral-500">Manager, Central Pharmacy</div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md -rotate-2 shadow-xl flex-shrink-0">
+                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
+                      "I used to spend 4 hours a night reconcilling numbers. Now, Zeneva does it in real-time. My business is finally operating with clarity."
+                    </p>
+                    <div className="mt-8 flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">JD</div>
+                      <div>
+                        <div className="text-base font-semibold text-neutral-900">John Doe</div>
+                        <div className="text-xs text-neutral-500">Retail Entrepreneur</div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+
+                <div className="absolute bottom-6 right-10 flex items-center gap-4">
+                  <button 
+                    className="hover:bg-neutral-200 transition-all inline-flex text-neutral-900 bg-neutral-100 w-12 h-12 border-neutral-200 border rounded-full items-center justify-center backdrop-blur-md"
+                    onClick={() => scroll(-1)}
+                    disabled={!canScrollLeft}
+                    style={{ opacity: canScrollLeft ? 1 : 0.3 }}
+                  >
+                    {mounted && <iconify-icon icon="solar:arrow-left-linear" class="w-6 h-6" />}
+                  </button>
+                  <button 
+                    className="w-12 h-12 rounded-full text-white bg-black hover:bg-neutral-800 transition-all inline-flex items-center justify-center shadow-lg"
+                    onClick={() => scroll(1)}
+                    disabled={!canScrollRight}
+                    style={{ opacity: canScrollRight ? 1 : 0.3 }}
+                  >
+                    {mounted && <iconify-icon icon="solar:arrow-right-linear" class="w-6 h-6" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
+           <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
+             {mounted && <iconify-icon icon="solar:rocket-linear" class="h-4 w-4 text-primary" />}
+             <span className="font-geist">Join 500+ Nigerian Retailers</span>
+           </div>
+           <h2 className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-tighter text-neutral-900 mb-8 font-jakarta">Ready to see your business clearly?</h2>
+           <p className="text-neutral-600 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-geist">
+             Stop firefighting and start leading. Experience the future of retail management today with Zeneva.
+           </p>
+
+           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+             <Link href="/signup" className="codepen-button-aura scale-125 mx-4">
+                <span>Join the Mission</span>
+             </Link>
+           </div>
+        </section>
+      </main>
+
+      <style jsx>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
