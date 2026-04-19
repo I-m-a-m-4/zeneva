@@ -135,17 +135,17 @@ export default function BlogPostDetailPage() {
         <MarketingHeader />
         
         <main className="min-h-screen">
-          <div className="mx-auto max-w-6xl px-6 pb-16 pt-32 sm:px-6 sm:pb-24 sm:pt-40 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12 lg:pb-24 lg:pt-20 xl:gap-16">
+          <div className="mx-auto max-w-6xl px-6 pb-16 pt-48 sm:px-6 sm:pb-24 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12 lg:pb-24 xl:gap-16">
             <article className="min-w-0">
                {/* Breadcrumbs */}
-              <nav className="mb-8 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+              <nav className="mb-10 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
                 <Link href="/blog" className="hover:text-slate-900 transition-colors">Blog</Link>
                 <span className="text-slate-300">/</span>
                 <span className="truncate">{post.title}</span>
               </nav>
 
-              <header className="mb-10">
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 mb-6 leading-[1.15]">
+              <header className="mb-12">
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 mb-8 leading-[1.2]">
                    {post.title}
                 </h1>
                 
@@ -177,7 +177,12 @@ export default function BlogPostDetailPage() {
                 prose-hr:border-slate-100 prose-hr:my-16
                 prose-table:border-collapse prose-th:text-left prose-th:font-bold prose-th:text-slate-900 prose-th:pb-4 prose-td:py-4 prose-td:border-t prose-td:border-slate-100
               ">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({node, ...props}) => null // Strip H1 from markdown to prevent duplicates
+                  }}
+                >
                   {post.content}
                 </ReactMarkdown>
               </div>
