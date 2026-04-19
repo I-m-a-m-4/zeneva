@@ -161,7 +161,7 @@ export default function BlogLandingPage() {
                   <Link 
                     key={post.id} 
                     href={`/blog/${post.slug || post.id}`}
-                    className={`group relative flex ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-slate-200 bg-white shadow-sm hover:shadow-2xl hover:border-slate-300 transition-all duration-500 overflow-hidden`}
+                    className={`group relative flex ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-slate-200 bg-white shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-500 overflow-hidden`}
                   >
                     <div className={`${viewMode === 'grid' ? 'aspect-[16/10]' : 'aspect-video md:w-80'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
                       {/* Gradient replaces the image for a cleaner, more focused look */}

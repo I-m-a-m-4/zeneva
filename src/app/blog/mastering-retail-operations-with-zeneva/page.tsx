@@ -43,7 +43,7 @@ export default function MasteringZenevaPage() {
       { rootMargin: '-20% 0% -35% 0%' }
     );
 
-    const sections = ['inventory', 'synchronization', 'audit', 'performance', 'growth'];
+    const sections = ['inventory', 'synchronization', 'audit', 'performance', 'growth', 'psychology', 'legacy', 'local', 'volatility', 'invisible'];
     sections.forEach((id) => {
       const element = document.getElementById(id);
       if (element) observer.observe(element);
@@ -149,11 +149,20 @@ export default function MasteringZenevaPage() {
                   </table>
                 </div>
 
-                <h2 id="performance" className="scroll-mt-32">Employee Performance Analytics</h2>
-                <p>Your staff are your frontline. Knowing who is driving sales and who is lagging allows for precise training and reward systems. Zeneva tracks sales performance down to the individual cashier, providing you with data-driven leaderboard metrics.</p>
+                <h2 id="psychology" className="scroll-mt-32">The Psychology of the Sale</h2>
+                <p>Retail is as much about psychology as it is about logistics. In 2026, the Nigerian consumer is more informed and more selective than ever. Zeneva helps you understand customer behavior patterns by linking every sale to a profile. Are your customers buying out of necessity or habit? When you have this data, you stop running &quot;sales&quot; and start running &quot;campaigns.&quot;</p>
 
-                <h2 id="growth" className="scroll-mt-32">Customer Growth Framework</h2>
-                <p>Acquiring a new customer is 5x more expensive than retaining an existing one. Use Zeneva&apos;s customer loyalty profiles to build high-fidelity relationships. Track purchase history, offer targeted discounts, and ensure every customer feels recognized.</p>
+                <h2 id="legacy" className="scroll-mt-32">Legacy vs. High-Fidelity Operations</h2>
+                <p>The transition from legacy systems—or worse, paper ledgers—to a high-fidelity digital OS like Zeneva is the single most important hardware-software upgrade a boutique or supermarket can make. Legacy systems are silos; Zeneva is an ecosystem. While legacy tools struggle to export a simple CSV, Zeneva provides real-time API-driven insights that can be shared with stakeholders or used for deeper internal audits.</p>
+
+                <h2 id="local" className="scroll-mt-32">The Local Advantage (Hyper-Contextual Retail)</h2>
+                <p>Global solutions often fail in the local Nigerian context. They don&apos;t account for intermittent connectivity or the specific credit-base logic of local vendor relations. Zeneva was built with these challenges at the core. Our &quot;Offline-First&quot; architecture means your business never stops, even when the network does. This is how you out-compete larger, less agile rivals: by being hyper-local and hyper-available.</p>
+
+                <h2 id="volatility" className="scroll-mt-32">Mitigating Macro-Volatility</h2>
+                <p>Exchange rate fluctuations and fuel price shifts mean your margins are under constant attack. You cannot afford to wait until the end of the month to know if you&apos;ve been profitable. Zeneva&apos;s real-time P&L tracking allows you to adjust prices on the fly across all outlets simultaneously. When the market moves, you move faster.</p>
+
+                <h2 id="invisible" className="scroll-mt-32">Scaling the Invisible</h2>
+                <p>The most dangerous part of growing from 1 store to 5 is the &quot;Invisible Loss&quot;—the details that slip through your fingers because you can&apos;t be everywhere at once. Zeneva acts as your remote eyes. Through detailed staff performance analytics and automated stock alerts, you scale your presence without having to scale your time.</p>
               </div>
 
               {/* Share */}
@@ -206,42 +215,42 @@ export default function MasteringZenevaPage() {
                     <ol className="mt-4 space-y-3 border-l border-slate-100 pl-4">
                        <li>
                          <a 
-                           href="#inventory" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'inventory' ? 'text-orange-600 pl-2' : 'text-slate-900'}`}
+                           href="#psychology" 
+                           className={`block text-xs font-bold transition-all ${activeSection === 'psychology' ? 'text-orange-600 pl-2' : 'text-slate-900'}`}
                          >
-                           Tactical Inventory
+                           Psychology of Sale
                          </a>
                        </li>
                        <li>
                          <a 
-                           href="#synchronization" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'synchronization' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
+                           href="#legacy" 
+                           className={`block text-xs font-bold transition-all ${activeSection === 'legacy' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
                          >
-                           Multi-Outlet Sync
+                           Legacy vs. High-Fidelity
                          </a>
                        </li>
                        <li>
                          <a 
-                           href="#audit" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'audit' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
+                           href="#local" 
+                           className={`block text-xs font-bold transition-all ${activeSection === 'local' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
                          >
-                           Audit Integrity
+                           The Local Advantage
                          </a>
                        </li>
                        <li>
                          <a 
-                           href="#performance" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'performance' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
+                           href="#volatility" 
+                           className={`block text-xs font-bold transition-all ${activeSection === 'volatility' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
                          >
-                           Staff Analytics
+                           Mitigating Volatility
                          </a>
                        </li>
                        <li>
                          <a 
-                           href="#growth" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'growth' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
+                           href="#invisible" 
+                           className={`block text-xs font-bold transition-all ${activeSection === 'invisible' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
                          >
-                           Customer Growth
+                           Scaling the Invisible
                          </a>
                        </li>
                     </ol>

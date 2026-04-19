@@ -163,29 +163,28 @@ At Zeneva, we approach retail not as a series of transactions, but as a high-fid
 ### 1. Unified Command Structures
 Fragmentation is the enemy of scale. If you cannot see your inventory levels in Ikeja while sitting in an office in VI, you are not in control—you are just guessing. Zeneva's cloud-native sync architecture ensures that every single POS terminal across your entire network acts as a satellite for a single, unified brain.
 
-- **Real-Time Visibility:** Instant stock status across N outlets.
-- **Inter-Branch Transfers:** Move slow-moving stock to high-demand locations before it becomes a liability.
-
 ### 2. Radical Accountability (The Audit Shield)
 Internal shrinkage is the silent killer. Most systems allow for "voids" and "edits" that are easily exploited. Zeneva implements an immutable audit log. Every price change, every deleted item, and every discount offered is stamped with a user ID and a timestamp.
-
-- **Price Integrity:** Lock your margins by preventing unauthorized cashier-side discounts.
-- **Void Analysis:** Track patterns of deleted sales to identify potential fraud before it scales.
 
 ### 3. Predictive Velocity (Zen Insights)
 The biggest waste of retail capital is "Dead Stock." Money sitting on a shelf is money that could be in a new location. Zeneva uses velocity tracking to identify exactly how many days of cover you have left for every SKU.
 
-## Implementation: From Chaos to Command
+## Section 4: The Psychology of the Sale
+Retail is as much about psychology as it is about logistics. In 2026, the Nigerian consumer is more informed and more selective than ever. Zeneva helps you understand customer behavior patterns by linking every sale to a profile. Are your customers buying out of necessity or habit? Are they responding to your discounts, or is it the quality of the service? When you have this data, you stop running "sales" and start running "campaigns."
 
-Implementing this framework requires more than just new software; it requires a shift in operational culture. Here is how Zeneva facilitates that transition:
+## Section 5: Legacy vs. High-Fidelity Operations
+The transition from legacy systems—or worse, paper ledgers—to a high-fidelity digital OS like Zeneva is the single most important hardware-software upgrade a boutique or supermarket can make. Legacy systems are silos; Zeneva is an ecosystem. While legacy tools struggle to export a simple CSV, Zeneva provides real-time API-driven insights that can be shared with stakeholders or used for deeper internal audits. Digital sovereignty is no longer optional.
 
-1. **Phase One: Digital Foundation.** We ingest your existing data—no matter how messy—through our high-speed CSV processors. This gives you an immediate baseline of Truth.
-2. **Phase Two: Role Isolation.** You assign precise permissions. Your cashiers sell; your managers audit; you lead. The system enforces these boundaries automatically.
-3. **Phase Three: Velocity Optimization.** Within 14 days of data collection, Zen Insights begins flagging reorder opportunities and expiration risks.
+## Section 6: The Local Advantage (Hyper-Contextual Retail)
+Global solutions often fail in the local Nigerian context. They don't account for intermittent connectivity or the specific credit-base logic of local vendor relations. Zeneva was built with these challenges at the core. Our "Offline-First" architecture means your business never stops, even when the network does. This is how you out-compete larger, less agile rivals: by being hyper-local and hyper-available.
+
+## Section 7: Mitigating Macro-Volatility
+Exchange rate fluctuations and fuel price shifts mean your margins are under constant attack. You cannot afford to wait until the end of the month to know if you've been profitable. Zeneva's real-time P&L tracking allows you to adjust prices on the fly across all outlets simultaneously. When the market moves, you move faster. This agility is the difference between survival and liquidation.
+
+## Section 8: Scaling the Invisible
+The most dangerous part of growing from 1 store to 5 is the "Invisible Loss"—the details that slip through your fingers because you can't be everywhere at once. Zeneva acts as your remote eyes. Through detailed staff performance analytics and automated stock alerts, you scale your presence without having to scale your time. You manage by exception, focusing only where the system identifies a variance.
 
 ## Success Metrics to Track
-
-How do you know the Zeneva framework is working? Look for these three key indicators:
 
 | Metric | Target | Strategic Impact |
 |--------|--------|------------------|
