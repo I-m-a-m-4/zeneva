@@ -188,8 +188,8 @@ export default function MasteringZenevaPage() {
                 <p>Zeneva is not just about managing today&apos;s sales; it&apos;s about building a business that lasts. By creating structured, repeatable, and data-driven processes, you turn your shop into a system. A system can be scaled, it can be passed down, and it can be audited by investors. Whether your goal is a family legacy or a multi-billion Naira exit, Zeneva provides the operational rigor required of a world-class enterprise.</p>
 
                 {/* FAQ Section */}
-                <div className="mt-24 pt-20 border-t border-slate-100">
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-950 mb-10 tracking-tight">Frequently Asked Questions</h3>
+                <div className="mt-24 pt-16 border-t border-slate-100">
+                  <h3 className="text-2xl font-black text-slate-950 mb-8 tracking-tight font-bricolage">Operational FAQ</h3>
                   <Accordion type="multiple" className="w-full">
                     {[
                       {
@@ -214,10 +214,10 @@ export default function MasteringZenevaPage() {
                       }
                     ].map((item, index) => (
                       <AccordionItem key={index} value={`item-${index}`} className="border-slate-100">
-                        <AccordionTrigger className="text-left font-bold text-slate-900 hover:text-orange-600 transition-colors py-6">
+                        <AccordionTrigger className="text-left font-bold text-slate-900 hover:text-orange-600 transition-all py-4 text-base">
                           {item.question}
                         </AccordionTrigger>
-                        <AccordionContent className="text-slate-600 text-lg leading-relaxed pb-6">
+                        <AccordionContent className="text-slate-500 text-base leading-relaxed pb-4">
                           {item.answer}
                         </AccordionContent>
                       </AccordionItem>
@@ -320,7 +320,7 @@ export default function MasteringZenevaPage() {
                   <div className="pt-10 border-t border-slate-100">
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Follow Mission</p>
                     <Link 
-                      href="https://instagram.com/zeneva_hq" 
+                      href="https://instagram.com/zeneva_pos" 
                       target="_blank"
                       className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white border border-transparent hover:border-slate-200 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
@@ -331,7 +331,7 @@ export default function MasteringZenevaPage() {
                             </div>
                          </div>
                          <div>
-                            <p className="text-xs font-black text-slate-950 uppercase tracking-tighter">@zeneva_hq</p>
+                            <p className="text-xs font-black text-slate-950 uppercase tracking-tighter">@zeneva_pos</p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Follow Tactical Feed</p>
                          </div>
                       </div>

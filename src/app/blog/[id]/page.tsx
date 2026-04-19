@@ -65,6 +65,28 @@ export default function BlogPostDetailPage() {
 
   const [post, setPost] = React.useState<BlogPost | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [activeSection, setActiveSection] = React.useState<string>('');
+
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: '-20% 0% -35% 0%' }
+    );
+
+    const sections = ['challenge', 'framework', 'psychology', 'legacy', 'implementation', 'problems', 'tips'];
+    sections.forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) observer.observe(element);
+    });
+
+    return () => observer.disconnect();
+  }, [post]);
 
   // Fetch related posts
   const relatedQuery = useMemoFirebase(
@@ -195,8 +217,8 @@ export default function BlogPostDetailPage() {
                 </ReactMarkdown>
 
                 {/* FAQ Section */}
-                <div className="mt-24 pt-20 border-t border-slate-100">
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-950 mb-10 tracking-tight">Frequently Asked Questions</h3>
+                <div className="mt-24 pt-16 border-t border-slate-100">
+                  <h3 className="text-2xl font-black text-slate-950 mb-8 tracking-tight font-bricolage">Operational FAQ</h3>
                   <Accordion type="multiple" className="w-full">
                     {[
                       {
@@ -221,10 +243,10 @@ export default function BlogPostDetailPage() {
                       }
                     ].map((item, index) => (
                       <AccordionItem key={index} value={`item-${index}`} className="border-slate-100">
-                        <AccordionTrigger className="text-left font-bold text-slate-900 hover:text-orange-600 transition-colors py-6">
+                        <AccordionTrigger className="text-left font-bold text-slate-900 hover:text-orange-600 transition-all py-4 text-base">
                           {item.question}
                         </AccordionTrigger>
-                        <AccordionContent className="text-slate-600 text-lg leading-relaxed pb-6">
+                        <AccordionContent className="text-slate-500 text-base leading-relaxed pb-4">
                           {item.answer}
                         </AccordionContent>
                       </AccordionItem>
@@ -261,17 +283,34 @@ export default function BlogPostDetailPage() {
               <div className="sticky top-40 space-y-12">
                  <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">On this page</p>
-                    <div className="space-y-4">
-                       <p className="text-sm font-medium text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-4">
+                    <div className="space-y-6">
+                       <p className="text-sm font-medium text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-4 mb-4">
                          {post.excerpt || "Strategic breakdown of mission-critical retail operations."}
                        </p>
+                       <nav className="flex flex-col gap-3">
+                         {['Challenge', 'Framework', 'Psychology', 'Legacy', 'Implementation', 'Problems', 'Tips'].map((section) => (
+                           <button 
+                             key={section}
+                             onClick={() => {
+                               const el = document.getElementById(section.toLowerCase());
+                               if (el) el.scrollIntoView({ behavior: 'smooth' });
+                             }}
+                             className={cn(
+                               "text-left text-[11px] font-bold uppercase tracking-widest transition-colors",
+                               activeSection === section.toLowerCase() ? "text-orange-600" : "text-slate-400 hover:text-slate-900"
+                             )}
+                           >
+                             {section}
+                           </button>
+                         ))}
+                       </nav>
                     </div>
                  </div>
 
                   <div className="pt-10 border-t border-slate-100">
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Follow Mission</p>
                     <Link 
-                      href="https://instagram.com/zeneva_hq" 
+                      href="https://instagram.com/zeneva_pos" 
                       target="_blank"
                       className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white border border-transparent hover:border-slate-200 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
@@ -282,7 +321,7 @@ export default function BlogPostDetailPage() {
                             </div>
                          </div>
                          <div>
-                            <p className="text-xs font-black text-slate-950 uppercase tracking-tighter">@zeneva_hq</p>
+                            <p className="text-xs font-black text-slate-950 uppercase tracking-tighter">@zeneva_pos</p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Follow Tactical Feed</p>
                          </div>
                       </div>

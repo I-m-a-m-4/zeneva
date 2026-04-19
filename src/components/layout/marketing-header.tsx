@@ -57,7 +57,7 @@ export default function MarketingHeader() {
       <header className={cn(
         "fixed top-[var(--tauri-title-height,0)] z-50 w-full transition-all duration-300 h-20",
         isScrolled 
-          ? "bg-white/90 border-b border-slate-100 backdrop-blur-md" 
+          ? "bg-white/80 border-b border-slate-100 backdrop-blur-xl" 
           : "bg-transparent border-none backdrop-blur-none"
       )}>
         <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
