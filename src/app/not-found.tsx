@@ -67,7 +67,7 @@ export default function NotFound() {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="h-14 px-10 rounded-2xl border-slate-200 bg-white text-slate-950 hover:bg-slate-50 transition-all font-bold group"
+                className="h-14 px-10 rounded-2xl border-slate-200 bg-white text-slate-950 hover:bg-slate-50 hover:text-slate-950 transition-all font-bold group"
                 onClick={() => window.history.back()}
               >
                 <ArrowLeft className="mr-2 h-5 w-5 transition-transform group-hover:-translate-x-1" />
@@ -92,8 +92,6 @@ export default function NotFound() {
             </motion.div>
           </div>
         </main>
-
-        <MarketingFooter />
       </div>
     </ThemeProvider>
   );
