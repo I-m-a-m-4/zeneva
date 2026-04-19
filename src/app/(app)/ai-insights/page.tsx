@@ -131,7 +131,7 @@ function ProductDetailModal({ product, isOpen, onOpenChange, currencySymbol }: {
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button asChild><Link href={`/inventory/${product.productId}`}>Go to Product</Link></Button>
+                    <Button asChild><Link href={`/inventory/details?id=${product.productId}`}>Go to Product</Link></Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -184,7 +184,7 @@ function StockRecDetailModal({ recommendation, product, isOpen, onOpenChange }: 
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                    <Button asChild><Link href={`/inventory/details?id=${product.id}`}>Go to Product</Link></Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -331,7 +331,7 @@ function MerchandisingDetailModal({
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <Link href={`/inventory/${product1?.id}`}>
+                        <Link href={`/inventory/details?id=${product1?.id}`}>
                             <Card className="overflow-hidden hover:border-primary">
                                 <div className="aspect-square relative bg-muted flex items-center justify-center">
                                     {product1?.imageUrl ? (
@@ -352,7 +352,7 @@ function MerchandisingDetailModal({
                                 </CardContent>
                             </Card>
                         </Link>
-                        <Link href={`/inventory/${product2?.id}`}>
+                        <Link href={`/inventory/details?id=${product2?.id}`}>
                             <Card className="overflow-hidden hover:border-primary">
                                 <div className="aspect-square relative bg-muted flex items-center justify-center">
                                     {product2?.imageUrl ? (
@@ -412,7 +412,7 @@ function OfferDetailModal({ offer, allProducts, isOpen, onOpenChange, currencySy
                     <div className="space-y-2">
                         <h4 className="font-semibold">Products in this Bundle:</h4>
                         {offerProducts.map(p => (
-                            <Link key={p.id} href={`/inventory/${p.id}`} className="block group">
+                            <Link key={p.id} href={`/inventory/details?id=${p.id}`} className="block group">
                                 <div className="flex items-center gap-4 p-2 border rounded-md hover:bg-muted/50">
                                     <div className="w-16 h-16 bg-muted rounded-md relative flex-shrink-0">
                                         {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} fill className="object-cover rounded-md" /> : <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20"><Package className="h-6 w-6" /></div>}
@@ -473,7 +473,7 @@ function RevenueOpportunityModal({ opportunity, product, isOpen, onOpenChange, c
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                    <Button asChild><Link href={`/inventory/details?id=${product.id}`}>Go to Product</Link></Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -510,7 +510,7 @@ function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currenc
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                    <Button asChild><Link href={`/inventory/details?id=${product.id}`}>Go to Product</Link></Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -541,7 +541,7 @@ function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, c
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                    <Button asChild><Link href={`/inventory/${product.id}`}>Go to Product</Link></Button>
+                    <Button asChild><Link href={`/inventory/details?id=${product.id}`}>Go to Product</Link></Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

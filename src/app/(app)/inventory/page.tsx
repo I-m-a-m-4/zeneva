@@ -842,7 +842,7 @@ function InventoryPageContent() {
                           <DropdownMenuContent align="end">
                             {canManageStock && (
                               <>
-                                <DropdownMenuItem onSelect={() => router.push(`/inventory/${product.id}`)}>
+                                <DropdownMenuItem onSelect={() => router.push(`/inventory/details?id=${product.id}`)}>
                                   <Edit className="mr-2 h-4 w-4" /> Full Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>

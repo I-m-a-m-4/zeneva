@@ -40,7 +40,7 @@ function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, 
         <ScrollArea className="h-96">
           <div className="space-y-2 pr-4">
             {issue.items.map(product => (
-              <Link href={`/inventory/${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
+              <Link href={`/inventory/details?id=${product.id}`} key={product.id} className="block p-3 rounded-md border hover:bg-muted" onClick={() => onOpenChange(false)}>
                 <div className="flex justify-between items-center">
                     <div>
                         <p className="font-medium">{product.name}</p>

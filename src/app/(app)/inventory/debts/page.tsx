@@ -289,7 +289,7 @@ export default function DebtsPage() {
                                                     Details
                                                 </Button>
                                                 <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/inventory/${product.id}`}>Edit</Link>
+                                                    <Link href={`/inventory/details?id=${product.id}`}>Edit</Link>
                                                 </Button>
                                             </TableCell>
                                         </TableRow>

@@ -17,6 +17,8 @@ import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { Analytics } from '@vercel/analytics/react';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
+import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
+
 
 const siteUrl = 'https://zeneva.space';
 
@@ -143,7 +145,9 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased bg-background text-foreground')}>
         <SplashScreen />
+        <ChunkErrorListener />
         <FirebaseClientProvider>
+
           <PWAProvider>
             <UserActivityTracker />
             <GlobalAnnouncement />
