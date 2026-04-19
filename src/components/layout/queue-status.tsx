@@ -79,7 +79,7 @@ export default function QueueStatus() {
                                         {action.status === 'pending' && <Cloud className="h-4 w-4 text-muted-foreground" />}
                                         {action.status === 'processing' && <RefreshCw className="h-4 w-4 animate-spin text-primary" />}
                                         {action.status === 'failed' && <XCircle className="h-4 w-4 text-destructive" />}
-                                        {action.status === 'failed' && <XCircle className="h-4 w-4 text-destructive" />}
+                                        {action.status === 'synced' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                                     </div>
                                     <div className="flex-1 space-y-1">
                                         <p className="text-sm font-medium leading-none">{action.description || 'Unknown Action'}</p>

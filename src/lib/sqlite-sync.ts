@@ -333,6 +333,33 @@ export async function getOfflineQueue() {
   }
 }
 
+export async function getMonthlyRevenue(businessId: string, monthCount: number = 12) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  
+  try {
+    // Group by month and sum totals from JSON data
+    const result: any[] = await db.select(`
+      SELECT 
+        strftime('%Y-%m', datetime(created_at, 'unixepoch')) as month,
+        SUM(CAST(json_extract(data, '$.total') AS REAL)) as revenue
+      FROM receipts 
+      WHERE business_id = $1
+      GROUP BY month
+      ORDER BY month DESC
+      LIMIT $2
+    `, [businessId, monthCount]);
+    
+    return result.map(r => ({
+      month: r.month,
+      revenue: r.revenue || 0
+    }));
+  } catch (err) {
+    console.error('SQLite Monthly Revenue Error:', err);
+    return [];
+  }
+}
+
 export async function removeActionFromOfflineQueue(actionId: string) {
   const db = await getOfflineDb();
   if (!db) return;

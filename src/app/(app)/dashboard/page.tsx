@@ -513,7 +513,11 @@ export default function DashboardPage() {
                 <ul className="space-y-3">
                   {topSellingItems.map(item => (
                     <li key={item.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 text-sm">
-                      <Link href={`/inventory/${item.id}`} className="hover:underline text-primary font-medium" title={item.name}>
+                      <Link 
+                        href={item.id.startsWith('manual-') ? '#' : `/inventory/details?id=${item.id}`} 
+                        className={cn("font-medium", item.id.startsWith('manual-') ? "text-muted-foreground cursor-default" : "hover:underline text-primary")} 
+                        title={item.name}
+                      >
                         {item.name}
                       </Link>
                       <div className="flex items-center gap-2">

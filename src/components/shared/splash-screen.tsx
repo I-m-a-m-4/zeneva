@@ -22,6 +22,13 @@ export function SplashScreen() {
     );
     setIsTauri(!!isTauriEnv);
 
+    // Only run if not already shown in this session
+    const hasBeenShown = sessionStorage.getItem('zeneva_splash_shown');
+    if (hasBeenShown) {
+      setIsFinished(true);
+      return;
+    }
+
     // Only run the loading simulation if in Tauri
     if (isTauriEnv) {
       const duration = 2500;
@@ -32,6 +39,7 @@ export function SplashScreen() {
         setProgress((prev) => {
           if (prev >= 100) {
             clearInterval(timer);
+            sessionStorage.setItem('zeneva_splash_shown', 'true');
             setTimeout(() => setIsFinished(true), 300);
             return 100;
           }

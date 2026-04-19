@@ -23,7 +23,8 @@ import {
   setLastSyncMetadata,
   saveActionToOfflineQueue,
   getOfflineQueue,
-  removeActionFromOfflineQueue
+  removeActionFromOfflineQueue,
+  getMonthlyRevenue
 } from '@/lib/sqlite-sync';
 
 import { 
@@ -293,7 +294,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
         successfulIds.forEach(id => removeActionFromOfflineQueue(id as string));
       }
-      return prev.filter(a => !successfulIds.has(a.id));
+
+      // Mark as synced first
+      const nextActions = prev.map(a => 
+        successfulIds.has(a.id) ? { ...a, status: 'synced' as any } : a
+      );
+
+      // Actually clear them after 2 seconds
+      if (successfulIds.size > 0) {
+        setTimeout(() => {
+          setQueuedActions(current => current.filter(a => !successfulIds.has(a.id)));
+        }, 2000);
+      }
+
+      return nextActions;
     });
     setIsQueueProcessing(false);
   }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast]);
@@ -470,7 +484,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField: async () => [], searchReceipts: async () => [],
     fetchReceiptsInRange: async () => [], searchProducts, searchProductsByField: async () => [],
-    findProductBySku: async () => null, fetchDetailedAnalytics, fetchMonthlyAnalytics: async () => [],
+    fetchDetailedAnalytics, 
+    fetchMonthlyAnalytics: useCallback(async (monthCount: number = 12) => {
+      if (!businessId) return [];
+      
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        try {
+          const res = await getMonthlyRevenue(businessId, monthCount);
+          if (res && res.length > 0) return res;
+        } catch (err) {
+          console.error("SQLite Monthly Fetch Failed:", err);
+        }
+      }
+
+      // Fallback to receipts in state if Firestore is not available/slow
+      if (receipts && receipts.length > 0) {
+        const monthly: Record<string, number> = {};
+        receipts.forEach(r => {
+          const date = safeToDate(r.createdAt);
+          const key = \`\${date.getFullYear()}-\${String(date.getMonth() + 1).padStart(2, '0')}\`;
+          monthly[key] = (monthly[key] || 0) + (r.total || 0);
+        });
+        return Object.entries(monthly).map(([month, revenue]) => ({ month, revenue })).sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+      }
+      
+      return [];
+    }, [businessId, receipts]),
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
     stats, isSubscriptionActive: true
   }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, isProfileReady]);
