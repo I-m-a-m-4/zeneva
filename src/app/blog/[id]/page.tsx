@@ -68,6 +68,13 @@ export default function BlogPostDetailPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [activeSection, setActiveSection] = React.useState<string>('');
 
+  const headings = React.useMemo(() => {
+    if (!post?.content) return [];
+    const h2s = post.content.match(/^## (.*$)/gm);
+    if (!h2s) return [];
+    return h2s.map(h => h.replace('## ', '').trim());
+  }, [post?.content]);
+
   React.useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -80,14 +87,14 @@ export default function BlogPostDetailPage() {
       { rootMargin: '-20% 0% -35% 0%' }
     );
 
-    const sections = ['challenge', 'framework', 'psychology', 'legacy', 'implementation', 'problems', 'tips'];
-    sections.forEach((id) => {
+    headings.forEach((heading) => {
+      const id = heading.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
       const element = document.getElementById(id);
       if (element) observer.observe(element);
     });
 
     return () => observer.disconnect();
-  }, [post]);
+  }, [post, headings]);
 
   // Fetch related posts
   const relatedQuery = useMemoFirebase(
@@ -211,7 +218,11 @@ export default function BlogPostDetailPage() {
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    h1: ({node, ...props}) => null // Strip H1 from markdown to prevent duplicates
+                    h1: ({node, ...props}) => null, // Strip H1 from markdown to prevent duplicates
+                    h2: ({node, children, ...props}) => {
+                      const id = String(children).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+                      return <h2 id={id} {...props}>{children}</h2>
+                    }
                   }}
                 >
                   {post.content}
@@ -288,22 +299,25 @@ export default function BlogPostDetailPage() {
                        <p className="text-sm font-medium text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-4 mb-4">
                          {post.excerpt || "Strategic breakdown of mission-critical retail operations."}
                        </p>
-                       <nav className="flex flex-col gap-3">
-                         {['Challenge', 'Framework', 'Psychology', 'Legacy', 'Implementation', 'Problems', 'Tips'].map((section) => (
-                           <button 
-                             key={section}
-                             onClick={() => {
-                               const el = document.getElementById(section.toLowerCase());
-                               if (el) el.scrollIntoView({ behavior: 'smooth' });
-                             }}
-                             className={cn(
-                               "text-left text-[11px] font-bold uppercase tracking-widest transition-colors",
-                               activeSection === section.toLowerCase() ? "text-orange-600" : "text-slate-400 hover:text-slate-900"
-                             )}
-                           >
-                             {section}
-                           </button>
-                         ))}
+                       <nav className="flex flex-col gap-4">
+                         {headings.map((heading) => {
+                           const id = heading.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-');
+                           return (
+                             <button 
+                               key={id}
+                               onClick={() => {
+                                 const el = document.getElementById(id);
+                                 if (el) el.scrollIntoView({ behavior: 'smooth' });
+                               }}
+                               className={cn(
+                                 "text-left text-xs font-bold transition-all duration-300",
+                                 activeSection === id ? "text-orange-600 pl-2" : "text-slate-500 hover:text-slate-900"
+                               )}
+                             >
+                               {heading}
+                             </button>
+                           );
+                         })}
                        </nav>
                     </div>
                  </div>

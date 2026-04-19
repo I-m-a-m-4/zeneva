@@ -274,48 +274,39 @@ export default function MasteringZenevaPage() {
               <div className="sticky top-40 space-y-12">
                  <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">On this page</p>
-                    <ol className="mt-4 space-y-3 border-l border-slate-100 pl-4">
-                       <li>
-                         <a 
-                           href="#psychology" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'psychology' ? 'text-orange-600 pl-2' : 'text-slate-900'}`}
-                         >
-                           Psychology of Sale
-                         </a>
-                       </li>
-                       <li>
-                         <a 
-                           href="#legacy" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'legacy' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
-                         >
-                           Legacy vs. High-Fidelity
-                         </a>
-                       </li>
-                       <li>
-                         <a 
-                           href="#local" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'local' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
-                         >
-                           The Local Advantage
-                         </a>
-                       </li>
-                       <li>
-                         <a 
-                           href="#volatility" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'volatility' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
-                         >
-                           Mitigating Volatility
-                         </a>
-                       </li>
-                       <li>
-                         <a 
-                           href="#invisible" 
-                           className={`block text-xs font-bold transition-all ${activeSection === 'invisible' ? 'text-orange-600 pl-2' : 'text-slate-400 hover:text-slate-900'}`}
-                         >
-                           Scaling the Invisible
-                         </a>
-                       </li>
-                    </ol>
+                    <div className="space-y-6">
+                       <p className="text-sm font-medium text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-4 mb-4">
+                         Everything you need to know about scaling inventory across multiple Nigerian retail outlets.
+                       </p>
+                       <nav className="flex flex-col gap-4">
+                         {[
+                           { id: 'psychology', label: 'The Psychology of the Sale' },
+                           { id: 'legacy', label: 'Legacy vs. High-Fidelity OS' },
+                           { id: 'local', label: 'The Zeneva Local Advantage' },
+                           { id: 'volatility', label: 'Mitigating Macro-Volatility' },
+                           { id: 'invisible', label: 'Scaling the Invisible Losses' },
+                           { id: 'sovereignty', label: 'Data Sovereignty in the Cloud' },
+                           { id: 'hesitation', label: 'The High Cost of Hesitation' },
+                           { id: 'divide', label: 'Bridging the Digital Divide' },
+                           { id: 'liquidity', label: 'The Liquidity Trap (Cash-in-Stock)' },
+                           { id: 'generational', label: 'Building a Generational Enterprise' }
+                         ].map((item) => (
+                           <button 
+                             key={item.id}
+                             onClick={() => {
+                               const el = document.getElementById(item.id);
+                               if (el) el.scrollIntoView({ behavior: 'smooth' });
+                             }}
+                             className={cn(
+                               "text-left text-xs font-bold transition-all duration-300",
+                               activeSection === item.id ? "text-orange-600 pl-2" : "text-slate-500 hover:text-slate-900"
+                             )}
+                           >
+                             {item.label}
+                           </button>
+                         ))}
+                       </nav>
+                    </div>
                  </div>
 
                   <div className="pt-10 border-t border-slate-100">
