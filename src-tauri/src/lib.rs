@@ -1,3 +1,4 @@
+#[cfg(desktop)]
 use tauri::Manager;
 
 #[cfg(desktop)]
@@ -56,6 +57,7 @@ pub fn run() {
   // Single-instance: if a second instance is launched, show the existing window
   #[cfg(desktop)]
   {
+    use tauri::Manager;
     builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         println!("Zeneva: Second instance detected — focusing existing window.");
         if let Some(window) = app.get_webview_window("main") {
@@ -72,6 +74,7 @@ pub fn run() {
 
         #[cfg(desktop)]
         {
+            use tauri::Manager;
             // FIX: Explicitly show and focus the main window on startup.
             // This is the primary fix — without this, the window can start hidden.
             if let Some(window) = app.get_webview_window("main") {
@@ -129,6 +132,11 @@ pub fn run() {
             } else {
                 println!("Zeneva: WARNING — No default window icon found, skipping tray.");
             }
+        }
+        
+        #[cfg(mobile)]
+        {
+            let _ = app;
         }
 
         println!("Zeneva: Setup completed successfully.");
