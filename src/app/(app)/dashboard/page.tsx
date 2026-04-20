@@ -92,7 +92,10 @@ export default function DashboardPage() {
   const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange } = usePOS();
 
   // Date range state, defaults to today
-  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date())
+  });
 
 
   const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);

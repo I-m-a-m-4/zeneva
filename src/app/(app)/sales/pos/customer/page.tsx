@@ -161,13 +161,24 @@ export default function CustomerPage() {
 
         // Combine with results from Firestore search for cases where customer might not be in the initial batch
         const combined = [...localResults, ...(searchedCustomers || [])];
-        const uniqueItems = Array.from(new Map(combined.map(item => [item.id, item])).values());
+        
+        // Ensure uniqueness by ID
+        const uniqueMap = new Map();
+        combined.forEach(item => {
+            if (item && item.id) uniqueMap.set(item.id, item);
+        });
+        const uniqueItems = Array.from(uniqueMap.values());
 
         // Sort by createdAt descending to show newest first
         return uniqueItems.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-            return dateB.getTime() - dateA.getTime();
+            const safeDate = (obj: any) => {
+                if (!obj?.createdAt) return 0;
+                if (obj.createdAt.toDate) return obj.createdAt.toDate().getTime();
+                if (obj.createdAt instanceof Date) return obj.createdAt.getTime();
+                if (typeof obj.createdAt === 'string' || typeof obj.createdAt === 'number') return new Date(obj.createdAt).getTime();
+                return 0;
+            };
+            return safeDate(b) - safeDate(a);
         });
     }, [searchTerm, customers, searchedCustomers]);
 

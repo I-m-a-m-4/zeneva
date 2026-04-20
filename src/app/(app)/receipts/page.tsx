@@ -28,7 +28,7 @@ import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import React from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
@@ -301,25 +301,25 @@ export default function ReceiptsPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!receiptToDelete} onOpenChange={(open) => !open && setReceiptToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to void this sale?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={!!receiptToDelete} onOpenChange={(open) => !open && setReceiptToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Are you sure you want to void this sale?</DialogTitle>
+            <DialogDescription>
               This will permanently delete receipt <strong>{receiptToDelete?.id.substring(0, 8)}</strong>.
               Stock for all items will be restored and any loyalty points earned will be removed.
               This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteReceipt} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiptToDelete(null)} disabled={isDeleting}>Cancel</Button>
+            <Button onClick={handleDeleteReceipt} disabled={isDeleting} variant="destructive">
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Void Sale
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
