@@ -173,10 +173,14 @@ jobs:
         run: |
           npm run tauri android build -- --apk --target aarch64
 
+      - name: Rename APK for Release
+        run: |
+          mv src-tauri/gen/android/app/build/outputs/apk/release/app-release-unsigned.apk src-tauri/gen/android/app/build/outputs/apk/release/zeneva-v1.6.5.apk || true
+
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: src-tauri/gen/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          files: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
