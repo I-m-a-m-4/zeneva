@@ -171,7 +171,7 @@ jobs:
           NDK_HOME: ${{ env.NDK_HOME }}
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
         run: |
-          npm run tauri android build -- --apk --target aarch64-linux-android
+          npm run tauri android build -- --apk --target aarch64
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
