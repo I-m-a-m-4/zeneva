@@ -104,7 +104,21 @@ jobs:
           java-version: '17'
 
       - name: Android SDK setup
+        id: setup-android
         uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          # Find NDK
+          if [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
+            NDK_PATH=$ANDROID_SDK_ROOT/ndk/$(ls $ANDROID_SDK_ROOT/ndk | sort -V | tail -1)
+          else
+            NDK_PATH=$ANDROID_SDK_ROOT/ndk-bundle
+          fi
+          echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          # Add NDK toolchain to path
+          echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
