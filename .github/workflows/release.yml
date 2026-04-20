@@ -119,10 +119,22 @@ jobs:
           else
             NDK_PATH=$ANDROID_NDK_HOME
           fi
+          
+          echo "Zeneva: Using NDK at $NDK_PATH"
           echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          
           # Add NDK toolchain to path
-          echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+          TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin
+          echo "$TOOLCHAIN" >> $GITHUB_PATH
+          
+          # Set explicit linkers for cargo
+          # Note: The version '33' in the binary name might vary, but standard NDKs usually have a generic clang or one with a version.
+          # We'll use the generic aarch64-linux-android*-clang wrapper.
+          CLANG_PATH=$(find $TOOLCHAIN -name "aarch64-linux-android*-clang" | head -n 1)
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CLANG_PATH" >> $GITHUB_ENV
+          echo "CC_aarch64_linux_android=$CLANG_PATH" >> $GITHUB_ENV
+          echo "Zeneva: Linker set to $CLANG_PATH"
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
