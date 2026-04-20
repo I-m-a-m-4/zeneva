@@ -1,4 +1,7 @@
-use tauri::{Manager, menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}};
+use tauri::Manager;
+
+#[cfg(desktop)]
+use tauri::{menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}};
 
 #[tauri::command]
 fn calculate_secure_loyalty(amount: f64) -> u32 {
@@ -29,19 +32,12 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   println!("Zeneva: Initializing Builder...");
-  tauri::Builder::default()
+  
+  #[allow(unused_mut)]
+  let mut builder = tauri::Builder::default()
     .plugin(tauri_plugin_log::Builder::default()
       .level(log::LevelFilter::Info)
       .build())
-    // Single-instance: if a second instance is launched, show the existing window
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        println!("Zeneva: Second instance detected — focusing existing window.");
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-        }
-    }))
     .invoke_handler(tauri::generate_handler![
         calculate_secure_loyalty, 
         calculate_royalty, 
@@ -50,80 +46,89 @@ pub fn run() {
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
-    // IMPORTANT: Stronghold wrapped defensively — a bad vault file was crashing
-    // the app silently before the window could ever appear.
     .plugin(tauri_plugin_stronghold::Builder::new(|_password| {
         "zeneva-secure-key-2024".as_bytes().to_vec()
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
-    .plugin(tauri_plugin_shell::init())
-    // FIX: Only intercept close events on Windows to keep app in tray.
-    // Previously this was hiding the window on ALL platforms/events
-    // causing the window to vanish immediately on launch.
-    // Removed: Intercepting close events on Windows to keep app in tray.
-    // The user prefers the application to quit fully on 'X' to ensure a clean state upon restart.
-    .setup(|app| {
-        println!("Zeneva: Entering setup...");
+    .plugin(tauri_plugin_shell::init());
 
-        // FIX: Explicitly show and focus the main window on startup.
-        // This is the primary fix — without this, the window can start hidden.
+  // Single-instance: if a second instance is launched, show the existing window
+  #[cfg(desktop)]
+  {
+    builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        println!("Zeneva: Second instance detected — focusing existing window.");
         if let Some(window) = app.get_webview_window("main") {
-            println!("Zeneva: Showing and focusing main window...");
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
-        } else {
-            println!("Zeneva: WARNING — could not find 'main' window in setup!");
         }
+    }));
+  }
 
-        // Build tray menu
-        let quit_i = MenuItem::with_id(app, "quit", "Quit Zeneva", true, None::<&str>)?;
-        let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
-        let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+  builder
+    .setup(|app| {
+        println!("Zeneva: Entering setup...");
 
-        // Build tray icon (non-fatal if icon is missing)
-        if let Some(tray_icon) = app.default_window_icon().cloned() {
-            println!("Zeneva: Building tray icon...");
-            let tray_result = TrayIconBuilder::new()
-                .icon(tray_icon)
-                .menu(&menu)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "quit" => {
-                            println!("Zeneva: Quit requested from tray.");
+        #[cfg(desktop)]
+        {
+            // FIX: Explicitly show and focus the main window on startup.
+            // This is the primary fix — without this, the window can start hidden.
+            if let Some(window) = app.get_webview_window("main") {
+                println!("Zeneva: Showing and focusing main window...");
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            } else {
+                println!("Zeneva: WARNING — could not find 'main' window in setup!");
+            }
 
-                            
-                            std::process::exit(0);
+            // Build tray menu
+            let quit_i = MenuItem::with_id(app, "quit", "Quit Zeneva", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show Zeneva Dashboard", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            // Build tray icon (non-fatal if icon is missing)
+            if let Some(tray_icon) = app.default_window_icon().cloned() {
+                println!("Zeneva: Building tray icon...");
+                let tray_result = TrayIconBuilder::new()
+                    .icon(tray_icon)
+                    .menu(&menu)
+                    .on_menu_event(|app, event| {
+                        match event.id.as_ref() {
+                            "quit" => {
+                                println!("Zeneva: Quit requested from tray.");
+                                std::process::exit(0);
+                            }
+                            "show" => {
+                                if let Some(win) = app.get_webview_window("main") {
+                                    let _ = win.show();
+                                    let _ = win.unminimize();
+                                    let _ = win.set_focus();
+                                }
+                            }
+                            _ => {}
                         }
-                        "show" => {
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                            let app = tray.app_handle();
                             if let Some(win) = app.get_webview_window("main") {
                                 let _ = win.show();
                                 let _ = win.unminimize();
                                 let _ = win.set_focus();
                             }
                         }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
-                        let app = tray.app_handle();
-                        if let Some(win) = app.get_webview_window("main") {
-                            let _ = win.show();
-                            let _ = win.unminimize();
-                            let _ = win.set_focus();
-                        }
-                    }
-                })
-                .build(app);
+                    })
+                    .build(app);
 
-            match tray_result {
-                Ok(_) => println!("Zeneva: Tray icon built successfully."),
-                Err(e) => println!("Zeneva: WARNING — Tray icon failed to build: {:?}", e),
+                match tray_result {
+                    Ok(_) => println!("Zeneva: Tray icon built successfully."),
+                    Err(e) => println!("Zeneva: WARNING — Tray icon failed to build: {:?}", e),
+                }
+            } else {
+                println!("Zeneva: WARNING — No default window icon found, skipping tray.");
             }
-        } else {
-            println!("Zeneva: WARNING — No default window icon found, skipping tray.");
         }
 
         println!("Zeneva: Setup completed successfully.");
