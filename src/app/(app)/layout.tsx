@@ -43,6 +43,8 @@ import { AppConfig } from '@/lib/config';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CachedImage } from '@/components/shared/cached-image';
+import { useNativeNotifications } from '@/hooks/use-native-notifications';
 
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -162,6 +164,8 @@ export default function AuthenticatedLayout({
     queuedActions,
     isSubscriptionActive
   } = usePOS();
+
+  const { notify } = useNativeNotifications();
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
@@ -459,10 +463,18 @@ export default function AuthenticatedLayout({
               <SidebarHeader className="p-4 flex items-center gap-2 justify-center">
                 <Link href="/dashboard" className="flex items-center justify-center h-12 w-full">
                   {/* Expanded state logo */}
-                  <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="w-32 h-auto group-data-[state=expanded]:block hidden" />
+                  <CachedImage 
+                    src={businessInstance?.settings?.logoUrl || AppConfig.logoUrl} 
+                    alt="Zeneva Logo" 
+                    className="w-32 h-auto group-data-[state=expanded]:block hidden" 
+                  />
                   {/* Collapsed state logo */}
                   <div className="w-12 h-12 group-data-[state=collapsed]:block hidden">
-                    <img src={AppConfig.logoIconUrl} alt="Zeneva Icon" className="w-10 h-10 mx-auto" />
+                    <CachedImage 
+                      src={businessInstance?.settings?.logoUrl || AppConfig.logoIconUrl} 
+                      alt="Zeneva Icon" 
+                      className="w-10 h-10 mx-auto" 
+                    />
                   </div>
                 </Link>
               </SidebarHeader>

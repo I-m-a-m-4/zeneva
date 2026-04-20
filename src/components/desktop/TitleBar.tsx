@@ -4,10 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { X, Minus, Square, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppConfig } from '@/lib/config';
+import { CachedImage } from '@/components/shared/cached-image';
+import { usePOS } from '@/context/pos-context';
 
 export function DesktopTitleBar() {
+  const { business } = usePOS();
   const [isTauri, setIsTauri] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  
+  const displayLogo = business?.settings?.logoUrl || AppConfig.logoIconUrl;
 
   useEffect(() => {
     // Check if we are in Tauri or Web
@@ -78,7 +83,7 @@ export function DesktopTitleBar() {
          {/* Premium Logo Container */}
          <div className="h-6 w-6 relative">
             <div className="absolute inset-0 bg-primary/20 rounded-lg blur-[2px] animate-pulse"></div>
-            <img src={AppConfig.logoIconUrl} alt="Zeneva" className="h-6 w-6 relative z-10 drop-shadow-sm" />
+            <CachedImage src={displayLogo} alt="Zeneva" className="h-6 w-6 relative z-10 drop-shadow-sm" />
          </div>
          <div className="flex flex-col" data-tauri-drag-region>
             <span className="text-[10px] font-black tracking-[0.25em] text-primary/90 leading-none">ZENEVA</span>

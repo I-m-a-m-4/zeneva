@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.6.1"
+version = "1.6.8"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -31,3 +31,5 @@ tauri-plugin-stronghold = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-http = "2"
+tauri-plugin-notification = "2"

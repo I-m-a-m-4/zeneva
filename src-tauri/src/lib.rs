@@ -52,6 +52,8 @@ pub fn run() {
     }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
+    .plugin(tauri_plugin_http::init())
+    .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_shell::init());
 
   // Single-instance: if a second instance is launched, show the existing window
