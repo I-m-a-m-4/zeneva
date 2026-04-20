@@ -25,25 +25,23 @@ if (!getFirestore) {
 const db = getFirestore();
 
 async function cleanup() {
-  console.log("Cleaning up old PDF references in blog posts...");
+  console.log("NUCLEAR WIPE: Deleting all existing blog posts...");
   try {
-    const snapshot = await db.collection('blogPosts').where('title', '>=', 'Best Free PDF').get();
+    const snapshot = await db.collection('blogPosts').get();
     
     if (snapshot.empty) {
-      console.log("No PDF posts found.");
+      console.log("No blog posts found to delete.");
+      process.exit(0);
     }
 
+    console.log(`Found ${snapshot.size} posts. Initializing batch delete...`);
     const batch = db.batch();
     snapshot.docs.forEach(doc => {
-      const title = doc.data().title;
-      if (title.includes("PDF")) {
-        console.log(`Deleting/Replacing post: ${title}`);
-        batch.delete(doc.ref);
-      }
+      batch.delete(doc.ref);
     });
 
     await batch.commit();
-    console.log("Cleanup complete.");
+    console.log("SUCCESS: All blog posts have been removed.");
     process.exit(0);
   } catch (err) {
     console.error("Error during cleanup:", err);

@@ -173,14 +173,28 @@ jobs:
         run: |
           npm run tauri android build -- --apk --target aarch64
 
-      - name: Rename APK for Release
+      - name: Locate and Prepare APK
         run: |
-          mv src-tauri/gen/android/app/build/outputs/apk/release/app-release-unsigned.apk src-tauri/gen/android/app/build/outputs/apk/release/zeneva-v1.6.5.apk || true
+          echo "Searching for APK files..."
+          APK_PATH=$(find . -name "*.apk" | grep release | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No release APK found with search. Checking all APKs..."
+            APK_PATH=$(find . -name "*.apk" | head -n 1)
+          fi
+          
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK at: $APK_PATH"
+            cp "$APK_PATH" ./zeneva-v1.6.6.apk
+            echo "APK ready at ./zeneva-v1.6.6.apk"
+          else
+            echo "CRITICAL: No APK file found in the entire workspace!"
+            exit 1
+          fi
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+          files: ./zeneva-v1.6.6.apk
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
