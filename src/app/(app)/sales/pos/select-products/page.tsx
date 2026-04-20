@@ -20,6 +20,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadio
 import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
 import { QrCode } from "lucide-react";
+import { ImageDialog } from "@/components/shared/image-dialog";
+
 
 function ProductCardSkeleton() {
     return (
@@ -38,24 +40,29 @@ function ProductCardSkeleton() {
     );
 }
 
-const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart }: {
+const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart, onPreview }: {
     product: Product,
     currencySymbol: string,
     handleAddToCart: (product: Product) => void,
-    addToCart: any
+    addToCart: any,
+    onPreview: (src: string, alt: string) => void
 }) => {
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
-            <CardContent className="p-4 relative aspect-square w-full bg-muted/20 flex items-center justify-center">
+            <CardContent 
+                className="p-4 relative aspect-square w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
+                onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
+            >
                 {product.imageUrl ? (
                     <div className="relative w-full h-full">
                         <Image
                             src={product.imageUrl}
                             alt={product.name}
                             fill
-                            className="object-contain"
+                            className="object-contain hover:scale-105 transition-transform"
                         />
                     </div>
+
                 ) : (
                     <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground/40">
                         <Package size={48} />
@@ -198,6 +205,8 @@ export default function SelectProductsPage() {
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
     const [isSearching, setIsSearching] = React.useState(false);
+    const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
+
 
     React.useEffect(() => {
         if (business) {
@@ -429,7 +438,7 @@ export default function SelectProductsPage() {
                     )}
                 </div>
                 <div className="pb-24 md:pb-0">
-                    {isLoading && !filteredProducts.length ? (
+                    {isLoading || products === null ? (
                         <div className="flex flex-col items-center justify-center p-12 min-h-[300px] text-center">
                             <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
                             <p className="text-muted-foreground animate-pulse">Filtering products...</p>
@@ -443,9 +452,12 @@ export default function SelectProductsPage() {
                                             key={product.id}
                                             product={product}
                                             currencySymbol={currencySymbol}
-                                            handleAddToCart={handleAddToCart}
+                                            handleAddToCart={() => handleAddToCart(product)}
                                             addToCart={addToCart}
+                                            onPreview={(src, alt) => setPreviewImage({ src, alt })}
                                         />
+
+
                                     ))}
                                 </div>
                             ) : (
@@ -537,6 +549,13 @@ export default function SelectProductsPage() {
                     onScan={handleScan}
                 />
             )}
+            <ImageDialog 
+                isOpen={!!previewImage} 
+                onClose={() => setPreviewImage(null)} 
+                src={previewImage?.src || null} 
+                alt={previewImage?.alt || ''} 
+            />
         </div>
+
     )
 }

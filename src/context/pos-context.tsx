@@ -161,10 +161,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialStats } = useDoc<BusinessStats>(statsDocRef);
 
   const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(100)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
+  const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
   const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
-  const { data: initialCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
+  const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
   const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
@@ -190,6 +190,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
   const products = useMemo(() => {
+    if (!initialProducts && isLoadingProducts) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
@@ -208,6 +209,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialProducts, syncedProducts, queuedActions]);
 
   const receipts = useMemo(() => {
+    if (!initialReceipts && isLoadingReceipts) return null;
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
     syncedReceipts.forEach(r => { if (!existingIds.has(r.id)) merged.push(r); });
@@ -220,6 +222,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialReceipts, syncedReceipts, queuedActions]);
 
   const customers = useMemo(() => {
+    if (!initialCustomers && isLoadingCustomers) return null;
     let merged = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
     const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
     merged = merged.filter(c => !deletedIds.has(c.id));
@@ -268,9 +271,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
             const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
             batch.set(rRef, { ...action.payload.receiptData, createdAt: serverTimestamp() });
             action.payload.productUpdates.forEach((u:any) => batch.update(doc(firestore, 'products', u.id), { stock: u.newStock, updatedAt: serverTimestamp() }));
-            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalSales: increment(1), totalRevenue: increment(action.payload.receiptData.total) }, { merge: true });
+            const totalUnits = action.payload.receiptData.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
+            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { 
+              totalSales: increment(1), 
+              totalRevenue: increment(action.payload.receiptData.total),
+              totalUnitsSold: increment(totalUnits)
+            }, { merge: true });
+
             resultData.newReceiptId = rRef.id; break;
+          case 'delete-product':
+            action.payload.productIds.forEach((id: string) => batch.delete(doc(firestore, 'products', id)));
+            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(-action.payload.productIds.length) }, { merge: true });
+            break;
+          case 'update-product':
+            batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
+            break;
+          case 'bulk-update-products':
+            action.payload.productIds.forEach((id: string) => {
+              batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
+            });
+            break;
         }
+
         await batch.commit();
         return { id: action.id, status: 'fulfilled', ...resultData };
       } catch (e: any) { 
@@ -633,7 +655,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const value: POSContextType = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile, isLoading: isUserLoading || (!!user && !isProfileReady), isUserLoading, user, firestore,
+    business, products, receipts, customers, onlineOrders, currentUserProfile, 
+    isLoading: isUserLoading || (!!user && !isProfileReady) || isLoadingBusiness || isLoadingProducts || isLoadingCustomers || isLoadingReceipts || !isMounted, 
+    isUserLoading, user, firestore,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer: setSelectedCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,

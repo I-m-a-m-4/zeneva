@@ -456,5 +456,7 @@ export interface BusinessStats {
     totalProducts: number;
     totalRevenue: number;
     totalSales: number;
+    totalUnitsSold?: number;
     updatedAt: any;
 }
+

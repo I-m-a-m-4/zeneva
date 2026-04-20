@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 
-function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: () => void }) {
+function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: (customer: Customer) => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { triggerRefresh, customers, addToQueue } = usePOS();
@@ -80,24 +80,26 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 
             if (isTauri) {
                 const tempId = `temp-${Date.now()}`;
+                const completeCustomer = { ...newCustomerData, id: tempId, createdAt: new Date() };
                 addToQueue({
                     type: 'add-customer',
-                    payload: { ...newCustomerData, id: tempId },
+                    payload: completeCustomer,
                 }, `Adding customer: ${name}`);
 
-                
                 toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
                 triggerRefresh();
-                onCustomerAdded();
+                onCustomerAdded(completeCustomer as Customer);
             } else {
-                await addDoc(collection(firestore, 'customers'), {
+                const docRef = await addDoc(collection(firestore, 'customers'), {
                     ...newCustomerData,
                     createdAt: serverTimestamp(),
                 });
+                const completeCustomer = { ...newCustomerData, id: docRef.id, createdAt: new Date() };
                 toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
                 triggerRefresh();
-                onCustomerAdded();
+                onCustomerAdded(completeCustomer as Customer);
             }
+
         } catch (error) {
             toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
         } finally {
@@ -161,8 +163,14 @@ export default function CustomerPage() {
         const combined = [...localResults, ...(searchedCustomers || [])];
         const uniqueItems = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
-        return uniqueItems;
+        // Sort by createdAt descending to show newest first
+        return uniqueItems.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return dateB.getTime() - dateA.getTime();
+        });
     }, [searchTerm, customers, searchedCustomers]);
+
 
     const isLoading = isPosLoading || (searchTerm.trim() && isSearching && (!filteredCustomers || filteredCustomers.length === 0));
 
@@ -219,7 +227,16 @@ export default function CustomerPage() {
                                             Enter the details for the new customer.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    {currentUser?.businessId && <AddCustomerForm businessId={currentUser.businessId} onCustomerAdded={() => setIsAddCustomerOpen(false)} />}
+                                    {currentUser?.businessId && (
+                                        <AddCustomerForm 
+                                            businessId={currentUser.businessId} 
+                                            onCustomerAdded={(c) => {
+                                                selectCustomer(c);
+                                                setIsAddCustomerOpen(false);
+                                            }} 
+                                        />
+                                    )}
+
                                 </DialogContent>
                             </Dialog>
                         </div>

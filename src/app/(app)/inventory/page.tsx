@@ -86,6 +86,8 @@ import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
 import BarcodeDialog from '@/components/inventory/barcode-dialog';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { QrCode } from 'lucide-react';
+import { ImageDialog } from "@/components/shared/image-dialog";
+
 
 function ProductRowSkeleton() {
   return (
@@ -176,6 +178,8 @@ function InventoryPageContent() {
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+  const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
+
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
 
@@ -259,8 +263,9 @@ function InventoryPageContent() {
   // Get IDs of products queued for deletion
   const queuedDeletionIds = React.useMemo(() => {
     return queuedActions
-      .filter(a => a.type === 'delete-product' && (a.status === 'pending' || a.status === 'processing'))
+      .filter(a => a.type === 'delete-product' && (a.status === 'pending' || a.status === 'processing' || a.status === 'synced'))
       .flatMap(a => a.payload.productIds as string[]);
+
   }, [queuedActions]);
 
   const filteredProducts = React.useMemo(() => {
@@ -729,7 +734,7 @@ function InventoryPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
-          {isLoading ? (
+          {isLoading || products === null ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
               <p className="text-muted-foreground animate-pulse font-medium">Scanning inventory catalogs...</p>
@@ -768,10 +773,16 @@ function InventoryPageContent() {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
                         {product.imageUrl ? (
-                          <div className="relative h-16 w-16">
+                          <div 
+                            className="relative h-16 w-16" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewImage({ src: product.imageUrl!, alt: product.name });
+                            }}
+                          >
                             <Image
                               alt={product.name}
-                              className="aspect-square rounded-md object-cover"
+                              className="aspect-square rounded-md object-cover hover:ring-2 ring-primary/50 transition-all"
                               fill
                               src={product.imageUrl}
                             />
@@ -791,6 +802,7 @@ function InventoryPageContent() {
                             )}
                           </div>
                         )}
+
                       </TableCell>
                       <TableCell className="font-medium whitespace-normal">
                         <div className="flex items-center gap-2">
@@ -957,7 +969,14 @@ function InventoryPageContent() {
           }}
         />
       )}
+      <ImageDialog 
+          isOpen={!!previewImage} 
+          onClose={() => setPreviewImage(null)} 
+          src={previewImage?.src || null} 
+          alt={previewImage?.alt || ''} 
+      />
     </div>
+
   );
 }
 

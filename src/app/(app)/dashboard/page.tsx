@@ -92,10 +92,8 @@ export default function DashboardPage() {
   const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange } = usePOS();
 
   // Date range state, defaults to today
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfDay(new Date()),
-    to: endOfDay(new Date()),
-  });
+  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
+
 
   const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);
   const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
@@ -213,7 +211,8 @@ export default function DashboardPage() {
       totalOnlineOrdersCount,
       totalRevenue: showLifetime ? (stats?.totalRevenue || 0) : totalRevenue,
       newCustomersCount: showLifetime ? (stats?.totalCustomers || 0) : newCustomers.length,
-      totalUnitsSold,
+      totalUnitsSold: showLifetime ? (stats?.totalUnitsSold || 0) : totalUnitsSold,
+
       topSellingItems,
       topLoyaltyCustomers,
       debtItemsCount: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).length,
