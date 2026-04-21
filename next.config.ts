@@ -204,7 +204,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
         },
       },
     ],
-    buildExcludes: [/middleware-manifest\.json$/, /_next\/static\/.*\.map$/, /_next\/static\/chunks\/.*\.js$/],
+    exclude: [/middleware-manifest\.json$/, /_next\/static\/.*\.map$/, /_next\/static\/chunks\/.*\.js$/],
   },
 });
 
