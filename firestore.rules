@@ -1,3 +1,4 @@
+// Force rules update - Version 2.0.2
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,12 +9,9 @@ service cloud.firestore {
     // =================================================================
     
     function isSuperAdmin() {
-      // Use UIDs for maximum reliability and security
       return request.auth != null && 
              (request.auth.uid == 'jzQgCHzaObeUbeYklTLtQQh03G53' || 
-              (request.auth.token != null && 
-               'email' in request.auth.token && 
-               request.auth.token.email == 'belloimam431@gmail.com'));
+              (request.auth.token != null && 'email' in request.auth.token && request.auth.token.email == 'belloimam431@gmail.com'));
     }
 
     match /{allPaths=**} {
@@ -24,32 +22,40 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isRequestingUserMemberOf(businessId) {
+    function getCurrentUserBusinessId() {
       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isSuperAdmin() || (request.auth != null && exists(userDocPath) && get(userDocPath).data.businessId == businessId);
+      return (request.auth != null && exists(userDocPath)) 
+             ? get(userDocPath).data.get('businessId', 'none') 
+             : 'none';
+    }
+
+    function getCurrentUserRole() {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return (request.auth != null && exists(userDocPath)) 
+             ? get(userDocPath).data.get('role', 'none') 
+             : 'none';
+    }
+
+    function isRequestingUserMemberOf(businessId) {
+      return isSuperAdmin() || (request.auth != null && getCurrentUserBusinessId() == businessId);
     }
     
     function isRequestingUserAdmin() {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role == 'admin';
+      return request.auth != null && getCurrentUserRole() == 'admin';
     }
 
     function isRequestingUserManager() {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role in ['admin', 'manager'];
+      return request.auth != null && getCurrentUserRole() in ['admin', 'manager'];
     }
 
     function isRequestingUserStaff() {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role in ['admin', 'manager', 'vendor_operator'];
+      return request.auth != null && getCurrentUserRole() in ['admin', 'manager', 'vendor_operator'];
     }
 
     function isBusinessOwner(businessId) {
-       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
        return request.auth != null && 
-              exists(userDocPath) &&
-              get(userDocPath).data.businessId == businessId && 
-              get(userDocPath).data.role == 'admin';
+              getCurrentUserBusinessId() == businessId && 
+              getCurrentUserRole() == 'admin';
     }
 
     // =================================================================
@@ -90,12 +96,15 @@ service cloud.firestore {
     // =================================================================
 
     match /businessInstances/{businessId} {
-      allow get: if resource.data.get(['settings', 'publicStore', 'enabled'], false) == true || (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+      allow get: if isSuperAdmin() ||
+                    (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) ||
+                    (isUserAuthenticated() && resource != null && resource.data.get('ownerId', null) == request.auth.uid) ||
+                    (resource != null && resource.data.get(['settings', 'publicStore', 'enabled'], false) == true);
       
       allow list: if request.query.limit <= 1 || isSuperAdmin();
       
       allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerId;
-      allow update: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId) || isSuperAdmin();
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId);
       allow delete: if isSuperAdmin();
       
       match /subscription_history/{historyId} {
@@ -124,59 +133,62 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if (request.auth != null && request.auth.uid == userId) || (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
-      allow list: if isRequestingUserAdmin() || isSuperAdmin();
+      // Direct self-access or Super Admin access.
+      allow get: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
+                    
+      // Only SuperAdmin can list globally. Business Admins fetch via Cloud Functions or we allow lists if they are super admin.
+      allow list: if isSuperAdmin();
       
-      allow update: if (request.auth != null && request.auth.uid == userId) || 
-                       (isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || isSuperAdmin();
+      // Self-update or Super Admin
+      allow update: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
 
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Self-create or Super Admin
+      allow create: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
       
-      allow delete: if isSuperAdmin() ||
-                       (isRequestingUserAdmin() && request.auth != null && request.auth.uid != userId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
+      // Only Super admin can delete users to prevent rogue logic
+      allow delete: if isSuperAdmin();
       
       match /notifications/{notificationId} {
-        allow read, write: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
+        allow read, write: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
       }
 
       match /fcmTokens/{tokenId} {
-        allow read, write: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
+        allow read, write: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
       }
 
       match /sessions/{sessionId} {
-        allow read, write: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
+        allow read, write: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
       }
     }
    
     match /invitations/{invitationId} {
       allow read: if true; // Publicly readable by anyone with the unguessable link ID
-      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId);
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin());
-      allow delete: if (isUserAuthenticated() && isRequestingUserAdmin() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId) || 
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.get('businessId', null) == getCurrentUserBusinessId());
+      allow list: if isSuperAdmin() || isUserAuthenticated();
+      allow delete: if (isUserAuthenticated() && isRequestingUserAdmin() && getCurrentUserBusinessId() == resource.data.get('businessId', 'none')) || 
                        isSuperAdmin() ||
-                       (isUserAuthenticated() && 'email' in request.auth.token && request.auth.token.email.lower() == resource.data.email.lower());
+                       (isUserAuthenticated() && 'email' in request.auth.token && request.auth.token.email.lower() == resource.data.get('email', '').lower());
     }
 
 
     match /products/{productId} {
       allow get, list: if true;
-      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId);
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && request.resource.data.get('businessId', null) == getCurrentUserBusinessId());
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
 
     match /receipts/{receiptId} {
-        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.businessId) || resource.data.createdBy == request.auth.uid));
-        allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId));
-        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
+        allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.get('businessId', null)));
+        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
     
     match /customers/{customerId} {
-      allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId)) || isSuperAdmin();
-      // Allow public creation for checkout
+      allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null))) || isSuperAdmin();
       allow create: if true; 
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.businessId));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.businessId));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
 
     match /admin_analytics/{docId} {
@@ -188,14 +200,10 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // --- Global Surveillance Hooks ---
-    
-    // Enable collectionGroup queries for Cyber Shield
     match /{path=**}/auditLogs/{logId} {
       allow read, list: if isSuperAdmin();
     }
 
-    // Outreach Intelligence
     match /follow_up_logs/{logId} {
       allow read, list, write: if isSuperAdmin();
     }

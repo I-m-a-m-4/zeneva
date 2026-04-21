@@ -496,8 +496,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isUserLoading) return;
-    if (!user) { if (lastUserId) nuclearReset(); setLastUserId(null); return; }
-    if (effectiveUserId !== lastUserId) { if (lastUserId) resetPOS(); setLastUserId(effectiveUserId); }
+    if (!user) { 
+      if (lastUserId) nuclearReset(); 
+      setLastUserId(null); 
+      setImpersonatedUserId(null);
+      if (typeof window !== 'undefined') sessionStorage.removeItem('zeneva_impersonated_user_id');
+      return; 
+    }
+    if (effectiveUserId !== lastUserId) { 
+      if (lastUserId) resetPOS(); 
+      setLastUserId(effectiveUserId); 
+    }
+    
+    // Safety check: only allow impersonation if current user is super admin
+    const isSuperAdmin = user?.email === 'belloimam431@gmail.com';
+    if (impersonatedUserId && !isSuperAdmin) {
+      setImpersonatedUserId(null);
+      if (typeof window !== 'undefined') sessionStorage.removeItem('zeneva_impersonated_user_id');
+    }
   }, [user, isUserLoading, effectiveUserId, lastUserId, resetPOS, nuclearReset]);
 
   useEffect(() => {

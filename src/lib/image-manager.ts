@@ -1,8 +1,4 @@
 
-import { BaseDirectory, exists, mkdir, readFile, writeFile } from '@tauri-apps/plugin-fs';
-import { fetch } from '@tauri-apps/plugin-http';
-import { join, appDataDir } from '@tauri-apps/api/path';
-
 /**
  * ImageManager handles the local persistence of images on the device (Mobile/Desktop).
  * It downloads external images and saves them to the local filesystem,
@@ -16,8 +12,10 @@ export class ImageManager {
    */
   private static async ensureDir() {
     try {
-      const isTauri = !!(window as any).__TAURI_INTERNALS__;
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (!isTauri) return;
+
+      const { exists, mkdir, BaseDirectory } = await import('@tauri-apps/plugin-fs');
 
       const mediaDirExists = await exists(this.MEDIA_DIR, { baseDir: BaseDirectory.AppData });
       if (!mediaDirExists) {
@@ -32,10 +30,14 @@ export class ImageManager {
    * Sanitize a URL to use as a filename
    */
   private static getFilename(url: string): string {
-    // Generate a simple hash-like string from URL
-    const hash = btoa(url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-    const extension = url.split('.').pop()?.split('?')[0] || 'png';
-    return `${hash}.${extension}`;
+    try {
+      // Generate a simple hash-like string from URL
+      const hash = btoa(url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+      const extension = url.split('.').pop()?.split('?')[0] || 'png';
+      return `${hash}.${extension}`;
+    } catch (e) {
+      return `img_${Date.now()}.png`;
+    }
   }
 
   /**
@@ -43,10 +45,15 @@ export class ImageManager {
    * If the image isn't cached, it downloads it first.
    */
   static async getLocalUri(url: string): Promise<string> {
-    const isTauri = !!(window as any).__TAURI_INTERNALS__;
-    if (!isTauri || !url.startsWith('http')) return url;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri || !url || !url.startsWith('http')) return url;
 
     try {
+      const { exists, writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+      const { fetch } = await import('@tauri-apps/plugin-http');
+      const { join, appDataDir } = await import('@tauri-apps/api/path');
+      const { convertFileSrc } = await import('@tauri-apps/api/core');
+
       await this.ensureDir();
       const filename = this.getFilename(url);
       const filePath = await join(this.MEDIA_DIR, filename);
@@ -54,8 +61,6 @@ export class ImageManager {
       const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData });
       
       if (fileExists) {
-        // In Tauri 2, we can use the convertFileSrc to get a valid URI
-        const { convertFileSrc } = await import('@tauri-apps/api/core');
         const appData = await appDataDir();
         const fullPath = await join(appData, filePath);
         return convertFileSrc(fullPath);
@@ -71,7 +76,6 @@ export class ImageManager {
       
       await writeFile(filePath, unit8Array, { baseDir: BaseDirectory.AppData });
       
-      const { convertFileSrc } = await import('@tauri-apps/api/core');
       const appData = await appDataDir();
       const fullPath = await join(appData, filePath);
       return convertFileSrc(fullPath);

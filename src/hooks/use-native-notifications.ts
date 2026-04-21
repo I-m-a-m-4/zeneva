@@ -1,10 +1,4 @@
 
-import { 
-  isPermissionGranted, 
-  requestPermission, 
-  sendNotification 
-} from '@tauri-apps/plugin-notification';
-
 /**
  * useNativeNotifications provides a bridge between Zeneva's internal events
  * and the Native Mobile/Desktop notification system.
@@ -12,12 +6,14 @@ import {
 export function useNativeNotifications() {
   const notify = async (title: string, body: string) => {
     try {
-      const isTauri = !!(window as any).__TAURI_INTERNALS__;
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (!isTauri) {
         console.log('Web Notification (Fallback):', title, body);
         return;
       }
 
+      const { isPermissionGranted, requestPermission, sendNotification } = await import('@tauri-apps/plugin-notification');
+      
       let permission = await isPermissionGranted();
       
       if (!permission) {

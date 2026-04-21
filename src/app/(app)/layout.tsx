@@ -464,14 +464,14 @@ export default function AuthenticatedLayout({
                 <Link href="/dashboard" className="flex items-center justify-center h-12 w-full">
                   {/* Expanded state logo */}
                   <CachedImage 
-                    src={businessInstance?.settings?.logoUrl || AppConfig.logoUrl} 
+                    src={AppConfig.logoUrl} 
                     alt="Zeneva Logo" 
                     className="w-32 h-auto group-data-[state=expanded]:block hidden" 
                   />
                   {/* Collapsed state logo */}
                   <div className="w-12 h-12 group-data-[state=collapsed]:block hidden">
                     <CachedImage 
-                      src={businessInstance?.settings?.logoUrl || AppConfig.logoIconUrl} 
+                      src={AppConfig.logoIconUrl} 
                       alt="Zeneva Icon" 
                       className="w-10 h-10 mx-auto" 
                     />
