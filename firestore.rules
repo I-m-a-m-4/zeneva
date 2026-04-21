@@ -136,8 +136,10 @@ service cloud.firestore {
       // Direct self-access or Super Admin access.
       allow get: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
                     
-      // Only SuperAdmin can list globally. Business Admins fetch via Cloud Functions or we allow lists if they are super admin.
-      allow list: if isSuperAdmin();
+      // Only SuperAdmin can list globally. Business Admins fetch their own staff.
+      allow list: if isSuperAdmin() || 
+                  (isUserAuthenticated() && 
+                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
       
       // Self-update or Super Admin
       allow update: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
