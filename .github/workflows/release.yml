@@ -165,6 +165,10 @@ jobs:
         run: npx tauri android init --ci
         continue-on-error: true
 
+      - name: Generate App Icons
+        run: npm run tauri icon public/zeneva.png
+        continue-on-error: true
+
       - name: Build Android APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,17 +188,20 @@ jobs:
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at: $APK_PATH"
             
-            # Generate a temporary keystore for signing
-            keytool -genkey -v -keystore temp.keystore -alias zeneva -keyalg RSA -keysize 2048 -validity 10000 -storepass zenevapass -keypass zenevapass -dname "CN=Zeneva, OU=Mobile, O=Zeneva, L=Lagos, S=Lagos, C=NG"
+            # Check if zeneva.keystore exists, otherwise fallback to temp
+            if [ ! -f "zeneva.keystore" ]; then
+                echo "Zeneva Keystore not found, falling back to temp"
+                keytool -genkey -v -keystore zeneva.keystore -alias zeneva -keyalg RSA -keysize 2048 -validity 10000 -storepass zenevapass -keypass zenevapass -dname "CN=Zeneva, OU=Mobile, O=Zeneva, L=Lagos, S=Lagos, C=NG"
+            fi
             
             # Find apksigner
             APKSIGNER=$(find $ANDROID_SDK_ROOT/build-tools -name "apksigner" | sort -V | tail -1)
             echo "Using apksigner at: $APKSIGNER"
             
             # Sign the APK
-            $APKSIGNER sign --ks temp.keystore --ks-key-alias zeneva --ks-pass pass:zenevapass --key-pass pass:zenevapass --out ./zeneva-v1.6.7-SIGNED.apk "$APK_PATH"
+            $APKSIGNER sign --ks zeneva.keystore --ks-key-alias zeneva --ks-pass pass:zenevapass --key-pass pass:zenevapass --out "./zeneva-${{ github.ref_name }}-SIGNED.apk" "$APK_PATH"
             
-            echo "SIGNED APK ready at ./zeneva-v1.6.7-SIGNED.apk"
+            echo "SIGNED APK ready at ./zeneva-${{ github.ref_name }}-SIGNED.apk"
           else
             echo "CRITICAL: No APK file found!"
             exit 1
@@ -204,6 +211,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./zeneva-v1.6.7-SIGNED.apk
+          files: ./zeneva-${{ github.ref_name }}-SIGNED.apk
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
