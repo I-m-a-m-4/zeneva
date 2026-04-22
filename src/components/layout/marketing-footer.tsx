@@ -149,7 +149,7 @@ export default function MarketingFooter() {
               <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Company</h4>
               <ul className="mt-3 space-y-2 text-sm">
                 <li><Link href="/about/our-mission" className="transition text-neutral-300 hover:text-white">Our Mission</Link></li>
-                <li><Link href="#contact" className="transition text-neutral-300 hover:text-white">Contact</Link></li>
+                <li><Link href="/contact" className="transition text-neutral-300 hover:text-white">Contact</Link></li>
                 <li><Link href="/legal/privacy-policy" className="transition text-neutral-300 hover:text-white">Privacy Policy</Link></li>
                 <li><Link href="/legal/terms-of-service" className="transition text-neutral-300 hover:text-white">Terms of Service</Link></li>
               </ul>
