@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeProvider } from '@/components/theme-provider';
 import { InteractiveGrid } from '@/components/interactive-grid';
+import { allBlogPosts, StaticBlogPost } from '@/lib/blog-data';
 
 function BlogCardSkeleton() {
   return (
@@ -81,13 +82,35 @@ export default function BlogLandingPage() {
   }, [searchQuery]);
 
   const filteredPosts = React.useMemo(() => {
-    if (!posts) return [];
-    if (!searchQuery.trim()) return posts;
+    // Convert static posts to match Firestore BlogPost type roughly
+    const staticAsBlogPosts: BlogPost[] = allBlogPosts.map(staticPost => ({
+      id: staticPost.slug,
+      title: staticPost.title,
+      slug: staticPost.slug,
+      content: '', // Content is handled by specific pages or the detail page
+      excerpt: staticPost.excerpt,
+      imageUrl: staticPost.imageUrl,
+      authorId: 'admin',
+      authorName: 'Zeneva Editorial',
+      published: true,
+      category: staticPost.category,
+      createdAt: { toDate: () => new Date('2026-04-19') },
+      updatedAt: { toDate: () => new Date('2026-04-19') }
+    }));
+
+    // Merge both, preferring Firestore if ID/Slug matches
+    const combined = [...(posts || [])];
+    staticAsBlogPosts.forEach(staticPost => {
+      if (!combined.find(p => p.slug === staticPost.slug || p.id === staticPost.id)) {
+        combined.push(staticPost);
+      }
+    });
+
+    if (!searchQuery.trim()) return combined;
     const q = searchQuery.toLowerCase();
-    return posts.filter(post => 
+    return combined.filter(post => 
       post.title.toLowerCase().includes(q) || 
-      post.excerpt?.toLowerCase().includes(q) ||
-      post.content.toLowerCase().includes(q)
+      post.excerpt?.toLowerCase().includes(q)
     );
   }, [posts, searchQuery]);
 

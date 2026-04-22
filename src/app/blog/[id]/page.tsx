@@ -56,6 +56,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeProvider } from '@/components/theme-provider';
+import { allBlogPosts, StaticBlogPost } from '@/lib/blog-data';
 
 export default function BlogPostDetailPage() {
   const params = useParams();
@@ -132,7 +133,26 @@ export default function BlogPostDetailPage() {
             const d = slugSnap.docs[0];
             setPost({ id: d.id, ...d.data() } as BlogPost);
           } else {
-            router.push('/blog');
+            // Static Fallback
+            const staticPost = allBlogPosts.find(p => p.slug === id);
+            if (staticPost) {
+              setPost({
+                id: staticPost.slug,
+                title: staticPost.title,
+                slug: staticPost.slug,
+                content: `## ${staticPost.title}\n\n${staticPost.excerpt}\n\n${staticPost.directAnswer || ''}\n\n${staticPost.isProgrammatic ? 'This is a specialized guide for ' + staticPost.programmaticData?.industry + ' in ' + staticPost.programmaticData?.location + '.' : ''}`,
+                excerpt: staticPost.excerpt,
+                imageUrl: staticPost.imageUrl,
+                authorId: 'admin',
+                authorName: 'Zeneva Editorial',
+                published: true,
+                category: staticPost.category,
+                createdAt: { toDate: () => new Date('2026-04-19') },
+                updatedAt: { toDate: () => new Date('2026-04-19') }
+              });
+            } else {
+              router.push('/blog');
+            }
           }
         }
       } catch (error) {
