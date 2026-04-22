@@ -1061,7 +1061,7 @@ export default function Home() {
 
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            {billingCycle === 'monthly' ? '₦8,079' : '₦77,550'}
+                                            {billingCycle === 'monthly' ? '₦10,000' : '₦100,000'}
                                         </span>
                                         <span className="text-base font-medium text-slate-500">
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}
@@ -1093,7 +1093,7 @@ export default function Home() {
 
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            {billingCycle === 'monthly' ? '₦21,580' : '₦207,170'}
+                                            {billingCycle === 'monthly' ? '₦30,000' : '₦300,000'}
                                         </span>
                                         <span className="text-base font-medium text-slate-500">
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}
