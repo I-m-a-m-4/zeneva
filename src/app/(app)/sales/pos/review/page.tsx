@@ -118,25 +118,49 @@ function ReviewPageContent() {
 
         setIsCompleting(true);
 
-        // 2. Prepare Data for Queue
+        // 2. Prepare Data for Queue (Securely Recalculate)
         const newReceiptId = uuidv4();
-        let totalCost = 0;
+        let secureSubtotal = 0;
+        let secureTotalCost = 0;
+        
         const itemsForReceipt = cart.map(cartItem => {
-            const product = products.find(p => p.id === cartItem.product.id);
-            const costPrice = product?.costPrice || 0;
-            totalCost += costPrice * cartItem.quantity;
+            const masterProduct = products.find(p => p.id === cartItem.product.id);
+            const costPrice = masterProduct?.costPrice || 0;
+            
+            // SECURITY: If not a manual override, use the price from the master product list
+            let finalPrice = cartItem.product.price;
+            if (!cartItem.isPriceOverride && masterProduct) {
+                if (cartItem.unit) {
+                    // Check if there's a unit conversion with a specific price override
+                    const conversion = masterProduct.uomConversions?.find(u => u.unitName === cartItem.unit);
+                    finalPrice = conversion?.price ?? (masterProduct.price * (cartItem.multiplier || 1));
+                } else {
+                    finalPrice = masterProduct.price;
+                }
+            }
+
+            // Detect if the price in cart was tampered with (different from expected)
+            if (finalPrice !== cartItem.product.price) {
+                console.warn(`Price mismatch detected for ${cartItem.product.name}. Expected ${finalPrice}, got ${cartItem.product.price}. Reverting to secure price.`);
+            }
+
+            secureSubtotal += finalPrice * cartItem.quantity;
+            secureTotalCost += costPrice * cartItem.quantity;
+
             return {
                 productId: cartItem.product.id,
                 name: cartItem.unit ? `${cartItem.product.name} (${cartItem.unit})` : cartItem.product.name,
                 quantity: cartItem.quantity,
                 unit: cartItem.unit || null,
                 multiplier: cartItem.multiplier || 1,
-                price: cartItem.product.price,
+                price: finalPrice,
                 costPrice: costPrice,
             };
         });
 
-        const profit = total - totalCost;
+        const secureTax = secureSubtotal * (business.settings?.defaultTaxRate || 0) / 100;
+        const secureTotal = secureSubtotal + secureTax - discount;
+        const profit = secureTotal - secureTotalCost;
         const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
 
         const receiptData = {
@@ -145,7 +169,13 @@ function ReviewPageContent() {
             receiptNumber: displayReceipt.receiptNumber,
             items: itemsForReceipt,
             customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
-            subtotal, tax, discount, total, totalCost, profit, paymentMethod,
+            subtotal: secureSubtotal, 
+            tax: secureTax, 
+            discount, 
+            total: secureTotal, 
+            totalCost: secureTotalCost, 
+            profit, 
+            paymentMethod,
             status,
             createdAt: backdate ? new Date(backdate) : new Date(),
             createdBy: user.uid,
@@ -166,7 +196,7 @@ function ReviewPageContent() {
 
         const customerUpdate = selectedCustomer && business.settings?.loyaltyProgramEnabled ? {
             id: selectedCustomer.id,
-            loyaltyPoints: (selectedCustomer.loyaltyPoints || 0) + Math.floor(total * (business.settings.pointsPerUnit || 0))
+            loyaltyPoints: (selectedCustomer.loyaltyPoints || 0) + Math.floor(secureTotal * (business.settings.pointsPerUnit || 0))
         } : null;
 
         // 3. ADD TO QUEUE (This is now instant and handles SQLite)
@@ -203,10 +233,10 @@ function ReviewPageContent() {
                     receipt_id: newReceiptId.substring(0, 8),
                     items_html,
                     currency_symbol: currencySymbol,
-                    subtotal: numberFormat.format(subtotal),
-                    tax: numberFormat.format(tax),
+                    subtotal: numberFormat.format(secureSubtotal),
+                    tax: numberFormat.format(secureTax),
                     discount: numberFormat.format(discount),
-                    total: numberFormat.format(total),
+                    total: numberFormat.format(secureTotal),
                     payment_method: paymentMethod,
                     date: new Date().toLocaleString()
                 }).catch(e => console.error("Email failed:", e));

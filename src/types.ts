@@ -38,6 +38,8 @@ export interface CartItem {
     quantity: number;
     unit?: string;
     multiplier?: number;
+    isPriceOverride?: boolean;
+    originalPrice?: number;
 }
 
 export type TopSellingItem = Product & {

@@ -101,6 +101,40 @@ const nextConfig: NextConfig = {
     ],
   },
   assetPrefix: isTauri ? '' : undefined,
+  headers: async () => {
+    if (isTauri) return [];
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://code.iconify.design https://*.google.com https://*.googleapis.com https://*.gstatic.com https://*.vercel-insights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.google-analytics.com https://*.vercel-insights.com https://*.chowdeck.com https://*.ibb.co https://*.cloudinary.com; frame-ancestors 'none';",
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+          }
+        ],
+      },
+    ];
+  },
   webpack: (config, { dev, isServer }) => {
     // Broad protection: Mock Genkit and Node.js-heavy libraries for ALL client-side bundles
     // This prevents "ReferenceError: process is not defined" or "Can't resolve 'fs'" in the browser on Vercel

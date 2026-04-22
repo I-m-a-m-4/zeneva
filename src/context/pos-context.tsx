@@ -442,7 +442,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const exists = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
       if (exists) return prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
       const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
-      return [...prev, { product: finalProduct, quantity: 1, unit: unitName, multiplier }];
+      return [...prev, { 
+        product: finalProduct, 
+        quantity: 1, 
+        unit: unitName, 
+        multiplier,
+        isPriceOverride: !!priceOverride,
+        originalPrice: product.price
+      }];
     });
   }, [toast, cart]);
 
