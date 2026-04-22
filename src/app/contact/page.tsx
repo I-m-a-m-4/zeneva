@@ -93,7 +93,7 @@ export default function ContactPage() {
                                     />
                                     <ContactCard 
                                         href="https://wa.me/2349064233805"
-                                        icon={<MessageCircle className="w-6 h-6 text-emerald-500" />}
+                                        icon={<MessageCircle className="w-6 h-6 text-primary" />}
                                         title="WhatsApp"
                                         description="Chat directly with our success managers."
                                         info="+234 906 423 3805"
@@ -101,7 +101,7 @@ export default function ContactPage() {
                                     />
                                     <ContactCard 
                                         href="/help-center"
-                                        icon={<HelpCircle className="w-6 h-6 text-orange-500" />}
+                                        icon={<HelpCircle className="w-6 h-6 text-primary" />}
                                         title="Help Center"
                                         description="Browse our knowledge base and tutorials."
                                         info="Visit Knowledge Base"
@@ -228,7 +228,7 @@ function ContactCard({ href, icon, title, description, info, isExternal = false 
             rel={isExternal ? "noopener noreferrer" : undefined}
             className="group flex flex-col sm:flex-row items-start gap-4 p-6 rounded-2xl border border-slate-100 hover:border-primary/20 hover:bg-slate-50 transition-all duration-300"
         >
-            <div className="shrink-0 w-12 h-12 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+            <div className="shrink-0 w-12 h-12 rounded-xl bg-primary/10 shadow-sm border border-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 {icon}
             </div>
             <div className="space-y-1">

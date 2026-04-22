@@ -1170,8 +1170,8 @@ export default function Home() {
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                                            <DollarSign className="w-6 h-6 text-emerald-600" />
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <DollarSign className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Reduce overstock</h4>
@@ -1179,8 +1179,8 @@ export default function Home() {
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                            <Box className="w-6 h-6 text-blue-600" />
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <Box className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Optimize production timing</h4>
@@ -1188,8 +1188,8 @@ export default function Home() {
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                            <Trophy className="w-6 h-6 text-purple-600" />
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                            <Trophy className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
                                             <h4 className="text-lg font-semibold text-slate-900">Identify winning products</h4>
