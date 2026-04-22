@@ -44,7 +44,7 @@ export default function ContactPage() {
 
             <main>
                 {/* Hero Section */}
-                <section className="relative flex items-center justify-center px-6 pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-slate-50">
+                <section className="relative flex items-center justify-center px-6 pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-[#F9F8F6]">
                     <div className="absolute inset-0">
                         <svg aria-hidden="true" className="w-full h-full opacity-[0.03] fill-stone-950 stroke-stone-950 [mask-image:radial-gradient(ellipse_at_center,white,transparent)]">
                             <defs>
