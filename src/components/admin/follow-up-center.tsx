@@ -105,7 +105,7 @@ export default function FollowUpCenter({
       const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as FollowUpLog[];
       
       setLogs(logsData);
-      setSentCount(logsData.length);
+      setSentCount(logsData.filter(log => log.status !== 'failed').length);
     } catch (error) {
       console.error('Failed to fetch logs from Firestore:', error);
     } finally {
@@ -309,9 +309,9 @@ export default function FollowUpCenter({
                     logs.forEach(log => {
                       const key = `${log.sentTo}-${log.type || 'follow-up'}`;
                       if (!groupedLogs[key]) {
-                        groupedLogs[key] = { ...log, count: 1 };
+                        groupedLogs[key] = { ...log, count: log.status === 'failed' ? 0 : 1 };
                       } else {
-                        groupedLogs[key].count++;
+                        if (log.status !== 'failed') groupedLogs[key].count++;
                         groupedLogs[key].openCount = Math.max(groupedLogs[key].openCount, log.openCount);
                         if (log.status === 'opened') groupedLogs[key].status = 'opened';
                         else if (log.status === 'failed' && groupedLogs[key].status !== 'opened') groupedLogs[key].status = 'failed';

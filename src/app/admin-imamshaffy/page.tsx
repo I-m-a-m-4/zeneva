@@ -379,7 +379,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             setOutreachLogs(logs);
-            setOutreachSentCount(logs.length);
+            setOutreachSentCount(logs.filter(log => log.status !== 'failed').length);
             setHasLoadedOutreach(true);
         } catch (error) {
             console.error('Failed to fetch outreach logs from Firestore:', error);

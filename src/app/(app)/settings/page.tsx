@@ -542,6 +542,16 @@ function SettingsPageContent() {
 
                 <Card>
                     <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
+                        <CardDescription>Customize the look and feel of the application.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ThemeSwitcher />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Loyalty Program</CardTitle>
                         <CardDescription>Reward your returning customers and encourage repeat business.</CardDescription>
                     </CardHeader>

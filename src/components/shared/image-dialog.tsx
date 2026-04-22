@@ -24,7 +24,7 @@ export function ImageDialog({ src, alt, isOpen, onClose }: ImageDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-black/95 border-none">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-black/95 border-none [&>button]:text-white">
         <DialogHeader className="sr-only">
           <DialogTitle>{alt}</DialogTitle>
         </DialogHeader>
@@ -36,14 +36,6 @@ export function ImageDialog({ src, alt, isOpen, onClose }: ImageDialogProps) {
             className="object-contain"
             priority
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 text-white hover:bg-white/20 rounded-full"
-            onClick={onClose}
-          >
-            <X className="h-6 w-6" />
-          </Button>
         </div>
         <div className="p-4 bg-background/10 backdrop-blur-md absolute bottom-0 left-0 right-0">
             <p className="text-white font-medium text-center">{alt}</p>
