@@ -41,7 +41,7 @@ export default function MarketingHeader() {
     { href: "/#features", label: "Features" },
     { href: "/download", label: "Download" },
     { href: "/about/our-mission", label: "Our Mission" },
-    { href: "/#pricing", label: "Pricing" },
+    { href: "/pricing", label: "Pricing" },
     { href: "/blog", label: "Blog" },
   ];
 

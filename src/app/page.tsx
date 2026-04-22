@@ -1056,12 +1056,12 @@ export default function Home() {
                                 {/* Pro Plan */}
                                 <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
                                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
-                                    <h3 className="text-lg font-semibold leading-5">Pro</h3>
+                                    <h3 className="text-lg font-semibold leading-5">Business Pro</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
 
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            {billingCycle === 'monthly' ? '₦10,000' : '₦100,000'}
+                                            {billingCycle === 'monthly' ? '₦8,079' : '₦77,550'}
                                         </span>
                                         <span className="text-base font-medium text-slate-500">
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}
@@ -1088,12 +1088,12 @@ export default function Home() {
                                 </div>
                                 {/* Business Plan */}
                                 <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
-                                    <h3 className="text-lg font-semibold leading-5">Business</h3>
+                                    <h3 className="text-lg font-semibold leading-5">Enterprise Plus</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
                                     <div className="mt-4">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            {billingCycle === 'monthly' ? '₦30,000' : '₦300,000'}
+                                            {billingCycle === 'monthly' ? '₦21,580' : '₦207,170'}
                                         </span>
                                         <span className="text-base font-medium text-slate-500">
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}

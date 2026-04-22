@@ -134,6 +134,7 @@ export default function MarketingFooter() {
                 <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Point of Sale</a></li>
                 <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">AI Insights</a></li>
                 <li><Link href="/use-cases" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Use Cases</Link></li>
+                <li><Link href="/pricing" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Pricing</Link></li>
               </ul>
             </div>
             <div className="">
