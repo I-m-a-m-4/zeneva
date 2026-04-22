@@ -5,20 +5,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://zeneva.space';
 
   // Core pages
-  const routes = [
+  const coreRoutes = [
     '',
-    '/about',
-    '/blog',
+    '/pricing',
+    '/contact',
     '/download',
-    '/legal/privacy',
-    '/legal/terms',
+    '/blog',
+    '/help-center',
+    '/use-cases',
+    '/about/our-mission',
+    '/legal/privacy-policy',
+    '/legal/terms-of-service',
     '/signup',
     '/login',
-  ].map((route) => ({
+  ];
+
+  const routes = coreRoutes.map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
     changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
+    priority: route === '' ? 1 : (['/pricing', '/blog', '/contact'].includes(route) ? 0.9 : 0.8),
   }));
 
   try {
@@ -43,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return [...routes, ...blogRoutes];
     }
   } catch (error) {
-    console.error('Sitemap blog fetch error:', error);
+    console.warn('Sitemap dynamic fetch failed, using static routes only:', error);
   }
 
   return routes;

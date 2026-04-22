@@ -85,16 +85,17 @@ const jsonLd = {
       '@type': 'SoftwareApplication',
       name: 'Zeneva',
       applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web, Android, iOS',
+      operatingSystem: 'Web, Android, iOS, Windows, macOS, Linux',
       offers: {
         '@type': 'Offer',
         price: '0',
-        priceCurrency: 'NGN'
+        priceCurrency: 'NGN',
+        description: 'Starter plan is free forever. Paid plans start at ₦10,000/month.'
       },
       aggregateRating: {
         '@type': 'AggregateRating',
-        ratingValue: '4.8',
-        ratingCount: '124'
+        ratingValue: '4.9',
+        ratingCount: '156'
       }
     },
     {
@@ -109,20 +110,38 @@ const jsonLd = {
         {
           '@type': 'ListItem',
           'position': 2,
-          'name': 'About',
-          'item': `${siteUrl}/about`
+          'name': 'Pricing',
+          'item': `${siteUrl}/pricing`
         },
         {
           '@type': 'ListItem',
           'position': 3,
+          'name': 'Download',
+          'item': `${siteUrl}/download`
+        },
+        {
+          '@type': 'ListItem',
+          'position': 4,
           'name': 'Blog',
           'item': `${siteUrl}/blog`
         },
         {
           '@type': 'ListItem',
-          'position': 4,
-          'name': 'Download',
-          'item': `${siteUrl}/download`
+          'position': 5,
+          'name': 'Contact',
+          'item': `${siteUrl}/contact`
+        },
+        {
+          '@type': 'ListItem',
+          'position': 6,
+          'name': 'Help Center',
+          'item': `${siteUrl}/help-center`
+        },
+        {
+          '@type': 'ListItem',
+          'position': 7,
+          'name': 'Our Mission',
+          'item': `${siteUrl}/about/our-mission`
         }
       ]
     }
