@@ -58,6 +58,10 @@ service cloud.firestore {
               getCurrentUserRole() == 'admin';
     }
 
+    function isFieldUntouched(fieldName) {
+      return !(fieldName in request.resource.data) || request.resource.data[fieldName] == resource.data[fieldName];
+    }
+
     // =================================================================
     // Public & Admin-Only Collections
     // =================================================================
@@ -104,7 +108,8 @@ service cloud.firestore {
       allow list: if request.query.limit <= 1 || isSuperAdmin();
       
       allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerId;
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isBusinessOwner(businessId);
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId) && 
+                      isFieldUntouched('plan') && isFieldUntouched('trialExpiresAt')) || isBusinessOwner(businessId);
       allow delete: if isSuperAdmin();
       
       match /subscription_history/{historyId} {
@@ -128,7 +133,10 @@ service cloud.firestore {
       }
 
       match /stats/{statId} {
-        allow read, write: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+        // Only allow pro/business plans to access historical stats
+        allow read: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId) && 
+                      get(/databases/$(database)/documents/businessInstances/$(businessId)).data.get('plan', 'starter') in ['pro', 'business', 'starter']);
+        allow write: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
       }
     }
 
