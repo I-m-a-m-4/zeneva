@@ -7,6 +7,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, limit, getDocs, increment, getAggregateFromServer, sum, count, startAfter } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
+import { secureStorage } from '@/lib/secure-storage';
 import { 
   syncProductsToOffline, 
   syncProductToOffline,
@@ -132,14 +133,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(null);
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
+  const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => Date.now());
 
   // --- POS Local States ---
-  const [cart, setCart] = useState<CartItem[]>(() => { try { const s = typeof window !== 'undefined' ? localStorage.getItem(POS_CART_KEY) : null; return s ? JSON.parse(s) : []; } catch { return []; } });
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(() => { try { const s = typeof window !== 'undefined' ? localStorage.getItem(POS_CUSTOMER_KEY) : null; return s ? JSON.parse(s) : null; } catch { return null; } });
-  const [taxRate, setTaxRate] = useState<number>(() => { try { const s = typeof window !== 'undefined' ? localStorage.getItem(POS_TAX_RATE_KEY) : null; return s ? parseFloat(s) : 0; } catch { return 0; } });
-  const [discount, setDiscount] = useState<number>(() => { try { const s = typeof window !== 'undefined' ? localStorage.getItem(POS_DISCOUNT_KEY) : null; return s ? parseFloat(s) : 0; } catch { return 0; } });
-  const [paymentMethod, setPaymentMethod] = useState<string>(() => (typeof window !== 'undefined' ? localStorage.getItem(POS_PAYMENT_METHOD_KEY) : 'Cash') || 'Cash');
-  const [autoPrint, setAutoPrint] = useState<boolean>(() => { try { const s = typeof window !== 'undefined' ? localStorage.getItem(POS_AUTO_PRINT_KEY) : null; return s === null ? true : s === 'true'; } catch { return true; } });
+  const [cart, setCart] = useState<CartItem[]>(() => secureStorage.getItem<CartItem[]>(POS_CART_KEY) || []);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(() => secureStorage.getItem<Customer>(POS_CUSTOMER_KEY));
+  const [taxRate, setTaxRate] = useState<number>(() => secureStorage.getItem<number>(POS_TAX_RATE_KEY) || 0);
+  const [discount, setDiscount] = useState<number>(() => secureStorage.getItem<number>(POS_DISCOUNT_KEY) || 0);
+  const [paymentMethod, setPaymentMethod] = useState<string>(() => secureStorage.getItem<string>(POS_PAYMENT_METHOD_KEY) || 'Cash');
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    const s = secureStorage.getItem<boolean>(POS_AUTO_PRINT_KEY);
+    return s === null ? true : s;
+  });
   const [lastUserId, setLastUserId] = useState<string | null>(null);
   const [isSubscriptionActiveFromRust, setIsSubscriptionActiveFromRust] = useState(true);
 
@@ -149,25 +154,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
   const businessId = isProfileReady ? currentUserProfile.businessId : null;
 
-  const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore, refreshKey]);
+  const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
-  const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
   const { data: initialStats } = useDoc<BusinessStats>(statsDocRef);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(100)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(100)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
-  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore, refreshKey]);
+  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore]);
   const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   // --- Derived Sync States ---
@@ -223,7 +228,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const customers = useMemo(() => {
     if (!initialCustomers && isLoadingCustomers) return null;
-    let merged = [...(syncedCustomers.length > (initialCustomers?.length || 0) ? syncedCustomers : (initialCustomers || []))];
+    let merged = [...(initialCustomers || [])];
+    const existingIds = new Set(merged.map(c => c.id));
+    syncedCustomers.forEach(c => { 
+      if (!existingIds.has(c.id)) merged.push(c); 
+      else { 
+        const idx = merged.findIndex(m => m.id === c.id); 
+        if (idx !== -1) merged[idx] = c; 
+      } 
+    });
     const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
     merged = merged.filter(c => !deletedIds.has(c.id));
     queuedActions.forEach(action => {
@@ -236,7 +249,63 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);
 
   // --- Functions ---
-  const triggerRefresh = useCallback(() => setRefreshKey(prev => prev + 1), []);
+  const refreshData = useCallback(async () => {
+    if (!businessId || !firestore || isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      // Delta Sync: Only fetch documents updated since our last check
+      // This turns 10,000 reads into 1-10 reads.
+      const lastCheck = new Date(lastSyncedTimestamp);
+      
+      const pQuery = query(collection(firestore, "products"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
+      const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
+      
+      const [pSnap, cSnap] = await Promise.all([getDocs(pQuery), getDocs(cQuery)]);
+      
+      const newProducts = pSnap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+      const newCustomers = cSnap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+
+      if (newProducts.length > 0) {
+        setSyncedProducts(prev => {
+          const merged = [...prev];
+          newProducts.forEach(np => {
+            const idx = merged.findIndex(p => p.id === np.id);
+            if (idx !== -1) merged[idx] = np;
+            else merged.push(np);
+          });
+          return merged;
+        });
+      }
+
+      if (newCustomers.length > 0) {
+        setSyncedCustomers(prev => {
+          const merged = [...prev];
+          newCustomers.forEach(nc => {
+            const idx = merged.findIndex(c => c.id === nc.id);
+            if (idx !== -1) merged[idx] = nc;
+            else merged.push(nc);
+          });
+          return merged;
+        });
+      }
+
+      setLastSyncedTimestamp(Date.now());
+      if (newProducts.length > 0 || newCustomers.length > 0) {
+        toast({ title: "Sync Complete", description: `Updated ${newProducts.length} products and ${newCustomers.length} customers.` });
+      }
+    } catch (error) {
+      console.error("Delta Sync Failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast]);
+
+  const triggerRefresh = useCallback(() => {
+    refreshData();
+    setRefreshKey(prev => prev + 1); // Keep for legacy triggers
+  }, [refreshData]);
+
   const triggerConfetti = useCallback(() => setIsConfettiActive(true), []);
 
   const calculateLoyaltyPoints = useCallback(async (amount: number) => {
@@ -385,10 +454,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   }, [addToQueue, toast]);
 
-  const resetPOS = useCallback(async () => {
-
     setCart([]); setSelectedCustomer(null); setDiscount(0); setTaxRate(0); setPaymentMethod('Cash');
-    if (typeof window !== 'undefined') { localStorage.removeItem(POS_CART_KEY); localStorage.removeItem(POS_CUSTOMER_KEY); }
+    secureStorage.removeItem(POS_CART_KEY); 
+    secureStorage.removeItem(POS_CUSTOMER_KEY);
   }, []);
 
   const nuclearReset = useCallback(async () => {
@@ -487,8 +555,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // --- Effects ---
   useEffect(() => { setIsMounted(true); }, []);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(POS_CART_KEY, JSON.stringify(cart)); }, [cart]);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem(POS_CUSTOMER_KEY, JSON.stringify(selectedCustomer)); }, [selectedCustomer]);
+  useEffect(() => { secureStorage.setItem(POS_CART_KEY, cart); }, [cart]);
+  useEffect(() => { secureStorage.setItem(POS_CUSTOMER_KEY, selectedCustomer); }, [selectedCustomer]);
+  useEffect(() => { secureStorage.setItem(POS_TAX_RATE_KEY, taxRate); }, [taxRate]);
+  useEffect(() => { secureStorage.setItem(POS_DISCOUNT_KEY, discount); }, [discount]);
+  useEffect(() => { secureStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); }, [paymentMethod]);
+  useEffect(() => { secureStorage.setItem(POS_AUTO_PRINT_KEY, autoPrint); }, [autoPrint]);
   
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;

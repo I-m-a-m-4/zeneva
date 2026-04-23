@@ -3,6 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { Search, Book, CreditCard, Activity, Cpu, Users, Shield, ArrowRight, LifeBuoy, FileText } from 'lucide-react';
+import { InteractiveGrid } from '@/components/interactive-grid';
+
 import MarketingHeader from '@/components/layout/marketing-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
 
@@ -67,8 +69,11 @@ export default function HelpCenterPage() {
       <MarketingHeader />
       
       {/* Hero Section */}
-      <section className="relative flex items-center justify-center px-6 pt-28 pb-16 md:py-32 overflow-hidden bg-secondary">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-10"></div>
+      <section className="relative flex items-center justify-center px-6 pt-28 pb-16 md:py-32 overflow-hidden bg-transparent">
+        <div className="absolute inset-0 z-0">
+          <InteractiveGrid />
+          <div className="aura-background"></div>
+        </div>
         <div className="relative z-10 text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center justify-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium mb-6">
             <LifeBuoy className="w-4 h-4" />

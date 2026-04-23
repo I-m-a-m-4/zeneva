@@ -131,9 +131,11 @@ export default function DownloadPage() {
         <main className="relative z-10 pt-20">
           
           {/* Hero Section */}
-          <section className="relative px-6 pt-24 pb-32 overflow-hidden min-h-[85vh] flex flex-col items-center justify-center">
-             <div className="absolute inset-0 hero-glow z-0" />
-             <div className="absolute inset-0 grid-pattern opacity-50 z-0" />
+          <section className="relative px-6 pt-24 pb-32 overflow-hidden min-h-[85vh] flex flex-col items-center justify-center bg-transparent">
+             <div className="absolute inset-0 pointer-events-none z-0">
+               <InteractiveGrid />
+               <div className="aura-background"></div>
+             </div>
 
             <div className="container max-w-6xl mx-auto text-center relative z-10">
               <motion.div

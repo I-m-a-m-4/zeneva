@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { sendContactFormEmail } from '@/lib/email';
 import { AppConfig } from '@/lib/config';
+import { InteractiveGrid } from '@/components/interactive-grid';
 
 export default function ContactPage() {
     const { toast } = useToast();
@@ -44,16 +45,10 @@ export default function ContactPage() {
 
             <main>
                 {/* Hero Section */}
-                <section className="relative flex items-center justify-center px-6 pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-[#F9F8F6]">
-                    <div className="absolute inset-0">
-                        <svg aria-hidden="true" className="w-full h-full opacity-[0.03] fill-stone-950 stroke-stone-950 [mask-image:radial-gradient(ellipse_at_center,white,transparent)]">
-                            <defs>
-                                <pattern id="contact-grid" width="40" height="40" patternUnits="userSpaceOnUse" x="-1" y="-1">
-                                    <path d="M.5 40V.5H40" fill="none" strokeDasharray="4 2"></path>
-                                </pattern>
-                            </defs>
-                            <rect width="100%" height="100%" strokeWidth="0" fill="url(#contact-grid)"></rect>
-                        </svg>
+                <section className="relative flex items-center justify-center px-6 pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-transparent border-b border-slate-50">
+                    <div className="absolute inset-0 z-0">
+                        <InteractiveGrid />
+                        <div className="aura-background"></div>
                     </div>
 
                     <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">

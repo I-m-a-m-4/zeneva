@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, getDocs, limit, or, getDoc, and } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
+import { secureStorage } from '@/lib/secure-storage';
 
 interface StoreContextType {
   business: BusinessInstance | null;
@@ -36,24 +37,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    // Load cart from localStorage on initial render
-    try {
-        const storedCart = localStorage.getItem(CART_STORAGE_KEY);
-        if (storedCart) {
-            setCart(JSON.parse(storedCart));
-        }
-    } catch (e) {
-        console.error("Could not load cart from local storage", e);
+    // Load cart from secureStorage on initial render
+    const storedCart = secureStorage.getItem<CartItem[]>(CART_STORAGE_KEY);
+    if (storedCart) {
+        setCart(storedCart);
     }
   }, []);
 
   useEffect(() => {
-    // Save cart to localStorage whenever it changes
-    try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-    } catch (e) {
-        console.error("Could not save cart to local storage", e);
-    }
+    // Save cart to secureStorage whenever it changes
+    secureStorage.setItem(CART_STORAGE_KEY, cart);
   }, [cart]);
 
 

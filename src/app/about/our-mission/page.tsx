@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { InteractiveGrid } from '@/components/interactive-grid';
 
 declare global {
   namespace JSX {
@@ -39,30 +40,18 @@ export default function OurMissionPage() {
   };
 
   return (
-    <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden">
+    <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden relative">
+      <div className="fixed grid-lines w-full h-full top-0 right-0 left-0 pointer-events-none z-0 opacity-50"></div>
       {/* Background with Spline Embed */}
-      <div 
-        className="aura-background-component top-0 w-full h-screen -z-10 fixed" 
-        data-alpha-mask="20" 
-        style={{ 
-          maskImage: 'linear-gradient(to bottom, transparent, white 0%, white 80%, transparent)', 
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent, white 0%, white 80%, transparent)' 
-        }}
-      >
-        <div className="spline-container absolute top-0 left-0 w-full h-full -z-10 opacity-40">
-          <iframe 
-            src="https://my.spline.design/thresholddarkambientui-v0gkZCfi6zXm69kE0wccy70f" 
-            frameBorder="0" 
-            width="100%" 
-            height="100%"
-            title="Spline Background"
-          ></iframe>
-        </div>
+      {/* Hero Section Background */}
+      <div className="absolute top-0 left-0 w-full h-[800px] overflow-hidden pointer-events-none z-0">
+        <InteractiveGrid />
+        <div className="aura-background"></div>
       </div>
 
       <main className="z-10 pt-24 relative font-geist">
         {/* Hero */}
-        <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6">
+        <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6 bg-transparent">
           <div className="inline-flex gap-2 text-xs text-neutral-600 bg-neutral-100 border-neutral-200 border rounded-full mr-auto ml-auto pt-1.5 pr-3 pb-1.5 pl-3 items-center backdrop-blur-sm">
             {mounted && <iconify-icon icon="solar:stars-linear" class="h-3.5 w-3.5 text-primary" />}
             <span className="font-geist text-neutral-900 font-semibold">AI-Powered Retail Intelligence</span>

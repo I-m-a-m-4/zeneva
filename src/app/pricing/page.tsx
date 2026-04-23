@@ -12,6 +12,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Link from 'next/link';
+import { InteractiveGrid } from '@/components/interactive-grid';
+
 
 const faqItems = [
     {
@@ -49,7 +51,11 @@ export default function PricingPage() {
 
             <main>
                 {/* Hero / Pricing Header */}
-                <section className="relative pt-32 pb-20 px-6 bg-[#F9F8F6] border-b border-slate-100">
+                <section className="relative pt-32 pb-20 px-6 bg-transparent border-b border-slate-100 overflow-hidden">
+                    <div className="absolute inset-0 z-0">
+                        <InteractiveGrid />
+                        <div className="aura-background"></div>
+                    </div>
                     <div className="max-w-6xl mx-auto text-center relative z-10">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-8">
                             <Zap className="w-4 h-4 text-primary" />

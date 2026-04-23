@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { secureStorage } from '@/lib/secure-storage';
 
 const SALES_MILESTONES = [
     { value: 100000, label: '₦100k in Sales', image: '/badges/sales-pioneer.png' },
@@ -51,18 +52,14 @@ interface Goal {
 function GoalSetting() {
     const { receipts, customers } = usePOS();
     const [goals, setGoals] = React.useState<Goal[]>(() => {
-        if (typeof window !== 'undefined') {
-            const savedGoals = localStorage.getItem('userGoals');
-            return savedGoals ? JSON.parse(savedGoals) : [];
-        }
-        return [];
+        return secureStorage.getItem<Goal[]>('userGoals') || [];
     });
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
     const [newGoal, setNewGoal] = React.useState({ title: '', target: '', metric: 'totalSales' as GoalMetric });
     const { toast } = useToast();
 
     React.useEffect(() => {
-        localStorage.setItem('userGoals', JSON.stringify(goals));
+        secureStorage.setItem('userGoals', goals);
     }, [goals]);
 
     const handleAddGoal = () => {
@@ -207,15 +204,9 @@ export default function AchievementsPage() {
     };
 
     React.useEffect(() => {
-        if (typeof window !== 'undefined') {
-            try {
-                const stored = localStorage.getItem('seenMilestones');
-                if (stored) {
-                    setSeenMilestones(new Set(JSON.parse(stored)));
-                }
-            } catch (e) {
-                console.error("Could not parse seen milestones from localStorage", e);
-            }
+        const stored = secureStorage.getItem<string[]>('seenMilestones');
+        if (stored) {
+            setSeenMilestones(new Set(stored));
         }
     }, []);
 
@@ -306,13 +297,7 @@ export default function AchievementsPage() {
             if (hasNewMilestone) {
                 triggerConfetti();
                 setSeenMilestones(newSeen);
-                if (typeof window !== 'undefined') {
-                    try {
-                        localStorage.setItem('seenMilestones', JSON.stringify(Array.from(newSeen)));
-                    } catch (e) {
-                        console.error("Could not save milestones to localStorage", e);
-                    }
-                }
+                secureStorage.setItem('seenMilestones', Array.from(newSeen));
             }
         }
     }, [milestones, seenMilestones, triggerConfetti]);

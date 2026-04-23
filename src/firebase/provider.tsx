@@ -5,6 +5,7 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { secureStorage } from '@/lib/secure-storage';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -60,14 +61,7 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
     // Optimistic initial state for offline support
     let cachedUser: any = null;
     if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('zeneva_auth_session');
-        if (stored) {
-          cachedUser = JSON.parse(stored);
-        }
-      } catch (e) {
-        console.warn("Failed to load cached auth session", e);
-      }
+      cachedUser = secureStorage.getItem('zeneva_auth_session');
     }
 
     return {
@@ -99,9 +93,9 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
             // Add a flag to indicate this is a cached user
             isCached: true,
           };
-          localStorage.setItem('zeneva_auth_session', JSON.stringify(sessionData));
+          secureStorage.setItem('zeneva_auth_session', sessionData);
         } else {
-          localStorage.removeItem('zeneva_auth_session');
+          secureStorage.removeItem('zeneva_auth_session');
         }
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
