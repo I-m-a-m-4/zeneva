@@ -454,6 +454,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   }, [addToQueue, toast]);
 
+  const resetPOS = useCallback(async () => {
     setCart([]); setSelectedCustomer(null); setDiscount(0); setTaxRate(0); setPaymentMethod('Cash');
     secureStorage.removeItem(POS_CART_KEY); 
     secureStorage.removeItem(POS_CUSTOMER_KEY);
