@@ -252,9 +252,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const pending = queuedActions.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
     setIsQueueProcessing(true);
-    toast({ title: "Syncing...", description: `Processing ${pending.length} actions.` });
     
-    const results = await Promise.allSettled(pending.map(async (action) => {
+    try {
+      const results = await Promise.allSettled(pending.map(async (action) => {
       const batch = writeBatch(firestore);
       const resultData: any = { id: action.id };
       try {
@@ -332,7 +332,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
       return nextActions;
     });
-    setIsQueueProcessing(false);
+    } finally {
+      setIsQueueProcessing(false);
+    }
   }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast]);
 
   const addToQueue = useCallback((action: any, description: string) => {
@@ -342,9 +344,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const id = uuidv4();
     const newAction: QueuedAction = { ...action, description, id, timestamp: Date.now(), status: 'pending' };
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
+    
     setQueuedActions(prev => [...prev, newAction]);
+    
+    // Proactive Sync: If online, trigger processQueue in the next tick
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+        setTimeout(() => processQueue(), 100);
+    }
+    
     return id;
-  }, [businessId, business, toast]);
+  }, [businessId, business, toast, processQueue]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // If there's an image, we handle it. Ideally in background but for now let's just queue the data.
