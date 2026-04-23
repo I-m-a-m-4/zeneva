@@ -55,10 +55,7 @@ export default function MarketingHeader() {
   return (
     <>
       <header className={cn(
-        "fixed top-[var(--tauri-title-height,0)] z-50 w-full h-20 transition-all duration-300",
-        scrolled || isMobileMenuOpen
-          ? "bg-white/95 backdrop-blur-md shadow-md border-b border-slate-200/10" 
-          : "bg-transparent border-none backdrop-blur-none"
+        "fixed top-[var(--tauri-title-height,0)] z-50 w-full h-20 transition-all duration-300 bg-white shadow-md border-b border-slate-100"
       )}>
         <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
           {/* Logo */}
