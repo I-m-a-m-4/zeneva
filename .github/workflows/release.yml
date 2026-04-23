@@ -53,6 +53,7 @@ jobs:
           NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
           NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
           NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
+          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
         run: |
           node scripts/prepare-tauri.mjs
           npm run build
@@ -165,6 +166,7 @@ jobs:
           NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
           NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
           NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
+          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
         run: |
           node scripts/prepare-tauri.mjs
           npm run build
