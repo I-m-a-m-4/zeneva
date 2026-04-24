@@ -204,7 +204,9 @@ const nextConfig: NextConfig = {
 
 
 
-const withPWA = require("@ducanh2912/next-pwa").default({
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
   dest: "public",
   disable: isTauri || process.env.NODE_ENV === "development",
   register: true,
@@ -212,11 +214,15 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   workboxOptions: {
     runtimeCaching: [
       {
-        urlPattern: ({ url }) => url.pathname.startsWith('/_vercel') || url.hostname.includes('vercel-scripts.com') || url.hostname.includes('vercel-insights.com'),
+        urlPattern: /^https?:\/\/(?:[a-zA-Z0-9-]+\.)?zeneva\.space\/_vercel\/.*/i,
         handler: 'NetworkOnly',
       },
       {
-        urlPattern: ({ url }) => url.hostname.includes('paystack.co') || url.hostname.includes('paystack.com'),
+        urlPattern: /^https?:\/\/(?:[a-zA-Z0-9-]+\.)?(?:vercel-scripts|vercel-insights)\.com\/.*/i,
+        handler: 'NetworkOnly',
+      },
+      {
+        urlPattern: /^https?:\/\/(?:[a-zA-Z0-9-]+\.)?paystack\.(?:co|com)\/.*/i,
         handler: 'NetworkOnly',
       },
       {
