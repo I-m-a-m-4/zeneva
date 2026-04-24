@@ -212,7 +212,11 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   workboxOptions: {
     runtimeCaching: [
       {
-        urlPattern: /^https?:\/\/.*\/_vercel\/insights\/.*$/,
+        urlPattern: ({ url }) => url.pathname.startsWith('/_vercel') || url.hostname.includes('vercel-scripts.com') || url.hostname.includes('vercel-insights.com'),
+        handler: 'NetworkOnly',
+      },
+      {
+        urlPattern: ({ url }) => url.hostname.includes('paystack.co') || url.hostname.includes('paystack.com'),
         handler: 'NetworkOnly',
       },
       {
@@ -238,7 +242,11 @@ const withPWA = require("@ducanh2912/next-pwa").default({
         },
       },
     ],
-    exclude: [/middleware-manifest\.json$/, /_next\/static\/.*\.map$/, /_next\/static\/chunks\/.*\.js$/],
+    exclude: [
+      /middleware-manifest\.json$/,
+      /_next\/static\/.*\.map$/,
+      /.*\/_vercel\/.*/,
+    ],
   },
 });
 
