@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -717,14 +717,21 @@ export default function AuthenticatedLayout({
                   </DropdownMenu>
                 </div>
               </header>
-              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll bg-background">
-                {showSubscriptionBlock ? (
-                  <div className="flex h-full min-h-[400px] w-full items-center justify-center p-4">
-                    <Card className="w-full max-w-lg border-none shadow-xl bg-gradient-to-br from-background to-muted/50 overflow-hidden animate-in fade-in zoom-in duration-500">
-                      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600"></div>
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6 font-body smooth-scroll bg-background relative">
+                <div className={cn("h-full w-full transition-all duration-700", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
+                  {children}
+                </div>
+                {showSubscriptionBlock && (
+                   <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] animate-in fade-in duration-500">
+                    <Card className="w-full max-w-lg border-2 border-dashed border-orange-500/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-8 duration-700">
                       <CardHeader className="pt-10 pb-6 text-center">
-                        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-2xl bg-orange-500/10 mb-6 rotate-3 hover:rotate-0 transition-transform duration-300">
-                          <ShieldAlert className="h-12 w-12 text-orange-600" />
+                        <div className="mx-auto mb-8 relative">
+                           <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
+                           <img 
+                             src="/trial-expired.png" 
+                             alt="Trial Expired" 
+                             className="h-32 w-auto relative z-10 drop-shadow-2xl animate-float"
+                           />
                         </div>
                         <CardTitle className="text-4xl font-extrabold tracking-tight text-foreground">
                           Trial Expired
@@ -733,37 +740,31 @@ export default function AuthenticatedLayout({
                           Your trial period or subscription has ended. To continue using <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span>, please subscribe to a plan.
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="px-8 pb-8">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl bg-background/50 border border-border/50 shadow-sm backdrop-blur-sm">
-                            <h4 className="text-sm font-bold text-primary mb-3 uppercase tracking-wider">Restricted Features</h4>
-                            <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> POS & Sales</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Storefront</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Zen AI</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-orange-500" /> Customers</li>
+                      <CardContent className="px-8 pb-10">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <div className="p-5 rounded-2xl bg-muted/30 border border-border/50 shadow-sm">
+                            <h4 className="text-xs font-bold text-primary mb-4 uppercase tracking-wider">Restricted Features</h4>
+                            <ul className="text-sm space-y-3 text-muted-foreground font-medium">
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> POS & Sales</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Storefront</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Zen AI</li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Customers</li>
                             </ul>
                           </div>
-                          <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 flex flex-col justify-center">
-                            <p className="text-xs text-muted-foreground mb-4">Choose a plan that fits your business needs and keep growing with Zeneva.</p>
-                            <Button asChild className="w-full shadow-lg shadow-orange-500/20 hover:scale-[1.02] transition-transform">
+                          <div className="p-5 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex flex-col justify-center text-center">
+                            <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Unlock all features instantly with our business-ready plans.</p>
+                            <Button asChild className="w-full h-12 shadow-lg shadow-orange-500/20 hover:scale-[1.05] active:scale-95 transition-all duration-300 bg-orange-500 hover:bg-orange-600 font-bold">
                               <Link href="/billing">
-                                <CreditCard className="mr-2 h-4 w-4" />
+                                <ArrowRight className="mr-2 h-4 w-4" />
                                 Review Plans
                               </Link>
                             </Button>
                           </div>
                         </div>
                       </CardContent>
-                      <CardFooter className="bg-muted/30 border-t p-4 flex justify-center">
-                        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Sign out
-                        </Button>
-                      </CardFooter>
                     </Card>
                   </div>
-                ) : children}
+                )}
               </main>
               {currentUserProfile && currentUserProfile.id !== user?.uid && (
                 <div className="bg-destructive/10 border-t border-destructive/20 p-2 text-center text-sm text-destructive font-medium flex items-center justify-center gap-4">

@@ -145,6 +145,7 @@ const usePaystack = () => {
       currency: config.currency || 'NGN',
       ref: config.reference || config.ref,
       subaccount: config.subaccount,
+      metadata: config.metadata || {},
       callback: (transaction: any) => {
         if (config.onSuccess && typeof config.onSuccess === 'function') {
           config.onSuccess(transaction);
@@ -157,8 +158,23 @@ const usePaystack = () => {
       },
     };
 
-    const handler = window.PaystackPop.setup(paystackConfig);
-    handler.openIframe();
+    try {
+        console.log('Initializing Paystack payment...', { 
+            key: config.key?.substring(0, 8) + '...', 
+            email: config.email, 
+            amount: config.amount,
+            currency: paystackConfig.currency
+        });
+        const handler = window.PaystackPop.setup(paystackConfig);
+        handler.openIframe();
+    } catch (error) {
+        console.error('Error in Paystack setup:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Payment Error',
+            description: 'Failed to initialize payment window. Please check your internet connection and try again.'
+        });
+    }
 
   }, [isSdkReady, toast]);
 

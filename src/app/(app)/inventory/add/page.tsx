@@ -238,7 +238,7 @@ export default function AddProductPage() {
         title: 'Product Limit Reached',
         description: `You have reached your limit of ${limit} products for the ${currentPlan} plan. Please upgrade to add more.`,
       });
-      router.push('/billing');
+      setIsSaving(false);
       return;
     }
 

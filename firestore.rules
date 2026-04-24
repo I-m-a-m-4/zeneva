@@ -62,6 +62,18 @@ service cloud.firestore {
       return !(fieldName in request.resource.data) || request.resource.data[fieldName] == resource.data[fieldName];
     }
 
+    function isSubscriptionActive(businessId) {
+      let business = get(/databases/$(database)/documents/businessInstances/$(businessId)).data;
+      let trialExpiresAt = business.get('trialExpiresAt', null);
+      let plan = business.get('plan', 'starter');
+      let accessLevel = business.get('accessLevel', 'none');
+      
+      return isSuperAdmin() || 
+             accessLevel == 'lifetime' || 
+             (plan != 'starter') || 
+             (trialExpiresAt != null && trialExpiresAt > request.time);
+    }
+
     // =================================================================
     // Public & Admin-Only Collections
     // =================================================================
@@ -183,22 +195,39 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow get, list: if true;
-      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && request.resource.data.get('businessId', null) == getCurrentUserBusinessId());
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && 
+                      request.resource.data.get('businessId', null) == getCurrentUserBusinessId() && 
+                      isSubscriptionActive(request.resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && 
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                      isSubscriptionActive(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && 
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                      isSubscriptionActive(resource.data.get('businessId', null)));
     }
 
     match /receipts/{receiptId} {
         allow read, list: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
-        allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.get('businessId', null)));
-        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+        allow create: if isSuperAdmin() || (isUserAuthenticated() && 
+                        isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
+                        isSubscriptionActive(request.resource.data.get('businessId', null)));
+        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && 
+                                isRequestingUserManager() && 
+                                isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                                isSubscriptionActive(resource.data.get('businessId', null)));
     }
     
     match /customers/{customerId} {
       allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null))) || isSuperAdmin();
       allow create: if true; 
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && 
+                      isRequestingUserStaff() && 
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                      isSubscriptionActive(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
+                      isRequestingUserManager() && 
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                      isSubscriptionActive(resource.data.get('businessId', null)));
     }
 
     match /admin_analytics/{docId} {

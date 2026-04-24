@@ -111,6 +111,14 @@ const faqItems = [
         answer: "Zen AI improves continuously using your historical sales, time-based demand, and customer behavior. Accuracy increases as your data grows."
     },
     {
+        question: "Can I manage multiple business locations?",
+        answer: "Yes. Zeneva’s Enterprise Plus plan allows you to sync stock levels, track staff movements, and view unified analytics across multiple storefronts or warehouses from one dashboard."
+    },
+    {
+        question: "Does Zeneva support international payments?",
+        answer: "Yes! Zeneva now supports international payments via Paystack. You can accept USD and other global currencies from customers anywhere in the world on our Pro and Enterprise plans."
+    },
+    {
         question: "Can Zeneva replace my existing POS or inventory system?",
         answer: "Yes. Zeneva is a full operating system — POS, inventory, storefront, CRM, and analytics in one unified platform."
     },
@@ -441,7 +449,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 
-                                <div className="mt-6 flex items-center justify-center lg:justify-start gap-4">
+                                <div className="mt-8 flex items-center justify-center lg:justify-start gap-4">
                                     <Link href="/download" className="group flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
                                         <Monitor className="h-4 w-4" />
                                         Download Desktop App
@@ -964,6 +972,65 @@ export default function Home() {
 
 
 
+
+
+                    {/* Security & Global Payments Section */}
+                    <section className="py-24 px-6 bg-slate-50/50 border-y border-slate-100">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="grid md:grid-cols-2 gap-12 items-center">
+                                <div className="animate-in fade-in slide-in-from-left duration-700">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="bg-primary/10 p-2 rounded-lg">
+                                            <ShieldCheck className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Security & Trust</span>
+                                    </div>
+                                    <h2 className="text-3xl md:text-4xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
+                                        Your Data, Protected by <span className="text-primary font-medium">Bank-Grade Encryption</span>
+                                    </h2>
+                                    <p className="text-lg text-slate-600 mb-8 font-light leading-relaxed">
+                                        We take retail security seriously. Zeneva uses AES-256 encryption to protect your sensitive local data and multi-tenant isolation to ensure your records stay private. Your business is safe with us.
+                                    </p>
+                                    <div className="flex flex-wrap gap-4">
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                            <span className="text-sm font-medium text-slate-700">AES-256 Encrypted</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                            <span className="text-sm font-medium text-slate-700">PCI-DSS Compliant</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl border border-slate-100 relative overflow-hidden group animate-in fade-in slide-in-from-right duration-700">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16 blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+                                    <div className="relative z-10">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                                                <Globe className="h-5 w-5" />
+                                            </div>
+                                            <span className="text-sm font-bold uppercase tracking-wider text-blue-600">Global Ready</span>
+                                        </div>
+                                        <h3 className="text-2xl font-semibold text-slate-900 mb-4 font-bricolage">Accept Global Payments</h3>
+                                        <p className="text-slate-600 mb-6 leading-relaxed">
+                                            Expand your reach beyond borders. Zeneva now supports international payments through our Paystack partnership, allowing you to accept USD and local currencies from customers anywhere in the world.
+                                        </p>
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors hover:bg-slate-100">
+                                                <div className="bg-white p-2 rounded-xl shadow-sm">
+                                                    <ShoppingCart className="h-6 w-6 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 text-sm">International Cart Support</p>
+                                                    <p className="text-xs text-slate-500">Accept UK, US, and EU cards out-of-the-box.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
 
                     <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">

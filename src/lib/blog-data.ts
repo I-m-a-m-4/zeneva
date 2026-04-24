@@ -23,6 +23,19 @@ export type StaticBlogPost = {
 
 export const blogPosts: StaticBlogPost[] = [
   {
+    slug: 'zeneva-goes-global-paystack-usd-security-updates',
+    title: 'Zeneva Goes Global: Now Accepting International Payments + Major Security Upgrades',
+    excerpt: 'Big news! You can now accept USD payments globally on Zeneva. Plus, we\'ve implemented bank-grade encryption to keep your retail data safer than ever.',
+    imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?q=80&w=2070&auto=format&fit=crop',
+    category: 'Company News',
+    directAnswer: "Zeneva has officially launched international payment support via Paystack, allowing Nigerian merchants to accept USD from customers worldwide. Simultaneously, we've deployed AES-256 encryption for all local data, ensuring your business intelligence is protected by bank-level security.",
+    faq: [
+      { question: "Can I accept payments from the UK or US?", answer: "Yes! With our updated Paystack integration, you can accept payments from any international card globally." },
+      { question: "Is my data encrypted?", answer: "Absolutely. We now use AES-256 encryption for data at rest, which is the same standard used by global banks and military organizations." },
+      { question: "How do I enable USD payments?", answer: "Simply link your Zenith Bank USD Domiciliary account in your Paystack dashboard and activate international payments." }
+    ]
+  },
+  {
     slug: 'getting-started-with-zeneva',
     title: 'Getting Started with Zeneva: A Quick Guide',
     excerpt: 'Your journey to streamlined inventory management starts here. Follow these simple steps to get your business set up for success on Zeneva.',

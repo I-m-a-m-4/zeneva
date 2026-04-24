@@ -208,22 +208,7 @@ export default function SelectProductsPage() {
     const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
 
 
-    React.useEffect(() => {
-        if (business) {
-            const isTrialActive = business.trialExpiresAt && business.trialExpiresAt.toDate() > new Date();
-            const isPaidPlan = business.plan && business.plan !== 'starter';
-            const isLifetime = business.accessLevel === 'lifetime';
-
-            if (!isTrialActive && !isPaidPlan && !isLifetime) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Subscription Required',
-                    description: 'Please subscribe to a plan to create sales.',
-                });
-                router.push('/billing');
-            }
-        }
-    }, [business, router, toast]);
+    // Subscription status is now managed by the background glassmorphism overlay in layout.tsx.
 
     const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
     const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);

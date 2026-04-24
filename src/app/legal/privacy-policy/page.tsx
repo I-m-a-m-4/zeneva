@@ -59,14 +59,19 @@ export default function PrivacyPolicyPage() {
       </p>
       <ul>
         <li><strong>By Law or to Protect Rights:</strong> If we believe the release of information about you is necessary to respond to legal process, to investigate or remedy potential violations of our policies, or to protect the rights, property, and safety of others.</li>
-        <li><strong>Third-Party Service Providers:</strong> We may share your information with third parties that perform services for us or on our behalf, including payment processing (Paystack), data analysis, email delivery, and hosting services.</li>
+        <li><strong>Third-Party Service Providers:</strong> We may share your information with third parties that perform services for us, including local and international payment processing (Paystack), data analysis, email delivery (EmailJS), and hosting services.</li>
         <li><strong>Business Transfers:</strong> We may share or transfer your information in connection with, or during negotiations of, any merger, sale of company assets, financing, or acquisition of all or a portion of our business to another company.</li>
       </ul>
       
-      <h2>4. Data Security</h2>
+      <h2>4. Data Security & Encryption</h2>
       <p>
-        We use administrative, technical, and physical security measures to help protect your personal information and Business Data. While we have taken reasonable steps to secure the data you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable, and no method of data transmission can be guaranteed against any interception or other type of misuse.
+        We use administrative, technical, and physical security measures to protect your personal information and Business Data. This includes:
       </p>
+      <ul>
+        <li><strong>Encryption at Rest:</strong> Sensitive business and transaction data is protected using AES-256 bank-grade encryption to ensure information remains confidential even when stored locally.</li>
+        <li><strong>Secure Transmission:</strong> All data transmitted between your device and our servers is encrypted using industry-standard SSL/TLS protocols.</li>
+        <li><strong>Multi-Tenant Isolation:</strong> We use strict logical boundaries to ensure your data is accessible only by you and your authorized staff.</li>
+      </ul>
       
       <h2>5. Your Rights</h2>
       <p>

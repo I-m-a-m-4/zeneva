@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Zap, Loader2, ShieldCheck } from 'lucide-react';
+import { Check, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import type { UserProfile, BusinessInstance } from '@/types';
 import { useFirestore } from '@/firebase';
 import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore';
@@ -22,7 +22,7 @@ const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 const plans = [
     {
         name: 'Pro',
-        price: 10000,
+        price: 50,
         features: [
             'Up to 1,500 products & 10 users',
             'Advanced Point of Sale (POS)',
@@ -159,43 +159,72 @@ const PaystackSubscriptionButton = ({
         }
     }, [firestore, userProfile, businessInstance, plan, cycle, finalAmount, toast, setProcessingPlan]);
     
-    const handlePaymentClick = () => {
+    const handleSubscribe = useCallback(() => {
         if (!isScriptLoaded) {
-             toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
-             return;
+            toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
+            return;
         }
-        if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('xxx')) {
+        if (isProcessing) return;
+        
+        // Safety check for keys and email
+        if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('your_public_key') || PAYSTACK_PUBLIC_KEY === 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx') {
             toast({
-                title: "Gateway Not Configured",
-                description: "The payment gateway has not been configured by the site administrator.",
-                variant: "destructive",
+                variant: 'destructive',
+                title: 'Configuration Error',
+                description: 'The payment system is not correctly configured. Please contact the administrator (Invalid Public Key).'
             });
             return;
         }
-        setProcessingPlan(plan.planId);
 
+        if (!userProfile?.email) {
+            toast({
+                variant: 'destructive',
+                title: 'User Profile Incomplete',
+                description: 'We need your email address to process the payment. Please update your profile.'
+            });
+            return;
+        }
+
+        setProcessingPlan(plan.planId);
+        
         initializePayment({
             key: PAYSTACK_PUBLIC_KEY,
             email: userProfile.email,
-            amount: finalAmount * 100,
+            amount: Math.round(finalAmount * 100), // Ensure it's an integer
             currency: 'NGN',
             reference: `z-${businessInstance.id.substring(0, 6)}-${Date.now()}`,
-            onSuccess: handleSuccessfulPayment,
+            metadata: {
+                custom_fields: [
+                    {
+                        display_name: "Business ID",
+                        variable_name: "business_id",
+                        value: businessInstance.id
+                    },
+                    {
+                        display_name: "Plan",
+                        variable_name: "plan",
+                        value: plan.name
+                    }
+                ]
+            },
+            onSuccess: (transaction: any) => {
+                handleSuccessfulPayment(transaction);
+            },
             onClose: () => {
                 setProcessingPlan(null);
             },
         });
-    };
+    }, [initializePayment, userProfile, businessInstance, plan, finalAmount, isProcessing, setProcessingPlan, handleSuccessfulPayment, toast]);
 
     const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
 
     return (
         <Button
-            onClick={handlePaymentClick}
+            onClick={handleSubscribe}
             className="w-full"
             disabled={isProcessing || !isScriptLoaded}
         >
-            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Zap className="mr-2 h-4 w-4" />}
+            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ArrowRight className="mr-2 h-4 w-4" />}
             {buttonText}
         </Button>
     )

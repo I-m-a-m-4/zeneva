@@ -37,8 +37,12 @@ const faqItems = [
       answer: "We support businesses that give back. Please reach out to our team at zenevapos@gmail.com to discuss special pricing for registered charitable organizations."
     },
     {
+      question: "Can I accept international payments?",
+      answer: "Yes! Zeneva now supports international payments via our Paystack integration. You can accept USD and other global currencies from cards anywhere in the world on our Pro and Enterprise plans."
+    },
+    {
       question: "Is my data secure?",
-      answer: "Absolutely. We use industry-standard encryption and secure cloud infrastructure to ensure your business data and customer information are always protected."
+      answer: "Absolutely. Zeneva uses AES-256 bank-grade encryption to protect your local data at rest and industry-standard SSL/TLS for data in transit. We also provide full audit logs to track every movement in your business."
     }
   ];
 
@@ -57,9 +61,16 @@ export default function PricingPage() {
                         <div className="aura-background"></div>
                     </div>
                     <div className="max-w-6xl mx-auto text-center relative z-10">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-8">
-                            <Zap className="w-4 h-4 text-primary" />
-                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Pricing Plans</span>
+                        <div className="inline-flex items-center gap-4 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 mb-8">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-3.5 h-3.5 text-primary" />
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Pricing Plans</span>
+                            </div>
+                            <div className="w-px h-3 bg-slate-300"></div>
+                            <div className="flex items-center gap-2">
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Accepting Global USD (Paystack)</span>
+                            </div>
                         </div>
                         <h1 className="text-4xl md:text-6xl font-light text-slate-900 tracking-tight font-bricolage max-w-3xl mx-auto mb-6">
                             Choose the Perfect Plan for Your Business
@@ -142,7 +153,6 @@ export default function PricingPage() {
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
-                                    <li className="flex items-center gap-3 text-slate-700 font-bold text-primary">Audit Log</li>
                                 </ul>
                                 <div className="mt-auto pt-8">
                                     <Button asChild size="lg" className="w-full">
@@ -171,7 +181,6 @@ export default function PricingPage() {
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Unlimited products & users</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
-                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
                                 </ul>
                                 <div className="mt-auto pt-8">
