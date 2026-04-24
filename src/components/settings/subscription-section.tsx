@@ -22,7 +22,7 @@ const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 const plans = [
     {
         name: 'Pro',
-        price: 50,
+        price: 10000,
         features: [
             'Up to 1,500 products & 10 users',
             'Advanced Point of Sale (POS)',
