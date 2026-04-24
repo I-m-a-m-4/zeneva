@@ -23,6 +23,8 @@ interface AddUserDialogProps {
     businessName: string;
     inviterName: string;
     onSuccess?: () => void;
+    currentUserCount: number;
+    pendingInvitationCount: number;
 }
 
 const inviteUserSchema = z.object({
@@ -35,10 +37,22 @@ const inviteUserSchema = z.object({
 
 type InviteUserFormValues = z.infer<typeof inviteUserSchema>;
 
-export default function AddUserDialog({ isOpen, onOpenChange, businessId, businessName, inviterName, onSuccess }: AddUserDialogProps) {
+const PLAN_USER_LIMITS: Record<string, number> = {
+    'starter': 1,
+    'pro': 5,
+    'business': 1000000, // Effectively unlimited
+};
+
+export default function AddUserDialog({ isOpen, onOpenChange, businessId, businessName, inviterName, onSuccess, currentUserCount, pendingInvitationCount }: AddUserDialogProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { business } = usePOS();
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+    const plan = business?.plan || 'starter';
+    const limit = PLAN_USER_LIMITS[plan] || 1;
+    const totalCurrentSlots = currentUserCount + pendingInvitationCount;
+    const isLimitReached = totalCurrentSlots >= limit;
 
     const form = useForm<InviteUserFormValues>({
         resolver: zodResolver(inviteUserSchema),
@@ -51,6 +65,16 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
 
     const handleInvite = async (values: InviteUserFormValues) => {
         if (!firestore) return;
+
+        if (isLimitReached) {
+            toast({
+                variant: 'destructive',
+                title: 'Limit Reached',
+                description: `Your ${plan} plan is limited to ${limit} user${limit === 1 ? '' : 's'}. Please upgrade your subscription to add more staff.`,
+            });
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const invitationCode = uuidv4();

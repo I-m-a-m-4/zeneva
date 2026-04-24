@@ -974,63 +974,8 @@ export default function Home() {
 
 
 
-                    {/* Security & Global Payments Section */}
-                    <section className="py-24 px-6 bg-slate-50/50 border-y border-slate-100">
-                        <div className="max-w-7xl mx-auto">
-                            <div className="grid md:grid-cols-2 gap-12 items-center">
-                                <div className="animate-in fade-in slide-in-from-left duration-700">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <div className="bg-primary/10 p-2 rounded-lg">
-                                            <ShieldCheck className="h-5 w-5 text-primary" />
-                                        </div>
-                                        <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Security & Trust</span>
-                                    </div>
-                                    <h2 className="text-3xl md:text-4xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
-                                        Your Data, Protected by <span className="text-primary font-medium">Bank-Grade Encryption</span>
-                                    </h2>
-                                    <p className="text-lg text-slate-600 mb-8 font-light leading-relaxed">
-                                        We take retail security seriously. Zeneva uses AES-256 encryption to protect your sensitive local data and multi-tenant isolation to ensure your records stay private. Your business is safe with us.
-                                    </p>
-                                    <div className="flex flex-wrap gap-4">
-                                        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                            <span className="text-sm font-medium text-slate-700">AES-256 Encrypted</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                            <span className="text-sm font-medium text-slate-700">PCI-DSS Compliant</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl border border-slate-100 relative overflow-hidden group animate-in fade-in slide-in-from-right duration-700">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16 blur-3xl group-hover:bg-primary/10 transition-colors"></div>
-                                    <div className="relative z-10">
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                                                <Globe className="h-5 w-5" />
-                                            </div>
-                                            <span className="text-sm font-bold uppercase tracking-wider text-blue-600">Global Ready</span>
-                                        </div>
-                                        <h3 className="text-2xl font-semibold text-slate-900 mb-4 font-bricolage">Accept Global Payments</h3>
-                                        <p className="text-slate-600 mb-6 leading-relaxed">
-                                            Expand your reach beyond borders. Zeneva now supports international payments through our Paystack partnership, allowing you to accept USD and local currencies from customers anywhere in the world.
-                                        </p>
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors hover:bg-slate-100">
-                                                <div className="bg-white p-2 rounded-xl shadow-sm">
-                                                    <ShoppingCart className="h-6 w-6 text-primary" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 text-sm">International Cart Support</p>
-                                                    <p className="text-xs text-slate-500">Accept UK, US, and EU cards out-of-the-box.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+
+
 
 
                     <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
@@ -1080,17 +1025,18 @@ export default function Home() {
                                 </p>
                             </div>
 
-                            <div className="flex justify-center mb-12">
+                            <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
+                                {/* Billing Toggle */}
                                 <div className="inline-flex items-center p-1 bg-neutral-100/80 border border-neutral-200 rounded-xl">
                                     <button
                                         onClick={() => setBillingCycle('monthly')}
-                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                     >
                                         Monthly
                                     </button>
                                     <button
                                         onClick={() => setBillingCycle('yearly')}
-                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'yearly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${billingCycle === 'yearly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                     >
                                         Yearly
                                     </button>
@@ -1108,7 +1054,7 @@ export default function Home() {
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 500 products</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 2 Staff Accounts</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 1 Staff Account</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS (Unlimited Sales)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Receipts</li>
@@ -1123,7 +1069,7 @@ export default function Home() {
                                 {/* Pro Plan */}
                                 <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
                                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
-                                    <h3 className="text-lg font-semibold leading-5">Business Pro</h3>
+                                    <h3 className="text-lg font-semibold leading-5">Pro</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
 
                                     <div className="mt-4">
@@ -1134,12 +1080,12 @@ export default function Home() {
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}
                                         </span>
                                         {billingCycle === 'yearly' && (
-                                            <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2 animate-bounce">2 Months Free!</div>
+                                            <div className="text-xs text-emerald-600 font-bold mt-1 block animate-pulse">Save ₦20,000!</div>
                                         )}
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 10 Staff Accounts</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 5 Staff Accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
@@ -1155,7 +1101,7 @@ export default function Home() {
                                 </div>
                                 {/* Business Plan */}
                                 <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
-                                    <h3 className="text-lg font-semibold leading-5">Enterprise Plus</h3>
+                                    <h3 className="text-lg font-semibold leading-5 text-slate-900">Business</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
                                     <div className="mt-4">
@@ -1166,11 +1112,11 @@ export default function Home() {
                                             {billingCycle === 'monthly' ? '/mo' : '/year'}
                                         </span>
                                         {billingCycle === 'yearly' && (
-                                            <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2">Save ₦60,000!</div>
+                                            <div className="text-xs text-emerald-600 font-bold mt-1 block">Save ₦60,000!</div>
                                         )}
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & users</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence</li>
@@ -1292,6 +1238,48 @@ export default function Home() {
                     </a>
 
 
+
+
+                    {/* Global Payments Banner */}
+                    <section className="py-20 px-6">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="relative overflow-hidden rounded-3xl bg-stone-950 text-white p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-12 group shadow-2xl border border-white/5">
+                                {/* Abstract background pattern */}
+                                <div className="absolute inset-0 z-0 opacity-10" style={{
+                                    backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                                    backgroundSize: '32px 32px'
+                                }}></div>
+                                <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+                                
+                                <div className="relative z-10 max-w-xl text-left">
+                                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 font-bricolage leading-tight">
+                                        Global Access. <br />Seamless <span className="text-primary">USD</span> Subscriptions.
+                                    </h2>
+                                    <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed max-w-md font-light">
+                                        Zeneva is built for the world. We accept international card payments and USD subscription billing, ensuring you can access our premium retail operating system from anywhere on the planet.
+                                    </p>
+                                    <Link href="/signup" className="inline-flex items-center gap-2 text-white font-semibold group/link border-b border-transparent hover:border-white transition-all py-1">
+                                        <span className="text-sm">Get Started on Zeneva Today</span>
+                                        <ArrowRight className="w-4 h-4 transition-transform group-hover/link:translate-x-1" />
+                                    </Link>
+                                </div>
+                                
+                                <div className="relative z-10 w-full md:w-1/2 flex justify-center md:justify-end">
+                                    <div className="relative transition-all duration-700 group-hover:translate-x-2 group-hover:-translate-y-2">
+                                        {/* Soft glow behind the image */}
+                                        <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full -z-10 scale-125"></div>
+                                        <Image 
+                                            src="/global-payment.png" 
+                                            alt="Multi-currency Payment Integration" 
+                                            width={600} 
+                                            height={400} 
+                                            className="w-full max-w-sm h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
                     <MarketingFooter />
                 </div >

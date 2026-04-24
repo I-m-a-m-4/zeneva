@@ -165,6 +165,10 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
         return users.filter(user => user.id !== currentUserId);
     }, [users, currentUserId]);
 
+    const totalUsers = (users?.length || 0) + (invitations?.length || 0);
+    const planLimit = businessInstance?.plan === 'business' ? 1000000 : (businessInstance?.plan === 'pro' ? 5 : 1);
+    const isLimitReached = totalUsers >= planLimit;
+
     const handleRevokeInvitation = async () => {
         if (!invitationToRevoke || !firestore) return;
         const invitationRef = doc(firestore, 'invitations', invitationToRevoke.id);
@@ -210,13 +214,32 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                     A list of all users in your business.
                                 </CardDescription>
                             </div>
-                            <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)}>
-                                <PlusCircle className="h-3.5 w-3.5" />
-                                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                                    Invite User
-                                </span>
-                            </Button>
+                            <div className="flex items-center gap-4">
+                                {businessInstance && (
+                                    <div className="hidden lg:flex flex-col items-end text-sm">
+                                        <span className="font-medium">
+                                            {totalUsers} / {planLimit === Infinity ? '∞' : planLimit} Users
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-tight">Plan: {businessInstance.plan || 'starter'}</span>
+                                    </div>
+                                )}
+                                <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)} disabled={isLimitReached}>
+                                    <PlusCircle className="h-3.5 w-3.5" />
+                                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                                        Invite User
+                                    </span>
+                                </Button>
+                            </div>
                         </div>
+                        {isLimitReached && (
+                            <Alert variant="warning" className="mt-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Plan Limit Reached</AlertTitle>
+                                <AlertDescription>
+                                    You have reached the maximum number of users for your current plan. Please upgrade to invite more team members.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                     </CardHeader>
                     <CardContent>
                         {isLoading ? (
@@ -355,6 +378,8 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     businessName={businessInstance?.name || ''}
                     inviterName={inviterName}
                     onSuccess={forceRefresh}
+                    currentUserCount={users?.length || 0}
+                    pendingInvitationCount={invitations?.length || 0}
                 />
             )}
 

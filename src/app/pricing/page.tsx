@@ -79,7 +79,8 @@ export default function PricingPage() {
                             Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
                         </p>
 
-                        <div className="flex justify-center mb-4">
+                        <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-4">
+                            {/* Billing Toggle */}
                             <div className="inline-flex items-center p-1 bg-neutral-100/80 border border-neutral-200 rounded-xl">
                                 <button
                                     onClick={() => setBillingCycle('monthly')}
@@ -115,7 +116,7 @@ export default function PricingPage() {
                                 </div>
                                 <ul className="mt-6 space-y-4 text-sm flex-1">
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Up to 500 products</li>
-                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> 2 Staff Accounts</li>
+                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> 1 Staff Account</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Standard POS (Unlimited Sales)</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Invoicing & Receipts</li>
@@ -131,7 +132,7 @@ export default function PricingPage() {
                             {/* Pro Plan */}
                             <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
                                 <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
-                                <h3 className="text-lg font-semibold leading-5 text-slate-900">Business Pro</h3>
+                                <h3 className="text-lg font-semibold leading-5 text-slate-900">Pro</h3>
                                 <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
 
                                 <div className="mt-4">
@@ -142,12 +143,12 @@ export default function PricingPage() {
                                         {billingCycle === 'monthly' ? '/mo' : '/year'}
                                     </span>
                                     {billingCycle === 'yearly' && (
-                                        <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2 animate-bounce">2 Months Free!</div>
+                                        <div className="text-xs text-emerald-600 font-bold mt-1 block animate-pulse">Save ₦20,000!</div>
                                     )}
                                 </div>
                                 <ul className="mt-6 space-y-4 text-sm flex-1">
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
-                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> 10 Staff Accounts</li>
+                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> 5 Staff Accounts</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
@@ -163,7 +164,7 @@ export default function PricingPage() {
 
                             {/* Business Plan */}
                             <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
-                                <h3 className="text-lg font-semibold leading-5 text-slate-900">Enterprise Plus</h3>
+                                <h3 className="text-lg font-semibold leading-5 text-slate-900">Business</h3>
                                 <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
                                 <div className="mt-4">
@@ -174,11 +175,11 @@ export default function PricingPage() {
                                         {billingCycle === 'monthly' ? '/mo' : '/year'}
                                     </span>
                                     {billingCycle === 'yearly' && (
-                                        <div className="text-xs text-emerald-600 font-bold mt-1 inline-block ml-2">Save ₦60,000!</div>
+                                        <div className="text-xs text-emerald-600 font-bold mt-1 block">Save ₦60,000!</div>
                                     )}
                                 </div>
                                 <ul className="mt-6 space-y-4 text-sm flex-1">
-                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Unlimited products & users</li>
+                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>

@@ -23,8 +23,9 @@ const plans = [
     {
         name: 'Pro',
         price: 10000,
+        priceUSD: 7,
         features: [
-            'Up to 1,500 products & 10 users',
+            'Up to 1,500 products & 5 staff accounts',
             'Advanced Point of Sale (POS)',
             'Customizable Public Storefront',
             'Advanced Reports & Analytics',
@@ -36,9 +37,10 @@ const plans = [
     {
         name: 'Business',
         price: 30000,
+        priceUSD: 20,
         features: [
             'Everything in Pro',
-            'Unlimited products & users',
+            'Unlimited products & staff accounts',
             'AI Business Performance Dashboard',
             'Advanced Customer Intelligence (CRM+)',
             'Inventory Velocity Reports (ABC Analysis)',
@@ -234,6 +236,7 @@ const PaystackSubscriptionButton = ({
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
     const [processingPlan, setProcessingPlan] = useState<string | null>(null);
     const [selectedCycles, setSelectedCycles] = useState({ pro: '1m', business: '1m' });
+    const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
 
     const handleCycleChange = (planId: string, cycleId: string) => {
         setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
@@ -263,80 +266,132 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-            {plans.map((plan) => {
-                const selectedCycleId = selectedCycles[plan.planId as keyof typeof selectedCycles];
-                const selectedCycle = billingCycles.find(c => c.id === selectedCycleId)!;
-                const finalAmount = plan.price * selectedCycle.months * (1 - selectedCycle.discount / 100);
-                const isCurrentPlan = plan.planId === businessInstance.plan;
+        <div className="space-y-6 mt-6">
+            {/* Currency Toggle */}
+            <div className="flex justify-center border-b pb-6">
+                <div className="inline-flex p-1 bg-muted rounded-lg">
+                    <button
+                        onClick={() => setCurrency('NGN')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            currency === 'NGN'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        Naira (₦)
+                    </button>
+                    <button
+                        onClick={() => setCurrency('USD')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            currency === 'USD'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        USD ($)
+                    </button>
+                </div>
+            </div>
 
-                return (
-                    <Card key={plan.name} className={`flex flex-col ${isCurrentPlan ? 'border-2 border-primary' : ''}`}>
-                        <CardHeader>
-                            <CardTitle className="flex justify-between items-center">
-                                {plan.name}
-                                {isCurrentPlan && <Badge variant="secondary">Current Plan</Badge>}
-                            </CardTitle>
-                            <CardDescription>
-                                <span className="text-3xl font-bold">₦{plan.price.toLocaleString()}</span>
-                                <span className="text-muted-foreground"> / month</span>
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-grow">
-                            <h4 className="font-semibold mb-3">Plan Details:</h4>
-                            <ul className="space-y-3 text-sm mb-6">
-                                {plan.features.map(feature => (
-                                    <li key={feature} className="flex items-center gap-2">
-                                        <Check className="h-4 w-4 text-primary"/>
-                                        <span>{feature}</span>
-                                    </li>
-                                ))}
-                            </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {plans.map((plan) => {
+                    const selectedCycleId = selectedCycles[plan.planId as keyof typeof selectedCycles];
+                    const selectedCycle = billingCycles.find(c => c.id === selectedCycleId)!;
+                    
+                    const finalAmountNGN = plan.price * selectedCycle.months * (1 - selectedCycle.discount / 100);
+                    const displayBasePrice = currency === 'NGN' ? plan.price : (plan as any).priceUSD;
+                    const displayFinalPrice = displayBasePrice * selectedCycle.months * (1 - selectedCycle.discount / 100);
+                    
+                    const isCurrentPlan = plan.planId === businessInstance.plan;
 
-                            <h4 className="font-semibold mb-3">Billing Cycle:</h4>
-                            <RadioGroup 
-                                defaultValue={selectedCycleId}
-                                onValueChange={(value) => handleCycleChange(plan.planId, value)}
-                            >
-                                {billingCycles.map(cycle => {
-                                    const cyclePrice = plan.price * cycle.months;
-                                    const discountedPrice = cyclePrice * (1 - cycle.discount / 100);
-                                    return (
-                                        <Label 
-                                            key={cycle.id}
-                                            htmlFor={`${plan.planId}-${cycle.id}`}
-                                            className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value={cycle.id} id={`${plan.planId}-${cycle.id}`} />
-                                                <div>
-                                                    <span className="font-medium">{cycle.label}</span>
-                                                    {cycle.discount > 0 && (
-                                                        <Badge variant="destructive" className="ml-2">Save {cycle.discount}%</Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <span className="font-semibold">₦{discountedPrice.toLocaleString()}</span>
-                                        </Label>
-                                    )
-                                })}
-                            </RadioGroup>
-                        </CardContent>
-                        <CardFooter>
-                            <PaystackSubscriptionButton
-                                plan={plan}
-                                cycle={selectedCycle}
-                                finalAmount={finalAmount}
-                                userProfile={userProfile}
-                                businessInstance={businessInstance}
-                                isCurrentPlan={isCurrentPlan}
-                                isProcessing={processingPlan === plan.planId}
-                                setProcessingPlan={setProcessingPlan}
-                            />
-                        </CardFooter>
-                    </Card>
-                )
-            })}
+                    return (
+                        <Card key={plan.name} className={`flex flex-col ${isCurrentPlan ? 'border-primary ring-1 ring-primary/20' : ''}`}>
+                            <CardHeader>
+                                <div className="flex justify-between items-start">
+                                    <CardTitle>{plan.name}</CardTitle>
+                                    {isCurrentPlan && <Badge variant="secondary" className="font-bold">Current Plan</Badge>}
+                                </div>
+                                <CardDescription>
+                                    <span className="text-3xl font-bold text-foreground">
+                                        {currency === 'NGN' ? '₦' : '$'}{displayBasePrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-muted-foreground ml-1">/ month</span>
+                                    {currency === 'USD' && (
+                                        <div className="text-[10px] text-muted-foreground mt-1 uppercase">
+                                            ≃ ₦{plan.price.toLocaleString()} Monthly
+                                        </div>
+                                    )}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex-grow space-y-6">
+                                <ul className="space-y-2">
+                                    {plan.features.map(feature => (
+                                        <li key={feature} className="flex items-center gap-2 text-sm">
+                                            <Check className="h-4 w-4 text-primary shrink-0" />
+                                            <span>{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <div className="space-y-3 pt-4 border-t">
+                                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Billing Cycle</Label>
+                                    <RadioGroup 
+                                        defaultValue={selectedCycleId}
+                                        onValueChange={(value) => handleCycleChange(plan.planId, value)}
+                                        className="grid gap-2"
+                                    >
+                                        {billingCycles.map(cycle => {
+                                            const cyclePriceNGN = plan.price * cycle.months;
+                                            const discountedPriceNGN = cyclePriceNGN * (1 - cycle.discount / 100);
+                                            const discountedPriceUSD = ((plan as any).priceUSD * cycle.months) * (1 - cycle.discount / 100);
+
+                                            return (
+                                                <Label 
+                                                    key={cycle.id}
+                                                    htmlFor={`${plan.planId}-${cycle.id}`}
+                                                    className={`flex items-center justify-between p-3 border rounded-md cursor-pointer transition-colors ${
+                                                        selectedCycleId === cycle.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value={cycle.id} id={`${plan.planId}-${cycle.id}`} className="sr-only" />
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-medium">{cycle.label}</span>
+                                                            {cycle.discount > 0 && <span className="text-[10px] text-green-600 font-bold">-{cycle.discount}% OFF</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-sm font-bold">
+                                                            {currency === 'NGN' ? '₦' : '$'}{currency === 'NGN' ? discountedPriceNGN.toLocaleString() : discountedPriceUSD.toLocaleString()}
+                                                        </span>
+                                                        {currency === 'USD' && (
+                                                            <div className="text-[9px] text-muted-foreground">
+                                                                ≃ ₦{discountedPriceNGN.toLocaleString()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Label>
+                                            )
+                                        })}
+                                    </RadioGroup>
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <PaystackSubscriptionButton
+                                    plan={plan}
+                                    cycle={selectedCycle}
+                                    finalAmount={finalAmountNGN}
+                                    userProfile={userProfile}
+                                    businessInstance={businessInstance}
+                                    isCurrentPlan={isCurrentPlan}
+                                    isProcessing={processingPlan === plan.planId}
+                                    setProcessingPlan={setProcessingPlan}
+                                />
+                            </CardFooter>
+                        </Card>
+                    )
+                })}
+            </div>
         </div>
     );
 }
