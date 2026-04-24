@@ -36,17 +36,22 @@ export const secureStorage = {
       }
 
       const bytes = CryptoJS.AES.decrypt(encrypted, SECRET_KEY);
-      const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
+      
+      let decryptedString: string;
+      try {
+        decryptedString = bytes.toString(CryptoJS.enc.Utf8);
+      } catch (err) {
+        console.warn('Decryption error (possibly wrong key or corrupted data) for key:', key);
+        return null;
+      }
       
       if (!decryptedString) {
-        // If decryption results in empty string, it might have been saved as plaintext
-        // despite not starting with {/[, or the key changed.
         return null;
       }
 
       return JSON.parse(decryptedString) as T;
     } catch (error) {
-      console.error('Decryption failed for key:', key, error);
+      console.warn('Secure storage error for key:', key);
       return null;
     }
   },

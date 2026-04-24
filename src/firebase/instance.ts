@@ -3,7 +3,7 @@
 import { firebaseConfig } from './config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence, type Firestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore';
 
 // --- Singleton Initialization ---
 let firebaseApp: FirebaseApp;
@@ -39,9 +39,15 @@ try {
   auth = {} as Auth;
 }
 
-// Safely initialize Firestore
+// Safely initialize Firestore with modern persistence
 try {
-  firestore = getFirestore(firebaseApp);
+  if (!isServer && hasConfig) {
+    firestore = initializeFirestore(firebaseApp, {
+      cache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } else {
+    firestore = initializeFirestore(firebaseApp, {});
+  }
 } catch (e) {
   // Fallback for build time
   firestore = {} as Firestore;
@@ -53,17 +59,7 @@ if (!isServer && hasConfig) {
     .catch((err) => console.error("Firebase Auth persistence error:", err));
 }
 
-// Enable persistence only on the client-side.
-if (!isServer && hasConfig) {
-  enableMultiTabIndexedDbPersistence(firestore)
-    .catch((err) => {
-      if (err.code === 'failed-precondition') {
-        // Expected error when multiple tabs are open.
-      } else if (err.code === 'unimplemented') {
-        // Browser does not support persistence.
-      }
-    });
-}
+// Firestore persistence is now handled during initialization in the new SDK version.
 
 // --- Exports ---
 export { firebaseApp, auth, firestore };
