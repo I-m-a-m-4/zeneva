@@ -66,7 +66,7 @@ export default function HelpGuidesPage() {
               </div>
               <div className="p-5 border border-slate-100 rounded-xl bg-white shadow-sm">
                 <div className="font-bold mb-2">Step 3: Background Listener</div>
-                <p className="text-sm text-slate-600">A service worker continuously monitors your connection throughput. Once a stable >15kbps link is detected, the "Sync Handshake" begins.</p>
+                <p className="text-sm text-slate-600">A service worker continuously monitors your connection throughput. Once a stable &gt;15kbps link is detected, the "Sync Handshake" begins.</p>
               </div>
               <div className="p-5 border border-slate-100 rounded-xl bg-white shadow-sm">
                 <div className="font-bold mb-2">Step 4: Vector Clock Resolution</div>
@@ -250,7 +250,7 @@ export default function HelpGuidesPage() {
               <ol className="space-y-4">
                 <li className="flex gap-3">
                   <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-900 shrink-0">1</span>
-                  <span className="text-sm text-slate-600">Navigate to **Inventory > Manage Items**.</span>
+                  <span className="text-sm text-slate-600">Navigate to **Inventory &gt; Manage Items**.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-900 shrink-0">2</span>
