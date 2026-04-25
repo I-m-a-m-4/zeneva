@@ -40,6 +40,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+export async function generateStaticParams() {
+  return allBlogPosts.map((post) => ({
+    id: post.slug,
+  }));
+}
+
 export default function Page() {
   return <BlogPostClient />;
 }
