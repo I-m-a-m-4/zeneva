@@ -61,6 +61,14 @@ export default function PricingPage() {
                         <div className="aura-background"></div>
                     </div>
                     <div className="max-w-6xl mx-auto text-center relative z-10">
+                        <div className="relative mb-8 flex justify-center">
+                            <img 
+                                src="/images/doodles/inventory-doodle.png" 
+                                alt="Inventory Doodle" 
+                                className="w-20 h-20 md:w-28 md:h-28 opacity-80 animate-float"
+                                style={{ filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.05))' }}
+                            />
+                        </div>
                         <div className="inline-flex items-center gap-4 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 mb-8">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-3.5 h-3.5 text-primary" />

@@ -55,6 +55,14 @@ export default function OurMissionPage() {
       <main className="z-10 pt-24 relative font-geist">
         {/* Hero */}
         <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6 bg-transparent">
+          <div className="relative mb-12 flex justify-center">
+            <img 
+              src="/images/doodles/inventory-doodle.png" 
+              alt="Inventory Doodle" 
+              className="w-24 h-24 md:w-32 md:h-32 opacity-80 animate-float"
+              style={{ filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.05))' }}
+            />
+          </div>
           <div className="inline-flex gap-2 text-xs text-neutral-600 bg-neutral-100 border-neutral-200 border rounded-full mr-auto ml-auto pt-1.5 pr-3 pb-1.5 pl-3 items-center backdrop-blur-sm">
             {mounted && <iconify-icon icon="solar:stars-linear" class="h-3.5 w-3.5 text-primary" />}
             <span className="font-geist text-neutral-900 font-semibold">AI-Powered Retail Intelligence</span>
