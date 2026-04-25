@@ -569,7 +569,7 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <section id="features" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden">
+                    <section id="features" className="py-24 px-6 bg-white border-t-2 border-slate-100 relative overflow-hidden">
                         <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                         <div className="max-w-7xl mx-auto relative z-10">
                             <div className="text-center max-w-2xl mx-auto mb-16">
@@ -706,7 +706,7 @@ export default function Home() {
                                         hoverBg: "bg-[#FFFBEB]" // Light Amber
                                     }
                                 ].map((feature, index) => (
-                                    <div key={index} className="group relative p-8 bg-slate-50/50 backdrop-blur-sm border border-dashed border-slate-200 rounded-2xl overflow-hidden transition-all duration-300 isolate cursor-pointer">
+                                    <div key={index} className="group relative p-8 bg-slate-50/50 backdrop-blur-sm border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden transition-all duration-300 isolate cursor-pointer">
                                         {/* Slide-in Background Animation */}
                                         <div className={`absolute inset-0 w-0 group-hover:w-full transition-all duration-500 ease-out ${feature.hoverBg} -z-10`}></div>
 
@@ -725,7 +725,7 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <section ref={zenAIRef} id="how-it-works" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden bg-noise">
+                    <section ref={zenAIRef} id="how-it-works" className="py-24 px-6 bg-white border-t-2 border-slate-100 relative overflow-hidden bg-noise">
                         <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                         <div className="aura-background"></div>
                         <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
@@ -743,7 +743,7 @@ export default function Home() {
                                     Zeneva connects POS, inventory, storefront, CRM, and analytics into one intelligent system — with Zen AI at the center, turning daily operations into profit-maximizing decisions.
                                 </p>
 
-                                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden">
+                                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10">
                                         <BrainCircuit className="w-32 h-32 text-slate-900" />
                                     </div>
