@@ -212,13 +212,14 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   workboxOptions: {
+    importScripts: ['https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.7/runtime.min.js'],
     runtimeCaching: [
       {
-        urlPattern: /^https?:\/\/(?:[a-zA-Z0-9-]+\.)?zeneva\.space\/_vercel\/.*/i,
+        urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/_vercel/'),
         handler: 'NetworkOnly',
       },
       {
-        urlPattern: /^https?:\/\/(?:[a-zA-Z0-9-]+\.)?(?:vercel-scripts|vercel-insights)\.com\/.*/i,
+        urlPattern: ({ url }) => url.hostname.includes('vercel-scripts') || url.hostname.includes('vercel-insights'),
         handler: 'NetworkOnly',
       },
       {

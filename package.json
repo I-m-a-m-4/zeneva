@@ -106,5 +106,10 @@
     "typescript": "^5",
     "webpack-obfuscator": "^3.6.1"
   },
-  "overrides": {}
+  "overrides": {},
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not op_mini all"
+  ]
 }
