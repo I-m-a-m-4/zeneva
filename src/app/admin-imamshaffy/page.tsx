@@ -100,6 +100,7 @@ import {
     Timestamp,
     collectionGroup,
     getDoc,
+    deleteDoc,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase, auth } from '@/firebase';
@@ -429,6 +430,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         value: user.email,
         label: `${user.name} (${user.email})`
     })), [users]);
+
+    const handleDeleteApplication = async (appId: string) => {
+        if (!confirm('Are you sure you want to delete this application?')) return;
+        try {
+            await deleteDoc(doc(firestore, 'job_applications', appId));
+            toast({ title: "Intelligence Action: Target Deleted", description: "The career application has been removed from the sector." });
+        } catch (error) {
+            console.error("Error deleting application:", error);
+            toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the application. Data integrity maintained." });
+        }
+    };
 
     const processedUsers = useMemo(() => {
         let result = users || [];
@@ -1587,6 +1599,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                             <TableHead>Pitch</TableHead>
                                             <TableHead>Links</TableHead>
                                             <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1620,6 +1633,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                         <Badge variant={app.status === 'pending' ? 'secondary' : 'default'} className="capitalize">
                                                             {app.status || 'pending'}
                                                         </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleDeleteApplication(app.id)}
+                                                            className="hover:bg-destructive/10 hover:text-destructive group"
+                                                            title="Delete Application"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+                                                        </Button>
                                                     </TableCell>
                                                 </TableRow>
                                             ))
