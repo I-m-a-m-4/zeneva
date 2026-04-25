@@ -3,6 +3,8 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Barcode, Package, Box, Tag } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { InteractiveGrid } from '@/components/interactive-grid';
 import MarketingHeader from '@/components/layout/marketing-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
@@ -55,13 +57,35 @@ export default function OurMissionPage() {
       <main className="z-10 pt-24 relative font-geist">
         {/* Hero */}
         <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6 bg-transparent">
-          <div className="relative mb-12 flex justify-center">
-            <img 
-              src="/images/doodles/inventory-doodle.png" 
-              alt="Inventory Doodle" 
-              className="w-24 h-24 md:w-32 md:h-32 opacity-80 animate-float"
-              style={{ filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.05))' }}
-            />
+          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.15]">
+            <motion.div 
+              animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute top-[15%] left-[15%]"
+            >
+              <Barcode className="w-16 h-16 text-slate-900" />
+            </motion.div>
+            <motion.div 
+              animate={{ y: [0, 20, 0], rotate: [0, -10, 0] }}
+              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              className="absolute top-[25%] right-[15%]"
+            >
+              <Package className="w-20 h-20 text-slate-900" />
+            </motion.div>
+            <motion.div 
+              animate={{ y: [0, -15, 0], scale: [1, 1.1, 1] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+              className="absolute bottom-[20%] left-[10%]"
+            >
+              <Box className="w-12 h-12 text-slate-900" />
+            </motion.div>
+            <motion.div 
+              animate={{ y: [0, 25, 0], rotate: [0, 15, 0] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+              className="absolute bottom-[15%] right-[10%]"
+            >
+              <Tag className="w-24 h-24 text-slate-900" />
+            </motion.div>
           </div>
           <div className="inline-flex gap-2 text-xs text-neutral-600 bg-neutral-100 border-neutral-200 border rounded-full mr-auto ml-auto pt-1.5 pr-3 pb-1.5 pl-3 items-center backdrop-blur-sm">
             {mounted && <iconify-icon icon="solar:stars-linear" class="h-3.5 w-3.5 text-primary" />}
