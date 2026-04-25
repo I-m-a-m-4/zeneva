@@ -11,7 +11,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/contact',
     '/download',
     '/blog',
+    '/blog/mastering-retail-operations-with-zeneva',
     '/help-center',
+    '/help-center/guides',
     '/use-cases',
     '/careers',
     '/about/our-mission',
@@ -26,7 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (route === '') priority = 1.0;
     else if (['/pricing', '/download'].includes(route)) priority = 0.9;
     else if (['/blog', '/help-center', '/use-cases'].includes(route)) priority = 0.85;
-    else if (['/signup', '/login', '/contact'].includes(route)) priority = 0.8;
+    else if (['/signup', '/login', '/contact', '/help-center/guides'].includes(route)) priority = 0.8;
+    else if (route.startsWith('/blog/')) priority = 0.7;
 
     return {
       url: `${baseUrl}${route}`,

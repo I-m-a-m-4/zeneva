@@ -199,7 +199,7 @@ const features = [
 ];
 
 
-export default function HomeClient() {
+export default function Home() {
     const [email, setEmail] = useState('');
     const { toast } = useToast();
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');

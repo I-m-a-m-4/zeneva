@@ -64,7 +64,7 @@ function BlogCardSkeleton() {
   );
 }
 
-export default function BlogClient() {
+export default function BlogLandingPage() {
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
