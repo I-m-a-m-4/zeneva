@@ -231,15 +231,21 @@ export default function OurMissionPage() {
         </section>
 
         {/* Testimonials */}
-        <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-16 sm:mt-24 md:mt-40 relative" id="testimonials">
-          <div className="sm:p-10 p-6 border-neutral-200 bg-neutral-50/50 rounded-3xl relative backdrop-blur-lg border">
-            <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-              <h2 className="text-3xl sm:text-6xl lg:text-7xl leading-none text-neutral-900 tracking-tighter font-jakarta font-medium">Voices of Victory.</h2>
-              <span className="hidden sm:block w-px bg-neutral-200 h-12"></span>
-              <p className="text-base text-neutral-600 tracking-tight">Retailers who gained clarity through Zeneva.</p>
+        <section className="mb-32 relative">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary mb-4 block">Social Proof</span>
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-neutral-900 font-display">Voices of Victory</h2>
+              <p className="text-xl text-neutral-600 mt-4 font-body leading-relaxed">
+                Real stories from the frontlines of retail revolution.
+              </p>
             </div>
-            
-            <div className="relative mt-10 h-[400px]">
+            <Link href="/blog" className="group flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-neutral-900 border-b-2 border-primary/20 hover:border-primary transition-all pb-1">
+              Read all stories
+              <iconify-icon icon="solar:arrow-right-up-linear" className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </Link>
+          </div>
+          <div className="relative mt-10 h-[400px]">
               <div 
                 className="overflow-hidden h-full rounded-2xl relative" 
                 style={{ 
@@ -312,8 +318,7 @@ export default function OurMissionPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
         <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
            <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
@@ -328,6 +333,9 @@ export default function OurMissionPage() {
            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
              <Link href="/signup" className="codepen-button-aura scale-125 mx-4">
                 <span>Join the Mission</span>
+             </Link>
+             <Link href="/careers" className="mt-8 sm:mt-0 text-sm font-semibold text-neutral-600 hover:text-primary transition-colors flex items-center gap-2">
+               Join the Team <iconify-icon icon="solar:arrow-right-linear" />
              </Link>
            </div>
         </section>

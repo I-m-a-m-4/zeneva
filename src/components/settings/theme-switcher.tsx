@@ -8,7 +8,7 @@ import { Moon, Sun } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -19,7 +19,7 @@ export function ThemeSwitcher() {
     return <Skeleton className="h-20 w-full" />;
   }
 
-  const isDarkMode = theme === 'dark';
+  const isDarkMode = resolvedTheme === 'dark';
 
   const toggleTheme = () => {
     setTheme(isDarkMode ? 'light' : 'dark');

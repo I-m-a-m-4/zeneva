@@ -20,8 +20,8 @@
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 0 0% 90%; /* Crisp silver for definitive hairline borders */
+    --input: 220 13% 94%;
     --ring: 22 90% 55%;
     --radius: 0.5rem;
 
@@ -41,6 +41,45 @@
     --sidebar-ring: 22 90% 45%;
   }
 
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 4.5%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 22 90% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 12%; /* Keep dark but allow for sharper contrast */
+    --input: 240 3.7% 12%;
+    --ring: 22 90% 55%;
+
+    --sidebar-background: 240 5.9% 5%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 22 90% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 22 90% 55%;
+
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
   /* Custom scrollbar to match premium feel - Neutral grey for better integration */
   ::-webkit-scrollbar {
     width: 6px;
@@ -63,27 +102,100 @@
     background-color: hsl(var(--muted-foreground) / 0.4);
   }
 
-  /* Force HTML/Body to match background to prevent black flashes/gaps */
+  /* Force HTML/Body to match background */
   html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    background-color: hsl(var(--background)) !important;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    transition: opacity ease-in 0.3s;
+    opacity: 1;
   }
 
-  /* Body-level fixes for Tauri gaps */
+  body[unresolved] {
+    opacity: 0;
+    display: block;
+    overflow: hidden;
+    position: relative;
+  }
+
   body {
     overscroll-behavior: none;
-    background: hsl(var(--background));
   }
  
   body.is-desktop {
-     overflow: hidden; /* Prevent native scroll on the body, use internal scroll-areas */
+     overflow: hidden;
   }
 
   ::selection {
     background: hsl(var(--primary) / 0.3);
     color: hsl(var(--foreground));
+  }
+
+  .pattern-bg {
+    background-color: hsl(var(--background));
+    background-image: radial-gradient(hsl(var(--foreground) / 0.08) 0.5px, transparent 0.5px);
+    background-size: 14px 14px;
+    background-attachment: fixed;
+  }
+
+  .auth-bg {
+    @apply bg-background transition-colors duration-300;
+    background-image: radial-gradient(circle at top, hsla(var(--primary), 0.05), transparent);
+  }
+
+  /* 
+     High-Fidelity Scoped Borders 
+     This ensures the POS and Admin Dashboard maintain the 'Crisp Silver' hairline aesthetic
+     without affecting the softer marketing homepage.
+  */
+  .high-fidelity-shell .border, 
+  .high-fidelity-shell .border-b, 
+  .high-fidelity-shell .border-t, 
+  .high-fidelity-shell .border-l, 
+  .high-fidelity-shell .border-r,
+  .high-fidelity-shell .sidebar-border,
+  .high-fidelity-shell [class*='border-border'] {
+    border-color: hsl(var(--border)) !important; 
+    border-width: 1px;
+    border-style: solid;
+  }
+
+  /* Keep sidebar borders slightly more subtle even in high-fidelity mode */
+  .high-fidelity-shell [class*='sidebar-border'] {
+    border-color: hsl(var(--sidebar-border) / 0.3) !important;
+  }
+
+  .dark .high-fidelity-shell .border,
+  .dark .high-fidelity-shell .border-b,
+  .dark .high-fidelity-shell .border-t,
+  .dark .high-fidelity-shell .border-l,
+  .dark .high-fidelity-shell .border-r,
+  .dark .high-fidelity-shell [class*='border-border'] {
+    border-color: hsl(var(--border) / 0.5) !important; /* Sharper definition in dark mode */
+  }
+
+  .dark .high-fidelity-shell .sidebar-border,
+  .dark .high-fidelity-shell [class*='sidebar-border'] {
+    border-color: hsl(var(--sidebar-border) / 0.2) !important;
+  }
+
+  /* Force dark mode background for shell components */
+  .dark .bg-sidebar,
+  .dark [data-sidebar='sidebar'] {
+    background-color: hsl(var(--sidebar-background)) !important;
+  }
+
+  .dark .bg-background {
+    background-color: hsl(var(--background)) !important;
+  }
+
+  .bg-sidebar,
+  [data-sidebar='sidebar'],
+  .bg-background,
+  header {
+    @apply transition-colors duration-300;
   }
 
   .codepen-button {
@@ -109,19 +221,6 @@
     height: 100%
   }
 
-  .pattern-bg {
-    background-color: #ffffff;
-    opacity: 1;
-    background-image: radial-gradient(#d3d3d3 0.5px, #ffffff 0.5px);
-    background-size: 10px 10px;
-  }
-
-  .auth-bg {
-    @apply bg-gray-50 dark:bg-gray-900;
-    /* Simple fallback */
-    background-image: radial-gradient(circle at top, hsl(240 5% 15%), hsl(240 5% 8%));
-  }
-
   .animated-input {
     @apply bg-white/5 border border-white/20 text-white placeholder:text-gray-400 focus:bg-white/10 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all duration-300;
   }
@@ -131,17 +230,6 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-}
-
-@layer base {
-  html,
-  body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
   }
 
   .focus-glow {
@@ -179,15 +267,6 @@
 
   .tauri-window header {
     /* Background handled by component logic */
-  }
-
-  /* Light mode background standardisation */
-  :root {
-    --background: 0 0% 100%; /* Pure white for cleanest look */
-  }
-  
-  .dark {
-    --background: 240 10% 3.9%;
   }
 }
 

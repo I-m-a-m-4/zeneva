@@ -17,8 +17,14 @@ import {
   LayoutGrid,
   List,
   Clock,
-  Sparkles
+  Sparkles,
+  Barcode,
+  Package,
+  Box,
+  Tag,
+  Receipt
 } from 'lucide-react';
+import { motion } from "framer-motion";
 import { 
   useFirestore, 
   useCollection, 
@@ -129,11 +135,49 @@ export default function BlogLandingPage() {
           <MarketingHeader />
           
           <main className="min-h-screen">
-            {/* Hero Section with Interactive Grid Pattern */}
             <section className="relative flex items-center justify-center px-6 pt-48 pb-20 md:py-56 overflow-hidden bg-transparent">
               <div className="absolute inset-0 z-0">
                 <InteractiveGrid />
                 <div className="aura-background"></div>
+
+                {/* Doodle Icons */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25">
+                  <motion.div 
+                    animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-[25%] left-[22%]"
+                  >
+                    <Barcode className="w-12 h-12 text-slate-400" />
+                  </motion.div>
+                  <motion.div 
+                    animate={{ y: [0, 20, 0], rotate: [0, -10, 0] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="absolute top-[35%] right-[22%]"
+                  >
+                    <Package className="w-10 h-10 text-slate-400" />
+                  </motion.div>
+                  <motion.div 
+                    animate={{ y: [0, -15, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                    className="absolute bottom-[35%] left-[25%]"
+                  >
+                    <Box className="w-8 h-8 text-slate-400" />
+                  </motion.div>
+                  <motion.div 
+                    animate={{ y: [0, 25, 0], rotate: [0, 15, 0] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+                    className="absolute bottom-[30%] right-[25%]"
+                  >
+                    <Tag className="w-14 h-14 text-slate-400" />
+                  </motion.div>
+                  <motion.div 
+                    animate={{ opacity: [0.3, 0.6, 0.3], y: [0, -10, 0] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-[50%] left-[18%]"
+                  >
+                    <Receipt className="w-10 h-10 text-slate-400" />
+                  </motion.div>
+                </div>
               </div>
               
               <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">

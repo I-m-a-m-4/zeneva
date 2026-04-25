@@ -332,7 +332,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 }
 
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null }) {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -960,7 +960,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     };
 
     return (
-        <div className="p-4 md:p-6 lg:p-8 space-y-6">
+        <div className="p-4 md:p-6 lg:p-8 space-y-6 high-fidelity-shell">
             <div className="mb-2">
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
                 <p className="text-muted-foreground">
@@ -974,6 +974,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
+                    <TabsTrigger value="recruitment" className="gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Recruitment
+                    </TabsTrigger>
                     <TabsTrigger value="security" className="gap-2">
                         <ShieldCheck className="h-4 w-4" />
                         Cyber Shield
@@ -1073,7 +1077,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                             index === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-500/30" : "bg-background/60 border-border/50"
                                         )}>
                                             <div className="flex items-center gap-3">
-                                                <div className={cn(
+                                                <div className={cn( 
                                                     "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
                                                     index === 0 ? "bg-yellow-500 text-white" : "bg-muted text-muted-foreground"
                                                 )}>
@@ -1561,6 +1565,77 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         onMount={fetchOutreachData}
                     />
                 </TabsContent>
+                <TabsContent value="recruitment" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Briefcase className="h-5 w-5 text-primary" />
+                                Talent Acquisitions ({applications?.length || 0})
+                            </CardTitle>
+                            <CardDescription>
+                                Review and manage job applications for Zeneva roles.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Candidate</TableHead>
+                                            <TableHead>Role</TableHead>
+                                            <TableHead>Applied</TableHead>
+                                            <TableHead>Pitch</TableHead>
+                                            <TableHead>Links</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {applications && applications.length > 0 ? (
+                                            applications.map((app) => (
+                                                <TableRow key={app.id}>
+                                                    <TableCell className="font-medium">
+                                                        <div>{app.name}</div>
+                                                        <div className="text-xs text-muted-foreground">{app.email}</div>
+                                                        <div className="text-xs text-muted-foreground">{app.phone}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">{app.jobTitle || app.jobId}</Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">
+                                                        {app.createdAt?.toDate ? format(app.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                                                    </TableCell>
+                                                    <TableCell className="max-w-xs truncate text-sm" title={app.pitch}>
+                                                        {app.pitch}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {app.portfolio && (
+                                                            <Button variant="link" size="sm" asChild className="h-auto p-0">
+                                                                <a href={app.portfolio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                                    View File <Globe className="h-3 w-3" />
+                                                                </a>
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={app.status === 'pending' ? 'secondary' : 'default'} className="capitalize">
+                                                            {app.status || 'pending'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                                                    No applications received yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
                 <TabsContent value="security">
                     <CyberShield />
                 </TabsContent>
@@ -1719,16 +1794,18 @@ export default function AdminDashboardPage() {
     const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances'), orderBy('name')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
+    const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
 
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
     const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+    const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
     const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
     const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || receiptsLoading || purchasesLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || receiptsLoading || purchasesLoading;
 
     if (isLoading) {
         return (
@@ -1739,5 +1816,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} />
+    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} />
 }

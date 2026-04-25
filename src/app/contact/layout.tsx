@@ -1,11 +1,11 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Contact Us | Get Expert Support | Zeneva',
-  description: 'Have questions about Zeneva POS? Reach out to our team for support, sales inquiries, or technical help. We are here to help your business flourish.',
+  title: 'Contact Us | Partner with Zeneva Retail OS',
+  description: 'Connect with our global support and sales team. Whether you need technical assistance or want to scale your retail operations, Zeneva is here to help.',
   openGraph: {
-    title: 'Contact Zeneva - We are Ready to Help',
-    description: 'Get in touch with the Zeneva team via WhatsApp, Email, or our Help Center.',
+    title: 'Contact Zeneva - Global Retail Support',
+    description: 'Get in touch with the Zeneva team for sales inquiries, technical support, and partnership opportunities.',
   }
 };
 

@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Mail, Phone, MessageSquare, Send, ArrowRight, HelpCircle, MapPin, Loader2, MessageCircle } from 'lucide-react';
+import { Mail, Phone, MessageSquare, Send, ArrowRight, HelpCircle, MapPin, Loader2, MessageCircle, Barcode, Package, Box, Tag, Receipt } from 'lucide-react';
+import { motion } from "framer-motion";
+import Link from 'next/link';
 import MarketingHeader from '@/components/layout/marketing-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
 import { Button } from '@/components/ui/button';
@@ -49,6 +51,45 @@ export default function ContactPage() {
                     <div className="absolute inset-0 z-0">
                         <InteractiveGrid />
                         <div className="aura-background"></div>
+                        
+                        {/* Doodle Icons */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25">
+                            <motion.div 
+                                animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+                                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute top-[25%] left-[22%]"
+                            >
+                                <Barcode className="w-12 h-12 text-slate-400" />
+                            </motion.div>
+                            <motion.div 
+                                animate={{ y: [0, 20, 0], rotate: [0, -10, 0] }}
+                                transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                className="absolute top-[35%] right-[22%]"
+                            >
+                                <Package className="w-10 h-10 text-slate-400" />
+                            </motion.div>
+                            <motion.div 
+                                animate={{ y: [0, -15, 0], scale: [1, 1.1, 1] }}
+                                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                                className="absolute bottom-[35%] left-[25%]"
+                            >
+                                <Box className="w-8 h-8 text-slate-400" />
+                            </motion.div>
+                            <motion.div 
+                                animate={{ y: [0, 25, 0], rotate: [0, 15, 0] }}
+                                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+                                className="absolute bottom-[30%] right-[25%]"
+                            >
+                                <Tag className="w-14 h-14 text-slate-400" />
+                            </motion.div>
+                            <motion.div 
+                                animate={{ opacity: [0.3, 0.6, 0.3], y: [0, -10, 0] }}
+                                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute top-[50%] left-[18%]"
+                            >
+                                <Receipt className="w-10 h-10 text-slate-400" />
+                            </motion.div>
+                        </div>
                     </div>
 
                     <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
@@ -60,7 +101,8 @@ export default function ContactPage() {
                             Contact Us
                         </h1>
                         <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto">
-                            Have questions or feedback? We'd love to hear from you. We typically respond within 24 hours.
+                            Have questions or feedback? We'd love to hear from you. We typically respond within 24 hours. 
+                            You can also learn more <Link href="/about/our-mission" className="text-primary font-bold hover:underline">about our mission</Link>.
                         </p>
                     </div>
                 </section>
@@ -101,16 +143,15 @@ export default function ContactPage() {
                                         description="Browse our knowledge base and tutorials."
                                         info="Visit Knowledge Base"
                                     />
+                                    <ContactCard 
+                                        href="/pricing"
+                                        icon={<Tag className="w-6 h-6 text-primary" />}
+                                        title="Sales & Pricing"
+                                        description="Looking for specific plans for your business?"
+                                        info="View Pricing Tiers"
+                                    />
                                 </div>
 
-                                <div className="p-8 rounded-2xl bg-slate-900 text-white relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/30 transition-colors"></div>
-                                    <h3 className="text-xl font-semibold mb-2">Location</h3>
-                                    <div className="flex items-start gap-3 text-slate-300">
-                                        <MapPin className="w-5 h-5 mt-1 text-primary shrink-0" />
-                                        <p>Lagos, Nigeria. Serving businesses globally.</p>
-                                    </div>
-                                </div>
                             </div>
 
                             {/* Right Column: Form */}
@@ -133,7 +174,7 @@ export default function ContactPage() {
                                                 required 
                                                 type="text" 
                                                 placeholder="John Doe"
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50"
+                                                className="w-full px-4 py-3 rounded-xl border border-dashed border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -144,7 +185,7 @@ export default function ContactPage() {
                                                 required 
                                                 type="email" 
                                                 placeholder="john@company.com"
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50"
+                                                className="w-full px-4 py-3 rounded-xl border border-dashed border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50"
                                             />
                                         </div>
                                     </div>
@@ -155,7 +196,7 @@ export default function ContactPage() {
                                             id="subject"
                                             name="project_type"
                                             required
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat"
+                                            className="w-full px-4 py-3 rounded-xl border border-dashed border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.75rem_center] bg-no-repeat"
                                         >
                                             <option value="">Select a topic</option>
                                             <option value="sales">Sales & Pricing</option>
@@ -174,7 +215,7 @@ export default function ContactPage() {
                                             required 
                                             rows={6}
                                             placeholder="How can we help your business flourish?"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50 resize-none"
+                                            className="w-full px-4 py-3 rounded-xl border border-dashed border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all bg-slate-50/50 resize-none"
                                         />
                                     </div>
 
@@ -221,7 +262,7 @@ function ContactCard({ href, icon, title, description, info, isExternal = false 
             href={href}
             target={isExternal ? "_blank" : undefined}
             rel={isExternal ? "noopener noreferrer" : undefined}
-            className="group flex flex-col sm:flex-row items-start gap-4 p-6 rounded-2xl border border-slate-100 hover:border-primary/20 hover:bg-slate-50 transition-all duration-300"
+            className="group flex flex-col sm:flex-row items-start gap-4 p-6 rounded-2xl border border-dashed border-slate-200 hover:border-primary/50 hover:bg-slate-50 transition-all duration-300"
         >
             <div className="shrink-0 w-12 h-12 rounded-xl bg-primary/10 shadow-sm border border-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 {icon}

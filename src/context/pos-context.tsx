@@ -92,7 +92,7 @@ interface POSContextType {
   addToQueue: (action: Omit<QueuedAction, 'id' | 'timestamp' | 'status' | 'description'>, description: string) => string | null;
   mutateBusiness: (data?: any) => Promise<any> | void;
   isSyncing: boolean;
-  isSyncingCustomers: boolean;
+  isFullSyncingCustomers: boolean;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
   optimisticProducts: Product[];
@@ -123,7 +123,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
+  const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
@@ -159,7 +159,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
@@ -168,7 +168,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(100)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("totalSpent", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
@@ -301,6 +301,57 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast]);
 
+  const fetchFullCustomers = useCallback(async () => {
+    if (!businessId || !firestore || isFullSyncingCustomers) return;
+    
+    setIsFullSyncingCustomers(true);
+    let allFetched: Customer[] = [];
+    let lastDoc: any = null;
+    let hasMore = true;
+    const BATCH_SIZE = 5000;
+
+    try {
+      while (hasMore) {
+        let q = query(
+          collection(firestore, "customers"),
+          where("businessId", "==", businessId),
+          orderBy("totalSpent", "desc"),
+          limit(BATCH_SIZE)
+        );
+        
+        if (lastDoc) q = query(q, startAfter(lastDoc));
+        
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          hasMore = false;
+        } else {
+          const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+          allFetched = [...allFetched, ...batch];
+          
+          setSyncedCustomers(prev => {
+            const merged = [...prev];
+            batch.forEach(nc => {
+              const idx = merged.findIndex(c => c.id === nc.id);
+              if (idx !== -1) merged[idx] = nc;
+              else merged.push(nc);
+            });
+            return merged;
+          });
+
+          lastDoc = snap.docs[snap.docs.length - 1];
+          if (snap.docs.length < BATCH_SIZE) hasMore = false;
+        }
+      }
+      
+      setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
+      toast({ title: "Full Sync Successful", description: `Synchronized ${allFetched.length} customers for offline access.` });
+    } catch (error) {
+      console.error("Full Customer Sync Failed:", error);
+    } finally {
+      setIsFullSyncingCustomers(false);
+    }
+  }, [businessId, firestore, isFullSyncingCustomers, toast]);
+
   const triggerRefresh = useCallback(() => {
     refreshData();
     setRefreshKey(prev => prev + 1); // Keep for legacy triggers
@@ -346,6 +397,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
               totalRevenue: increment(action.payload.receiptData.total),
               totalUnitsSold: increment(totalUnits)
             }, { merge: true });
+
+            const customerUpdate = action.payload.customerUpdate;
+            if (customerUpdate && customerUpdate.id) {
+              const custRef = doc(firestore, 'customers', customerUpdate.id);
+              const updates: any = { 
+                updatedAt: serverTimestamp() 
+              };
+              if (customerUpdate.loyaltyPoints !== undefined) updates.loyaltyPoints = customerUpdate.loyaltyPoints;
+              if (customerUpdate.totalSpent !== undefined) updates.totalSpent = increment(customerUpdate.totalSpent);
+              
+              batch.update(custRef, updates);
+            }
 
             resultData.newReceiptId = rRef.id; break;
           case 'delete-product':
@@ -470,7 +533,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const lower = term.toLowerCase().trim();
     if (customers && customers.length > 0) {
       const local = customers.filter(c => c.name.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term));
-      if (local.length >= 10 || !isSyncingCustomers) return local.slice(0, 20);
+      if (local.length >= 10 || !isFullSyncingCustomers) return local.slice(0, 20);
     }
     if (!businessId || !firestore) return [];
     try {
@@ -479,7 +542,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const combined = [...nameSnap.docs, ...emailSnap.docs].map(d => ({ ...d.data() as any, id: d.id } as Customer));
       return Array.from(new Map(combined.map(item => [item.id, item])).values()).slice(0, 20);
     } catch { return []; }
-  }, [businessId, firestore, customers, isSyncingCustomers]);
+  }, [businessId, firestore, customers, isFullSyncingCustomers]);
 
   const searchProducts = useCallback(async (term: string) => {
     if (!term.trim()) return [];
@@ -629,6 +692,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, products, customers, receipts, business, stats]);
 
+  // Handle Full Background Sync of Customers for Native
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isMounted || !isTauri || !businessId || !firestore || isFullSyncingCustomers || !navigator.onLine) return;
+
+    const checkFullSyncStatus = async () => {
+      const lastFullSync = await getLastSyncMetadata(businessId, 'full_customers_sync');
+      const now = Date.now();
+      const oneHour = 60 * 60 * 1000;
+      
+      // We do a full background sync if it hasn't been done in the last hour
+      // and we are connected to the internet.
+      if (now - lastFullSync > oneHour) {
+        fetchFullCustomers();
+      }
+    };
+
+    checkFullSyncStatus();
+  }, [isMounted, businessId, firestore, fetchFullCustomers]);
+
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), [cart]);
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
@@ -769,7 +852,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     paymentMethod, setPaymentMethod, autoPrint, setAutoPrint, resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
-    mutateBusiness, isSyncing, isSyncingCustomers, optimisticProducts: [],
+    mutateBusiness, isSyncing, isFullSyncingCustomers, optimisticProducts: [],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField: async () => [], searchReceipts: async () => [],
@@ -780,7 +863,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

@@ -1,5 +1,5 @@
 'use client';
-import { Check, Github, Linkedin, Mail, Phone, Send, Twitter, Loader2, Instagram } from "lucide-react";
+import { Check, Linkedin, Mail, Phone, Send, Twitter, Loader2, Instagram } from "lucide-react";
 import BackToTopButton from '@/components/back-to-top-button';
 import Link from "next/link";
 import React, { useRef, useState } from 'react';
@@ -167,8 +167,8 @@ export default function MarketingFooter() {
                 </button>
               </form>
               <div className="mt-4 flex items-center gap-3">
-                <a href="#" aria-label="GitHub" className="inline-flex h-9 w-9 items-center justify-center rounded-full ring-1 transition bg-white/5 ring-white/10 text-white/80 hover:text-white hover:bg-white/10">
-                  <Github className="w-[16px] h-[16px]" style={{ color: 'rgb(255, 255, 255)' }} />
+                <a href="https://share.google/zSJOsFEcwRPpem4A2" target="_blank" rel="noopener noreferrer" aria-label="Google Business" className="inline-flex h-9 w-9 items-center justify-center rounded-full ring-1 transition bg-white/5 ring-white/10 text-white/80 hover:text-white hover:bg-white/10">
+                  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="w-[16px] h-[16px]" fill="currentColor"><title>Google</title><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.896 4.14-1.224 1.224-3.132 2.364-6.944 2.364-6.192 0-11-5.004-11-11.196s4.808-11.196 11-11.196c3.348 0 5.772 1.308 7.5 3.048l2.316-2.316C19.164 1.632 15.768 0 11.48 0 5.136 0 0 5.136 0 11.48s5.136 11.48 11.48 11.48c3.42 0 6.012-1.128 8.028-3.24 2.088-2.088 2.748-4.992 2.748-7.392 0-.708-.06-1.416-.18-2.112h-9.588z"/></svg>
                 </a>
                 <a href="https://x.com/zeneva_retail" aria-label="X" className="inline-flex h-9 w-9 items-center justify-center rounded-full ring-1 transition bg-white/5 ring-white/10 text-white/80 hover:text-white hover:bg-white/10">
                   <Twitter className="w-[16px] h-[16px]" style={{ color: 'rgb(255, 255, 255)' }} />
@@ -197,9 +197,9 @@ export default function MarketingFooter() {
           <div className="mt-10 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-white/10">
             <p className="text-sm text-white/60">© 2026 Zeneva. All rights reserved.</p>
             <div className="flex items-center gap-4 text-sm text-white/60">
-              <a href="#" className="transition hover:text-white">Privacy</a>
+              <Link href="/legal/privacy-policy" className="transition hover:text-white">Privacy</Link>
               <span className="hidden sm:block text-white/20">•</span>
-              <a href="#" className="transition hover:text-white">Terms</a>
+              <Link href="/legal/terms-of-service" className="transition hover:text-white">Terms</Link>
               <span className="hidden sm:block text-white/20">•</span>
               <BackToTopButton />
             </div>

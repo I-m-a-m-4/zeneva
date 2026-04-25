@@ -18,7 +18,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, description, ic
   const iconStr = typeof icon === 'string' ? icon : null;
 
   const cardContent = (
-    <Card className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer h-full">
+    <Card className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer h-full bg-card/80 backdrop-blur-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         {Icon ? (

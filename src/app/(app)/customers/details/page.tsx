@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import { usePOS } from '@/context/pos-context';
-import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc, serverTimestamp, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
 import { generateLocalCustomerIntelligence } from '@/lib/customer-intelligence';
 import NProgress from 'nprogress';
@@ -56,10 +56,61 @@ function CustomerDetailContent() {
     const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business } = usePOS();
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
-    const receipts = React.useMemo(() => {
-        if (!allReceipts) return [];
-        return allReceipts.filter(r => r.customer?.id === customerId);
-    }, [allReceipts, customerId]);
+    
+    // FETCH FULL RECEIPT HISTORY FOR THIS CUSTOMER
+    const [allCustomerReceipts, setAllCustomerReceipts] = React.useState<Receipt[]>([]);
+    const [isFetchingReceipts, setIsFetchingReceipts] = React.useState(true);
+
+    React.useEffect(() => {
+        if (!firestore || !customerId || !business?.id) return;
+
+        const fetchFullHistory = async () => {
+            setIsFetchingReceipts(true);
+            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+            
+            // 1. Initial hit from SQLite for instant UI in Native
+            if (isTauri) {
+                try {
+                    const { getCachedCustomerReceipts } = await import('@/lib/sqlite-sync');
+                    const localReceipts = await getCachedCustomerReceipts(business.id, customerId);
+                    if (localReceipts.length > 0) {
+                        setAllCustomerReceipts(localReceipts);
+                    }
+                } catch (err) {
+                    console.warn("SQLite Receipt Fetch failed:", err);
+                }
+            }
+
+            try {
+                const q = query(
+                    collection(firestore, 'receipts'),
+                    where('businessId', '==', business.id),
+                    where('customer.id', '==', customerId),
+                    orderBy('createdAt', 'desc')
+                );
+                const snap = await getDocs(q);
+                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+                
+                setAllCustomerReceipts(prev => {
+                    const merged = [...prev];
+                    docs.forEach(rd => {
+                        if (!merged.find(m => m.id === rd.id)) {
+                            merged.push(rd);
+                        }
+                    });
+                    return merged.sort((a,b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+                });
+            } catch (err) {
+                console.error("Failed to fetch customer history from Firestore:", err);
+            } finally {
+                setIsFetchingReceipts(false);
+            }
+        };
+
+        fetchFullHistory();
+    }, [firestore, customerId, business?.id]);
+
+    const receipts = allCustomerReceipts;
 
     const [insights, setInsights] = React.useState<CustomerInsightsOutput | null>(customer?.aiInsights || null);
     const [isGeneratingInsights, setIsGeneratingInsights] = React.useState(false);
@@ -82,41 +133,47 @@ function CustomerDetailContent() {
     }, [customer]);
 
     const purchaseSummary = React.useMemo(() => {
-        if (!receipts || !allProducts) return [];
+        if (!receipts) return [];
 
-        const productMap: Record<string, {
-            product: Product;
+        const summaryMap: Record<string, {
+            product: Partial<Product>;
             totalQuantity: number;
             totalRevenue: number;
             lastPurchase: Date;
         }> = {};
 
-        (receipts || []).forEach(receipt => {
+        receipts.forEach(receipt => {
             if (!receipt) return;
             const purchaseDate = safeToDate(receipt.createdAt);
             (receipt.items || []).forEach(item => {
-                if (!item || !item.productId) return;
-                const productInfo = allProducts.find(p => p.id === item.productId);
-                if (!productInfo) return;
-
-                if (!productMap[item.productId]) {
-                    productMap[item.productId] = {
-                        product: productInfo,
+                if (!item) return;
+                const productId = item.productId || 'unknown';
+                
+                if (!summaryMap[productId]) {
+                    // Fallback to item data if product record is missing
+                    const productInfo = allProducts?.find(p => p.id === productId);
+                    summaryMap[productId] = {
+                        product: productInfo || {
+                            id: productId,
+                            name: item.name || 'Unknown Product',
+                            price: item.price || 0,
+                            imageUrl: (item as any).image || '',
+                        },
                         totalQuantity: 0,
                         totalRevenue: 0,
                         lastPurchase: purchaseDate,
                     };
                 }
 
-                productMap[item.productId].totalQuantity += (item.quantity || 0);
-                productMap[item.productId].totalRevenue += (item.price || 0) * (item.quantity || 0);
-                if (purchaseDate > productMap[item.productId].lastPurchase) {
-                    productMap[item.productId].lastPurchase = purchaseDate;
+                summaryMap[productId].totalQuantity += (item.quantity || 0);
+                summaryMap[productId].totalRevenue += (item.price || 0) * (item.quantity || 0);
+                if (purchaseDate > summaryMap[productId].lastPurchase) {
+                    summaryMap[productId].lastPurchase = purchaseDate;
                 }
             });
         });
 
-        return Object.values(productMap).sort((a, b) => b.lastPurchase.getTime() - a.lastPurchase.getTime());
+        return Object.values(summaryMap).sort((a, b) => b.lastPurchase.getTime() - a.lastPurchase.getTime());
     }, [receipts, allProducts]);
 
 
@@ -180,7 +237,7 @@ function CustomerDetailContent() {
         }
     };
 
-    const isLoading = isPosLoading;
+    const isLoading = isPosLoading || isFetchingReceipts;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
@@ -207,7 +264,10 @@ function CustomerDetailContent() {
         )
     }
 
-    const totalSpent = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
+    const totalSpent = React.useMemo(() => {
+        const fromReceipts = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
+        return Math.max(customer?.totalSpent || 0, fromReceipts);
+    }, [customer, receipts]);
 
     return (
         <div className="space-y-6">
@@ -216,16 +276,31 @@ function CustomerDetailContent() {
             </Button>
 
             <div className="grid md:grid-cols-3 gap-6">
-                <Card className="md:col-span-1 flex flex-col">
-                    <CardHeader className="flex flex-col items-center text-center">
-                        <Avatar className="h-24 w-24 mb-4 text-3xl">
-                            <AvatarFallback>{customer.name ? customer.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : 'U'}</AvatarFallback>
+                <Card className="md:col-span-1 flex flex-col bg-card border-border/60 shadow-sm">
+                    <CardHeader className="flex flex-col items-center text-center pb-2">
+                        <Avatar className="h-24 w-24 mb-4 text-3xl border-2 border-primary/20">
+                            <AvatarFallback className="bg-primary/5 text-primary">
+                                {customer.name ? customer.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : 'U'}
+                            </AvatarFallback>
                         </Avatar>
-                        <CardTitle>{customer.name}</CardTitle>
+                        <CardTitle className="text-2xl font-bold">{customer.name}</CardTitle>
                         <CardDescription>{customer.email}</CardDescription>
-                        <CardDescription>{customer.phone}</CardDescription>
+                        {customer.phone && <CardDescription>{customer.phone}</CardDescription>}
                     </CardHeader>
-                    <CardContent className="text-center flex-grow">
+                    <CardContent className="text-center flex-grow pt-4">
+                        <div className="flex items-center justify-center gap-2 mb-6">
+                            <span className={cn(
+                                "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                totalSpent > 100000 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-primary/10 text-primary"
+                            )}>
+                                {totalSpent > 100000 ? 'VIP Customer' : 'Regular'}
+                            </span>
+                            {totalDebt > 0 && (
+                                <span className="bg-destructive/10 text-destructive px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                    Owing
+                                </span>
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <p className="text-2xl font-bold">{currencySymbol}{(totalSpent || 0).toLocaleString()}</p>
@@ -259,7 +334,7 @@ function CustomerDetailContent() {
                     </CardFooter>
                 </Card>
 
-                <Card className="md:col-span-2">
+                <Card className="md:col-span-2 bg-card border-border/60 shadow-sm">
                     <CardHeader>
                         <CardTitle>Purchase History</CardTitle>
                         <CardDescription>Products this customer has purchased, sorted by most recent.</CardDescription>

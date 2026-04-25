@@ -194,9 +194,10 @@ function ReviewPageContent() {
             };
         });
 
-        const customerUpdate = selectedCustomer && business.settings?.loyaltyProgramEnabled ? {
+        const customerUpdate = selectedCustomer ? {
             id: selectedCustomer.id,
-            loyaltyPoints: (selectedCustomer.loyaltyPoints || 0) + Math.floor(secureTotal * (business.settings.pointsPerUnit || 0))
+            loyaltyPoints: business.settings?.loyaltyProgramEnabled ? (selectedCustomer.loyaltyPoints || 0) + Math.floor(secureTotal * (business.settings.pointsPerUnit || 0)) : (selectedCustomer.loyaltyPoints || 0),
+            totalSpent: secureTotal
         } : null;
 
         // 3. ADD TO QUEUE (This is now instant and handles SQLite)

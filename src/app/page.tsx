@@ -206,6 +206,8 @@ export default function Home() {
     const form = useRef<HTMLFormElement>(null);
     const [isSending, setIsSending] = useState(false);
     const router = useRouter();
+    const zenAIRef = useRef<HTMLElement>(null);
+    const [hasTriggeredZenAI, setHasTriggeredZenAI] = useState(false);
 
 
 
@@ -255,6 +257,25 @@ export default function Home() {
         }, 8000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !hasTriggeredZenAI) {
+                    handleFoodClick();
+                    handleFashionClick();
+                    setHasTriggeredZenAI(true);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (zenAIRef.current) {
+            observer.observe(zenAIRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [hasTriggeredZenAI]);
 
     const handleFoodClick = () => {
         setIsFoodPulsing(true);
@@ -555,9 +576,12 @@ export default function Home() {
                                 <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
                                     Everything You Need to Grow
                                 </h2>
-                                <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
+                                <p className="text-lg text-slate-500 tracking-tight font-dm-sans mb-6">
                                     Zeneva is an all-in-one platform. From point-of-sale to a public storefront, we provide the tools to run your business efficiently.
                                 </p>
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href="/use-cases">Explore Use Cases</Link>
+                                </Button>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                                 {[
@@ -701,7 +725,7 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <section id="how-it-works" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden bg-noise">
+                    <section ref={zenAIRef} id="how-it-works" className="py-24 px-6 bg-white border-t border-slate-100 relative overflow-hidden bg-noise">
                         <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                         <div className="aura-background"></div>
                         <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
@@ -711,13 +735,15 @@ export default function Home() {
                                     The Operating System for Profit-Driven Retail
                                 </span>
                                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
-                                    Zen AI: The Brain Behind Every Sale
+                                    <Link href="/about/our-mission" className="hover:text-primary transition-colors cursor-pointer">
+                                        Zen AI: The Brain Behind Every Sale
+                                    </Link>
                                 </h2>
                                 <p className="text-lg text-slate-500 font-light max-w-3xl mx-auto mb-8">
                                     Zeneva connects POS, inventory, storefront, CRM, and analytics into one intelligent system — with Zen AI at the center, turning daily operations into profit-maximizing decisions.
                                 </p>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden">
+                                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10">
                                         <BrainCircuit className="w-32 h-32 text-slate-900" />
                                     </div>
@@ -726,8 +752,8 @@ export default function Home() {
                                             <h3 className="text-xl font-semibold mb-8 text-slate-900">What Zen AI actually does:</h3>
                                             <ul className="space-y-8">
                                                 <li className="flex items-start gap-4">
-                                                    <div className="bg-emerald-100 p-2.5 rounded-xl shrink-0">
-                                                        <TrendingUp className="w-6 h-6 text-emerald-600" />
+                                                    <div className="bg-primary/10 p-2.5 rounded-xl shrink-0 border border-primary/20 shadow-sm">
+                                                        <TrendingUp className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-semibold text-slate-900 text-base">Revenue Opportunities</h4>
@@ -737,8 +763,8 @@ export default function Home() {
                                                     </div>
                                                 </li>
                                                 <li className="flex items-start gap-4">
-                                                    <div className="bg-blue-100 p-2.5 rounded-xl shrink-0">
-                                                        <Store className="w-6 h-6 text-blue-600" />
+                                                    <div className="bg-primary/10 p-2.5 rounded-xl shrink-0 border border-primary/20 shadow-sm">
+                                                        <Store className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-semibold text-slate-900 text-base">Smart Merchandising</h4>
@@ -748,8 +774,8 @@ export default function Home() {
                                                     </div>
                                                 </li>
                                                 <li className="flex items-start gap-4">
-                                                    <div className="bg-purple-100 p-2.5 rounded-xl shrink-0">
-                                                        <Search className="w-6 h-6 text-purple-600" />
+                                                    <div className="bg-primary/10 p-2.5 rounded-xl shrink-0 border border-primary/20 shadow-sm">
+                                                        <Search className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-semibold text-slate-900 text-base">Market Opportunities</h4>
@@ -790,7 +816,7 @@ export default function Home() {
                                                     <div className={`relative rounded-2xl rounded-tl-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFoodPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
 
                                                         {/* Spinning Beam Background */}
-                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,#10b981_360deg)] animate-spin opacity-0 transition-opacity duration-300 ${isFoodPulsing ? 'opacity-100' : ''}`}></div>
+                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_280deg,#10b981_360deg)] animate-[spin_8s_linear_infinite] opacity-0 blur-md transition-opacity duration-300 ${isFoodPulsing ? 'opacity-100' : ''}`}></div>
 
                                                         {/* Content */}
                                                         <div className="relative bg-white p-5 h-full rounded-[inherit]">
@@ -815,7 +841,7 @@ export default function Home() {
                                                     </div>
 
                                                     <div className={`relative rounded-2xl rounded-tr-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFashionPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
-                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,#3b82f6_360deg)] animate-spin opacity-0 transition-opacity duration-300 ${isFashionPulsing ? 'opacity-100' : ''}`}></div>
+                                                        <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_280deg,#3b82f6_360deg)] animate-[spin_8s_linear_infinite] opacity-0 blur-md transition-opacity duration-300 ${isFashionPulsing ? 'opacity-100' : ''}`}></div>
 
                                                         <div className="relative bg-white p-5 h-full rounded-[inherit]">
                                                             <div className="flex items-center gap-2 mb-2">
@@ -1027,7 +1053,7 @@ export default function Home() {
 
                             <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
                                 {/* Billing Toggle */}
-                                <div className="inline-flex items-center p-1 bg-neutral-100/80 border border-neutral-200 rounded-xl">
+                                <div className="inline-flex items-center p-1 bg-neutral-100/80 border-2 border-dashed border-neutral-200 rounded-xl">
                                     <button
                                         onClick={() => setBillingCycle('monthly')}
                                         className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1045,7 +1071,7 @@ export default function Home() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 {/* Starter Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5">Starter</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For new businesses getting started with inventory management.</p>
 
@@ -1067,7 +1093,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Pro Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-primary rounded-lg shadow-2xl shadow-primary/10">
                                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
                                     <h3 className="text-lg font-semibold leading-5">Pro</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
@@ -1100,7 +1126,7 @@ export default function Home() {
                                     </div>
                                 </div>
                                 {/* Business Plan */}
-                                <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold leading-5 text-slate-900">Business</h3>
                                     <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
@@ -1221,7 +1247,7 @@ export default function Home() {
                                 {/* Glow Effect */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-orange-500/30 blur-[100px] rounded-full -z-10 mix-blend-multiply"></div>
                                 <Image
-                                    src="/zen-mission.png"
+                                    src="/knob-removebg.png"
                                     alt="Zeneva Profit Dial Interface"
                                     width={500}
                                     height={500}
@@ -1241,7 +1267,7 @@ export default function Home() {
 
 
                     {/* Global Payments Banner */}
-                    <section className="py-20 px-6">
+                    <section className="pt-20 pb-0 px-6">
                         <div className="max-w-7xl mx-auto">
                             <div className="relative overflow-hidden rounded-3xl bg-stone-950 text-white p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-12 group shadow-2xl border border-white/5">
                                 {/* Abstract background pattern */}
@@ -1276,6 +1302,18 @@ export default function Home() {
                                             className="w-full max-w-sm h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl"
                                         />
                                     </div>
+                                </div>
+                            </div>
+                            
+                            {/* Architectural Connection Lines */}
+                            <div className="flex justify-between px-12 md:px-32 h-28 pointer-events-none">
+                                <div className="flex gap-24">
+                                    <div className="w-px h-full border-l-2 border-dashed border-stone-400/80"></div>
+                                    <div className="w-px h-full border-l-2 border-dashed border-stone-400/80"></div>
+                                </div>
+                                <div className="flex gap-24">
+                                    <div className="w-px h-full border-l-2 border-dashed border-stone-400/80"></div>
+                                    <div className="w-px h-full border-l-2 border-dashed border-stone-400/80"></div>
                                 </div>
                             </div>
                         </div>

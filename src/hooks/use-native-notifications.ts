@@ -8,7 +8,19 @@ export function useNativeNotifications() {
     try {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (!isTauri) {
-        console.log('Web Notification (Fallback):', title, body);
+        if (!("Notification" in window)) {
+          console.warn("This browser does not support desktop notification");
+          return;
+        }
+
+        if (Notification.permission === "granted") {
+          new Notification(title, { body, icon: '/icon-192x192.png' });
+        } else if (Notification.permission !== "denied") {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            new Notification(title, { body, icon: '/icon-192x192.png' });
+          }
+        }
         return;
       }
 

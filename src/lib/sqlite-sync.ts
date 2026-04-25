@@ -299,6 +299,25 @@ export async function getCachedReceipts(businessId: string, limit: number = 50) 
   }
 }
 
+export async function getCachedCustomerReceipts(businessId: string, customerId: string) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  
+  try {
+    const result: any[] = await db.select(
+      `SELECT data FROM receipts 
+       WHERE business_id = $1 
+       AND json_extract(data, '$.customer.id') = $2
+       ORDER BY created_at DESC`, 
+      [businessId, customerId]
+    );
+    return result.map(r => JSON.parse(r.data));
+  } catch (err) {
+    console.error('SQLite Customer Receipts Error:', err);
+    return [];
+  }
+}
+
 export async function saveActionToOfflineQueue(action: any) {
   const db = await getOfflineDb();
   if (!db) return;

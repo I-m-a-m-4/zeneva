@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/blog',
     '/help-center',
     '/use-cases',
+    '/careers',
     '/about/our-mission',
     '/legal/privacy-policy',
     '/legal/terms-of-service',
@@ -20,12 +21,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/login',
   ];
 
-  const routes = coreRoutes.map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : (['/pricing', '/blog', '/contact'].includes(route) ? 0.9 : 0.8),
-  }));
+  const routes = coreRoutes.map((route) => {
+    let priority = 0.5;
+    if (route === '') priority = 1.0;
+    else if (['/pricing', '/download'].includes(route)) priority = 0.9;
+    else if (['/blog', '/help-center', '/use-cases'].includes(route)) priority = 0.85;
+    else if (['/signup', '/login', '/contact'].includes(route)) priority = 0.8;
+
+    return {
+      url: `${baseUrl}${route}`,
+      lastModified: new Date(),
+      changeFrequency: (route === '' || route === '/blog') ? 'daily' as const : 'weekly' as const,
+      priority,
+    };
+  });
 
   try {
     // Fetch dynamic blog posts

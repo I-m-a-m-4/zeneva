@@ -19,14 +19,33 @@ import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
 
+import { ThemeProvider } from '@/components/theme-provider';
 
 const siteUrl = 'https://zeneva.space';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: 'Zeneva - Inventory Management and Point of Sale',
-  description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform — so you can track every product, capture every opportunity, and maximize every naira.',
-  keywords: ['inventory management', 'pos', 'point of sale', 'sales analytics', 'crm', 'business management', 'nigeria', 'retail'],
+  title: {
+    default: 'Zeneva - Advanced Inventory Management & Global POS Operating System',
+    template: '%s | Zeneva'
+  },
+  description: 'Zeneva is a borderless retail operating system that unifies inventory management, multi-store POS, analytics, and USD/NGN payments into one powerful platform. Built for modern retailers scaling globally.',
+  keywords: [
+    'inventory management software', 
+    'retail pos system', 
+    'cloud pos nigeria', 
+    'multi-currency billing', 
+    'usd payment gateway for retail', 
+    'pharmacy inventory software', 
+    'boutique management system', 
+    'business analytics dashboard', 
+    'global retail OS'
+  ],
+  applicationName: 'Zeneva',
+  authors: [{ name: 'Zeneva Team' }],
+  generator: 'Next.js',
+  publisher: 'Zeneva',
+  referrer: 'origin-when-cross-origin',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -34,21 +53,26 @@ export const metadata: Metadata = {
       { url: '/favicon.ico', sizes: 'any' },
     ],
     apple: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Zeneva',
+  },
   openGraph: {
-    title: 'Zeneva - Inventory Management and Point of Sale',
-    description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform ',
+    title: 'Zeneva - Advanced Inventory Management & Global POS',
+    description: 'Track every product, capture every sale, and scale globally. Zeneva unifies inventory, analytics, and multi-currency payments for the modern retailer.',
     url: siteUrl,
     siteName: 'Zeneva',
     images: [
       {
-        url: `${siteUrl}/zeneva.png`,
+        url: `${siteUrl}/zeneva-platform.png`,
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: 'Zeneva - Inventory Management and POS',
+        alt: 'Zeneva Retail Operating System',
       },
     ],
     locale: 'en_US',
@@ -56,9 +80,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Zeneva - Inventory Management and Point of Sale',
-    description: 'Never lose a sale. Zeneva unifies inventory, POS, analytics, and customer management into one powerful platform',
-    images: [`${siteUrl}/zeneva.png`],
+    title: 'Zeneva - Global Retail OS & POS Platform',
+    description: 'Transform your retail operations with Zeneva. Inventory, analytics, and global payments in one unified platform.',
+    images: [`${siteUrl}/zeneva-platform.png`],
+    creator: '@zeneva_retail',
   },
   alternates: {
     canonical: siteUrl,
@@ -73,7 +98,7 @@ const jsonLd = {
       '@id': `${siteUrl}/#organization`,
       name: 'Zeneva',
       url: siteUrl,
-      logo: `${siteUrl}/zeneva.png`,
+      logo: `${siteUrl}/zeneva-platform.png`,
       sameAs: [
         'https://x.com/zeneva_retail',
         'https://www.instagram.com/zeneva_pos/',
@@ -153,8 +178,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+
   return (
-    <html lang="en" className="light" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
+    <html lang="en" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="QGYrHkSlC71065ymk6dZc6DFesm14JeSPw-myjzZVso" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -162,35 +189,36 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
       </head>
-      <body className={cn('font-body antialiased bg-background text-foreground')}>
-        <SplashScreen />
-        <ChunkErrorListener />
-        <FirebaseClientProvider>
-
-          <PWAProvider>
-            <UserActivityTracker />
-            <GlobalAnnouncement />
-            <Loader />
-            <InstallPrompt />
-            <TauriUpdater />
-            <DesktopLauncher />
-            <POSProvider>
-              <TauriLayoutWrapper>
-                 <DesktopTitleBar />
-                 <Suspense>
-                   <NavigationEvents />
-                 </Suspense>
-                 {children}
-              </TauriLayoutWrapper>
-            </POSProvider>
-          </PWAProvider>
-        </FirebaseClientProvider>
+      <body className={cn('font-body antialiased bg-background text-foreground')} suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <SplashScreen />
+          <ChunkErrorListener />
+          <FirebaseClientProvider>
+            <PWAProvider>
+              <UserActivityTracker />
+              <GlobalAnnouncement />
+              <Loader />
+              <InstallPrompt />
+              <TauriUpdater />
+              <POSProvider>
+                <TauriLayoutWrapper>
+                   <DesktopTitleBar />
+                   <DesktopLauncher />
+                   <Suspense>
+                     <NavigationEvents />
+                   </Suspense>
+                   {children}
+                </TauriLayoutWrapper>
+              </POSProvider>
+            </PWAProvider>
+          </FirebaseClientProvider>
+          {!isTauri && <Analytics />}
+        </ThemeProvider>
         <Toaster />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <Analytics />
       </body>
     </html>
   );

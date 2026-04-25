@@ -45,6 +45,7 @@ import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CachedImage } from '@/components/shared/cached-image';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
+import { useFCM } from '@/hooks/use-fcm';
 
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -166,6 +167,20 @@ export default function AuthenticatedLayout({
   } = usePOS();
 
   const { notify } = useNativeNotifications();
+  const { requestPermission: handleRequestFcmPermission } = useFCM();
+
+  React.useEffect(() => {
+    // Only request notification permissions on Native Desktop or Native Mobile (Tauri)
+    const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    
+    if (isNative && !isUserLoading && user) {
+      // Small delay to ensure UI is ready before prompting for notifications
+      const timer = setTimeout(() => {
+        handleRequestFcmPermission();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isUserLoading, handleRequestFcmPermission]);
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
@@ -344,6 +359,27 @@ export default function AuthenticatedLayout({
   }, [pathname, currentUserProfile, isLoading, isUserLoading, router, toast]);
 
   // --- End of Hooks ---
+  
+  // New Effect: Trigger Push Notifications when new unread notifications arrive
+  const [lastNotifiedId, setLastNotifiedId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (userNotifications && userNotifications.length > 0) {
+      const latestNotif = userNotifications[0]; // Already ordered by desc createdAt
+      if (!latestNotif.read && latestNotif.id !== lastNotifiedId) {
+        // We only notify if the notification is less than 30 seconds old to avoid 
+        // flooding on initial load or re-syncs.
+        const createdDate = safeToDate(latestNotif.createdAt);
+        const now = new Date();
+        const diffSeconds = (now.getTime() - createdDate.getTime()) / 1000;
+
+        if (diffSeconds < 30) {
+          notify(latestNotif.title, latestNotif.body);
+          setLastNotifiedId(latestNotif.id);
+        }
+      }
+    }
+  }, [userNotifications, lastNotifiedId, notify]);
 
   if (isLoggingOut) {
     return <AppLoader text="Logging out..." />;
@@ -456,7 +492,7 @@ export default function AuthenticatedLayout({
       <TooltipProvider>
         <SidebarProvider defaultOpen={true}>
           <div
-            className="relative flex h-full w-full overflow-hidden"
+            className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
             <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
@@ -574,7 +610,7 @@ export default function AuthenticatedLayout({
                 </DropdownMenu>
               </SidebarFooter>
             </Sidebar>
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
               <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
                 <BusinessHealthIndicator />

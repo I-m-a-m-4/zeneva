@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/', '/admin/', '/(app)/dashboard/'],
+      disallow: ['/api/', '/admin/', '/admin-imamshaffy/', '/(app)/dashboard/'],
     },
     sitemap: 'https://zeneva.space/sitemap.xml',
   };

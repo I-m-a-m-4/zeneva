@@ -144,6 +144,7 @@ function SettingsPageContent() {
     const [isTauri, setIsTauri] = React.useState(false);
     const [currentVersion, setCurrentVersion] = React.useState<string>('0.3.5');
     const [isCheckingUpdates, setIsCheckingUpdates] = React.useState(false);
+    const isNative = isTauri; // Derived from isTauri state
 
     React.useEffect(() => {
         const checkTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -540,15 +541,7 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
-                        <CardDescription>Customize the look and feel of the application.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ThemeSwitcher />
-                    </CardContent>
-                </Card>
+
 
                 <Card>
                     <CardHeader>
@@ -951,8 +944,8 @@ function SettingsPageContent() {
                     </Card>
                 )}
 
-                {isTauri && (
-                    <Card className="border-primary/20 bg-primary/5">
+                {isNative && (
+                    <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Monitor className="h-5 w-5 text-primary" />
@@ -990,6 +983,19 @@ function SettingsPageContent() {
                         </CardFooter>
                     </Card>
                 )}
+
+                {/* Appearance - Placed at the very bottom as requested */}
+                <div className="pt-6 mt-6 border-t border-border/10">
+                    <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance & Theme</CardTitle>
+                            <CardDescription>Customize the visual interface of Zeneva.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ThemeSwitcher />
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );

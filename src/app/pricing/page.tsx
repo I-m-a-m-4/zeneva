@@ -81,7 +81,7 @@ export default function PricingPage() {
 
                         <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-4">
                             {/* Billing Toggle */}
-                            <div className="inline-flex items-center p-1 bg-neutral-100/80 border border-neutral-200 rounded-xl">
+                            <div className="inline-flex items-center p-1 bg-neutral-100/80 border-2 border-dashed border-neutral-200 rounded-xl">
                                 <button
                                     onClick={() => setBillingCycle('monthly')}
                                     className={`px-8 py-2.5 text-sm font-semibold rounded-lg transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -107,7 +107,7 @@ export default function PricingPage() {
                     <div className="max-w-6xl mx-auto">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {/* Starter Plan */}
-                            <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
+                            <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg shadow-sm">
                                 <h3 className="text-lg font-semibold leading-5 text-slate-900">Starter</h3>
                                 <p className="mt-4 text-slate-500 text-sm">For new businesses getting started with inventory management.</p>
 
@@ -130,7 +130,7 @@ export default function PricingPage() {
                             </div>
 
                             {/* Pro Plan */}
-                            <div className="relative flex flex-col p-8 bg-white border-2 border-primary rounded-lg shadow-2xl shadow-primary/10">
+                            <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-primary rounded-lg shadow-2xl shadow-primary/10">
                                 <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
                                 <h3 className="text-lg font-semibold leading-5 text-slate-900">Pro</h3>
                                 <p className="mt-4 text-slate-500 text-sm">For growing businesses that need advanced tools and an online presence.</p>
@@ -163,7 +163,7 @@ export default function PricingPage() {
                             </div>
 
                             {/* Business Plan */}
-                            <div className="relative flex flex-col p-8 bg-white border border-slate-200 rounded-lg shadow-sm">
+                            <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg shadow-sm">
                                 <h3 className="text-lg font-semibold leading-5 text-slate-900">Business</h3>
                                 <p className="mt-4 text-slate-500 text-sm">For established businesses that require our most powerful AI tools and support.</p>
 
@@ -210,9 +210,14 @@ export default function PricingPage() {
                         </Accordion>
                         <div className="text-center mt-12 bg-neutral-50 p-10 rounded-2xl border border-dashed border-neutral-200">
                             <p className="mb-4 font-dm-sans tracking-tight text-slate-600 text-lg">Still have questions?</p>
-                            <Button asChild size="lg">
-                                <Link href="/contact">Contact Support</Link>
-                            </Button>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <Button asChild size="lg" variant="outline">
+                                    <Link href="/help-center">Browse Help Center</Link>
+                                </Button>
+                                <Button asChild size="lg">
+                                    <Link href="/contact">Contact Support</Link>
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </section>

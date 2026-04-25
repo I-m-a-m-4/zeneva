@@ -57,11 +57,11 @@ export default function HelpCenterPage() {
   ];
 
   const popularArticles = [
-    "How to sync your inventory offline",
-    "Setting up staff permissions and roles",
-    "Understanding the AI waste tracking algorithm",
-    "Connecting barcode scanners to the POS",
-    "Setting up automatic low stock alerts"
+    { title: "How to sync your inventory offline", id: "offline-sync" },
+    { title: "Setting up staff permissions and roles", id: "staff-permissions" },
+    { title: "Understanding the AI waste tracking algorithm", id: "ai-waste" },
+    { title: "Connecting barcode scanners to the POS", id: "barcode-setup" },
+    { title: "Setting up automatic low stock alerts", id: "low-stock-alerts" }
   ];
 
   return (
@@ -153,8 +153,8 @@ export default function HelpCenterPage() {
                 <p className="text-muted-foreground mb-6">
                   Get quick solutions to the most common questions from our community.
                 </p>
-                <Link href="#" className="inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-fit">
-                  View All Articles
+                <Link href="/help-center/guides" className="inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-fit">
+                  View Operations Manual
                 </Link>
               </div>
               
@@ -162,12 +162,12 @@ export default function HelpCenterPage() {
                 {popularArticles.map((article, index) => (
                   <Link 
                     key={index} 
-                    href="#"
+                    href={`/help-center/guides#${article.id}`}
                     className="flex justify-between items-center bg-background p-4 rounded-xl border border-border/50 hover:border-primary/30 transition-all group"
                   >
                     <div className="flex items-center gap-3">
                       <FileText className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                      <span className="font-medium">{article}</span>
+                      <span className="font-medium">{article.title}</span>
                     </div>
                     <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                   </Link>
@@ -176,7 +176,99 @@ export default function HelpCenterPage() {
             </div>
           </div>
 
-          <div className="mt-24 text-center max-w-2xl mx-auto">
+          {/* Operations Manual Section (Image-Accurate Style) */}
+          <div className="mt-32 pt-24 border-t border-slate-100 -mx-6 px-6 bg-slate-50/50">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-4">
+                  <FileText className="w-4 h-4" />
+                  <span className="text-sm font-semibold uppercase tracking-wider">Operations Manual</span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900 border-none">Mastering Zeneva</h2>
+                <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+                  A comprehensive guide to scaling your retail operations with Zeneva's intelligent commerce engine.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 md:gap-12 items-start pb-24">
+                {/* Image-Accurate Sidebar Navigation */}
+                <aside className="sticky top-28 hidden lg:block bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-y-auto max-h-[80vh] scrollbar-thin scrollbar-thumb-slate-200">
+                  <div className="space-y-1">
+                    {[
+                      { id: 'intro', label: 'Introduction', icon: <Book className="w-4 h-4" /> },
+                      { id: 'setup', label: '1. Description of Services', icon: <Cpu className="w-4 h-4" /> },
+                      { id: 'inventory', label: '2. Eligibility', icon: <Activity className="w-4 h-4" /> },
+                      { id: 'pos', label: '3. Account Registration', icon: <CreditCard className="w-4 h-4" /> },
+                      { id: 'ai', label: '4. Subscription Plans', icon: <LifeBuoy className="w-4 h-4" /> },
+                      { id: 'team', label: '5. Referrals', icon: <Users className="w-4 h-4" /> },
+                      { id: 'billing', label: '6. Privacy & Terms', icon: <Shield className="w-4 h-4" /> }
+                    ].map((item, i) => (
+                      <button
+                        key={item.id}
+                        onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
+                          i === 0 ? 'bg-primary text-white' : 'text-slate-500 hover:text-primary hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={i === 0 ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </aside>
+
+                {/* Single Master Document Card */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 md:p-12 shadow-sm space-y-12">
+                  <section id="intro" className="space-y-4">
+                    <h1 className="text-3xl font-bold text-slate-900 border-none p-0">Introduction</h1>
+                    <p className="text-slate-600 leading-relaxed text-[15px]">
+                      These Operating Procedures govern access to and use of the Zeneva platform, including all hardware integrations, AI analytical engines, and real-time syncing services. By operating Zeneva in your retail environment, you agree to follow the architectural guidelines outlined in this manual.
+                    </p>
+                  </section>
+
+                  <section id="setup" className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-900">1. Description of Services</h3>
+                    <p className="text-slate-600 leading-relaxed text-[15px]">
+                      Zeneva is an all-in-one retail operating system that enables merchants to manage complex stock environments, process secure payments, and gain deep intelligence into their operations.
+                    </p>
+                    <ul className="list-disc pl-6 space-y-2 text-slate-600 text-[15px]">
+                      <li>Real-time inventory synchronization across multi-store nodes</li>
+                      <li>High-octane POS checkout with hardware acceleration</li>
+                      <li>Automated AI waste tracking and stock forensics</li>
+                      <li>Secure cloud backup with military-grade encryption</li>
+                    </ul>
+                  </section>
+
+                  <section id="inventory" className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-900">2. Eligibility</h3>
+                    <p className="text-slate-600 text-[15px]">To operate Zeneva within your business, you must meet the following hardware and operational requirements:</p>
+                    <ul className="list-disc pl-6 space-y-2 text-slate-600 text-[15px]">
+                      <li>Maintain a compatible iOS or Android terminal</li>
+                      <li>Provide authentic business identity for tax compliance</li>
+                      <li>Operate within the regulatory guidelines of your operating region</li>
+                    </ul>
+                  </section>
+
+                  <section id="pos" className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-900">3. Account Registration</h3>
+                    <p className="text-slate-600 text-[15px]">Registration requires a verified email and business identity. Once registered, you are responsible for maintaining the security of your authentication tokens and staff access pins.</p>
+                  </section>
+
+                  <section id="ai" className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-900">4. Subscription Plans and Fees</h3>
+                    <p className="text-slate-600 text-[15px]">Zeneva operates on a tier-based subscription model. Fees are calculated based on store count, staff limits, and AI analytical depth. All fees are processed monthly or annually depending on your selection.</p>
+                  </section>
+
+                  <section id="team" className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-900">5. Referral Program</h3>
+                    <p className="text-slate-600 text-[15px]">Earn rewards by onboarding other merchants to the Zeneva ecosystem. Referrals must complete their first cloud synchronization to qualify for bonus credits.</p>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-24 text-center max-w-2xl mx-auto pb-24">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <LifeBuoy className="w-8 h-8 text-primary" />
             </div>
@@ -187,6 +279,9 @@ export default function HelpCenterPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="mailto:zenevapos@gmail.com" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8">
                 Contact Support
+              </Link>
+              <Link href="/blog" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-slate-200 bg-white hover:bg-slate-50 h-11 px-8">
+                Visit Our Blog
               </Link>
               <Link href="https://wa.me/2349064233805" target="_blank" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-11 px-8">
                 Chat on WhatsApp

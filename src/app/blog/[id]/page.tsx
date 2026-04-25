@@ -287,6 +287,25 @@ export default function BlogPostDetailPage() {
                 </div>
               </div>
 
+              {/* Next Steps CTA */}
+              <div className="mt-24 rounded-[2.5rem] bg-slate-950 text-white p-8 md:p-16 relative overflow-hidden group">
+                <div className="absolute inset-0 grid-lines opacity-20 pointer-events-none"></div>
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+                  <div className="max-w-md">
+                    <h3 className="text-3xl md:text-4xl font-black tracking-tight mb-4 leading-tight">Ready to transform your retail operations?</h3>
+                    <p className="text-slate-400 font-medium text-lg">Join the thousands of retailers using Zeneva to automate profit and scale without limits.</p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    <Button asChild size="lg" className="bg-white text-slate-950 hover:bg-slate-100 rounded-2xl font-bold px-8 h-14">
+                      <Link href="/pricing">View Pricing</Link>
+                    </Button>
+                    <Button asChild size="lg" variant="outline" className="border-white/20 text-white hover:bg-black/20 rounded-2xl font-bold px-8 h-14">
+                      <Link href="/about/our-mission">Our Mission</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {/* Share */}
               <div className="mt-24 pt-10 border-t border-slate-100 flex items-center justify-between">
                  <div className="flex items-center gap-6">

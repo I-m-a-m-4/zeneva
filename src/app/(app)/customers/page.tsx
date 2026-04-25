@@ -76,9 +76,12 @@ function CustomerRowSkeleton() {
   )
 }
 
-const CUSTOMERS_PER_PAGE = 200;
+const CUSTOMERS_PER_PAGE_WEB = 200;
+const CUSTOMERS_PER_PAGE_NATIVE = 100000;
 
 export default function CustomersPage() {
+  const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+  const itemsPerPage = isNative ? CUSTOMERS_PER_PAGE_NATIVE : CUSTOMERS_PER_PAGE_WEB;
   const { 
     customers, 
     receipts,
@@ -86,7 +89,7 @@ export default function CustomersPage() {
     business, 
     currentUserProfile: currentUser, 
     triggerRefresh, 
-    isSyncingCustomers 
+    isFullSyncingCustomers 
   } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -142,11 +145,12 @@ export default function CustomersPage() {
   }, [searchTerm, customers, sortBy]);
 
   const paginatedCustomers = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
-    return displayedList.slice(startIndex, startIndex + CUSTOMERS_PER_PAGE);
-  }, [displayedList, currentPage]);
+    if (isNative) return displayedList;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return displayedList.slice(startIndex, startIndex + itemsPerPage);
+  }, [displayedList, currentPage, isNative, itemsPerPage]);
 
-  const pageCount = Math.ceil(displayedList.length / CUSTOMERS_PER_PAGE);
+  const pageCount = Math.ceil(displayedList.length / itemsPerPage);
 
   const handleLoadMore = null;
 
@@ -216,7 +220,7 @@ export default function CustomersPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Customers
-                {isSyncingCustomers && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                {isFullSyncingCustomers && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
               </CardTitle>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
                 <div className="relative w-full max-w-sm group">
@@ -380,11 +384,11 @@ export default function CustomersPage() {
             </div>
           )}
         </CardContent>
-        {displayedList && displayedList.length > 0 && (
+        {!isNative && displayedList && displayedList.length > 0 && (
           <CardFooter className="flex flex-col border-t py-4 gap-4">
             <div className="flex items-center justify-between w-full">
               <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * CUSTOMERS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * CUSTOMERS_PER_PAGE, displayedList.length)}</strong> of <strong>{displayedList.length}</strong> customers
+                Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> to <strong>{Math.min(currentPage * itemsPerPage, displayedList.length)}</strong> of <strong>{displayedList.length}</strong> customers
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -409,7 +413,7 @@ export default function CustomersPage() {
             </div>
 
             {/* Background Sync & Deep Retrieval Bridge */}
-            {isSyncingCustomers && (
+            {isFullSyncingCustomers && (
               <div className="flex flex-col items-center justify-center pt-4 border-t w-full space-y-2">
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />

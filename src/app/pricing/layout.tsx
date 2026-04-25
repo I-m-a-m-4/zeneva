@@ -1,11 +1,11 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Pricing Plans | Scalable Retail Solutions | Zeneva',
-  description: 'Choose the perfect plan for your business. From our forever-free Starter plan to Enterprise Plus, Zeneva offers transparent pricing for inventory and POS management.',
+  title: 'Pricing Plans | Zeneva Retail OS',
+  description: 'Explore transparent pricing for Zeneva. From our Starter plan to Enterprise-grade infrastructure, find the perfect retail operating system to scale your business globally.',
   openGraph: {
-    title: 'Zeneva Pricing - Flexible Plans for Every Retailer',
-    description: 'Start for free or scale with our Pro and Enterprise plans. No hidden fees, just pure growth.',
+    title: 'Zeneva Pricing - Flexible Plans for Growth-Minded Retailers',
+    description: 'Start for free or scale globally with our Pro and Enterprise tiers. No hidden fees, just high-performance retail software for inventory and POS management.',
   }
 };
 

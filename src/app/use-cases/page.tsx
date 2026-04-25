@@ -14,37 +14,37 @@ export default function UseCasesPage() {
       title: "Supermarkets & Grocery",
       description: "Manage massive SKU counts, expiration dates, and process high-volume checkouts offline.",
       icon: <ShoppingBag className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     },
     {
       title: "Pharmacies",
       description: "Track medication batches, monitor expiry dates closely, and maintain strict inventory compliance.",
       icon: <Pill className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     },
     {
       title: "Fashion & Boutiques",
       description: "Handle complex product variants like sizes and colors, and track fast-moving vs dead stock.",
       icon: <Shirt className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     },
     {
       title: "Gadgets & Electronics",
       description: "Track high-value inventory by serial numbers, manage warranties, and create product bundles.",
       icon: <Smartphone className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     },
     {
       title: "Multi-Store Chains",
       description: "Unify inventory and analytics across all your locations in a single, real-time dashboard.",
       icon: <MapPin className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     },
     {
       title: "Wholesale & Distribution",
       description: "Manage bulk orders, track backorders, and analyze wholesale customer purchasing trends.",
       icon: <Target className="w-6 h-6 text-primary" />,
-      href: "#"
+      href: "/signup"
     }
   ];
 
@@ -143,10 +143,11 @@ export default function UseCasesPage() {
               <div>
                 <h2 className="text-3xl font-bold mb-4">Core Capabilities</h2>
                 <p className="text-muted-foreground mb-6">
-                  No matter your industry, Zeneva provides the essential infrastructure to scale your operations safely and efficiently.
+                  No matter your industry, Zeneva provides the essential infrastructure to scale your operations safely and efficiently. 
+                  Learn how to set up these features in our <Link href="/help-center" className="text-primary hover:underline">Help Center</Link>.
                 </p>
-                <Link href="/about" className="inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-fit">
-                  View Full Features
+                <Link href="/about/our-mission" className="inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-fit">
+                  View Our Mission
                 </Link>
               </div>
               
