@@ -246,15 +246,18 @@ export default function OurMissionPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-neutral-200 pt-8 mt-4 flex items-center justify-between">
+                <div className="border-t border-neutral-200 pt-8 mt-4 grid grid-cols-2 md:grid-cols-3 gap-6">
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">45,000+</p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Transactions processed</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">1,100+</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Transactions Sync</p>
                    </div>
-                   <div className="h-10 w-px bg-neutral-200"></div>
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">100%</p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Data durability guarantee</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦45.6M</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">GMV Processed</p>
+                   </div>
+                   <div className="hidden md:block">
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">1,070+</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Catalog Variants</p>
                    </div>
                 </div>
               </div>
@@ -355,7 +358,7 @@ export default function OurMissionPage() {
           <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
              <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
                {mounted && <iconify-icon icon="solar:rocket-linear" class="h-4 w-4 text-primary" />}
-               <span className="font-geist">Join 500+ Nigerian Retailers</span>
+               <span className="font-geist">Join 30+ Forward-Thinking Retailers</span>
              </div>
              <h2 className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-tighter text-neutral-900 mb-8 font-jakarta">Ready to see your business clearly?</h2>
              <p className="text-neutral-600 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-geist">
