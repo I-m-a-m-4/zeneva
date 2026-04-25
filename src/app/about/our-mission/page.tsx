@@ -298,10 +298,10 @@ export default function OurMissionPage() {
                       "Zeneva stopped being just a POS and started being a partner. It told me exactly which luxury silks to stop ordering and where I was losing money on belts."
                     </p>
                     <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">BI</div>
+                      <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center font-bold text-emerald-500">AB</div>
                       <div>
-                        <div className="text-base font-semibold text-neutral-900">Bello Imam</div>
-                        <div className="text-xs text-neutral-500">Founder, High-End Fashion Boutique</div>
+                        <div className="text-base font-semibold text-neutral-900">Dr. Amina Bolanle</div>
+                        <div className="text-xs text-neutral-500">Director, Safeway Dermatology & Laser Center</div>
                       </div>
                     </div>
                   </article>
@@ -311,10 +311,10 @@ export default function OurMissionPage() {
                       "The offline first approach saved us during network blackouts. We didn't lose a single sale, and everything synced perfectly the moment we got back online."
                     </p>
                     <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center font-bold text-blue-500">FS</div>
+                      <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center font-bold text-blue-500">OA</div>
                       <div>
-                        <div className="text-base font-semibold text-neutral-900">Faith Stella</div>
-                        <div className="text-xs text-neutral-500">Manager, Central Pharmacy</div>
+                        <div className="text-base font-semibold text-neutral-900">Olumide Adebayo</div>
+                        <div className="text-xs text-neutral-500">Operations Lead, Lag Retail Ops</div>
                       </div>
                     </div>
                   </article>
@@ -324,10 +324,10 @@ export default function OurMissionPage() {
                       "I used to spend 4 hours a night reconcilling numbers. Now, Zeneva does it in real-time. My business is finally operating with clarity."
                     </p>
                     <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">JD</div>
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">CO</div>
                       <div>
-                        <div className="text-base font-semibold text-neutral-900">John Doe</div>
-                        <div className="text-xs text-neutral-500">Retail Entrepreneur</div>
+                        <div className="text-base font-semibold text-neutral-900">Chisom Okafor</div>
+                        <div className="text-xs text-neutral-500">Founder, The Retail Hub</div>
                       </div>
                     </div>
                   </article>
