@@ -208,6 +208,34 @@ export default function Home() {
     const router = useRouter();
     const zenAIRef = useRef<HTMLElement>(null);
     const [hasTriggeredZenAI, setHasTriggeredZenAI] = useState(false);
+    const [placeholder, setPlaceholder] = useState('');
+    const [phraseIndex, setPhraseIndex] = useState(0);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [charIndex, setCharIndex] = useState(0);
+
+    const phrases = ["Enter your work email", "Start your free trial", "Unlock Zen AI insights", "Join 30+ smart retailers"];
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            const currentPhrase = phrases[phraseIndex];
+            
+            if (!isDeleting && charIndex < currentPhrase.length) {
+                setPlaceholder(currentPhrase.substring(0, charIndex + 1));
+                setCharIndex(prev => prev + 1);
+            } else if (isDeleting && charIndex > 0) {
+                setPlaceholder(currentPhrase.substring(0, charIndex - 1));
+                setCharIndex(prev => prev - 1);
+            } else if (!isDeleting && charIndex === currentPhrase.length) {
+                setTimeout(() => setIsDeleting(true), 2000);
+            } else {
+                setIsDeleting(false);
+                setPhraseIndex((prev) => (prev + 1) % phrases.length);
+                setCharIndex(0);
+            }
+        }, isDeleting ? 40 : 80);
+
+        return () => clearTimeout(timeout);
+    }, [charIndex, isDeleting, phraseIndex]);
 
 
 
@@ -429,7 +457,7 @@ export default function Home() {
                                 <div className="flex flex-row w-full gap-2 items-stretch">
                                     <Input
                                         type="email"
-                                        placeholder="Enter your work email"
+                                        placeholder={placeholder || "Enter your work email"}
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="
