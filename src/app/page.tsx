@@ -378,14 +378,14 @@ export default function Home() {
     };
 
     const businessTypes = [
-        { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.', link: '/industries/fashion-boutique' },
-        { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.', link: '/signup' },
-        { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.', link: '/signup' },
-        { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.', link: '/industries/electronics' },
-        { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.', link: '/industries/restaurant-cafe' },
-        { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.', link: '/signup' },
-        { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.', link: '/industries/pharmacy' },
-        { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.', link: '/industries/restaurant-cafe' },
+        { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.', link: '/use-cases' },
+        { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.', link: '/use-cases' },
+        { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.', link: '/use-cases' },
+        { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.', link: '/use-cases' },
+        { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.', link: '/use-cases' },
+        { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.', link: '/use-cases' },
+        { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.', link: '/use-cases' },
+        { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.', link: '/use-cases' },
     ];
 
     return (

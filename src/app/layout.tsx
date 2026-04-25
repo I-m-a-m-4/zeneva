@@ -173,6 +173,8 @@ const jsonLd = {
   ]
 };
 
+import Script from 'next/script';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -188,6 +190,70 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+        
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-3CXY0JGWCR"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-3CXY0JGWCR');
+          `}
+        </Script>
+
+        {/* Smartsupp Chat */}
+        <Script id="smartsupp-chat" strategy="lazyOnload">
+          {`
+            var _smartsupp = _smartsupp || {};
+            _smartsupp.key = 'e82362095ce846b43f9a764720e7a17688000000'; // Placeholder key from reference structure
+            window.smartsupp||(function(d)(
+            var s=d.getElementsByTagName('script')[0],c=d.createElement('script');
+            c.type='text/javascript';c.charset='utf-8';c.async=true;
+            c.src='https://www.smartsuppchat.com/loader.js?';s.parentNode.insertBefore(c,s);
+            }))(document);
+          `}
+        </Script>
+
+        {/* Meta Pixel */}
+        <Script id="meta-pixel" strategy="afterInteractive">
+          {`
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', '1777044610581'); // Reference ID
+            fbq('track', 'PageView');
+          `}
+        </Script>
+
+        {/* Tiktok Pixel */}
+        <Script id="tiktok-pixel" strategy="afterInteractive">
+          {`
+            !function (w, d, t) {
+              w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","detach","updateConfig"],ttq.setAndLog=function(t,e){return function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq[i]=ttq.setAndLog(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)e[ttq.methods[n]]=e.setAndLog(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=d.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+              ttq.load('D2GLT5BC77U9B02LVDL0');
+              ttq.page();
+            }(window, document, 'ttq');
+          `}
+        </Script>
+
+        {/* Twitter Pixel */}
+        <Script id="twitter-pixel" strategy="afterInteractive">
+          {`
+            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+            },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
+            a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+            twq('config','ohv59');
+          `}
+        </Script>
       </head>
       <body className={cn('font-body antialiased bg-background text-foreground')} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>

@@ -1,8 +1,11 @@
+
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { InteractiveGrid } from '@/components/interactive-grid';
+import MarketingHeader from '@/components/layout/marketing-header';
+import MarketingFooter from '@/components/layout/marketing-footer';
 
 declare global {
   namespace JSX {
@@ -41,9 +44,9 @@ export default function OurMissionPage() {
 
   return (
     <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden relative">
+      <MarketingHeader />
       <div className="fixed grid-lines w-full h-full top-0 right-0 left-0 pointer-events-none z-0 opacity-50"></div>
-      {/* Background with Spline Embed */}
-      {/* Hero Section Background */}
+      
       <div className="absolute top-0 left-0 w-full h-[800px] overflow-hidden pointer-events-none z-0">
         <InteractiveGrid />
         <div className="aura-background"></div>
@@ -231,7 +234,7 @@ export default function OurMissionPage() {
         </section>
 
         {/* Testimonials */}
-        <section className="mb-32 relative">
+        <section className="mb-32 relative max-w-7xl mx-auto px-6 mt-32">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
             <div className="max-w-2xl">
               <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary mb-4 block">Social Proof</span>
@@ -245,7 +248,7 @@ export default function OurMissionPage() {
               <iconify-icon icon="solar:arrow-right-up-linear" className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
             </Link>
           </div>
-          <div className="relative mt-10 h-[400px]">
+          <div className="relative h-[400px]">
               <div 
                 className="overflow-hidden h-full rounded-2xl relative" 
                 style={{ 
@@ -320,26 +323,28 @@ export default function OurMissionPage() {
             </div>
           </section>
 
-        <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
-           <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
-             {mounted && <iconify-icon icon="solar:rocket-linear" class="h-4 w-4 text-primary" />}
-             <span className="font-geist">Join 500+ Nigerian Retailers</span>
-           </div>
-           <h2 className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-tighter text-neutral-900 mb-8 font-jakarta">Ready to see your business clearly?</h2>
-           <p className="text-neutral-600 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-geist">
-             Stop firefighting and start leading. Experience the future of retail management today with Zeneva.
-           </p>
+          <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
+             <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
+               {mounted && <iconify-icon icon="solar:rocket-linear" class="h-4 w-4 text-primary" />}
+               <span className="font-geist">Join 500+ Nigerian Retailers</span>
+             </div>
+             <h2 className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-tighter text-neutral-900 mb-8 font-jakarta">Ready to see your business clearly?</h2>
+             <p className="text-neutral-600 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-geist">
+               Stop firefighting and start leading. Experience the future of retail management today with Zeneva.
+             </p>
 
-           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-             <Link href="/signup" className="codepen-button-aura scale-125 mx-4">
-                <span>Join the Mission</span>
-             </Link>
-             <Link href="/careers" className="mt-8 sm:mt-0 text-sm font-semibold text-neutral-600 hover:text-primary transition-colors flex items-center gap-2">
-               Join the Team <iconify-icon icon="solar:arrow-right-linear" />
-             </Link>
-           </div>
-        </section>
+             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+               <Link href="/signup" className="codepen-button-aura scale-125 mx-4">
+                  <span>Join the Mission</span>
+               </Link>
+               <Link href="/careers" className="mt-8 sm:mt-0 text-sm font-semibold text-neutral-600 hover:text-primary transition-colors flex items-center gap-2">
+                 Join the Team <iconify-icon icon="solar:arrow-right-linear" />
+               </Link>
+             </div>
+          </section>
       </main>
+
+      <MarketingFooter />
 
       <style jsx>{`
         .hide-scrollbar::-webkit-scrollbar {
