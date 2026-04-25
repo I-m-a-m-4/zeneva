@@ -210,11 +210,11 @@ export default function RootLayout({
           {`
             var _smartsupp = _smartsupp || {};
             _smartsupp.key = 'e82362095ce846b43f9a764720e7a17688000000'; // Placeholder key from reference structure
-            window.smartsupp||(function(d)(
+            window.smartsupp||(function(d){
             var s=d.getElementsByTagName('script')[0],c=d.createElement('script');
             c.type='text/javascript';c.charset='utf-8';c.async=true;
             c.src='https://www.smartsuppchat.com/loader.js?';s.parentNode.insertBefore(c,s);
-            }))(document);
+            })(document);
           `}
         </Script>
 
