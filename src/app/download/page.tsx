@@ -168,13 +168,28 @@ export default function DownloadPage() {
                 {/* Video Background Layer */}
                 <div className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
                     <div className="absolute inset-0 z-10 bg-black/40" />
-                    <iframe
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-50"
-                        src="https://www.youtube.com/embed/0Iq3NYGmKE4?autoplay=1&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
-                        title="Zeneva Product Showcase"
-                        allow="autoplay; encrypted-media"
-                        frameBorder="0"
-                    />
+                    
+                    {/* Desktop Video */}
+                    <div className="hidden lg:block absolute inset-0">
+                        <iframe
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-50"
+                            src="https://www.youtube.com/embed/0Iq3NYGmKE4?autoplay=1&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
+                            title="Zeneva Product Showcase Desktop"
+                            allow="autoplay; encrypted-media"
+                            frameBorder="0"
+                        />
+                    </div>
+
+                    {/* Mobile Video (Vertical Short) */}
+                    <div className="block lg:hidden absolute inset-0">
+                        <iframe
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-60"
+                            src="https://www.youtube.com/embed/NP1QKaHch3U?autoplay=1&mute=1&loop=1&playlist=NP1QKaHch3U&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
+                            title="Zeneva Product Showcase Mobile"
+                            allow="autoplay; encrypted-media"
+                            frameBorder="0"
+                        />
+                    </div>
                 </div>
 
                 <div className="max-w-[1400px] mx-auto w-full relative z-20 flex flex-col items-center lg:flex-row lg:items-end justify-between gap-12 sm:gap-16">
