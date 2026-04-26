@@ -753,7 +753,7 @@ export default function AuthenticatedLayout({
                   </DropdownMenu>
                 </div>
               </header>
-              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-40 md:pb-6 scroll-pb-40 font-body smooth-scroll bg-background relative">
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-56 md:pb-6 scroll-pb-56 font-body smooth-scroll bg-background relative">
                 <div className={cn("h-full w-full transition-all duration-700", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
                   {children}
                 </div>
