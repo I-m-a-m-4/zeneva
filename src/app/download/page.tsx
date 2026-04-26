@@ -184,13 +184,15 @@ export default function DownloadPage() {
 
                     {/* Mobile Video (Vertical Short) */}
                     <div className="block lg:hidden absolute inset-0">
-                        <iframe
+                        <video
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
                             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-60"
-                            src="https://www.youtube.com/embed/NP1QKaHch3U?autoplay=1&mute=1&loop=1&playlist=NP1QKaHch3U&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
-                            title="Zeneva Product Showcase Mobile"
-                            allow="autoplay; encrypted-media"
-                            frameBorder="0"
-                        />
+                        >
+                            <source src="https://res.cloudinary.com/dd1czj85j/video/upload/v1777236783/WA_1777236748604_mp72a5.mp4" type="video/mp4" />
+                        </video>
                     </div>
                 </div>
 
