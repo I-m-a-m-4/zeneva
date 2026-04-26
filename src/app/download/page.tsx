@@ -170,7 +170,7 @@ export default function DownloadPage() {
                     <div className="absolute inset-0 z-10 bg-black/40" />
                     <iframe
                         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-50"
-                        src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
+                        src="https://www.youtube.com/embed/0Iq3NYGmKE4?autoplay=1&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
                         title="Zeneva Product Showcase"
                         allow="autoplay; encrypted-media"
                         frameBorder="0"
@@ -260,7 +260,7 @@ export default function DownloadPage() {
                                 )}>
                                     <iframe
                                         className="absolute inset-0 w-full h-full object-cover"
-                                        src={`https://www.youtube.com/embed/Sc6S_PqGZEY?${isPlaying ? 'autoplay=1' : ''}&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0&enablejsapi=1`}
+                                        src={`https://www.youtube.com/embed/0Iq3NYGmKE4?${isPlaying ? 'autoplay=1' : ''}&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0&enablejsapi=1`}
                                         title="Zeneva Showcase"
                                         allow="autoplay; encrypted-media"
                                         frameBorder="0"
@@ -371,7 +371,7 @@ export default function DownloadPage() {
                                         <div className="aspect-video bg-slate-900 rounded-sm overflow-hidden relative">
                                             <iframe
                                                 className="absolute inset-0 w-full h-full object-cover"
-                                                src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0"
+                                                src="https://www.youtube.com/embed/0Iq3NYGmKE4?autoplay=1&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0"
                                                 allow="autoplay; encrypted-media"
                                                 frameBorder="0"
                                             />
@@ -451,7 +451,7 @@ export default function DownloadPage() {
                                         <div className="aspect-video bg-slate-900 rounded-sm overflow-hidden relative">
                                             <iframe
                                                 className="absolute inset-0 w-full h-full object-cover"
-                                                src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0"
+                                                src="https://www.youtube.com/embed/0Iq3NYGmKE4?autoplay=1&mute=1&loop=1&playlist=0Iq3NYGmKE4&controls=0&modestbranding=1&rel=0"
                                                 allow="autoplay; encrypted-media"
                                                 frameBorder="0"
                                             />
