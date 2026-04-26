@@ -53,7 +53,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
-import MarketingHeader from '@/components/layout/marketing-header';
+import CinemaHeader from '@/components/layout/cinema-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
 import { InteractiveGrid } from '@/components/interactive-grid';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -88,16 +88,23 @@ const zenAiCapabilities = [
 ];
 
 export default function DownloadPage() {
-  const version = AppConfig.version || "1.5.8";
+  const version = AppConfig.version || "1.7.0";
   const [mounted, setMounted] = useState(false);
   const [placeholder, setPlaceholder] = useState('');
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const phrases = ["Enter your work email", "Start your free trial", "Unlock Zen AI insights", "Join 30+ smart retailers"];
 
   useEffect(() => {
     setMounted(true);
+    const handleResize = () => {
+        setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -137,33 +144,72 @@ export default function DownloadPage() {
         </div>
         
         <div className="relative z-10 w-full overflow-x-hidden">
-          <MarketingHeader />
+          <CinemaHeader />
 
           <main className="min-h-screen">
             
-            {/* Header / Hero Section */}
-            <section className="relative px-6 pt-32 pb-20 border-b-4 border-slate-950 overflow-hidden">
-                <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #000 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
-                <div className="max-w-7xl mx-auto relative z-10">
-                    <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
+            {/* Cinema Hero Section with Video Background */}
+            <section className="relative h-screen min-h-[700px] w-full overflow-hidden flex flex-col justify-end pb-20 px-6 sm:px-12 border-b-4 border-slate-950">
+                {/* Video Background Layer */}
+                <div className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
+                    <div className="absolute inset-0 z-10 bg-black/20" />
+                    <iframe
+                        key={isMobile ? "mobile-video" : "desktop-video"}
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[105%] h-[105%] min-w-[100vw] min-h-[56.25vw] pointer-events-none"
+                        src={`https://www.youtube.com/embed/${isMobile ? 'NP1QKaHch3U' : '0Iq3NYGmKE4'}?autoplay=1&mute=1&loop=1&playlist=${isMobile ? 'NP1QKaHch3U' : '0Iq3NYGmKE4'}&controls=0&rel=0&playsinline=1&enablejsapi=1`}
+                        title="Zeneva Product Experience"
+                        allow="autoplay; encrypted-media; accelerometer; gyroscope; picture-in-picture"
+                        frameBorder="0"
+                    />
+                </div>
+
+                <div className="max-w-[1400px] mx-auto w-full relative z-20 flex flex-col md:flex-row items-end justify-between gap-12">
+                    {/* Primary Institutional Brand Mark (Bottom Left) */}
+                    <div className="max-w-3xl transform -translate-y-4">
+                        <motion.h1 
+                            initial={{ opacity: 0, y: 40 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-950 text-white mb-8 border-2 border-slate-950 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]"
+                            transition={{ duration: 0.8, delay: 0.2 }}
+                            className="text-2xl md:text-5xl font-medium tracking-tighter text-white leading-tight font-display"
                         >
-                            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-xs font-semibold uppercase tracking-widest font-dm-sans">v{version} Stable Build Released</span>
-                        </motion.div>
-
-                        <h1 className="text-5xl md:text-8xl lg:text-9xl font-medium tracking-tighter text-slate-950 leading-[0.85] mb-8 font-display">
-                            ZEN-01<br />
-                            <span className="text-slate-400">TERMINAL</span>
-                        </h1>
-
-                        <p className="text-xl md:text-2xl text-slate-700 max-w-2xl font-medium tracking-tight font-dm-sans mb-12">
-                            Deploy the industry's most resilient retail operating system. Built for speed, hardened for security, designed for total operational control.
-                        </p>
+                            Never Lose Sale,<br />
+                            Never Waste Stock
+                        </motion.h1>
                     </div>
+
+                    {/* Tactical Tactical Intelligence Card (Bottom Right) */}
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.6 }}
+                        className="hidden lg:flex items-center bg-white p-2 rounded-[24px] overflow-hidden max-w-xl group cursor-pointer border border-slate-100"
+                    >
+                        <div className="w-48 h-32 relative overflow-hidden rounded-[18px] bg-slate-100 flex-shrink-0">
+                            <Image 
+                                src="/zeneva_android_pos_mockup.png" 
+                                alt="Zeneva Hardware Preview" 
+                                fill
+                                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                        </div>
+                        <div className="px-6 flex flex-col justify-center flex-grow py-1">
+                            <div className="space-y-1">
+                                <h4 className="text-slate-950 font-medium text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
+                                <p className="text-[11px] text-slate-500 font-medium leading-tight max-w-[180px]">Windows, Mac, and Android with instant cloud synchronization.</p>
+                            </div>
+                            <div className="flex items-center justify-end mt-1">
+                                <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-orange-600 transition-all duration-300">
+                                    <ArrowRight className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+
+                {/* Corner Decorative Element */}
+                <div className="absolute top-0 right-0 p-12 hidden md:block">
+                    <div className="w-px h-24 bg-white/20 absolute top-0 right-12" />
+                    <div className="w-24 h-px bg-white/20 absolute top-12 right-0" />
                 </div>
             </section>
 
@@ -176,16 +222,16 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border-2 border-dashed border-slate-200">
                   
                   {/* Windows Card */}
-                  <div className="p-12 border-b md:border-b-0 md:border-r-2 border-dashed border-slate-200 group hover:bg-slate-50/50 transition-colors">
-                    <div className="w-14 h-14 bg-slate-50 border border-slate-200 flex items-center justify-center mb-8">
+                  <div className="p-12 border-b md:border-b-0 md:border-r-2 border-dashed border-slate-200 group hover:bg-slate-50/50 transition-all rounded-l-lg">
+                    <div className="w-14 h-14 bg-white border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center mb-8 shadow-sm group-hover:border-primary/50 transition-colors">
                       <Monitor className="w-6 h-6 text-slate-950" />
                     </div>
-                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display">Windows</h3>
+                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display px-0">Windows</h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed mb-10 h-12">
                       Flagship desktop engine. Optimized for multi-monitor setups and industrial thermal printers.
                     </p>
                     <div className="space-y-4">
-                        <Button className="w-full h-14 bg-slate-950 text-white hover:bg-slate-800 rounded-none font-medium gap-2 text-[11px] uppercase tracking-[0.2em] font-display" asChild>
+                        <Button className="w-full h-14 bg-slate-950 text-white hover:bg-slate-800 rounded-lg font-medium gap-2 text-[11px] uppercase tracking-[0.2em] font-display shadow-lg shadow-black/10" asChild>
                             <a href={windowsDownloadUrl}><Download className="w-4 h-4" /> Download MSIX</a>
                         </Button>
                         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest text-center font-dm-sans">Version {version} • 64-bit</p>
@@ -193,19 +239,19 @@ export default function DownloadPage() {
                   </div>
 
                   {/* macOS Card */}
-                  <div className="p-12 border-b md:border-b-0 md:border-r-2 border-dashed border-slate-200 group hover:bg-slate-50/50 transition-colors">
-                    <div className="w-14 h-14 bg-slate-50 border border-slate-200 flex items-center justify-center mb-8">
+                  <div className="p-12 border-b md:border-b-0 md:border-r-2 border-dashed border-slate-200 group hover:bg-slate-50/50 transition-all">
+                    <div className="w-14 h-14 bg-white border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center mb-8 shadow-sm group-hover:border-primary/50 transition-colors">
                       <Apple className="w-6 h-6 text-slate-950" />
                     </div>
-                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display">macOS</h3>
+                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display px-0">macOS</h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed mb-10 h-12">
                       Elite retail performance. Born for Apple Silicon with full Retina display acceleration.
                     </p>
                     <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" className="h-14 border-2 border-slate-200 hover:border-slate-300 rounded-none font-medium text-[10px] uppercase tracking-widest font-display" asChild>
+                      <Button variant="outline" className="h-14 border-2 border-dashed border-slate-200 hover:border-primary rounded-lg font-medium text-[10px] uppercase tracking-widest font-display transition-all" asChild>
                         <a href={macDownloadUrlSilicon}>Silicon</a>
                       </Button>
-                      <Button variant="outline" className="h-14 border-2 border-slate-200 hover:border-slate-300 rounded-none font-medium text-[10px] uppercase tracking-widest font-display" asChild>
+                      <Button variant="outline" className="h-14 border-2 border-dashed border-slate-200 hover:border-primary rounded-lg font-medium text-[10px] uppercase tracking-widest font-display transition-all" asChild>
                         <a href={macDownloadUrlIntel}>Intel</a>
                       </Button>
                     </div>
@@ -213,16 +259,16 @@ export default function DownloadPage() {
                   </div>
 
                   {/* Android Card */}
-                  <div className="p-12 group hover:bg-slate-50/50 transition-colors">
-                    <div className="w-14 h-14 bg-slate-50 border border-slate-200 flex items-center justify-center mb-8">
+                  <div className="p-12 group hover:bg-slate-50/50 transition-all rounded-r-lg">
+                    <div className="w-14 h-14 bg-white border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center mb-8 shadow-sm group-hover:border-primary/50 transition-colors">
                       <Smartphone className="w-6 h-6 text-slate-950" />
                     </div>
-                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display">Android</h3>
+                    <h3 className="text-3xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display px-0">Android</h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed mb-10 h-12">
                       Tactical mobile kit. Direct APK installation for smartphones and portable POS terminals.
                     </p>
                     <div className="space-y-4">
-                        <Button className="w-full h-14 bg-orange-600 text-white hover:bg-orange-700 rounded-none font-medium gap-2 text-[11px] uppercase tracking-[0.2em] font-display" asChild>
+                        <Button className="w-full h-14 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-medium gap-2 text-[11px] uppercase tracking-[0.2em] font-display shadow-lg shadow-orange-600/10" asChild>
                             <Link href={latestReleaseUrl}><Download className="w-4 h-4" /> Download APK</Link>
                         </Button>
                         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest text-center font-dm-sans">GSM Optimized • v{version}</p>
@@ -234,52 +280,76 @@ export default function DownloadPage() {
             </section>
 
             {/* ANDROID SHOWCASE: Showcase how Zeneva looks on Android */}
-            <section className="py-24 px-6 bg-slate-50 overflow-hidden">
+            <section className="py-24 px-6 bg-slate-50 overflow-hidden border-b border-slate-200">
                 <div className="max-w-7xl mx-auto">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
-                        <div className="space-y-8">
-                            <Badge className="bg-orange-600/10 text-orange-600 rounded-none px-4 py-2 font-semibold uppercase tracking-widest border border-orange-600/20 font-dm-sans">Mobile Command</Badge>
-                            <h2 className="text-4xl md:text-7xl font-medium tracking-tighter text-slate-950 leading-[0.9] font-display">
-                                Android for the <br />
-                                <span className="text-orange-600 italic">Active Manager.</span>
-                            </h2>
-                            <p className="text-slate-600 font-medium text-lg leading-relaxed max-w-xl">
-                                Zeneva on Android isn't just a companion app—it's the full engine in your pocket. Manage inventory while walking the aisles, ring up customers in line, and track sales metrics from anywhere.
-                            </p>
+                        <div className="space-y-10">
+                            <div className="inline-flex items-center gap-3">
+                                <div className="w-12 h-px bg-orange-600"></div>
+                                <span className="font-bold uppercase tracking-[0.3em] text-[10px] text-orange-600 font-dm-sans">Mobile Command</span>
+                            </div>
                             
-                            <div className="grid grid-cols-2 gap-8 pt-8 border-t border-slate-200">
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-slate-950">
-                                        <QrCode className="w-5 h-5" />
-                                        <span className="font-semibold uppercase tracking-widest text-[11px] font-dm-sans">Instant Scanning</span>
+                            <div className="p-8 md:p-12 bg-white border-2 border-dashed border-slate-200 rounded-xl shadow-sm relative group overflow-hidden">
+                                <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300"></div>
+                                <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300"></div>
+                                
+                                <h2 className="text-4xl md:text-6xl font-medium tracking-tighter text-slate-950 leading-[0.95] font-display mb-8">
+                                    Android for the <br />
+                                    <span className="text-orange-600 italic">Active Manager.</span>
+                                </h2>
+                                
+                                <p className="text-slate-500 font-medium text-lg leading-relaxed mb-10 font-dm-sans">
+                                    Zeneva on Android isn't just a companion app—it's the full engine in your pocket. Manage inventory while walking the aisles, ring up customers in line, and track sales metrics from anywhere.
+                                </p>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-8 border-t border-slate-100">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-slate-950">
+                                            <div className="p-2 bg-orange-50 rounded-lg">
+                                                <QrCode className="w-5 h-5 text-orange-600" />
+                                            </div>
+                                            <span className="font-bold uppercase tracking-widest text-[10px] font-dm-sans">Instant Scanning</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 font-medium leading-relaxed">Turn your phone's camera into a high-speed laser reader.</p>
                                     </div>
-                                    <p className="text-xs text-slate-500 font-medium">Use your phone's camera as a high-speed barcode reader.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-slate-950">
-                                        <Wifi className="w-5 h-5" />
-                                        <span className="font-semibold uppercase tracking-widest text-[11px] font-dm-sans">Low-Bandwidth DNA</span>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-slate-950">
+                                            <div className="p-2 bg-slate-50 rounded-lg">
+                                                <Wifi className="w-5 h-5 text-slate-600" />
+                                            </div>
+                                            <span className="font-bold uppercase tracking-widest text-[10px] font-dm-sans">Low-Bandwidth DNA</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 font-medium leading-relaxed">Engineered to sync over 3G/4G with zero data waste.</p>
                                     </div>
-                                    <p className="text-xs text-slate-500 font-medium">Engineered to sync over 3G/4G with minimal data consumption.</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="relative">
-                            <div className="relative z-10 p-4 bg-slate-950 rounded-[3rem] shadow-2xl border-4 border-slate-800 self-center mx-auto max-w-[320px]">
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-slate-950 rounded-b-xl z-20"></div>
-                                <div className="overflow-hidden rounded-[2.5rem] bg-white aspect-[9/18.5]">
-                                    <Image 
-                                        src="/zeneva_android_pos_mockup.png" 
-                                        alt="Zeneva Android POS Showcase" 
-                                        width={500} 
-                                        height={1000}
-                                        className="w-full h-full object-cover"
-                                    />
+                        <div className="relative group flex justify-center">
+                            <div className="absolute inset-0 bg-orange-600/5 blur-[120px] rounded-full -z-10 group-hover:bg-orange-600/10 transition-colors duration-700"></div>
+                            <div className="relative z-10 max-w-[320px] transform hover:scale-[1.02] transition-transform duration-500">
+                                <Image 
+                                    src="/zeneva_android_pos_mockup.png" 
+                                    alt="Zeneva Android POS Mockup" 
+                                    width={400}
+                                    height={800}
+                                    className="w-full h-auto drop-shadow-2xl"
+                                    priority
+                                />
+                            </div>
+
+                            {/* Floating Stats Badge */}
+                            <div className="absolute top-20 -right-4 md:-right-12 p-6 bg-white border-2 border-dashed border-slate-200 rounded-xl shadow-xl z-20 hidden md:block animate-bounce-slow">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
+                                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mobile Link</div>
+                                        <div className="text-sm font-bold text-slate-950">Active & Synced</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-600/10 rounded-full blur-3xl -z-10 rotate-12"></div>
-                            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-slate-900/10 rounded-full blur-3xl -z-10"></div>
                         </div>
                     </div>
                 </div>
@@ -298,31 +368,34 @@ export default function DownloadPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                         {zenAiCapabilities.map((cap, i) => (
-                            <div key={i} className="group p-10 bg-white border-[4px] border-slate-950 shadow-[10px_10px_0px_0px_rgba(15,23,42,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[14px_14px_0px_0px_rgba(15,23,42,1)] transition-all duration-200">
-                                <div className="w-12 h-12 bg-orange-500 flex items-center justify-center mb-6 group-hover:rotate-12 transition-transform">
+                            <div key={i} className="group p-10 bg-white border-2 border-dashed border-slate-200 rounded-xl hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+                                <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center mb-6 group-hover:rotate-12 transition-transform shadow-lg shadow-orange-500/20">
                                     <cap.icon className="w-6 h-6 text-white" />
                                 </div>
-                                <h3 className="text-2xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display">{cap.title}</h3>
+                                <h3 className="text-2xl font-medium tracking-tighter text-slate-950 mb-4 uppercase font-display px-0">{cap.title}</h3>
                                 <p className="text-slate-600 font-medium leading-relaxed">
                                     {cap.description}
                                 </p>
                             </div>
                         ))}
                         
-                        <div className="p-10 bg-slate-950 border-[4px] border-slate-950 shadow-[10px_10px_0px_0px_rgba(249,115,22,1)] text-white">
-                             <div className="w-12 h-12 bg-white/10 flex items-center justify-center mb-6">
-                                <Activity className="w-6 h-6 text-orange-500" />
-                             </div>
-                             <h3 className="text-2xl font-medium tracking-tighter mb-4 uppercase font-display">Real-time Diagnostics</h3>
-                             <p className="text-slate-400 font-medium leading-relaxed italic text-lg">
-                                "Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand."
-                             </p>
-                             <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
-                                <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-500 font-dm-sans">Active Monitoring</span>
-                                <div className="flex gap-1">
-                                    <div className="w-1 h-3 bg-orange-500"></div>
-                                    <div className="w-1 h-5 bg-orange-500"></div>
-                                    <div className="w-1 h-2 bg-orange-500"></div>
+                        <div className="p-10 bg-slate-950 rounded-xl shadow-2xl shadow-slate-950/20 text-white relative overflow-hidden">
+                             <div className="absolute inset-0 bg-primary/5 opacity-40"></div>
+                             <div className="relative z-10">
+                                <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center mb-6">
+                                    <Activity className="w-6 h-6 text-orange-500" />
+                                </div>
+                                <h3 className="text-2xl font-medium tracking-tighter mb-4 uppercase font-display px-0">Real-time Diagnostics</h3>
+                                <p className="text-slate-400 font-medium leading-relaxed italic text-lg">
+                                    "Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand."
+                                </p>
+                                <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-500 font-dm-sans">Active Monitoring</span>
+                                    <div className="flex gap-1">
+                                        <div className="w-1 h-3 bg-orange-500 rounded-full"></div>
+                                        <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
+                                        <div className="w-1 h-2 bg-orange-500 rounded-full"></div>
+                                    </div>
                                 </div>
                              </div>
                         </div>
@@ -343,16 +416,18 @@ export default function DownloadPage() {
                     
                     <div className="relative group">
                         <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-orange-600 to-transparent"></div>
-                        <div className="border-[4px] border-slate-800 bg-slate-900 overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-[1.01]">
-                             <Image 
+                        <div className="bg-white p-3 rounded-2xl shadow-2xl shadow-black/5 overflow-hidden transition-all duration-500 group-hover:scale-[1.01] border-2 border-dashed border-slate-200 relative">
+                            <div className="absolute top-6 right-6 h-4 w-4 border-t-2 border-r-2 border-slate-300 z-10 opacity-50"></div>
+                            <div className="absolute bottom-6 left-6 h-4 w-4 border-b-2 border-l-2 border-slate-300 z-10 opacity-50"></div>
+                            <Image 
                                 src="/zeneva_desktop_mastery_showcase.png" 
                                 alt="Zeneva Desktop Interface" 
                                 width={1200} 
                                 height={800} 
-                                className="w-full h-auto opacity-90 group-hover:opacity-100 transition-opacity"
-                             />
+                                className="w-full h-auto rounded-xl"
+                            />
                         </div>
-                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-orange-600/20 blur-3xl rounded-full"></div>
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-orange-600/10 blur-3xl rounded-full -z-10"></div>
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-12 mt-20">
@@ -406,13 +481,15 @@ export default function DownloadPage() {
                             </div>
                         </div>
                         <div className="relative">
-                            <div className="border-[4px] border-slate-950 shadow-[20px_20px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden">
+                            <div className="p-3 bg-white rounded-2xl shadow-xl border-2 border-dashed border-slate-200 overflow-hidden relative group">
+                                <div className="absolute top-6 right-6 h-4 w-4 border-t-2 border-r-2 border-slate-300 z-10 opacity-50"></div>
+                                <div className="absolute bottom-6 left-6 h-4 w-4 border-b-2 border-l-2 border-slate-300 z-10 opacity-50"></div>
                                 <Image 
                                     src="/zeneva_hardware_protocol_showcase.png" 
                                     alt="Hardware Integration Showcase" 
                                     width={800} 
                                     height={600} 
-                                    className="w-full h-auto"
+                                    className="w-full h-auto rounded-xl transition-transform duration-700 group-hover:scale-105"
                                 />
                             </div>
                         </div>
@@ -425,18 +502,23 @@ export default function DownloadPage() {
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, #fff 1px, transparent 0)', backgroundSize: '30px 30px' }}></div>
                 <div className="max-w-7xl mx-auto relative z-10">
                     <div className="grid lg:grid-cols-2 gap-20 items-center">
-                        <div className="order-2 lg:order-1">
-                             <div className="border-[6px] border-white/20 rounded-[2rem] overflow-hidden shadow-2xl relative">
-                                <Image 
-                                    src="/zeneva_mobile_scanning_showcase.png" 
-                                    alt="Mobile Scanning Interface" 
-                                    width={600} 
-                                    height={800} 
-                                    className="w-full h-auto"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-orange-950/40 to-transparent"></div>
-                             </div>
-                        </div>
+                         <div className="order-2 lg:order-1 flex justify-center">
+                              <div className="relative z-10 p-4 bg-slate-950 rounded-[3.5rem] shadow-2xl border-[6px] border-white/20 mx-auto max-w-[340px] transform -rotate-1 hover:rotate-0 transition-transform duration-700">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-slate-950 rounded-b-[1.5rem] z-20 border-x border-b border-white/5"></div>
+                                <div className="overflow-hidden rounded-[2.8rem] bg-white aspect-[9/19] relative">
+                                    <Image 
+                                        src="/zeneva_android_pos_mockup.png" 
+                                        alt="Zeneva Android POS Mockup" 
+                                        fill
+                                        className="object-cover"
+                                        priority
+                                    />
+                                </div>
+                                {/* Phone physical buttons decorative */}
+                                <div className="absolute -left-[8px] top-24 w-1.5 h-16 bg-slate-800 rounded-l-md" />
+                                <div className="absolute -right-[8px] top-32 w-1.5 h-20 bg-slate-800 rounded-r-md" />
+                              </div>
+                         </div>
                         <div className="order-1 lg:order-2 space-y-10">
                              <div className="w-20 h-2 bg-white"></div>
                              <h2 className="text-4xl md:text-8xl lg:text-9xl font-medium tracking-tighter text-white leading-[0.85] font-display">
@@ -484,16 +566,18 @@ export default function DownloadPage() {
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-0 border-2 border-slate-950 divide-x-2 divide-y-2 lg:divide-y-0 divide-slate-950">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {[
                             { t: "Stock Parity", d: "Real-time updates across mobile and desktop. No stock discrepancies.", icon: Layers },
                             { t: "Price Uniformity", d: "Updated pricing in the dashboard reflects instantly on all mobile terminals.", icon: Tag },
                             { t: "Staff Telemetry", d: "Track who is selling what, where, and when from the central admin node.", icon: Users },
                             { t: "Secure Tunnel", d: "All cross-platform data is sent through encrypted AES-256 protocols.", icon: Lock }
                         ].map((item, i) => (
-                            <div key={i} className="p-10 bg-white hover:bg-slate-50 transition-colors">
-                                <item.icon className="w-8 h-8 text-slate-950 mb-6" />
-                                <h4 className="text-xl font-medium tracking-tight text-slate-950 font-display">{item.t}</h4>
+                            <div key={i} className="p-8 bg-white border-2 border-dashed border-slate-200 rounded-xl hover:border-primary/50 transition-all shadow-sm group">
+                                <div className="w-12 h-12 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary/5 transition-colors">
+                                    <item.icon className="w-6 h-6 text-slate-950" />
+                                </div>
+                                <h4 className="text-xl font-medium tracking-tight text-slate-950 font-display px-0 mb-2">{item.t}</h4>
                                 <p className="text-sm text-slate-500 font-medium font-dm-sans">{item.d}</p>
                             </div>
                         ))}
@@ -510,25 +594,27 @@ export default function DownloadPage() {
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-10">
-                        <div className="p-2 border-[4px] border-slate-950 bg-slate-950 shadow-[10px_10px_0px_0px_rgba(249,115,22,1)]">
-                            <div className="aspect-video bg-slate-900 flex items-center justify-center relative group cursor-pointer overflow-hidden">
+                        <div className="p-3 bg-white rounded-2xl shadow-sm border-2 border-dashed border-slate-200 relative group">
+                            <div className="absolute top-6 right-6 h-4 w-4 border-t-2 border-r-2 border-slate-300 z-10 opacity-50"></div>
+                            <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-inner">
                                 <div className="absolute inset-0 bg-gradient-to-br from-orange-600/20 to-transparent"></div>
                                 <div className="z-10 text-center space-y-4">
-                                    <div className="w-16 h-16 rounded-full bg-orange-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                                    <div className="w-16 h-16 rounded-full bg-orange-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform shadow-lg">
                                         <Monitor className="w-8 h-8 text-white" />
                                     </div>
-                                    <span className="block font-semibold uppercase tracking-widest text-[10px] font-dm-sans">Play Desktop Demo</span>
+                                    <span className="block font-semibold uppercase tracking-widest text-[10px] text-white/70 font-dm-sans">Play Desktop Demo</span>
                                 </div>
                             </div>
                         </div>
-                         <div className="p-2 border-[4px] border-slate-950 bg-slate-950 shadow-[10px_10px_0px_0px_rgba(0,0,0,0.1)]">
-                            <div className="aspect-video bg-slate-900 flex items-center justify-center relative group cursor-pointer overflow-hidden">
+                         <div className="p-3 bg-white rounded-2xl shadow-sm border-2 border-dashed border-slate-200 relative group">
+                            <div className="absolute top-6 right-6 h-4 w-4 border-t-2 border-r-2 border-slate-300 z-10 opacity-50"></div>
+                            <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-inner">
                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-600/20 to-transparent"></div>
                                 <div className="z-10 text-center space-y-4">
-                                    <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                                    <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform shadow-lg">
                                         <Smartphone className="w-8 h-8 text-white" />
                                     </div>
-                                    <span className="block font-semibold uppercase tracking-widest text-[10px] font-dm-sans">Play Mobile Demo</span>
+                                    <span className="block font-semibold uppercase tracking-widest text-[10px] text-white/70 font-dm-sans">Play Mobile Demo</span>
                                 </div>
                             </div>
                         </div>
