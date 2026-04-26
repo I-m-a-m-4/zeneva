@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -122,7 +122,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
-  const hasShownSyncToast = React.useRef(false);
+  const hasShownSyncToast = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
