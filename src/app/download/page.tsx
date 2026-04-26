@@ -58,6 +58,7 @@ import MarketingFooter from '@/components/layout/marketing-footer';
 import { InteractiveGrid } from '@/components/interactive-grid';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AppConfig } from '@/lib/config';
+import { cn } from "@/lib/utils";
 
 const zenAiCapabilities = [
   {
@@ -196,19 +197,7 @@ export default function DownloadPage() {
                             Never Lose Sale,<br />
                             Never Waste Stock
                         </motion.h1>
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.8, delay: 0.4 }}
-                            className="mt-8"
-                        >
-                            <Button 
-                                onClick={scrollToDownloads}
-                                className="h-16 px-10 bg-orange-600 text-white hover:bg-orange-700 rounded-none font-bold uppercase tracking-[0.3em] text-xs border-none shadow-2xl flex items-center gap-4 group"
-                            >
-                                Get Zeneva Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </Button>
-                        </motion.div>
+
                     </div>
 
                     {/* Tactical Tactical Intelligence Card (Bottom Right) */}
