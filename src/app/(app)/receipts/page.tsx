@@ -40,6 +40,7 @@ function ReceiptRowSkeleton() {
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
       <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
       <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-md ml-auto" /></TableCell>
     </TableRow>
@@ -100,9 +101,20 @@ export default function ReceiptsPage() {
     const safeFormatDate = (val: any) => {
         if (!val) return 'N/A';
         try {
-            const date = safeToDate(val);
+            const date = val?.toDate ? val.toDate() : new Date(val);
             if (isNaN(date.getTime())) return 'N/A';
             return format(date, 'PP');
+        } catch (e) {
+            return 'N/A';
+        }
+    };
+
+    const safeFormatTime = (val: any) => {
+        if (!val) return 'N/A';
+        try {
+            const date = val?.toDate ? val.toDate() : new Date(val);
+            if (isNaN(date.getTime())) return 'N/A';
+            return format(date, 'p');
         } catch (e) {
             return 'N/A';
         }
@@ -206,6 +218,7 @@ export default function ReceiptsPage() {
                   <TableHead>Receipt ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
                   <TableHead>Payment Method</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead><span className="sr-only">Actions</span></TableHead>
@@ -227,6 +240,7 @@ export default function ReceiptsPage() {
                     <TableHead>Receipt ID</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Time</TableHead>
                     <TableHead>Payment Method</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead><span className="sr-only">Actions</span></TableHead>
@@ -237,7 +251,8 @@ export default function ReceiptsPage() {
                     <TableRow key={receipt.id}>
                       <TableCell className="font-medium">{(receipt.id || '').substring(0, 8)}...</TableCell>
                       <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
-                      <TableCell>{safeFormatDate(receipt.createdAt)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{safeFormatDate(receipt.createdAt)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{safeFormatTime(receipt.createdAt)}</TableCell>
                       <TableCell>{receipt.paymentMethod || 'N/A'}</TableCell>
                       <TableCell className="text-right">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right">

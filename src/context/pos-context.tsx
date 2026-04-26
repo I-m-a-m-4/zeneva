@@ -122,6 +122,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
+  const hasShownSyncToast = React.useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
@@ -291,8 +292,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
 
       setLastSyncedTimestamp(Date.now());
-      if (newProducts.length > 0 || newCustomers.length > 0) {
-        toast({ title: "Sync Complete", description: `Updated ${newProducts.length} products and ${newCustomers.length} customers.` });
+      if ((newProducts.length > 0 || newCustomers.length > 0) && !hasShownSyncToast.current) {
+        toast({ title: "Product Sync Complete", description: `Successfully synchronized inventory and customer data.` });
+        hasShownSyncToast.current = true;
       }
     } catch (error) {
       console.error("Delta Sync Failed:", error);

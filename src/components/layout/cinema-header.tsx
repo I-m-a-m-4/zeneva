@@ -76,8 +76,8 @@ export default function CinemaHeader() {
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-lg transition-all duration-300 shadow-sm border border-slate-200",
-                isMenuOpen ? "bg-orange-600 text-white rotate-90 border-transparent" : 
+                "w-12 h-12 flex items-center justify-center rounded-md transition-all duration-300 shadow-sm border border-slate-200",
+                isMenuOpen ? "bg-orange-600 text-white border-transparent" : 
                 scrolled ? "bg-slate-950 text-white border-transparent" : "bg-white text-slate-950 hover:scale-110"
             )}
           >

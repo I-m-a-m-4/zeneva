@@ -22,11 +22,11 @@ export function useFCM() {
         }
     }, []);
 
-    const requestPermission = async () => {
+    const requestPermission = async (showToast = true) => {
         setIsLoading(true);
         try {
             if (typeof window === 'undefined' || !('Notification' in window)) {
-                toast({ title: "Not Supported", description: "This browser does not support notifications." });
+                if (showToast) toast({ title: "Not Supported", description: "This browser does not support notifications." });
                 return;
             }
 
@@ -44,7 +44,7 @@ export function useFCM() {
 
                 if (!vapidKey) {
                     console.warn("VAPID Key is missing! Notifications won't work without it.");
-                    toast({ variant: "destructive", title: "Configuration Error", description: "VAPID Key is missing." });
+                    if (showToast) toast({ variant: "destructive", title: "Configuration Error", description: "VAPID Key is missing." });
                     return;
                 }
 
@@ -71,21 +71,23 @@ export function useFCM() {
                             lastUsed: serverTimestamp(),
                             device: navigator.userAgent
                         });
-                        toast({ title: "Notifications Enabled", description: "You will now receive alerts." });
+                        if (showToast) toast({ title: "Notifications Enabled", description: "You will now receive alerts." });
                     }
                 } else {
                     console.log('No registration token available. Request permission to generate one.');
                 }
             } else {
-                toast({ variant: "destructive", title: "Permission Denied", description: "Please enable notifications in your browser settings." });
+                if (showToast) toast({ variant: "destructive", title: "Permission Denied", description: "Please enable notifications in your browser settings." });
             }
         } catch (error) {
             console.error('Error requesting notification permission:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: error instanceof Error ? error.message : 'Could not enable notifications.'
-            });
+            if (showToast) {
+                toast({
+                    variant: 'destructive',
+                    title: 'System Notification Error',
+                    description: error instanceof Error ? `Protocol Error: ${error.message}` : 'Permission conflict or network restriction prevented notification setup.'
+                });
+            }
         } finally {
             setIsLoading(false);
         }
