@@ -167,32 +167,28 @@ export default function DownloadPage() {
             <section className="relative h-screen min-h-[700px] w-full overflow-hidden flex flex-col justify-end pb-20 px-6 sm:px-12 border-b-4 border-slate-950">
                 {/* Video Background Layer */}
                 <div className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
-                    <div className="absolute inset-0 z-10 bg-black/20" />
-                    <video
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-60"
-                        poster="/zeneva_video_poster.png"
-                    >
-                        <source src="/zeneva_video.mp4" type="video/mp4" />
-                    </video>
+                    <div className="absolute inset-0 z-10 bg-black/40" />
+                    <iframe
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover opacity-50"
+                        src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0"
+                        title="Zeneva Product Showcase"
+                        allow="autoplay; encrypted-media"
+                        frameBorder="0"
+                    />
                 </div>
 
-                <div className="max-w-[1400px] mx-auto w-full relative z-20 flex flex-col md:flex-row items-end justify-between gap-12">
+                <div className="max-w-[1400px] mx-auto w-full relative z-20 flex flex-col items-center lg:flex-row lg:items-end justify-between gap-12 sm:gap-16">
                     {/* Primary Institutional Brand Mark (Bottom Left) */}
-                    <div className="max-w-3xl transform -translate-y-4">
+                    <div className="max-w-3xl transform lg:-translate-y-4 text-center lg:text-left w-full">
                         <motion.h1 
                             initial={{ opacity: 0, y: 40 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.8, delay: 0.2 }}
-                            className="text-2xl md:text-5xl font-medium tracking-tighter text-white leading-tight font-display"
+                            className="text-4xl md:text-6xl lg:text-5xl font-medium tracking-tighter text-white leading-[1.1] font-display"
                         >
                             Never Lose Sale,<br />
                             Never Waste Stock
                         </motion.h1>
-
                     </div>
 
                     {/* Tactical Tactical Intelligence Card (Bottom Right) */}
@@ -201,9 +197,9 @@ export default function DownloadPage() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             transition={{ duration: 0.8, delay: 0.6 }}
                             onClick={scrollToDownloads}
-                            className="hidden lg:flex items-center bg-white p-2 rounded-[24px] overflow-hidden max-w-xl group cursor-pointer border border-slate-100"
+                            className="flex items-center bg-white p-2 rounded-[24px] overflow-hidden w-full max-w-md lg:max-w-xl group cursor-pointer border border-slate-100 shadow-2xl lg:shadow-none"
                         >
-                            <div className="w-48 h-32 relative overflow-hidden rounded-[18px] bg-slate-100 flex-shrink-0">
+                            <div className="w-32 sm:w-48 h-24 sm:h-32 relative overflow-hidden rounded-[18px] bg-slate-100 flex-shrink-0">
                                 <Image 
                                     src="/zeneva_android_pos_mockup.png" 
                                     alt="Zeneva Hardware Preview" 
@@ -211,13 +207,16 @@ export default function DownloadPage() {
                                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                                 />
                             </div>
-                            <div className="px-6 flex flex-col justify-center flex-grow py-1">
+                            <div className="px-5 sm:px-6 flex flex-col justify-center flex-grow py-1">
                                 <div className="space-y-1">
-                                    <h4 className="text-slate-950 font-medium text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium leading-tight max-w-[180px]">Windows, Mac, and Android with instant cloud synchronization.</p>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[8px] font-bold tracking-[0.2em] text-orange-600 uppercase">Hardware Preview</span>
+                                    </div>
+                                    <h4 className="text-slate-950 font-medium text-lg sm:text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
+                                    <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium leading-tight max-w-[180px]">Windows, Mac, and Android with instant cloud synchronization.</p>
                                 </div>
                                 <div className="flex items-center justify-end mt-1">
-                                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-orange-600 transition-all duration-300">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-orange-600 transition-all duration-300">
                                         <ArrowRight className="w-4 h-4" />
                                     </div>
                                 </div>
@@ -255,22 +254,18 @@ export default function DownloadPage() {
                             
                             <div className="relative rounded-none md:rounded-sm overflow-hidden shadow-2xl border-y md:border border-slate-200 bg-slate-900 group-hover:shadow-[0_0_50px_rgba(0,0,0,0.1)] transition-all duration-700">
                                 {/* Video Surface */}
-                                <video 
-                                    ref={videoRef}
-                                    className={cn(
-                                        "w-full h-[70vh] md:h-auto object-cover block transition-all duration-1000",
-                                        !isPlaying && "grayscale-[0.4] group-hover:grayscale-0"
-                                    )}
-                                    muted 
-                                    loop 
-                                    playsInline
-                                    onPlay={() => setIsPlaying(true)}
-                                    onPause={() => setIsPlaying(false)}
-                                    preload="auto"
-                                >
-                                    <source src="/zeneva_video.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
+                                <div className={cn(
+                                    "w-full aspect-video md:aspect-auto md:h-[600px] bg-slate-900 relative overflow-hidden",
+                                    !isPlaying && "grayscale-[0.4] group-hover:grayscale-0 transition-all duration-1000"
+                                )}>
+                                    <iframe
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        src={`https://www.youtube.com/embed/Sc6S_PqGZEY?${isPlaying ? 'autoplay=1' : ''}&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0&enablejsapi=1`}
+                                        title="Zeneva Showcase"
+                                        allow="autoplay; encrypted-media"
+                                        frameBorder="0"
+                                    />
+                                </div>
                                 
                                 {/* Aesthetic Yellowish Overlay */}
                                 <div className={cn(
@@ -341,8 +336,8 @@ export default function DownloadPage() {
                                         Zeneva is a multi-store retail platform built for high-volume transactions at busy retail locations such as supermarkets, shopping malls, and large-scale boutique outlets.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-5 px-10 font-semibold text-xs tracking-[0.2em] gap-4 group font-dm-sans transition-all duration-300 shadow-md">
-                                    Download Zeneva on Windows
+                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md">
+                                    Download Zeneva
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                 </Button>
                             </div>
@@ -374,15 +369,12 @@ export default function DownloadPage() {
                                     {/* Screen Layer - Cream Frame */}
                                     <div className="relative bg-slate-900 rounded-xl p-3 border-[8px] border-[#e9dcc9] shadow-2xl">
                                         <div className="aspect-video bg-slate-900 rounded-sm overflow-hidden relative">
-                                            <video 
-                                                autoPlay 
-                                                muted 
-                                                loop 
-                                                playsInline
-                                                className="w-full h-full object-cover"
-                                            >
-                                                <source src="/zeneva_video.mp4" type="video/mp4" />
-                                            </video>
+                                            <iframe
+                                                className="absolute inset-0 w-full h-full object-cover"
+                                                src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0"
+                                                allow="autoplay; encrypted-media"
+                                                frameBorder="0"
+                                            />
                                         </div>
                                     </div>
                                     {/* Desktop Stand Layer */}
@@ -422,9 +414,9 @@ export default function DownloadPage() {
                                         Native M-series optimization for the most demanding administrative and analytics tasks. Tack-sharp UI for high-resolution Studio Displays and efficient unified memory management.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-5 px-10 font-semibold text-xs tracking-[0.2em] gap-4 group font-dm-sans transition-all duration-300 shadow-md" asChild>
+                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
                                     <a href={latestReleaseUrl}>
-                                        Download macOS
+                                        Download Zeneva
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
                                 </Button>
@@ -457,15 +449,12 @@ export default function DownloadPage() {
                                     {/* Screen Layer - Cream Frame */}
                                     <div className="relative bg-slate-900 rounded-xl p-3 border-[8px] border-[#e9dcc9] shadow-2xl">
                                         <div className="aspect-video bg-slate-900 rounded-sm overflow-hidden relative">
-                                            <video 
-                                                autoPlay 
-                                                muted 
-                                                loop 
-                                                playsInline
-                                                className="w-full h-full object-cover"
-                                            >
-                                                <source src="/zeneva_video.mp4" type="video/mp4" />
-                                            </video>
+                                            <iframe
+                                                className="absolute inset-0 w-full h-full object-cover"
+                                                src="https://www.youtube.com/embed/Sc6S_PqGZEY?autoplay=1&mute=1&loop=1&playlist=Sc6S_PqGZEY&controls=0&modestbranding=1&rel=0"
+                                                allow="autoplay; encrypted-media"
+                                                frameBorder="0"
+                                            />
                                         </div>
                                     </div>
                                     {/* Desktop Stand Layer */}
@@ -505,9 +494,9 @@ export default function DownloadPage() {
                                         Tactical mobile kit. Direct APK installation for smartphones and portable POS terminals. Zeneva on Android isn't just a companion app—it's the full engine in your pocket.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-5 px-10 font-semibold text-xs tracking-[0.2em] gap-4 group font-dm-sans transition-all duration-300 shadow-md" asChild>
+                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
                                     <a href={latestReleaseUrl}>
-                                        Download APK
+                                        Download Zeneva
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
                                 </Button>
