@@ -11,9 +11,9 @@ import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { AppConfig } from '@/lib/config';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 
-export default function CinemaHeader() {
+export default function CinemaHeader({ threshold = 50 }: { threshold?: number }) {
   const { user } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -21,13 +21,18 @@ export default function CinemaHeader() {
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
 
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    if (latest > threshold) {
+        setScrolled(true);
+    } else {
+        setScrolled(false);
+    }
+  });
+
   React.useEffect(() => {
     setMounted(true);
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleLogout = () => {
@@ -52,10 +57,15 @@ export default function CinemaHeader() {
 
   return (
     <>
-      <header className={cn(
-        "fixed top-0 left-0 right-0 z-[100] transition-all duration-500",
-        scrolled ? "h-16 bg-white/80 backdrop-blur-md border-b border-slate-200" : "h-24 bg-transparent"
-      )}>
+      <motion.header 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5 }}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-[100] transition-all duration-500",
+          scrolled ? "h-16 bg-white border-b border-slate-200 shadow-md" : "h-24 bg-transparent"
+        )}
+      >
         <nav className="max-w-[1400px] mx-auto h-full px-6 md:px-12 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center group">
@@ -88,7 +98,7 @@ export default function CinemaHeader() {
             )}
           </button>
         </nav>
-      </header>
+      </motion.header>
 
       {/* Android-style Slide Drawer */}
       <AnimatePresence>
