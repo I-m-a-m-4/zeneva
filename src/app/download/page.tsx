@@ -90,6 +90,23 @@ const zenAiCapabilities = [
 export default function DownloadPage() {
   const version = AppConfig.version || "1.7.0";
   const [mounted, setMounted] = useState(false);
+  const androidMockups = [
+    { src: "/zeneva_android_dashboard_mockup.png", label: "Dashboard" },
+    { src: "/zeneva_android_inventory_mockup.png", label: "Inventory" },
+    { src: "/zeneva_android_pos_mockup.png", label: "Checkout" },
+    { src: "/zeneva_android_report_mockup.png", label: "Analytics" },
+    { src: "/zeneva_android_storefront_mockup.png", label: "Storefront" },
+    { src: "/zeneva_android_toubleshoot_mockup.png", label: "Support" }
+  ];
+  const [activeMockup, setActiveMockup] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveMockup((prev) => (prev + 1) % androidMockups.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
   const [placeholder, setPlaceholder] = useState('');
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -133,6 +150,10 @@ export default function DownloadPage() {
   const macDownloadUrlIntel = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
   const macDownloadUrlSilicon = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
 
+  const scrollToDownloads = () => {
+    document.getElementById('downloads')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   if (!mounted) return null;
 
   return (
@@ -175,35 +196,49 @@ export default function DownloadPage() {
                             Never Lose Sale,<br />
                             Never Waste Stock
                         </motion.h1>
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.4 }}
+                            className="mt-8"
+                        >
+                            <Button 
+                                onClick={scrollToDownloads}
+                                className="h-16 px-10 bg-orange-600 text-white hover:bg-orange-700 rounded-none font-bold uppercase tracking-[0.3em] text-xs border-none shadow-2xl flex items-center gap-4 group"
+                            >
+                                Get Zeneva Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </Button>
+                        </motion.div>
                     </div>
 
                     {/* Tactical Tactical Intelligence Card (Bottom Right) */}
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.6 }}
-                        className="hidden lg:flex items-center bg-white p-2 rounded-[24px] overflow-hidden max-w-xl group cursor-pointer border border-slate-100"
-                    >
-                        <div className="w-48 h-32 relative overflow-hidden rounded-[18px] bg-slate-100 flex-shrink-0">
-                            <Image 
-                                src="/zeneva_android_pos_mockup.png" 
-                                alt="Zeneva Hardware Preview" 
-                                fill
-                                className="object-cover group-hover:scale-110 transition-transform duration-500"
-                            />
-                        </div>
-                        <div className="px-6 flex flex-col justify-center flex-grow py-1">
-                            <div className="space-y-1">
-                                <h4 className="text-slate-950 font-medium text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
-                                <p className="text-[11px] text-slate-500 font-medium leading-tight max-w-[180px]">Windows, Mac, and Android with instant cloud synchronization.</p>
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.6 }}
+                            onClick={scrollToDownloads}
+                            className="hidden lg:flex items-center bg-white p-2 rounded-[24px] overflow-hidden max-w-xl group cursor-pointer border border-slate-100"
+                        >
+                            <div className="w-48 h-32 relative overflow-hidden rounded-[18px] bg-slate-100 flex-shrink-0">
+                                <Image 
+                                    src="/zeneva_android_pos_mockup.png" 
+                                    alt="Zeneva Hardware Preview" 
+                                    fill
+                                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                />
                             </div>
-                            <div className="flex items-center justify-end mt-1">
-                                <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-orange-600 transition-all duration-300">
-                                    <ArrowRight className="w-4 h-4" />
+                            <div className="px-6 flex flex-col justify-center flex-grow py-1">
+                                <div className="space-y-1">
+                                    <h4 className="text-slate-950 font-medium text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-tight max-w-[180px]">Windows, Mac, and Android with instant cloud synchronization.</p>
+                                </div>
+                                <div className="flex items-center justify-end mt-1">
+                                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-orange-600 transition-all duration-300">
+                                        <ArrowRight className="w-4 h-4" />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </motion.div>
+                        </motion.div>
                 </div>
 
                 {/* Corner Decorative Element */}
@@ -325,31 +360,56 @@ export default function DownloadPage() {
                             </div>
                         </div>
 
-                        <div className="relative group flex justify-center">
-                            <div className="absolute inset-0 bg-orange-600/5 blur-[120px] rounded-full -z-10 group-hover:bg-orange-600/10 transition-colors duration-700"></div>
-                            <div className="relative z-10 max-w-[320px] transform hover:scale-[1.02] transition-transform duration-500">
-                                <Image 
-                                    src="/zeneva_android_pos_mockup.png" 
-                                    alt="Zeneva Android POS Mockup" 
-                                    width={400}
-                                    height={800}
-                                    className="w-full h-auto drop-shadow-2xl"
-                                    priority
-                                />
+                        <div className="relative group flex flex-col items-center">
+                            <div className="absolute inset-0 bg-primary/5 blur-[120px] rounded-full -z-10 group-hover:bg-primary/10 transition-colors duration-700"></div>
+                            
+                            <div className="relative z-10 w-full max-w-[320px] h-[640px] flex items-center justify-center">
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={activeMockup}
+                                        initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                                        exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                                        transition={{ duration: 0.6, ease: "easeOut" }}
+                                        className="w-full h-full relative"
+                                    >
+                                        <Image 
+                                            src={androidMockups[activeMockup].src} 
+                                            alt={androidMockups[activeMockup].label} 
+                                            fill
+                                            className="object-contain drop-shadow-2xl"
+                                            priority
+                                        />
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
 
-                            {/* Floating Stats Badge */}
-                            <div className="absolute top-20 -right-4 md:-right-12 p-6 bg-white border-2 border-dashed border-slate-200 rounded-xl shadow-xl z-20 hidden md:block animate-bounce-slow">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
-                                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mobile Link</div>
-                                        <div className="text-sm font-bold text-slate-950">Active & Synced</div>
-                                    </div>
-                                </div>
+                            {/* Slider Navigation Dots */}
+                            <div className="flex gap-2 mt-8 z-20">
+                                {androidMockups.map((_, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => setActiveMockup(i)}
+                                        className={cn(
+                                            "w-2 h-2 rounded-full transition-all duration-300",
+                                            activeMockup === i ? "w-8 bg-orange-600" : "bg-slate-200 hover:bg-slate-300"
+                                        )}
+                                    />
+                                ))}
                             </div>
+
+                            {/* Floating Module Badge */}
+                            <motion.div 
+                                key={`badge-${activeMockup}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="absolute -top-6 bg-white border border-slate-100 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 z-30"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-950">
+                                    {androidMockups[activeMockup].label} Module
+                                </span>
+                            </motion.div>
                         </div>
                     </div>
                 </div>
