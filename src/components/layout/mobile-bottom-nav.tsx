@@ -33,8 +33,8 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading }: M
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border z-40 md:hidden no-print">
-      <div className="flex justify-around items-center h-full">
+    <nav className="fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-background/95 backdrop-blur-md border-t border-border z-40 md:hidden no-print">
+      <div className="flex justify-around items-center h-16">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex flex-col items-center justify-center flex-1 h-full">

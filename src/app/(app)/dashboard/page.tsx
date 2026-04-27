@@ -338,7 +338,7 @@ export default function DashboardPage() {
   const isOperator = currentUserProfile?.role === 'vendor_operator';
 
   return (
-    <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
+    <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1 pb-10 sm:pb-1">
       <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
         <div className="no-capture flex flex-wrap items-center justify-start sm:justify-end gap-2">
           <DateRangePicker date={date} onDateChange={setDate} />
