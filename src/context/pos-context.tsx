@@ -29,13 +29,11 @@ import {
 } from '@/lib/sqlite-sync';
 
 import { 
-  POS_CART_KEY, 
-  POS_CUSTOMER_KEY, 
-  POS_TAX_RATE_KEY, 
-  POS_DISCOUNT_KEY, 
   POS_PAYMENT_METHOD_KEY, 
   POS_AUTO_PRINT_KEY, 
-  CURRENCY_SYMBOLS
+  CURRENCY_SYMBOLS,
+  USER_PROFILE_KEY,
+  BUSINESS_INSTANCE_KEY
 } from '@/lib/constants';
 import { safeToDate } from '@/lib/utils';
 
@@ -132,7 +130,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
-  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(null);
+  const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
+  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
   const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => Date.now());
 
@@ -153,12 +152,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile } = useDoc<UserProfile>(userDocRef);
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
-  const businessId = isProfileReady ? currentUserProfile.businessId : null;
+  const businessId = isProfileReady ? currentUserProfile.businessId : (offlineProfile?.businessId || null);
 
   const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
-  const canFetchSubData = isProfileReady && !!businessId && !!initialBusiness;
+  // Sync to local storage for fast subsequent loads
+  useEffect(() => {
+    if (currentUserProfile) secureStorage.setItem(USER_PROFILE_KEY, currentUserProfile);
+  }, [currentUserProfile]);
+
+  useEffect(() => {
+    if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
+  }, [initialBusiness]);
+
+  const canFetchSubData = !!businessId && !!initialBusiness;
 
   const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
@@ -176,7 +184,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore]);
   const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
-  // --- Derived Sync States ---
+  const products = useMemo(() => {
+    let merged = [...(initialProducts || [])];
+    const existingIds = new Set(merged.map(p => p.id));
+    syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
+    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
+    if (deletedIds.size > 0) merged = merged.filter(p => !deletedIds.has(p.id));
+    queuedActions.forEach(action => {
+      if (action.type === 'update-product') { const idx = merged.findIndex(p => p.id === action.payload.productId); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }
+      else if (action.type === 'bulk-update-products') { action.payload.productIds.forEach((id: string) => { const idx = merged.findIndex(p => p.id === id); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }); }
+      else if (action.type === 'add-product') { if (!merged.find(p => p.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); }
+      else if (action.type === 'complete-sale') { 
+        const items = action.payload.receiptData?.items || action.payload.items;
+        if (Array.isArray(items)) items.forEach((item: any) => { const idx = merged.findIndex(p => p.id === item.productId); if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity }; });
+      }
+    });
+    return merged;
+  }, [initialProducts, syncedProducts, queuedActions]);
+
+  const profile = useMemo(() => {
+    return currentUserProfile || offlineProfile;
+  }, [currentUserProfile, offlineProfile]);
+
   const business = useMemo(() => {
     const base = initialBusiness || offlineBusiness;
     if (!base) return null;
@@ -195,27 +224,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return result;
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
-  const products = useMemo(() => {
-    if (!initialProducts && isLoadingProducts) return null;
-    let merged = [...(initialProducts || [])];
-    const existingIds = new Set(merged.map(p => p.id));
-    syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
-    const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
-    if (deletedIds.size > 0) merged = merged.filter(p => !deletedIds.has(p.id));
-    queuedActions.forEach(action => {
-      if (action.type === 'update-product') { const idx = merged.findIndex(p => p.id === action.payload.productId); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }
-      else if (action.type === 'bulk-update-products') { action.payload.productIds.forEach((id: string) => { const idx = merged.findIndex(p => p.id === id); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }); }
-      else if (action.type === 'add-product') { if (!merged.find(p => p.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); }
-      else if (action.type === 'complete-sale') { 
-        const items = action.payload.receiptData?.items || action.payload.items;
-        if (Array.isArray(items)) items.forEach((item: any) => { const idx = merged.findIndex(p => p.id === item.productId); if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity }; });
-      }
-    });
-    return merged;
-  }, [initialProducts, syncedProducts, queuedActions]);
-
   const receipts = useMemo(() => {
-    if (!initialReceipts && isLoadingReceipts) return null;
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
     syncedReceipts.forEach(r => { if (!existingIds.has(r.id)) merged.push(r); });
@@ -228,7 +237,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialReceipts, syncedReceipts, queuedActions]);
 
   const customers = useMemo(() => {
-    if (!initialCustomers && isLoadingCustomers) return null;
     let merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
     syncedCustomers.forEach(c => { 
@@ -894,9 +902,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const value: POSContextType = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile, 
-    isLoading: isUserLoading || (!!user && !isProfileReady) || isLoadingBusiness || isLoadingProducts || isLoadingCustomers || isLoadingReceipts || !isMounted, 
-    isUserLoading, user, firestore,
+    business, products, receipts, customers, onlineOrders, currentUserProfile: profile, 
+    isLoading: (isLoadingBusiness && !business) || (isLoadingProducts && (!products || products.length === 0)) || !isMounted, 
+    isUserLoading: isUserLoading || (!!user && !profile), 
+    user, firestore,
+    isProfileReady,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer: setSelectedCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
