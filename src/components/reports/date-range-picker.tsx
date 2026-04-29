@@ -5,29 +5,46 @@ import * as React from 'react';
 import { format, isSameDay, startOfDay, subDays, endOfDay, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '../ui/separator';
+import { usePOS } from '@/context/pos-context';
 
 interface DateRangePickerProps extends React.HTMLAttributes<HTMLDivElement> {
   date: DateRange | undefined;
   onDateChange: (date: DateRange | undefined) => void;
 }
 
-const presets = [
-    { label: 'Today', range: { from: startOfDay(new Date()), to: endOfDay(new Date()) } },
-    { label: 'Yesterday', range: { from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) } },
-    { label: 'Last 7 Days', range: { from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) } },
-    { label: 'Last 30 Days', range: { from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) } },
-    { label: 'This Month', range: { from: startOfMonth(new Date()), to: endOfDay(new Date()) } },
-    { label: 'Last Month', range: { from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) } },
-];
-
-
 export function DateRangePicker({ className, date, onDateChange }: DateRangePickerProps) {
     const [isOpen, setIsOpen] = React.useState(false);
+    const { business } = usePOS();
+
+    const presets = React.useMemo(() => {
+        const basePresets = [
+            { label: 'Today', range: { from: startOfDay(new Date()), to: endOfDay(new Date()) } },
+            { label: 'Yesterday', range: { from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) } },
+            { label: 'Last 7 Days', range: { from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) } },
+        ];
+
+        // Add "All Time" if business start date is available
+        const businessStart = business?.settings?.inventoryStartDate || business?.createdAt;
+        if (businessStart) {
+            const startDate = safeToDate(businessStart);
+            basePresets.push({ label: 'All Time', range: { from: startOfDay(startDate), to: endOfDay(new Date()) } });
+        } else {
+            // Fallback if no business date is found
+            basePresets.push({ label: 'Last 30 Days', range: { from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) } });
+        }
+
+        basePresets.push(
+            { label: 'This Month', range: { from: startOfMonth(new Date()), to: endOfDay(new Date()) } },
+            { label: 'Last Month', range: { from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) } }
+        );
+
+        return basePresets;
+    }, [business]);
 
     const getDisplayString = () => {
         if (!date?.from) return "Pick a date range";
