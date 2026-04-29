@@ -126,8 +126,10 @@ export default function ReportsDashboard() {
         let totalProductsSold = 0;
         let totalServicesSold = 0;
         const uniqueProductIds = new Set<string>();
+        const uniqueCustomerIds = new Set<string>();
 
         targetReceipts.forEach(r => {
+            if (r.customer?.id) uniqueCustomerIds.add(r.customer.id);
             r.items?.forEach(i => {
                 uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
@@ -149,7 +151,7 @@ export default function ReportsDashboard() {
             totalSales,
             averageOrderValue,
             inventoryValue,
-            totalCustomers: Math.max(stats?.totalCustomers || 0, customers.length),
+            totalCustomers: uniqueCustomerIds.size || Math.max(stats?.totalCustomers || 0, customers.length),
             totalProductsSold,
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold,
@@ -234,21 +236,8 @@ export default function ReportsDashboard() {
 
     const finalReportData = React.useMemo(() => {
         if (!reportData) return null;
-        if (!rangeStats) {
-           return {
-             ...reportData,
-             totalRevenue: stats?.totalRevenue || 0,
-             totalSales: stats?.totalSales || 0,
-             totalCustomers: stats?.totalCustomers || 0
-           };
-        }
-        return {
-            ...reportData,
-            totalRevenue: rangeStats.revenue,
-            totalSales: rangeStats.count,
-            totalCustomers: rangeStats.customers
-        };
-    }, [reportData, rangeStats, stats]);
+        return reportData;
+    }, [reportData]);
 
     const handleDownloadImage = async () => {
         const element = dashboardRef.current;

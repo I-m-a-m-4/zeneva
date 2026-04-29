@@ -274,7 +274,7 @@ const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar="content"
       className={cn(
-        "flex flex-1 flex-col gap-2 overflow-hidden",
+        "flex flex-1 flex-col gap-2",
         className
       )}
       {...props}

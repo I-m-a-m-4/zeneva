@@ -515,7 +515,7 @@ export default function AuthenticatedLayout({
                 </Link>
               </SidebarHeader>
               <SidebarContent className="flex-1 p-2">
-                <ScrollArea className="h-full">
+                <div className="flex-1 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-muted-foreground/20">
                   <SidebarMenu>
                     {isUserLoading ? (
                       // Show skeletons for the top 5 nav items while loading
@@ -544,7 +544,7 @@ export default function AuthenticatedLayout({
                       ))
                     )}
                   </SidebarMenu>
-                </ScrollArea>
+                </div>
               </SidebarContent>
               <SidebarFooter className="p-2">
                 <SidebarMenu>

@@ -104,15 +104,17 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
+  const [displayLimit, setDisplayLimit] = React.useState(250);
 
   const isLoading = isPosLoading;
 
   // Local-First Search for Instant Performance
   React.useEffect(() => {
     setCurrentPage(1);
+    setDisplayLimit(500);
   }, [searchTerm]);
 
-  const displayedList = React.useMemo(() => {
+  const { filtered, displayedList } = React.useMemo(() => {
     let base = [...(customers || [])];
     
     let filtered = searchTerm.trim() 
@@ -127,7 +129,7 @@ export default function CustomersPage() {
     // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === 'spent') {
-        return (b.totalSpent || 0) - (a.totalSpent || 0);
+        return (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
       }
       if (sortBy === 'loyalty') {
         return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
@@ -141,8 +143,8 @@ export default function CustomersPage() {
       return Number(dateB) - Number(dateA);
     });
 
-    return filtered;
-  }, [searchTerm, customers, sortBy]);
+    return { filtered, displayedList: filtered.slice(0, displayLimit) };
+  }, [searchTerm, customers, sortBy, displayLimit]);
 
   const paginatedCustomers = React.useMemo(() => {
     if (isNative) return displayedList;
@@ -151,8 +153,6 @@ export default function CustomersPage() {
   }, [displayedList, currentPage, isNative, itemsPerPage]);
 
   const pageCount = Math.ceil(displayedList.length / itemsPerPage);
-
-  const handleLoadMore = null;
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -200,7 +200,6 @@ export default function CustomersPage() {
 
     try {
       await batch.commit();
-      // Ensure audit logs are written (best effort, but awaited so they run)
       await Promise.all(auditPromises);
 
       toast({ variant: 'success', title: 'Customers Deleted', description: `${selectedCustomerIds.length} customers have been removed.` });
@@ -381,6 +380,18 @@ export default function CustomersPage() {
                   </span>
                 </Button>
               )}
+            </div>
+          )}
+          {filtered.length > displayLimit && (
+            <div className="mt-6 flex justify-center pb-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setDisplayLimit(prev => prev + 500)}
+                className="gap-2 h-10 px-8 border-dashed"
+              >
+                Load More Results
+                <span className="text-xs text-muted-foreground">({filtered.length - displayLimit} hidden)</span>
+              </Button>
             </div>
           )}
         </CardContent>

@@ -232,17 +232,45 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
     syncedCustomers.forEach(c => { 
-      if (!existingIds.has(c.id)) merged.push(c); 
-      else { 
+      if (!existingIds.has(c.id)) {
+        merged.push(c); 
+      } else { 
+        // Only overwrite if the local data is actually newer (using updatedAt)
         const idx = merged.findIndex(m => m.id === c.id); 
-        if (idx !== -1) merged[idx] = c; 
+        if (idx !== -1) {
+          const serverDate = safeToDate(merged[idx].updatedAt).getTime();
+          const localDate = safeToDate(c.updatedAt).getTime();
+          if (localDate > serverDate) {
+            merged[idx] = { ...merged[idx], ...c };
+          }
+        }
       } 
     });
     const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
     merged = merged.filter(c => !deletedIds.has(c.id));
     queuedActions.forEach(action => {
-      if (action.type === 'update-customer') { const idx = merged.findIndex(c => c.id === action.payload.id); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }
-      else if (action.type === 'add-customer') { if (!merged.find(c => c.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); }
+      if (action.type === 'update-customer') { 
+        const idx = merged.findIndex(c => c.id === action.payload.id); 
+        if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; 
+      }
+      else if (action.type === 'add-customer') { 
+        if (!merged.find(c => c.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); 
+      }
+      else if (action.type === 'complete-sale') {
+        const { selectedCustomer, secureTotal } = action.payload;
+        if (selectedCustomer?.id) {
+          const idx = merged.findIndex(c => c.id === selectedCustomer.id);
+          if (idx !== -1) {
+            const current = merged[idx];
+            merged[idx] = {
+              ...current,
+              totalSpent: (Number(current.totalSpent) || 0) + secureTotal,
+              loyaltyPoints: (current.loyaltyPoints || 0) + (action.payload.pointsEarned || 0),
+              lastPurchaseDate: action.timestamp
+            };
+          }
+        }
+      }
     });
     return merged;
   }, [initialCustomers, syncedCustomers, queuedActions]);
@@ -563,11 +591,32 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
-    if (receipts && receipts.length > 0) {
-      const filtered = receipts.filter(r => { const rd = safeToDate(r.createdAt); return rd >= from && rd <= to; });
-      return { revenue: filtered.reduce((sum, r) => sum + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
+    
+    try {
+      const q = query(
+        collection(firestore, "receipts"),
+        where("businessId", "==", businessId),
+        where("createdAt", ">=", from),
+        where("createdAt", "<=", to)
+      );
+      
+      const snap = await getDocs(q);
+      const docs = snap.docs.map(d => d.data() as Receipt);
+      
+      const revenue = docs.reduce((sum, r) => sum + (r.total || 0), 0);
+      const count = docs.length;
+      const customers = new Set(docs.map(r => r.customer?.id).filter(Boolean)).size;
+      
+      return { revenue, count, customers };
+    } catch (err) {
+      console.error("fetchDetailedAnalytics failed:", err);
+      // Fallback to local filtering if Firestore fails
+      if (receipts && receipts.length > 0) {
+        const filtered = receipts.filter(r => { const rd = safeToDate(r.createdAt); return rd >= from && rd <= to; });
+        return { revenue: filtered.reduce((sum, r) => sum + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
+      }
+      return { revenue: 0, count: 0, customers: 0 };
     }
-    return { revenue: 0, count: 0, customers: 0 };
   }, [businessId, firestore, receipts]);
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
