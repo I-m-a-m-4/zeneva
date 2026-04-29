@@ -29,6 +29,10 @@ import {
 } from '@/lib/sqlite-sync';
 
 import { 
+  POS_CART_KEY, 
+  POS_CUSTOMER_KEY, 
+  POS_TAX_RATE_KEY, 
+  POS_DISCOUNT_KEY, 
   POS_PAYMENT_METHOD_KEY, 
   POS_AUTO_PRINT_KEY, 
   CURRENCY_SYMBOLS,
