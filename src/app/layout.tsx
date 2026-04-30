@@ -15,11 +15,10 @@ import { TauriUpdater } from '@/components/TauriUpdater';
 import { DesktopTitleBar } from '@/components/desktop/TitleBar';
 import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
 import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
-import { Analytics } from '@vercel/analytics/react';
+import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
+import { ClientSideInitializer } from '@/components/shared/client-initializer';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
-import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
-import { ConsoleGuard } from '@/components/shared/console-guard';
 
 import { ThemeProvider } from '@/components/theme-provider';
 
@@ -182,22 +181,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isMounted, setIsMounted] = React.useState(false);
-  
-  React.useEffect(() => {
-    setIsMounted(true);
-
-    // Zeneva Console Branding
-    console.log(
-      `%c\n  ______ ______ _   _ ______      __     \n |___  /|  ____|| \\ | |  ____|/\\   \\ \\    \n    / / | |__   |  \\| | |__  /  \\   \\ \\   \n   / /  |  __|  | . \` |  __|/ /\\ \\   > >  \n  / /__ | |____ | |\\  | |__/ ____ \\ / /   \n /_____||______||_| \\_|____/_/    \\_\\/_/    \n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
-      "color: #F97316; font-weight: bold; font-family: monospace;",
-      "background: #F97316; color: white; padding: 4px 8px; font-weight: bold; border-radius: 4px;",
-      "color: inherit;"
-    );
-  }, []);
-
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-
   return (
     <html lang="en" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
       <head>
@@ -294,8 +277,7 @@ export default function RootLayout({
               </POSProvider>
             </PWAProvider>
           </FirebaseClientProvider>
-          {isMounted && !isTauri && <Analytics />}
-          <ConsoleGuard />
+          <ClientSideInitializer />
         </ThemeProvider>
         <Toaster />
         <script
