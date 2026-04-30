@@ -33,12 +33,21 @@ export function ConsoleGuard() {
       'transport errored',
       'WebChannelConnection RPC',
       'Firestore (11.10.0)',
+      'firestore.googleapis.com',
+      'google.firestore.v1.Firestore',
       '400 (Bad Request)'
     ];
 
     const shouldSuppress = (args: any[]) => {
-      const msg = args.map(arg => String(arg)).join(' ');
-      return suppressedPatterns.some(pattern => msg.includes(pattern));
+      const message = args.map(arg => {
+        try {
+          return typeof arg === 'string' ? arg : JSON.stringify(arg);
+        } catch (e) {
+          return String(arg);
+        }
+      }).join(' ');
+      
+      return suppressedPatterns.some(pattern => message.includes(pattern));
     };
 
     console.error = (...args) => {
