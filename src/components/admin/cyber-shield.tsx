@@ -562,6 +562,7 @@ export default function CyberShield() {
                             <TableHeader className="bg-muted/10">
                                 <TableRow className="hover:bg-transparent border-border/50">
                                         <TableHead className="text-xs font-medium">Entity Name</TableHead>
+                                        <TableHead className="text-xs font-medium">Email Address</TableHead>
                                         <TableHead className="text-xs font-medium">Communication Link</TableHead>
                                         <TableHead className="text-xs font-medium">Node ID</TableHead>
                                         <TableHead className="text-xs font-medium text-right">Actions</TableHead>
@@ -570,11 +571,11 @@ export default function CyberShield() {
                             <TableBody>
                                 {isLoadingBusinesses ? (
                                     [...Array(6)].map((_, i) => (
-                                        <TableRow key={i} className="border-border/50"><TableCell colSpan={4}><div className="h-10 w-full bg-muted/20 animate-pulse rounded" /></TableCell></TableRow>
+                                        <TableRow key={i} className="border-border/50"><TableCell colSpan={5}><div className="h-10 w-full bg-muted/20 animate-pulse rounded" /></TableCell></TableRow>
                                     ))
                                 ) : filteredBusinesses.length === 0 ? (
                                     <TableRow className="border-border/50">
-                                        <TableCell colSpan={4} className="h-48 text-center">
+                                        <TableCell colSpan={5} className="h-48 text-center">
                                             <div className="flex flex-col items-center justify-center space-y-3 opacity-50">
                                                 <div className="p-3 bg-muted rounded-full">
                                                     <Server className="h-6 w-6 text-muted-foreground" />
@@ -592,7 +593,10 @@ export default function CyberShield() {
                                                 {business.name || 'Unnamed Entity'}
                                             </TableCell>
                                             <TableCell className="text-[11px] font-medium text-muted-foreground">
-                                                {business.email}
+                                                {business.email || 'N/A'}
+                                            </TableCell>
+                                            <TableCell className="text-[11px] font-medium text-muted-foreground/60">
+                                                {business.settings?.phone || 'N/A'}
                                             </TableCell>
                                             <TableCell className="font-mono text-[9px] text-muted-foreground/40">
                                                 {business.id}
