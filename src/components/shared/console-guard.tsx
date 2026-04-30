@@ -16,6 +16,7 @@ export function ConsoleGuard() {
       'ERR_BLOCKED_BY_CLIENT',
       'ERR_FAILED',
       'browsing-topics',
+      'Unrecognized feature: \'browsing-topics\'',
       'smartsupp',
       'Vercel Web Analytics',
       'Failed to load script',
