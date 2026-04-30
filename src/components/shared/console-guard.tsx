@@ -24,7 +24,15 @@ export function ConsoleGuard() {
       'tiktok.com',
       'twitter.com',
       'Minified React error #418',
-      'Minified React error #423'
+      'Minified React error #423',
+      'ResponsiveContainer',
+      'fixed numbers, maybe you don\'t need to use a ResponsiveContainer',
+      'QUIC_PROTOCOL_ERROR',
+      'QUIC_NETWORK_IDLE_TIMEOUT',
+      'transport errored',
+      'WebChannelConnection RPC',
+      'Firestore (11.10.0)',
+      '400 (Bad Request)'
     ];
 
     const shouldSuppress = (args: any[]) => {
