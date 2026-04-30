@@ -116,31 +116,24 @@ const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, border
         className={cn("relative overflow-hidden group hover:shadow-md transition-all border-border/50", borderClass)}
         onClick={onClick}
     >
-        <ScanningEffect />
-        <CardHeader className="p-4 pb-0">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
                 {label}
-                <Icon className={cn("h-3.5 w-3.5", colorClass)} />
             </CardTitle>
+            <Icon className={cn("h-4 w-4", colorClass)} />
         </CardHeader>
-        <CardContent className="p-4">
-            <div className={cn("text-2xl font-black tracking-tight", colorClass)}>
+        <CardContent>
+            <div className={cn("text-2xl font-bold", colorClass)}>
                 {value}
             </div>
-            <div className="text-[10px] text-muted-foreground font-medium mt-1">
-                {subValue}
-            </div>
-            <div className="h-1 bg-muted mt-3 rounded-full overflow-hidden">
-                <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: "100%" }}
-                    className={cn("h-full", colorClass.replace('text', 'bg'))} 
-                />
-            </div>
+            {subValue && (
+                <p className="text-xs text-muted-foreground mt-1">
+                    {subValue}
+                </p>
+            )}
         </CardContent>
     </Card>
 );
-
 export default function CyberShield() {
     const { firestore, auth, user: authUser } = useFirebase();
     const { toast } = useToast();
@@ -180,7 +173,7 @@ export default function CyberShield() {
             enabled: enrolled,
             color: enrolled ? 'text-emerald-600' : 'text-rose-600',
             bg: enrolled ? 'bg-emerald-600' : 'bg-rose-600',
-            label: enrolled ? 'SECURE' : 'UNPROTECTED'
+            label: enrolled ? 'Secure' : 'Unprotected'
         };
     }, [authUser]);
 
@@ -245,7 +238,7 @@ export default function CyberShield() {
                 suspendedAt: serverTimestamp(),
                 suspendedBy: 'SOC_PRIME'
             });
-            toast({ title: "Target Neutered", description: "System access revoked. Node dark.", className: "bg-red-600 text-white border-none" });
+            toast({ title: "Target Neutered", description: "System access revoked. Node offline.", className: "bg-red-600 text-white border-none" });
         } catch (err) {
             toast({ variant: "destructive", title: "Kill Command Failed", description: "Security override insufficient." });
         } finally {
@@ -371,7 +364,7 @@ export default function CyberShield() {
             await deleteDoc(doc(firestore, 'businessInstances', businessId));
             
             setDestructionProgress(100);
-            setDestructionStatus('ENTITY TERMINATED');
+            setDestructionStatus('Entity Terminated');
 
             toast({ 
                 title: "Destruction Complete", 
@@ -425,21 +418,21 @@ export default function CyberShield() {
             
             <div id="recaptcha-admin-container"></div>
             
-            {/* Top Bar - Situation Room Header */}
+            {/* Top Bar - Security Overview Header */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-b pb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <h1 className="text-base font-bold tracking-tight text-foreground/90">Cyber Shield Surveillance</h1>
+                        <h1 className="text-base font-bold tracking-tight text-foreground/90">Cyber Shield Security</h1>
                     </div>
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Critical Platform Surveillance & Intelligence Hub
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                        Platform Security Monitoring & Management Hub
                     </p>
                 </div>
                 
                 <div className="flex items-center gap-6">
                     <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Link integrity</span>
+                        <span className="text-[9px] font-bold text-muted-foreground mb-1">Link Integrity</span>
                         <div className="flex gap-1">
                             {[1, 2, 3, 4, 5].map(i => (
                                 <div key={i} className={cn("h-3 w-1 rounded-sm", i <= 4 ? "bg-emerald-500/40" : "bg-muted")} />
@@ -447,7 +440,7 @@ export default function CyberShield() {
                         </div>
                     </div>
                     <div className="flex flex-col items-end border-l pl-6">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Grid Uptime</span>
+                        <span className="text-[9px] font-bold text-muted-foreground mb-1">Network Uptime</span>
                         <span className="text-xs font-bold font-mono">99.9%</span>
                     </div>
                 </div>
@@ -461,16 +454,16 @@ export default function CyberShield() {
                     <ScanningEffect />
                     <RadarPulse />
                     <div className="mt-6 text-center">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">System Health</p>
-                        <div className={cn("text-5xl font-black tracking-tighter", securityMatrix.color)}>
+                        <p className="text-[10px] font-bold text-muted-foreground mb-1">System Health</p>
+                        <div className={cn("text-5xl font-bold tracking-tighter", securityMatrix.color)}>
                             {securityMatrix.score}%
                         </div>
-                        <Badge variant="secondary" className="mt-3 font-bold uppercase text-[10px] tracking-tight">
+                        <Badge variant="secondary" className="mt-3 font-bold text-[10px] tracking-tight">
                             {securityMatrix.level}
                         </Badge>
                     </div>
                     <div className="w-full space-y-2 mt-8">
-                        <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase">
+                        <div className="flex justify-between text-[9px] font-bold text-muted-foreground">
                             <span>Threat Density</span>
                             <span>Low</span>
                         </div>
@@ -482,7 +475,7 @@ export default function CyberShield() {
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <SecurityMetric 
                         label="Surface Nodes" 
-                        value={`${adminCount} ADMINS`}
+                        value={`${adminCount} Admins`}
                         subValue="Verified entry protocols active"
                         icon={Cpu}
                         colorClass="text-blue-600"
@@ -504,28 +497,28 @@ export default function CyberShield() {
                         onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}
                     />
                     
-                    {/* Live Entity Monitor */}
+                    {/* Active Network Monitor */}
                     <Card className="md:col-span-3 border-border/50 p-4 bg-white/50 backdrop-blur-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Neural Grid Status</span>
+                                <span className="text-[10px] font-bold text-muted-foreground">Active Network Status</span>
                             </div>
-                            <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
-                                Active Nodes
-                            </div>
+                            <p className="text-[11px] font-black text-primary/80 uppercase">
+                                zeneva.space - Certified Result
+                            </p>
                         </div>
                         <div className="h-28 overflow-hidden relative">
                              <div className="space-y-1.5">
                                 {allBusinesses?.slice(0, 4).map((b, i) => (
                                     <div key={i} className="flex items-center gap-4 text-[11px] border-l-2 border-primary/20 pl-4 py-1.5 hover:bg-muted/50 transition-colors cursor-default">
                                         <span className={cn("font-bold min-w-[60px] font-mono", i === 0 ? "text-primary" : "text-muted-foreground")}>
-                                            [ONLINE]
+                                            Online
                                         </span>
-                                        <span className="text-foreground font-bold">{b.name?.toUpperCase()}</span>
+                                        <span className="text-foreground font-bold">{b.name}</span>
                                         <ArrowRight className="h-2.5 w-2.5 text-muted-foreground/30" />
                                         <span className="text-muted-foreground/50 truncate max-w-[200px]">{b.email}</span>
-                                        <span className="text-[9px] font-black ml-auto bg-muted px-2 py-0.5 rounded text-muted-foreground uppercase">{b.id.slice(0, 8)}</span>
+                                        <span className="text-[9px] font-bold ml-auto bg-muted px-2 py-0.5 rounded text-muted-foreground">{b.id.slice(0, 8)}</span>
                                     </div>
                                 ))}
                              </div>
@@ -543,13 +536,13 @@ export default function CyberShield() {
                 <CardHeader className="bg-muted/30 border-b p-6 relative">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="space-y-1">
-                            <CardTitle className="text-sm flex items-center gap-2 font-black tracking-tighter text-primary uppercase italic">
+                            <CardTitle className="text-sm flex items-center gap-2 font-bold tracking-tighter text-primary">
                                 <Server className="h-4 w-4 animate-pulse" />
                                 Business Intelligence Unit
                             </CardTitle>
-                            <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70">
-                                ENTITY RECOGNITION & SANITIZATION PROTOCOL
-                            </CardDescription>
+                            <CardDescription className="text-xs font-medium text-muted-foreground opacity-70">
+                            Entity Management & Security Verification
+                        </CardDescription>
                         </div>
                         <div className="relative w-full md:w-80 group">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-lg blur opacity-25 group-focus-within:opacity-100 transition duration-1000" />
@@ -568,10 +561,10 @@ export default function CyberShield() {
                         <Table>
                             <TableHeader className="bg-muted/10">
                                 <TableRow className="hover:bg-transparent border-border/50">
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Entity Name</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Communication Link</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Node ID</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 text-right px-6">Actions</TableHead>
+                                        <TableHead className="text-xs font-medium">Entity Name</TableHead>
+                                        <TableHead className="text-xs font-medium">Communication Link</TableHead>
+                                        <TableHead className="text-xs font-medium">Node ID</TableHead>
+                                        <TableHead className="text-xs font-medium text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -586,7 +579,7 @@ export default function CyberShield() {
                                                 <div className="p-3 bg-muted rounded-full">
                                                     <Server className="h-6 w-6 text-muted-foreground" />
                                                 </div>
-                                                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground">
+                                                <p className="text-[10px] font-bold text-muted-foreground">
                                                     No entities detected in this sector
                                                 </p>
                                             </div>
@@ -595,20 +588,20 @@ export default function CyberShield() {
                                 ) : (
                                     filteredBusinesses.map((business) => (
                                         <TableRow key={business.id} className="hover:bg-muted/5 border-border/50 group transition-colors">
-                                            <TableCell className="font-bold text-[11px] uppercase tracking-tight text-foreground/80 py-4">
+                                            <TableCell className="font-bold text-[11px] tracking-tight text-foreground/80 py-4">
                                                 {business.name || 'Unnamed Entity'}
                                             </TableCell>
                                             <TableCell className="text-[11px] font-medium text-muted-foreground">
                                                 {business.email}
                                             </TableCell>
-                                            <TableCell className="font-mono text-[9px] text-muted-foreground/40 uppercase">
+                                            <TableCell className="font-mono text-[9px] text-muted-foreground/40">
                                                 {business.id}
                                             </TableCell>
                                             <TableCell className="text-right px-6">
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
-                                                    className="h-8 text-[9px] font-black uppercase tracking-widest text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-600/20 hover:border-rose-600 transition-all rounded-md"
+                                                    className="h-8 text-[9px] font-bold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-600/20 hover:border-rose-600 transition-all rounded-md"
                                                     onClick={() => {
                                                         setDestructionEmail(business.email || "");
                                                         setIsDestructionModalOpen(true);
@@ -629,16 +622,16 @@ export default function CyberShield() {
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
                             <Server className="h-3 w-3 text-muted-foreground/40" />
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Neural Grid Hub</span>
+                            <span className="text-[9px] font-bold text-muted-foreground">Administrative Infrastructure</span>
                         </div>
                         <div className="h-3 w-px bg-border/50" />
-                        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                        <span className="text-[9px] font-bold text-muted-foreground/60">
                             {filteredBusinesses.length} Nodes Identified
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Direct Link Active</span>
+                        <span className="text-[9px] font-bold text-primary">Direct Link Active</span>
                     </div>
                 </CardFooter>
             </Card>
@@ -647,12 +640,12 @@ export default function CyberShield() {
             <Dialog open={isDestructionModalOpen} onOpenChange={(open) => !isDestroying && setIsDestructionModalOpen(open)}>
                 <DialogContent className="sm:max-w-[500px] border-rose-500/50 bg-background shadow-2xl shadow-rose-500/10">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-3 text-rose-600 text-xl font-black italic tracking-tighter">
+                        <DialogTitle className="flex items-center gap-3 text-rose-600 text-xl font-bold tracking-tighter">
                             <ShieldAlert className="h-6 w-6 animate-pulse" />
-                            CONFIRM ENTITY DESTRUCTION
+                            Confirm Entity Termination
                         </DialogTitle>
-                        <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-2 border-b pb-4">
-                            You are about to scrub a business from the Zeneva Grid.
+                        <DialogDescription className="text-xs font-bold text-muted-foreground mt-2 border-b pb-4">
+                            You are about to permanently delete a business and all its data.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -670,7 +663,7 @@ export default function CyberShield() {
                             </div>
                             <div className="w-full max-w-xs space-y-2">
                                 <Progress value={destructionProgress} className="h-2 bg-rose-500/10" indicatorClassName="bg-rose-600" />
-                                <p className="text-[10px] font-black font-mono text-center text-rose-600 uppercase tracking-[0.2em] animate-pulse">
+                                <p className="text-[10px] font-bold font-mono text-center text-rose-600 animate-pulse">
                                     {destructionStatus}
                                 </p>
                             </div>
@@ -680,16 +673,16 @@ export default function CyberShield() {
                             <div className="p-4 bg-rose-50 border border-rose-100 rounded-lg flex gap-3 items-start">
                                 <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
                                 <div className="space-y-1">
-                                    <p className="text-xs font-bold text-rose-700 uppercase tracking-tight">Destructive Action Warning</p>
+                                    <p className="text-xs font-bold text-rose-700 tracking-tight">Destructive Action Warning</p>
                                     <p className="text-[11px] text-rose-600 leading-relaxed font-medium">
-                                        This will purge the business record and ALL related sub-collections across the entire Firestore architecture. All session tokens will be invalidated immediately.
+                                        This will purge the business record and ALL related data across the platform. All session tokens will be invalidated immediately.
                                     </p>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Verify Business Email</Label>
+                                    <Label className="text-[10px] font-bold text-muted-foreground">Verify Business Email</Label>
                                     <Input 
                                         placeholder="Enter target business email..." 
                                         value={destructionEmail}
@@ -699,7 +692,7 @@ export default function CyberShield() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Admin Security Key</Label>
+                                    <Label className="text-[10px] font-bold text-muted-foreground">Admin Security Key</Label>
                                     <Input 
                                         type="password"
                                         placeholder={`Type "${REQUIRED_KEY}"`}
@@ -731,7 +724,7 @@ export default function CyberShield() {
                             size="sm"
                             onClick={() => setIsDestructionModalOpen(false)}
                             disabled={isDestroying}
-                            className="font-bold uppercase text-[10px] tracking-widest"
+                            className="font-bold text-[10px]"
                         >
                             Abort Protocol
                         </Button>
@@ -741,10 +734,10 @@ export default function CyberShield() {
                                 size="sm"
                                 disabled={destructionEmail.trim() === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction}
                                 onClick={handleEntityTermination}
-                                className="bg-rose-600 hover:bg-rose-700 font-bold uppercase text-[10px] tracking-widest px-8 shadow-lg shadow-rose-500/20"
+                                className="bg-rose-600 hover:bg-rose-700 font-bold text-[10px] px-8 shadow-lg shadow-rose-500/20"
                             >
                                 <Zap className="h-3.5 w-3.5 mr-2" />
-                                EXECUTE TERMINATION
+                                Execute Termination
                             </Button>
                         )}
                     </DialogFooter>
@@ -764,22 +757,22 @@ export default function CyberShield() {
                                         </div>
                                         Secure Identity Link
                                     </DialogTitle>
-                                    <DialogDescription className="text-muted-foreground text-xs font-medium uppercase tracking-wider mt-2">
-                                        Protect your admin node with hardware verification.
+                                    <DialogDescription className="text-muted-foreground text-xs font-medium mt-2">
+                                        Protect your admin account with hardware verification.
                                     </DialogDescription>
                                 </DialogHeader>
                                 
                                 <div className="space-y-6 py-8">
                                     {mfaStep === 'phone' ? (
                                         <div className="space-y-3">
-                                            <Label htmlFor="phone" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Admin Phone Number</Label>
+                                            <Label htmlFor="phone" className="text-[10px] font-bold text-muted-foreground">Admin Phone Number</Label>
                                             <div className="relative">
                                                 <Input 
                                                     id="phone" 
                                                     placeholder="+234..." 
                                                     value={phoneNumber} 
                                                     onChange={(e) => setPhoneNumber(e.target.value)}
-                                                    className="h-12 font-bold text-lg tracking-widest focus:ring-primary transition-all"
+                                                    className="h-12 font-bold text-lg focus:ring-primary transition-all"
                                                 />
                                                 <Smartphone className="absolute right-3 top-3 h-6 w-6 text-muted-foreground/20" />
                                             </div>
@@ -795,10 +788,10 @@ export default function CyberShield() {
                                                     <Radio className="h-8 w-8 text-primary" />
                                                 </div>
                                             </div>
-                                            <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Transmission Received</Label>
-                                            <p className="text-xs text-muted-foreground mt-2 font-medium">Input 6-digit signal</p>
+                                            <Label className="text-[10px] font-bold text-primary">Verification Required</Label>
+                                            <p className="text-xs text-muted-foreground mt-2 font-medium">Enter the 6-digit code sent to your device</p>
                                             <Input 
-                                                className="mt-6 text-center text-4xl tracking-widest font-black h-20 focus:ring-emerald-500" 
+                                                className="mt-6 text-center text-4xl font-bold h-20 focus:ring-emerald-500" 
                                                 maxLength={6} 
                                                 autoFocus
                                                 value={verificationCode}
@@ -813,7 +806,7 @@ export default function CyberShield() {
                                         variant="ghost" 
                                         onClick={() => setIsMfaModalOpen(false)} 
                                         disabled={isEnrolling}
-                                        className="font-bold uppercase text-[10px] tracking-widest"
+                                        className="font-bold text-[10px]"
                                     >
                                         Abort
                                     </Button>
@@ -821,16 +814,16 @@ export default function CyberShield() {
                                         <Button 
                                             onClick={handleSendCode} 
                                             disabled={isEnrolling || !phoneNumber}
-                                            className="flex-1 bg-primary font-bold uppercase text-[11px] tracking-widest h-12 shadow-md"
+                                            className="flex-1 bg-primary font-bold text-[11px] h-12 shadow-md"
                                         >
                                             {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Signal className="h-4 w-4 mr-2" />}
-                                            Link Node
+                                            Link Account
                                         </Button>
                                     ) : (
                                         <Button 
                                             onClick={handleVerifyAndEnroll} 
                                             disabled={isEnrolling || verificationCode.length < 6}
-                                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-bold uppercase text-[11px] tracking-widest h-12 shadow-md text-white border-none"
+                                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-bold text-[11px] h-12 shadow-md text-white border-none"
                                         >
                                             {isEnrolling ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Crosshair className="h-4 w-4 mr-2" />}
                                             Confirm Identity

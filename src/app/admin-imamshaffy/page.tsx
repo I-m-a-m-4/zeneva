@@ -273,38 +273,38 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                 <div className="grid gap-6 py-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className='col-span-2'>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Business Name</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Business Name</Label>
                             <p className="font-medium text-lg">{business?.name || 'N/A'}</p>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Contact Phone</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Contact Phone</Label>
                             <p className="font-medium">{business?.settings?.phone || user.phone || 'N/A'}</p>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Contact Email</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Contact Email</Label>
                             <p className="font-medium">{business?.settings?.email || user.email || 'N/A'}</p>
                         </div>
 
                         <div className='col-span-2'>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Address</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Address</Label>
                             <p className="font-medium">{business?.address || 'N/A'}</p>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">State</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">State</Label>
                             <p className="font-medium">{business?.settings?.state || 'N/A'}</p>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Country</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Country</Label>
                             <p className="font-medium">{business?.settings?.country || 'N/A'}</p>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Currency</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Currency</Label>
                             <p className="font-medium">{business?.settings?.currency || 'NGN'}</p>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Plan</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Plan</Label>
                             <div className="mt-1">
                                 {business ? (
                                     business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
@@ -312,7 +312,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </div>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">User Status</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">User Status</Label>
                             <div className="mt-1">
                                 <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
                                     {user.status || 'active'}
@@ -320,7 +320,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </div>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Last Seen</Label>
+                            <Label className="text-xs text-muted-foreground font-bold">Last Seen</Label>
                             <div className="mt-1">
                                 <UserPresence lastSeen={user.lastSeen} />
                             </div>
@@ -1683,7 +1683,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </div>
 
                         <div className="relative z-10 mb-4 px-3 py-1 bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 rounded-full">
-                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase">
+                            <p className="text-xs font-bold text-yellow-600 tracking-wide">
                                 Zeneva Admin Analytics
                             </p>
                         </div>
@@ -1718,7 +1718,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </div>
 
                         <div className="absolute bottom-4 left-0 right-0 text-center">
-                            <p className="text-[11px] font-black tracking-[0.2em] text-primary/80 uppercase">
+                            <p className="text-[11px] font-black text-primary/80">
                                 zeneva.space - Certified Result
                             </p>
                         </div>

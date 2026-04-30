@@ -670,7 +670,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("fetchDetailedAnalytics failed:", err);
       if (receipts && receipts.length > 0) {
         const filtered = receipts.filter(r => { const rd = safeToDate(r.createdAt); return rd >= from && rd <= to; });
-        return { revenue: filtered.reduce((sum, r) => sum + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
+        return { revenue: filtered.reduce((acc, r) => acc + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
       }
       return { revenue: 0, count: 0, customers: 0 };
     }
@@ -821,7 +821,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [isMounted, businessId, firestore, fetchFullCustomers]);
 
 
-  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
   const total = useMemo(() => subtotal + tax - discount, [subtotal, tax, discount]);
 
