@@ -612,17 +612,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
         where("createdAt", "<=", safeToDate(to))
       );
       
-      const snap = await getDocs(q);
-      const docs = snap.docs.map(d => d.data() as Receipt);
+      // 100% Accurate Aggregation for Big Numbers
+      const aggregateSnap = await getAggregateFromServer(q, {
+        totalRevenue: sum('total'),
+        totalOrders: count()
+      });
       
-      const revenue = docs.reduce((sum, r) => sum + (r.total || 0), 0);
-      const count = docs.length;
-      const customers = new Set(docs.map(r => r.customer?.id).filter(Boolean)).size;
+      const revenue = aggregateSnap.data().totalRevenue || 0;
+      const orderCount = aggregateSnap.data().totalOrders || 0;
       
-      return { revenue, count, customers };
+      // For unique customers, we still need to fetch IDs or documents 
+      // We use a high limit here to ensure accuracy for most businesses
+      const docSnap = await getDocs(query(q, limit(100000)));
+      const customers = new Set(docSnap.docs.map(d => d.data().customer?.id).filter(Boolean)).size;
+      
+      return { revenue, count: orderCount, customers };
     } catch (err) {
       console.error("fetchDetailedAnalytics failed:", err);
-      // Fallback to local filtering if Firestore fails
       if (receipts && receipts.length > 0) {
         const filtered = receipts.filter(r => { const rd = safeToDate(r.createdAt); return rd >= from && rd <= to; });
         return { revenue: filtered.reduce((sum, r) => sum + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
@@ -795,7 +801,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     triggerRefresh();
   }, [toast, nuclearReset, triggerRefresh]);
 
-  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 2000) => {
+  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 1000000) => {
     if (!businessId || !firestore) return [];
     
     try {

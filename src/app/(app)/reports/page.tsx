@@ -194,7 +194,7 @@ export default function ReportsDashboard() {
                 }, 4000);
                 
                 try {
-                    const res = await fetchReceiptsInRange(date.from!, date.to!, 5000);
+                    const res = await fetchReceiptsInRange(date.from!, date.to!);
                     setReportBatchReceipts(res);
                 } finally {
                     clearTimeout(timeout);
