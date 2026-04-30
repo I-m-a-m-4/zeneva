@@ -18,6 +18,9 @@ export default function InstallPrompt() {
     const [showInstallModal, setShowInstallModal] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
 
+    // Disable automatic install prompt as requested
+    return null;
+
     useEffect(() => {
         // Check if device is iOS
         const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;

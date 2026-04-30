@@ -1,3 +1,4 @@
+import * as React from 'react';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import './globals.css';
@@ -185,6 +186,14 @@ export default function RootLayout({
   
   React.useEffect(() => {
     setIsMounted(true);
+
+    // Zeneva Console Branding
+    console.log(
+      `%c\n  ______ ______ _   _ ______      __     \n |___  /|  ____|| \\ | |  ____|/\\   \\ \\    \n    / / | |__   |  \\| | |__  /  \\   \\ \\   \n   / /  |  __|  | . \` |  __|/ /\\ \\   > >  \n  / /__ | |____ | |\\  | |__/ ____ \\ / /   \n /_____||______||_| \\_|____/_/    \\_\\/_/    \n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
+      "color: #F97316; font-weight: bold; font-family: monospace;",
+      "background: #F97316; color: white; padding: 4px 8px; font-weight: bold; border-radius: 4px;",
+      "color: inherit;"
+    );
   }, []);
 
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
