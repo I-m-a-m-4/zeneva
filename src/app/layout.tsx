@@ -18,6 +18,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
+import { ConsoleGuard } from '@/components/shared/console-guard';
 
 import { ThemeProvider } from '@/components/theme-provider';
 
@@ -180,7 +181,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+  const [isMounted, setIsMounted] = React.useState(false);
+  
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
   return (
     <html lang="en" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
@@ -278,7 +285,8 @@ export default function RootLayout({
               </POSProvider>
             </PWAProvider>
           </FirebaseClientProvider>
-          {!isTauri && <Analytics />}
+          {isMounted && !isTauri && <Analytics />}
+          <ConsoleGuard />
         </ThemeProvider>
         <Toaster />
         <script
