@@ -622,8 +622,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const orderCount = aggregateSnap.data().totalOrders || 0;
       
       // For unique customers, we still need to fetch IDs or documents 
-      // We use a high limit here to ensure accuracy for most businesses
-      const docSnap = await getDocs(query(q, limit(100000)));
+      // We cap this at 10,000 due to Firestore structured query limits
+      const docSnap = await getDocs(query(q, limit(10000)));
       const customers = new Set(docSnap.docs.map(d => d.data().customer?.id).filter(Boolean)).size;
       
       return { revenue, count: orderCount, customers };
@@ -801,7 +801,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     triggerRefresh();
   }, [toast, nuclearReset, triggerRefresh]);
 
-  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 1000000) => {
+  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 10000) => {
     if (!businessId || !firestore) return [];
     
     try {
