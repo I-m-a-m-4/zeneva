@@ -69,7 +69,7 @@ export const metadata: Metadata = {
     siteName: 'Zeneva',
     images: [
       {
-        url: `${siteUrl}/zeneva-platform.png`,
+        url: `${siteUrl}/zeneva-og-image.png`,
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -83,7 +83,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Zeneva - Global Retail OS & POS Platform',
     description: 'Transform your retail operations with Zeneva. Inventory, analytics, and global payments in one unified platform.',
-    images: [`${siteUrl}/zeneva-platform.png`],
+    images: [`${siteUrl}/zeneva-og-image.png`],
     creator: '@zeneva_retail',
   },
   alternates: {
@@ -99,7 +99,7 @@ const jsonLd = {
       '@id': `${siteUrl}/#organization`,
       name: 'Zeneva',
       url: siteUrl,
-      logo: `${siteUrl}/zeneva-platform.png`,
+      logo: `${siteUrl}/zeneva-og-image.png`,
       sameAs: [
         'https://x.com/zeneva_retail',
         'https://www.instagram.com/zeneva_pos/',
