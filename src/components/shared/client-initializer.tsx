@@ -13,7 +13,7 @@ export function ClientSideInitializer() {
 
     // Zeneva Console Branding
     console.log(
-      `%c\n  ____  _____ _   _ _______     __    _    \n |_  / | ____| \\ | | ____\\ \\   / /   / \\   \n  / /  |  _| |  \\| |  _|  \\ \\ / /   / _ \\  \n / /__ | |___| |\\  | |___  \\ V /   / ___ \\ \n/_____||_____|_| \\_|_____|  \\_/   /_/   \\_\\\n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
+      `%c\n  ______   ______   _   _   ______   __      __      _    \n |___  /  |  ____| | \\ | | |  ____|  \\ \\    / /     / \\   \n    / /   | |__    |  \\| | | |__      \\ \\  / /     / _ \\  \n   / /    |  __|   | . \` | |  __|      \\ \\/ /     / ___ \\ \n  / /__   | |____  | |\\  | | |____      \\  /     / /   \\ \\\n /_____|  |______| |_| \\_| |______|      \\/     /_/     \\_\\\n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
       "color: #F97316; font-weight: bold; font-family: monospace;",
       "background: #F97316; color: white; padding: 4px 8px; font-weight: bold; border-radius: 4px;",
       "color: inherit;"
