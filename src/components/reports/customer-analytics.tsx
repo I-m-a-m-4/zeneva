@@ -12,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
 
 interface CustomerAnalyticsProps {
   customers: Customer[];
@@ -41,7 +42,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
             email: c.email,
             totalSpent: 0,
             orderCount: 0,
-            firstOrder: c.createdAt?.toDate ? c.createdAt.toDate() : new Date()
+            firstOrder: safeToDate(c.createdAt)
         }
     });
 
@@ -53,13 +54,13 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                 email: receipt.customer.email || 'N/A',
                 totalSpent: 0,
                 orderCount: 0,
-                firstOrder: receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt || 0)
+                firstOrder: safeToDate(receipt.createdAt)
             };
         }
         customerStats[receipt.customer.id].totalSpent += receipt.total;
         customerStats[receipt.customer.id].orderCount += 1;
         
-        const rDate = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt || 0);
+        const rDate = safeToDate(receipt.createdAt);
         if (rDate < customerStats[receipt.customer.id].firstOrder) {
             customerStats[receipt.customer.id].firstOrder = rDate;
         }
@@ -98,7 +99,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     else limitDate = new Date(0);
 
     customers.forEach(c => {
-        const date = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.createdAt || 0);
+        const date = safeToDate(c.createdAt);
         if (date >= limitDate) {
             const day = date.toISOString().split('T')[0];
             days[day] = (days[day] || 0) + 1;

@@ -10,6 +10,7 @@ import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
 
 const chartConfig = {
   sales: {
@@ -41,7 +42,7 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
             else limitDate = subDays(now, 90);
 
             filteredReceipts = receipts.filter(r => {
-                const rd = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || 0);
+                const rd = safeToDate(r.createdAt);
                 return rd >= limitDate;
             });
         }
@@ -51,7 +52,7 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
         const currentYear = new Date().getFullYear();
 
         filteredReceipts.forEach(receipt => {
-          const date = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt);
+          const date = safeToDate(receipt.createdAt);
           const year = date.getFullYear();
           if (year === currentYear || timeframe !== 'all') { 
             const monthName = monthNames[date.getMonth()];

@@ -142,7 +142,7 @@ export default function ReportsDashboard() {
         });
 
         const activeDays = new Set(targetReceipts.map(r => {
-            const d = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
+            const d = safeToDate(r.createdAt);
             return d.toISOString().split('T')[0];
         })).size || 1;
 

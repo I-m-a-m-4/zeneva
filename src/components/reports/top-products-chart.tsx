@@ -10,6 +10,7 @@ import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
 
 const chartConfig = {
   quantity: {
@@ -37,7 +38,7 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
             else limitDate = subDays(now, 90);
 
             filteredReceipts = receipts.filter(r => {
-                const rd = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || 0);
+                const rd = safeToDate(r.createdAt);
                 return rd >= limitDate;
             });
         }
