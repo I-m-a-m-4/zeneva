@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { writeBatch, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { writeBatch, collection, doc, serverTimestamp, increment } from 'firebase/firestore';
 import { Loader2, UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
 import { Customer } from '@/types';
@@ -155,23 +155,38 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
     if (!businessId || !firestore || parsedData.length === 0) return;
     setIsImporting(true);
     try {
-      const batch = writeBatch(firestore);
       const customersRef = collection(firestore, 'customers');
-
-      parsedData.forEach(customerData => {
-        const newCustomerRef = doc(customersRef);
-        batch.set(newCustomerRef, {
-          name: customerData.name,
-          email: customerData.email,
-          phone: customerData.phone || '',
-          code: customerData.code || '',
-          businessId,
-          loyaltyPoints: 0,
-          createdAt: serverTimestamp(),
+      const statsRef = doc(firestore, 'businessInstances', businessId, 'stats', 'overall');
+      
+      // Batch size limit is 500 in Firestore
+      const BATCH_SIZE = 450; // Leave some room for stats update
+      const totalBatches = Math.ceil(parsedData.length / BATCH_SIZE);
+      
+      for (let i = 0; i < totalBatches; i++) {
+        const batch = writeBatch(firestore);
+        const chunk = parsedData.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+        
+        chunk.forEach(customerData => {
+          const newCustomerRef = doc(customersRef);
+          batch.set(newCustomerRef, {
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone || '',
+            code: customerData.code || '',
+            businessId,
+            loyaltyPoints: 0,
+            totalSpent: 0, // CRITICAL: Required for query ordering
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(), // CRITICAL: Required for sync logic
+          });
         });
-      });
-
-      await batch.commit();
+        
+        // Update stats in the last batch or once per batch
+        // We'll update it once per batch for safety
+        batch.set(statsRef, { totalCustomers: increment(chunk.length) }, { merge: true });
+        
+        await batch.commit();
+      }
 
       toast({
         variant: 'success',

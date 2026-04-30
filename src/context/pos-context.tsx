@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, orderBy, writeBatch, serverTimestamp, limit, getDocs, increment, getAggregateFromServer, sum, count, startAfter } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
@@ -172,16 +172,44 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const canFetchSubData = !!businessId && !!initialBusiness;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
   const { data: initialStats } = useDoc<BusinessStats>(statsDocRef);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
+  // Background Stats Reconciliation
+  useEffect(() => {
+    if (!canFetchSubData || !firestore || !businessId || !initialStats) return;
+    
+    const reconcileStats = async () => {
+      try {
+        const customersCount = await getAggregateFromServer(query(collection(firestore, "customers"), where("businessId", "==", businessId)), { total: count() });
+        const productsCount = await getAggregateFromServer(query(collection(firestore, "products"), where("businessId", "==", businessId)), { total: count() });
+        
+        const realTotalCustomers = customersCount.data().total;
+        const realTotalProducts = productsCount.data().total;
+
+        if (realTotalCustomers !== initialStats.totalCustomers || realTotalProducts !== initialStats.totalProducts) {
+          await setDoc(statsDocRef!, { 
+            totalCustomers: realTotalCustomers,
+            totalProducts: realTotalProducts 
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error("Failed to reconcile stats:", e);
+      }
+    };
+
+    // Run reconciliation 5 seconds after load to avoid initial contention
+    const timer = setTimeout(reconcileStats, 5000);
+    return () => clearTimeout(timer);
+  }, [canFetchSubData, businessId, !!initialStats]);
+
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("totalSpent", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
@@ -203,7 +231,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(items)) items.forEach((item: any) => { const idx = merged.findIndex(p => p.id === item.productId); if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity }; });
       }
     });
-    return merged;
+    // Client-side sort by createdAt desc
+    return merged.sort((a, b) => {
+      const dateA = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      return dateB - dateA;
+    });
   }, [initialProducts, syncedProducts, queuedActions]);
 
   const profile = useMemo(() => {
@@ -237,7 +270,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const receipt = action.payload.receiptData;
       if (receipt && !existingIds.has(receipt.id)) merged.push({ ...receipt, isOptimistic: true, createdAt: receipt.createdAt || new Date(action.timestamp) });
     });
-    return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+    
+    // Client-side sort by createdAt desc
+    return merged.sort((a, b) => {
+      const dateA = a.createdAt?.toMillis?.() || a.createdAt?.seconds || (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0);
+      const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0);
+      return dateB - dateA;
+    });
   }, [initialReceipts, syncedReceipts, queuedActions]);
 
   const customers = useMemo(() => {
@@ -284,7 +323,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-    return merged;
+    return merged.sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
   }, [initialCustomers, syncedCustomers, queuedActions]);
 
   const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);

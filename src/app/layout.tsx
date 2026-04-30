@@ -265,6 +265,7 @@ export default function RootLayout({
       <body className={cn('font-body antialiased bg-background text-foreground')} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <SplashScreen />
+          <ClientSideInitializer />
           <ChunkErrorListener />
           <FirebaseClientProvider>
             <PWAProvider>
@@ -285,7 +286,6 @@ export default function RootLayout({
               </POSProvider>
             </PWAProvider>
           </FirebaseClientProvider>
-          <ClientSideInitializer />
         </ThemeProvider>
         <Toaster />
         <script

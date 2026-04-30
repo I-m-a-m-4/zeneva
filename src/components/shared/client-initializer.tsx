@@ -14,7 +14,7 @@ export function ClientSideInitializer() {
     // Zeneva Console Branding
     // Note: Important errors are NOT suppressed. Only non-critical tracker and network noise is silenced.
     console.log(
-      `%c\n  ███████   ███████   ██    ██   ███████   ██   ██   ███████\n     ███    ███       ███   ██   ███       ██   ██   ███ ███\n    ███     ███████   ████  ██   ███████    ██ ██    ███████\n   ███      ███       ██ ██ ██   ███         ███     ███ ███\n  ███████   ███████   ██  ████   ███████      █      ███ ███\n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
+      `%c\n ███████  ███████  ██   ██  ███████  ██   ██   █████ \n    ███   ███      ███  ██  ███      ██   ██  ██   ██\n   ███    ███████  ████ ██  ███████   ██ ██   ███████\n  ███     ███      ██ ████  ███        ███    ██   ██\n ███████  ███████  ██   ██  ███████     █     ██   ██\n\n %c NEVER LOSE A SALE, NEVER WASTE A STOCK FOR ZENEVA %c \n`,
       "color: #F97316; font-weight: bold; font-family: monospace;",
       "background: #F97316; color: white; padding: 4px 8px; font-weight: bold; border-radius: 4px;",
       "color: inherit;"

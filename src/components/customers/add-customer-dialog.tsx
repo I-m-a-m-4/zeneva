@@ -95,6 +95,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         businessId,
         loyaltyPoints: 0,
         totalSpent: 0,
+        updatedAt: serverTimestamp(),
       };
 
       if (isTauri) {
@@ -113,6 +114,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         await addDoc(collection(firestore, 'customers'), {
           ...newCustomerData,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
         toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
         triggerRefresh();

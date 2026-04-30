@@ -35,7 +35,11 @@ export function ConsoleGuard() {
       'Firestore (11.10.0)',
       'firestore.googleapis.com',
       'google.firestore.v1.Firestore',
-      '400 (Bad Request)'
+      '400 (Bad Request)',
+      '404 (Not Found)',
+      'bootstrap.smartsuppchat.com',
+      'google.ads',
+      'pagead2.googlesyndication.com'
     ];
 
     const shouldSuppress = (args: any[]) => {
