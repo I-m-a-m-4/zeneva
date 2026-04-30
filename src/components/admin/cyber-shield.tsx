@@ -144,10 +144,8 @@ const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, border
 export default function CyberShield() {
     const { firestore, auth, user: authUser } = useFirebase();
     const { toast } = useToast();
-    const [auditLogs, setAuditLogs] = useState<any[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(true);
-    const [indexError, setIndexError] = useState<string | null>(null);
     const [isRevoking, setIsRevoking] = useState<string | null>(null);
+    const [searchBusiness, setSearchBusiness] = useState('');
 
     // Entity Termination State
     const [isDestructionModalOpen, setIsDestructionModalOpen] = useState(false);
@@ -186,38 +184,16 @@ export default function CyberShield() {
         };
     }, [authUser]);
 
-    const fetchGlobalAudit = async () => {
-        if (!firestore) return;
-        setIsLoadingLogs(true);
-        try {
-            const q = query(
-                collectionGroup(firestore, 'auditLogs'),
-                orderBy('createdAt', 'desc'),
-                limit(30)
-            );
-            const snap = await getDocs(q);
-            const logs = snap.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                businessId: doc.ref.parent.parent?.id
-            }));
-            setAuditLogs(logs);
-            setIndexError(null);
-        } catch (err: any) {
-            console.error("Failed to fetch global audit logs:", err);
-            if (err.message?.includes('index')) {
-                setIndexError("Audit Log Index required. Please enable global monitoring.");
-            }
-        } finally {
-            setIsLoadingLogs(false);
-        }
-    };
+    const businessesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'businessInstances')) : null, [firestore]);
+    const { data: allBusinesses, isLoading: isLoadingBusinesses } = useCollection<any>(businessesQuery);
 
-    useEffect(() => {
-        fetchGlobalAudit();
-        const interval = setInterval(fetchGlobalAudit, 30000); // Auto-sync every 30s
-        return () => clearInterval(interval);
-    }, [firestore]);
+    const filteredBusinesses = useMemo(() => {
+        if (!allBusinesses) return [];
+        return allBusinesses.filter(b => 
+            b.name?.toLowerCase().includes(searchBusiness.toLowerCase()) || 
+            b.email?.toLowerCase().includes(searchBusiness.toLowerCase())
+        );
+    }, [allBusinesses, searchBusiness]);
 
     const handleSendCode = async () => {
         if (!auth || !authUser || !phoneNumber) return;
@@ -432,15 +408,12 @@ export default function CyberShield() {
     };
 
     const securityMatrix = useMemo(() => {
-        const recentLogs = auditLogs.filter(log => log.createdAt?.toDate() > subHours(new Date(), 24));
-        const impersonations = recentLogs.filter(l => l.action?.includes('impersonation')).length;
-        const criticalDeletes = recentLogs.filter(l => l.action?.includes('delete')).length;
-        const sensitiveCount = impersonations + criticalDeletes;
-
-        if (sensitiveCount > 5) return { level: 'CRITICAL', score: 28, color: 'text-rose-600', from: 'from-rose-600', variant: 'destructive' as const };
-        if (sensitiveCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-600', from: 'from-amber-600', variant: 'outline' as const };
+        const suspiciousCount = allUsers?.filter(u => u.status === 'suspended').length || 0;
+        
+        if (suspiciousCount > 3) return { level: 'CRITICAL', score: 28, color: 'text-rose-600', from: 'from-rose-600', variant: 'destructive' as const };
+        if (suspiciousCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-600', from: 'from-amber-600', variant: 'outline' as const };
         return { level: 'OPTIMAL', score: 94, color: 'text-emerald-600', from: 'from-emerald-600', variant: 'default' as const };
-    }, [auditLogs]);
+    }, [allUsers]);
 
     return (
         <div className="space-y-6 relative overflow-hidden">
@@ -474,9 +447,6 @@ export default function CyberShield() {
                         <span className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Grid Uptime</span>
                         <span className="text-xs font-bold font-mono">99.9%</span>
                     </div>
-                    <Button onClick={fetchGlobalAudit} variant="outline" size="icon" className="h-9 w-9 rounded-full bg-white group">
-                        <RefreshCw className={cn("h-4 w-4 text-muted-foreground group-hover:rotate-180 transition-transform duration-500", isLoadingLogs && "animate-spin")} />
-                    </Button>
                 </div>
             </div>
 
@@ -531,28 +501,28 @@ export default function CyberShield() {
                         onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}
                     />
                     
-                    {/* Live Activity Monitor */}
+                    {/* Live Entity Monitor */}
                     <Card className="md:col-span-3 border-border/50 p-4 bg-white/50 backdrop-blur-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recent Neural Activity</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Neural Grid Status</span>
                             </div>
                             <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
-                                Monitoring Feed
+                                Active Nodes
                             </div>
                         </div>
                         <div className="h-28 overflow-hidden relative">
                              <div className="space-y-1.5">
-                                {auditLogs.slice(0, 4).map((log, i) => (
+                                {allBusinesses?.slice(0, 4).map((b, i) => (
                                     <div key={i} className="flex items-center gap-4 text-[11px] border-l-2 border-primary/20 pl-4 py-1.5 hover:bg-muted/50 transition-colors cursor-default">
                                         <span className={cn("font-bold min-w-[60px] font-mono", i === 0 ? "text-primary" : "text-muted-foreground")}>
-                                            [{log.createdAt ? format(log.createdAt.toDate(), 'HH:mm') : 'NOW'}]
+                                            [ONLINE]
                                         </span>
-                                        <span className="text-muted-foreground uppercase font-medium">{log.userName}</span>
+                                        <span className="text-foreground font-bold">{b.name?.toUpperCase()}</span>
                                         <ArrowRight className="h-2.5 w-2.5 text-muted-foreground/30" />
-                                        <span className="text-foreground font-bold">{log.action.toUpperCase()}</span>
-                                        <span className="text-muted-foreground/50 truncate max-w-[200px]">{log.entityType}</span>
+                                        <span className="text-muted-foreground/50 truncate max-w-[200px]">{b.email}</span>
+                                        <span className="text-[9px] font-black ml-auto bg-muted px-2 py-0.5 rounded text-muted-foreground uppercase">{b.id.slice(0, 8)}</span>
                                     </div>
                                 ))}
                              </div>
@@ -562,22 +532,32 @@ export default function CyberShield() {
                 </div>
             </div>
 
-            {/* The Intelligence Feed (Audit Logs) */}
-            <Card className="border-border/50 shadow-sm overflow-hidden relative z-10">
-                <CardHeader className="bg-muted/30 border-b p-6">
-                    <div className="flex items-center justify-between">
+            {/* Business Intelligence Unit */}
+            <Card className="border-primary/20 bg-white/40 backdrop-blur-md shadow-xl overflow-hidden relative z-10 group/biu">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-right from-transparent via-primary/20 to-transparent" />
+                
+                <CardHeader className="bg-muted/30 border-b p-6 relative">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="space-y-1">
-                            <CardTitle className="text-sm flex items-center gap-2 font-bold tracking-tight">
-                                <Terminal className="h-4 w-4 text-primary" />
-                                Tactical Audit Stream
+                            <CardTitle className="text-sm flex items-center gap-2 font-black tracking-tighter text-primary uppercase italic">
+                                <Server className="h-4 w-4 animate-pulse" />
+                                Business Intelligence Unit
                             </CardTitle>
-                            <CardDescription className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                                Real-time monitoring of all platform nodes.
+                            <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70">
+                                ENTITY RECOGNITION & SANITIZATION PROTOCOL
                             </CardDescription>
                         </div>
-                        <Badge variant="outline" className="text-[10px] font-bold border-border/50">
-                            {auditLogs.length} EVENTS LOADED
-                        </Badge>
+                        <div className="relative w-full md:w-80 group">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-lg blur opacity-25 group-focus-within:opacity-100 transition duration-1000" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search entities by name or email..." 
+                                value={searchBusiness}
+                                onChange={(e) => setSearchBusiness(e.target.value)}
+                                className="relative pl-9 h-10 text-xs bg-white/80 border-border/50 focus:bg-white transition-all font-bold placeholder:text-muted-foreground/40"
+                            />
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -585,67 +565,54 @@ export default function CyberShield() {
                         <Table>
                             <TableHeader className="bg-muted/10">
                                 <TableRow className="hover:bg-transparent border-border/50">
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Admin Node</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 px-6">Event Type</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Payload</TableHead>
-                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 text-right">Actions</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Entity Name</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Communication Link</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11">Node ID</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider h-11 text-right px-6">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoadingLogs ? (
+                                {isLoadingBusinesses ? (
                                     [...Array(6)].map((_, i) => (
                                         <TableRow key={i} className="border-border/50"><TableCell colSpan={4}><div className="h-10 w-full bg-muted/20 animate-pulse rounded" /></TableCell></TableRow>
                                     ))
-                                ) : auditLogs.length === 0 ? (
+                                ) : filteredBusinesses.length === 0 ? (
                                     <TableRow className="border-border/50">
-                                        <TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-medium text-xs italic">
-                                            No security alerts detected.
+                                        <TableCell colSpan={4} className="h-48 text-center">
+                                            <div className="flex flex-col items-center justify-center space-y-3 opacity-50">
+                                                <div className="p-3 bg-muted rounded-full">
+                                                    <Server className="h-6 w-6 text-muted-foreground" />
+                                                </div>
+                                                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground">
+                                                    No entities detected in this sector
+                                                </p>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    auditLogs.map((log) => (
-                                        <TableRow key={log.id} className="group hover:bg-muted/30 transition-all border-border/50">
-                                            <TableCell>
-                                                <div className="flex flex-col py-2">
-                                                    <span className="font-bold text-[11px] text-foreground/90">{log.userName}</span>
-                                                    <span className="text-[10px] text-muted-foreground font-medium">{log.userEmail}</span>
-                                                </div>
+                                    filteredBusinesses.map((business) => (
+                                        <TableRow key={business.id} className="hover:bg-muted/5 border-border/50 group transition-colors">
+                                            <TableCell className="font-bold text-[11px] uppercase tracking-tight text-foreground/80 py-4">
+                                                {business.name || 'Unnamed Entity'}
                                             </TableCell>
-                                            <TableCell className="px-6">
-                                                <div className="flex items-center gap-3">
-                                                    {log.action?.includes('delete') || log.action?.includes('void') ? (
-                                                        <div className="h-5 w-1 bg-rose-500 rounded-full" />
-                                                    ) : log.action?.includes('impersonation') ? (
-                                                        <div className="h-5 w-1 bg-blue-500 rounded-full" />
-                                                    ) : (
-                                                        <div className="h-5 w-1 bg-slate-300 rounded-full" />
-                                                    )}
-                                                    <div className="flex flex-col">
-                                                        <span className={cn(
-                                                            "text-[11px] font-bold uppercase tracking-tight",
-                                                            log.action?.includes('delete') ? "text-rose-600" : "text-foreground/70"
-                                                        )}>{log.action}</span>
-                                                        <span className="text-[9px] font-medium text-muted-foreground uppercase">
-                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'NOW'}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                            <TableCell className="text-[11px] font-medium text-muted-foreground">
+                                                {business.email}
                                             </TableCell>
-                                            <TableCell>
-                                               <div className="flex items-center gap-2">
-                                                   <Badge variant="outline" className="px-1.5 py-0 rounded text-[9px] font-bold text-muted-foreground">{log.entityType}</Badge>
-                                                   <span className="text-[10px] font-medium text-slate-500 truncate max-w-[150px]">{log.entityId}</span>
-                                               </div>
+                                            <TableCell className="font-mono text-[9px] text-muted-foreground/40 uppercase">
+                                                {business.id}
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
-                                                    onClick={() => handleHardKill(log.userId, log.userName)}
-                                                    disabled={isRevoking === log.userId}
+                                            <TableCell className="text-right px-6">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="h-8 text-[9px] font-black uppercase tracking-widest text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-600/20 hover:border-rose-600 transition-all rounded-md"
+                                                    onClick={() => {
+                                                        setDestructionEmail(business.email);
+                                                        setIsDestructionModalOpen(true);
+                                                    }}
                                                 >
-                                                    <Power className={cn("h-3.5 w-3.5", isRevoking === log.userId && "animate-spin")} />
+                                                    <Trash2 className="h-3 w-3 mr-2" />
+                                                    Prepare Termination
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -659,42 +626,18 @@ export default function CyberShield() {
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
                             <Server className="h-3 w-3 text-muted-foreground/40" />
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Zeneva Node Linked</span>
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Neural Grid Hub</span>
                         </div>
+                        <div className="h-3 w-px bg-border/50" />
+                        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                            {filteredBusinesses.length} Nodes Identified
+                        </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Secure Link Active</span>
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Direct Link Active</span>
                     </div>
                 </CardFooter>
-            </Card>
-
-            {/* Entity Termination Section (Danger Zone) */}
-            <Card className="border-rose-500/20 bg-rose-500/5 overflow-hidden relative z-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-transparent pointer-events-none" />
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2 font-bold text-rose-600">
-                        <ShieldAlert className="h-4 w-4" />
-                        Tactical Entity Termination
-                    </CardTitle>
-                    <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-rose-600/70">
-                        Irreversible data sanitization protocol. Proceed with extreme caution.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-xs text-muted-foreground mb-4 max-w-2xl">
-                        This operation will permanently delete a business instance, all associated user accounts, products, sales records, customer data, and telemetry logs. There is <span className="font-bold text-rose-600 underline">NO UNDO</span>.
-                    </p>
-                    <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="bg-rose-600 hover:bg-rose-700 font-bold uppercase text-[10px] tracking-widest px-6"
-                        onClick={() => setIsDestructionModalOpen(true)}
-                    >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        Initialize Wipe Sequence
-                    </Button>
-                </CardContent>
             </Card>
 
             {/* Termination Confirmation Dialog */}
