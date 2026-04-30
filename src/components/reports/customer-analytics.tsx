@@ -46,9 +46,23 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     });
 
     receipts.forEach(receipt => {
-      if (receipt.customer?.id && customerStats[receipt.customer.id]) {
+      if (receipt.customer?.id) {
+        if (!customerStats[receipt.customer.id]) {
+            customerStats[receipt.customer.id] = {
+                name: receipt.customer.name || 'Anonymous Buyer',
+                email: receipt.customer.email || 'N/A',
+                totalSpent: 0,
+                orderCount: 0,
+                firstOrder: receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt || 0)
+            };
+        }
         customerStats[receipt.customer.id].totalSpent += receipt.total;
         customerStats[receipt.customer.id].orderCount += 1;
+        
+        const rDate = receipt.createdAt?.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt || 0);
+        if (rDate < customerStats[receipt.customer.id].firstOrder) {
+            customerStats[receipt.customer.id].firstOrder = rDate;
+        }
       }
     });
     
@@ -63,7 +77,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     const returningCustomers = customerArray.filter(c => c.orderCount > 1).length;
 
     return {
-      totalCustomers: customers.length,
+      totalCustomers: customerArray.length,
       newCustomers,
       returningCustomers,
       topCustomersBySpend,

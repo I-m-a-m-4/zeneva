@@ -172,16 +172,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const canFetchSubData = !!businessId && !!initialBusiness;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
   const { data: initialStats } = useDoc<BusinessStats>(statsDocRef);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(100)) : null), [canFetchSubData, businessId, firestore]);
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("totalSpent", "desc"), limit(5000)) : null), [canFetchSubData, businessId, firestore]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), orderBy("totalSpent", "desc"), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
@@ -795,7 +795,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     triggerRefresh();
   }, [toast, nuclearReset, triggerRefresh]);
 
-  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 500) => {
+  const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 2000) => {
     if (!businessId || !firestore) return [];
     
     try {

@@ -35,8 +35,8 @@ export async function getCachedPlatformAnalytics(forceRefresh = false) {
     const [usersSnap, businessSnap, receiptsSnap, productSnap] = await Promise.all([
       adminFirestore.collection('users').select('id').get(),
       adminFirestore.collection('businessInstances').get(),
-      adminFirestore.collection('receipts').limit(2000).get(), // Reduced limit for stability
-      adminFirestore.collection('products').limit(5000).get() // Reduced limit for stability
+      adminFirestore.collection('receipts').limit(50000).get(),
+      adminFirestore.collection('products').limit(50000).get()
     ]);
 
     const users = usersSnap.docs;
