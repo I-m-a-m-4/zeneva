@@ -608,8 +608,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const q = query(
         collection(firestore, "receipts"),
         where("businessId", "==", businessId),
-        where("createdAt", ">=", from),
-        where("createdAt", "<=", to)
+        where("createdAt", ">=", safeToDate(from)),
+        where("createdAt", "<=", safeToDate(to))
       );
       
       const snap = await getDocs(q);
@@ -802,8 +802,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const q = query(
         collection(firestore, 'receipts'),
         where('businessId', '==', businessId),
-        where('createdAt', '>=', from),
-        where('createdAt', '<=', to),
+        where('createdAt', '>=', safeToDate(from)),
+        where('createdAt', '<=', safeToDate(to)),
         orderBy('createdAt', 'desc'),
         limit(limitCount)
       );

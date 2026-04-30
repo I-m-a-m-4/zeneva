@@ -49,16 +49,16 @@ export function DateRangePicker({ className, date, onDateChange }: DateRangePick
     const getDisplayString = () => {
         if (!date?.from) return "Pick a date range";
 
-        const today = new Date();
-        const yesterday = subDays(today, 1);
+        const from = safeToDate(date.from);
+        const to = date.to ? safeToDate(date.to) : null;
         
-        if (date.to && isSameDay(date.from, date.to)) {
-            if (isSameDay(date.from, today)) return "Today";
-            if (isSameDay(date.from, yesterday)) return "Yesterday";
-            return format(date.from, 'LLL dd, y');
+        if (to && isSameDay(from, to)) {
+            if (isSameDay(from, new Date())) return "Today";
+            if (isSameDay(from, subDays(new Date(), 1))) return "Yesterday";
+            return format(from, 'LLL dd, y');
         }
 
-        return `${format(date.from, 'LLL dd, y')} - ${date.to ? format(date.to, 'LLL dd, y') : '...'}`;
+        return `${format(from, 'LLL dd, y')} - ${to ? format(to, 'LLL dd, y') : '...'}`;
     };
 
     const handlePresetClick = (range: DateRange) => {

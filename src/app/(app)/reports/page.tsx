@@ -85,7 +85,7 @@ export default function ReportsDashboard() {
     // Auto-adjust to Business Lifetime once loaded
     React.useEffect(() => {
         if (business?.createdAt) {
-            const inception = business.createdAt.toDate ? business.createdAt.toDate() : new Date(business.createdAt);
+            const inception = safeToDate(business.createdAt);
             setDate({ from: inception, to: new Date() });
         }
     }, [business?.createdAt]);
