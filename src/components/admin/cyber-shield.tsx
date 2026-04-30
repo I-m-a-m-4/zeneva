@@ -56,7 +56,8 @@ import {
     Power,
     Server,
     Crosshair,
-    ArrowRight
+    ArrowRight,
+    Trash2
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { 
@@ -74,6 +75,9 @@ import {
     collection,
     doc,
     updateDoc,
+    deleteDoc,
+    writeBatch,
+    where,
     serverTimestamp
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subHours, subMinutes } from 'date-fns';
@@ -144,6 +148,17 @@ export default function CyberShield() {
     const [isLoadingLogs, setIsLoadingLogs] = useState(true);
     const [indexError, setIndexError] = useState<string | null>(null);
     const [isRevoking, setIsRevoking] = useState<string | null>(null);
+
+    // Entity Termination State
+    const [isDestructionModalOpen, setIsDestructionModalOpen] = useState(false);
+    const [destructionEmail, setDestructionEmail] = useState('');
+    const [destructionKey, setDestructionKey] = useState('');
+    const [hasConfirmedDestruction, setHasConfirmedDestruction] = useState(false);
+    const [isDestroying, setIsDestroying] = useState(false);
+    const [destructionProgress, setDestructionProgress] = useState(0);
+    const [destructionStatus, setDestructionStatus] = useState('');
+
+    const REQUIRED_KEY = "ZENEVA-ALPHA-TERMINATE";
 
     // MFA Enrollment State
     const [isMfaModalOpen, setIsMfaModalOpen] = useState(false);
@@ -259,6 +274,160 @@ export default function CyberShield() {
             toast({ variant: "destructive", title: "Kill Command Failed", description: "Security override insufficient." });
         } finally {
             setIsRevoking(null);
+        }
+    };
+
+    const handleEntityTermination = async () => {
+        if (!firestore || !authUser) return;
+        if (destructionEmail.trim() === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
+            toast({ variant: 'destructive', title: "Auth Failure", description: "Termination parameters invalid or incomplete." });
+            return;
+        }
+
+        setIsDestroying(true);
+        setDestructionProgress(5);
+        setDestructionStatus('Locating entity in grid...');
+
+        try {
+            // 1. Find the business instance
+            const businessesRef = collection(firestore, 'businessInstances');
+            const bQuery = query(businessesRef, where("email", "==", destructionEmail.trim().toLowerCase()));
+            const bSnap = await getDocs(bQuery);
+
+            if (bSnap.empty) {
+                throw new Error("Entity not found in current grid. Verify email signature.");
+            }
+
+            const businessDoc = bSnap.docs[0];
+            const businessId = businessDoc.id;
+            const businessData = businessDoc.data();
+
+            setDestructionProgress(15);
+            setDestructionStatus(`Target Locked: ${businessData.name || 'Unnamed'}. Initializing wipe...`);
+
+            // Collections to purge
+            const collectionsToPurge = [
+                'products',
+                'receipts',
+                'customers',
+                'purchases',
+                'expenses',
+                'suppliers',
+                'inventory_logs',
+                'notifications', // Top level notifications if any
+            ];
+
+            let completedSteps = 0;
+            const totalSteps = collectionsToPurge.length + 4; // + users + sub-business + audit + final
+
+            // 1. Purge standard top-level collections
+            for (const collName of collectionsToPurge) {
+                setDestructionStatus(`Purging ${collName} nodes...`);
+                const collRef = collection(firestore, collName);
+                const q = query(collRef, where("businessId", "==", businessId));
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+                    const chunks = [];
+                    for (let i = 0; i < snap.docs.length; i += 450) {
+                        chunks.push(snap.docs.slice(i, i + 450));
+                    }
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(firestore);
+                        chunk.forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                    }
+                }
+                completedSteps++;
+                setDestructionProgress(15 + (completedSteps / totalSteps) * 80);
+            }
+
+            // 2. Purge Users and their subcollections
+            setDestructionStatus('Purging user identities and sub-nodes...');
+            const usersRef = collection(firestore, 'users');
+            const usersQuery = query(usersRef, where("businessId", "==", businessId));
+            const usersSnap = await getDocs(usersQuery);
+
+            if (!usersSnap.empty) {
+                for (const userDoc of usersSnap.docs) {
+                    const userId = userDoc.id;
+                    // Purge user notifications
+                    const userNotifsRef = collection(firestore, 'users', userId, 'notifications');
+                    const notifsSnap = await getDocs(userNotifsRef);
+                    if (!notifsSnap.empty) {
+                        const batch = writeBatch(firestore);
+                        notifsSnap.forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                    }
+                    // Delete user doc
+                    await deleteDoc(userDoc.ref);
+                }
+            }
+            completedSteps++;
+            setDestructionProgress(15 + (completedSteps / totalSteps) * 80);
+
+            // 3. Purge Business Subcollections (Stats, OnlineOrders, AuditLogs)
+            setDestructionStatus('Sanitizing business sub-architectures...');
+            const subCollections = ['stats', 'onlineOrders', 'auditLogs', 'expenses', 'suppliers'];
+            for (const sub of subCollections) {
+                const subRef = collection(firestore, 'businessInstances', businessId, sub);
+                const subSnap = await getDocs(subRef);
+                if (!subSnap.empty) {
+                    const chunks = [];
+                    for (let i = 0; i < subSnap.docs.length; i += 450) {
+                        chunks.push(subSnap.docs.slice(i, i + 450));
+                    }
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(firestore);
+                        chunk.forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                    }
+                }
+            }
+            completedSteps++;
+            setDestructionProgress(15 + (completedSteps / totalSteps) * 80);
+
+            // Finally, delete the business document
+            setDestructionStatus('Finalizing sanitization...');
+            await deleteDoc(doc(firestore, 'businessInstances', businessId));
+            
+            setDestructionProgress(100);
+            setDestructionStatus('ENTITY TERMINATED');
+
+            toast({ 
+                title: "Destruction Complete", 
+                description: "Business and all associated nodes have been scrubbed from the grid.",
+                className: "bg-black text-emerald-500 border-emerald-500/50 font-mono"
+            });
+
+            // Log the destruction to a special global log if possible
+            try {
+                await updateDoc(doc(firestore, 'system_stats', 'global'), {
+                    lastDestruction: serverTimestamp(),
+                    lastDestroyedEmail: destructionEmail
+                });
+            } catch (e) {
+                // Ignore if system_stats doesn't exist or permissions fail
+            }
+
+            setTimeout(() => {
+                setIsDestructionModalOpen(false);
+                setDestructionEmail('');
+                setDestructionKey('');
+                setHasConfirmedDestruction(false);
+                setIsDestroying(false);
+                setDestructionProgress(0);
+            }, 2000);
+
+        } catch (error: any) {
+            console.error("Termination failed:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: "Termination Aborted", 
+                description: error.message || "Unknown error during purge." 
+            });
+            setIsDestroying(false);
+            setDestructionProgress(0);
         }
     };
 
@@ -499,6 +668,142 @@ export default function CyberShield() {
                     </div>
                 </CardFooter>
             </Card>
+
+            {/* Entity Termination Section (Danger Zone) */}
+            <Card className="border-rose-500/20 bg-rose-500/5 overflow-hidden relative z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-transparent pointer-events-none" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2 font-bold text-rose-600">
+                        <ShieldAlert className="h-4 w-4" />
+                        Tactical Entity Termination
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-rose-600/70">
+                        Irreversible data sanitization protocol. Proceed with extreme caution.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-xs text-muted-foreground mb-4 max-w-2xl">
+                        This operation will permanently delete a business instance, all associated user accounts, products, sales records, customer data, and telemetry logs. There is <span className="font-bold text-rose-600 underline">NO UNDO</span>.
+                    </p>
+                    <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="bg-rose-600 hover:bg-rose-700 font-bold uppercase text-[10px] tracking-widest px-6"
+                        onClick={() => setIsDestructionModalOpen(true)}
+                    >
+                        <Trash2 className="h-3.5 w-3.5 mr-2" />
+                        Initialize Wipe Sequence
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* Termination Confirmation Dialog */}
+            <Dialog open={isDestructionModalOpen} onOpenChange={(open) => !isDestroying && setIsDestructionModalOpen(open)}>
+                <DialogContent className="sm:max-w-[500px] border-rose-500/50 bg-background shadow-2xl shadow-rose-500/10">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-rose-600 text-xl font-black italic tracking-tighter">
+                            <ShieldAlert className="h-6 w-6 animate-pulse" />
+                            CONFIRM ENTITY DESTRUCTION
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-2 border-b pb-4">
+                            You are about to scrub a business from the Zeneva Grid.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {isDestroying ? (
+                        <div className="py-12 flex flex-col items-center justify-center space-y-6">
+                            <div className="relative w-24 h-24">
+                                <motion.div 
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                    className="absolute inset-0 border-4 border-rose-500/20 border-t-rose-600 rounded-full"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Trash2 className="h-10 w-10 text-rose-600" />
+                                </div>
+                            </div>
+                            <div className="w-full max-w-xs space-y-2">
+                                <Progress value={destructionProgress} className="h-2 bg-rose-500/10" indicatorClassName="bg-rose-600" />
+                                <p className="text-[10px] font-black font-mono text-center text-rose-600 uppercase tracking-[0.2em] animate-pulse">
+                                    {destructionStatus}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 py-4">
+                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-lg flex gap-3 items-start">
+                                <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold text-rose-700 uppercase tracking-tight">Destructive Action Warning</p>
+                                    <p className="text-[11px] text-rose-600 leading-relaxed font-medium">
+                                        This will purge the business record and ALL related sub-collections across the entire Firestore architecture. All session tokens will be invalidated immediately.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Verify Business Email</Label>
+                                    <Input 
+                                        placeholder="Enter target business email..." 
+                                        value={destructionEmail}
+                                        onChange={(e) => setDestructionEmail(e.target.value)}
+                                        className="h-11 font-bold text-sm border-rose-200 focus:ring-rose-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Admin Security Key</Label>
+                                    <Input 
+                                        type="password"
+                                        placeholder={`Type "${REQUIRED_KEY}"`}
+                                        value={destructionKey}
+                                        onChange={(e) => setDestructionKey(e.target.value)}
+                                        className="h-11 font-mono font-bold text-sm border-rose-200 focus:ring-rose-500"
+                                    />
+                                </div>
+
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <input 
+                                        type="checkbox" 
+                                        id="confirm" 
+                                        checked={hasConfirmedDestruction}
+                                        onChange={(e) => setHasConfirmedDestruction(e.target.checked)}
+                                        className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                                    />
+                                    <label htmlFor="confirm" className="text-[11px] font-bold text-muted-foreground leading-none">
+                                        I confirm that I am authorized to permanently purge this entity and all its data.
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="border-t pt-4">
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setIsDestructionModalOpen(false)}
+                            disabled={isDestroying}
+                            className="font-bold uppercase text-[10px] tracking-widest"
+                        >
+                            Abort Protocol
+                        </Button>
+                        {!isDestroying && (
+                            <Button 
+                                variant="destructive" 
+                                size="sm"
+                                disabled={destructionEmail.trim() === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction}
+                                onClick={handleEntityTermination}
+                                className="bg-rose-600 hover:bg-rose-700 font-bold uppercase text-[10px] tracking-widest px-8 shadow-lg shadow-rose-500/20"
+                            >
+                                <Zap className="h-3.5 w-3.5 mr-2" />
+                                EXECUTE TERMINATION
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* MFA Enrollment Overlay */}
             <AnimatePresence>
