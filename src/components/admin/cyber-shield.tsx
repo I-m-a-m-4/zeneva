@@ -255,7 +255,10 @@ export default function CyberShield() {
 
     const handleEntityTermination = async () => {
         if (!firestore || !authUser) return;
-        if (destructionEmail.trim() === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
+        
+        const targetEmail = (destructionEmail || "").trim();
+        
+        if (targetEmail === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
             toast({ variant: 'destructive', title: "Auth Failure", description: "Termination parameters invalid or incomplete." });
             return;
         }
@@ -267,7 +270,7 @@ export default function CyberShield() {
         try {
             // 1. Find the business instance
             const businessesRef = collection(firestore, 'businessInstances');
-            const bQuery = query(businessesRef, where("email", "==", destructionEmail.trim().toLowerCase()));
+            const bQuery = query(businessesRef, where("email", "==", targetEmail.toLowerCase()));
             const bSnap = await getDocs(bQuery);
 
             if (bSnap.empty) {
@@ -607,7 +610,7 @@ export default function CyberShield() {
                                                     size="sm" 
                                                     className="h-8 text-[9px] font-black uppercase tracking-widest text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-600/20 hover:border-rose-600 transition-all rounded-md"
                                                     onClick={() => {
-                                                        setDestructionEmail(business.email);
+                                                        setDestructionEmail(business.email || "");
                                                         setIsDestructionModalOpen(true);
                                                     }}
                                                 >
