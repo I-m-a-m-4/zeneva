@@ -91,15 +91,21 @@ export async function syncBusinessToOffline(business: any) {
 
 export async function syncProductsToOffline(businessId: string, products: any[]) {
   const db = await getOfflineDb();
-  if (!db) return;
+  if (!db || products.length === 0) return;
   
   try {
-    // We do it in a transaction for speed
-    for (const product of products) {
-      await db.execute(
-        'INSERT OR REPLACE INTO products (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
-        [product.id, businessId, JSON.stringify(product)]
-      );
+    await db.execute('BEGIN TRANSACTION');
+    try {
+      for (const product of products) {
+        await db.execute(
+          'INSERT OR REPLACE INTO products (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
+          [product.id, businessId, JSON.stringify(product)]
+        );
+      }
+      await db.execute('COMMIT');
+    } catch (innerErr) {
+      await db.execute('ROLLBACK');
+      throw innerErr;
     }
   } catch (err) {
     console.error('SQLite Sync Error (Products):', err);
@@ -238,14 +244,21 @@ export async function getCachedStats(businessId: string) {
 
 export async function syncCustomersToOffline(businessId: string, customers: any[]) {
   const db = await getOfflineDb();
-  if (!db) return;
+  if (!db || customers.length === 0) return;
   
   try {
-    for (const customer of customers) {
-      await db.execute(
-        'INSERT OR REPLACE INTO customers (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
-        [customer.id, businessId, JSON.stringify(customer)]
-      );
+    await db.execute('BEGIN TRANSACTION');
+    try {
+      for (const customer of customers) {
+        await db.execute(
+          'INSERT OR REPLACE INTO customers (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
+          [customer.id, businessId, JSON.stringify(customer)]
+        );
+      }
+      await db.execute('COMMIT');
+    } catch (innerErr) {
+      await db.execute('ROLLBACK');
+      throw innerErr;
     }
   } catch (err) {
     console.error('SQLite Sync Error (Customers):', err);
@@ -254,15 +267,22 @@ export async function syncCustomersToOffline(businessId: string, customers: any[
 
 export async function syncReceiptsToOffline(businessId: string, receipts: any[]) {
   const db = await getOfflineDb();
-  if (!db) return;
+  if (!db || receipts.length === 0) return;
   
   try {
-    for (const receipt of receipts) {
-      const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
-      await db.execute(
-        'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
-        [receipt.id, businessId, JSON.stringify(receipt), createdAt]
-      );
+    await db.execute('BEGIN TRANSACTION');
+    try {
+      for (const receipt of receipts) {
+        const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
+        await db.execute(
+          'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
+          [receipt.id, businessId, JSON.stringify(receipt), createdAt]
+        );
+      }
+      await db.execute('COMMIT');
+    } catch (innerErr) {
+      await db.execute('ROLLBACK');
+      throw innerErr;
     }
   } catch (err) {
     console.error('SQLite Sync Error (Receipts):', err);

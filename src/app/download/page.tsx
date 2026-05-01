@@ -341,7 +341,7 @@ export default function DownloadPage() {
                 <div className="w-full border-x-[2.5px] border-dashed border-slate-200">
                     {/* Upper Header Bar */}
                     <div className="flex items-center px-12 h-16 border-b-[2.5px] border-dashed border-slate-200">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.1</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.2</span>
                     </div>
 
                     <div className="grid lg:grid-cols-2">

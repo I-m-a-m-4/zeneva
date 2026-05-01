@@ -127,6 +127,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const hasShownSyncToast = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
+  const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
@@ -336,7 +337,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // --- Functions ---
   const refreshData = useCallback(async () => {
-    if (!user || !businessId || !firestore || isSyncing) return;
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (!user || !businessId || !firestore || isSyncing || !isOnline) return;
     
     setIsSyncing(true);
     try {
@@ -389,7 +391,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast]);
 
   const fetchFullCustomers = useCallback(async () => {
-    if (!businessId || !firestore || isFullSyncingCustomers) return;
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (!businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
     
     setIsFullSyncingCustomers(true);
     let allFetched: Customer[] = [];
@@ -445,6 +448,63 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingCustomers(false);
     }
   }, [businessId, firestore, isFullSyncingCustomers, toast]);
+
+  const fetchFullProducts = useCallback(async () => {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (!businessId || !firestore || isFullSyncingProducts || !isOnline) return;
+    
+    setIsFullSyncingProducts(true);
+    let allFetched: Product[] = [];
+    let lastDoc: any = null;
+    let hasMore = true;
+    const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
+
+    try {
+      while (hasMore) {
+        let q = query(
+          collection(firestore, "products"),
+          where("businessId", "==", businessId),
+          orderBy("name", "asc"),
+          limit(BATCH_SIZE)
+        );
+        
+        if (lastDoc) q = query(q, startAfter(lastDoc));
+        
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          hasMore = false;
+        } else {
+          const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+          allFetched = [...allFetched, ...batch];
+          
+          setSyncedProducts(prev => {
+            const merged = [...prev];
+            batch.forEach(np => {
+              const idx = merged.findIndex(p => p.id === np.id);
+              if (idx !== -1) merged[idx] = np;
+              else merged.push(np);
+            });
+            return merged;
+          });
+
+          lastDoc = snap.docs[snap.docs.length - 1];
+          if (snap.docs.length < BATCH_SIZE) hasMore = false;
+        }
+      }
+      
+      setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
+      
+      const lastToast = Number(localStorage.getItem('last_product_sync_toast_time') || 0);
+      if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
+        toast({ title: "Product Catalog Synced", description: `Synchronized ${allFetched.length} products for offline access.` });
+        localStorage.setItem('last_product_sync_toast_time', Date.now().toString());
+      }
+    } catch (error) {
+      console.error("Full Product Sync Failed:", error);
+    } finally {
+      setIsFullSyncingProducts(false);
+    }
+  }, [businessId, firestore, isFullSyncingProducts, toast]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();
@@ -641,11 +701,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchCustomers = useCallback(async (term: string) => {
     if (!term.trim()) return [];
     const lower = term.toLowerCase().trim();
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    
     if (customers && customers.length > 0) {
       const local = customers.filter(c => c.name.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term));
-      if (local.length >= 10 || !isFullSyncingCustomers) return local.slice(0, 20);
+      if (local.length >= 10 || !isOnline) return local.slice(0, 20);
     }
-    if (!user || !businessId || !firestore) return [];
+    
+    if (!user || !businessId || !firestore || !isOnline) return [];
     try {
       const q = (field: string) => query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '>=', lower), where(field, '<=', lower + '\uf8ff'), limit(20));
       const [nameSnap, emailSnap] = await Promise.all([getDocs(q('lowercaseName')), getDocs(q('lowercaseEmail'))]);
@@ -654,20 +717,75 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   }, [businessId, firestore, customers, isFullSyncingCustomers]);
 
+  const searchCustomersByField = useCallback(async (field: string, value: string) => {
+    if (!value) return [];
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    
+    if (customers && customers.length > 0) {
+      const local = customers.filter(c => (c as any)[field] === value);
+      if (local.length > 0 || !isOnline) return local;
+    }
+    
+    if (!user || !businessId || !firestore || !isOnline) return [];
+    try {
+      const q = query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '==', value), limit(50));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+    } catch { return []; }
+  }, [businessId, firestore, customers]);
+
   const searchProducts = useCallback(async (term: string) => {
     if (!term.trim()) return [];
     const lower = term.toLowerCase().trim();
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
     if (products && products.length > 0) {
       const local = products.filter(p => p.name.toLowerCase().includes(lower) || p.sku?.toLowerCase().includes(lower));
-      if (local.length >= 10 || !isSyncing) return local.slice(0, 30);
+      if (local.length >= 10 || !isOnline) return local.slice(0, 30);
     }
-    if (!user || !businessId || !firestore) return [];
+    
+    if (!user || !businessId || !firestore || !isOnline) return [];
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where('lowercaseName', '>=', lower), where('lowercaseName', '<=', lower + '\uf8ff'), limit(30));
       const snap = await getDocs(q);
       return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
     } catch { return []; }
   }, [businessId, firestore, products, isSyncing]);
+
+  const searchProductsByField = useCallback(async (field: string, value: string) => {
+    if (!value) return [];
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    
+    if (products && products.length > 0) {
+      const local = products.filter(p => (p as any)[field] === value);
+      if (local.length > 0 || !isOnline) return local;
+    }
+    
+    if (!user || !businessId || !firestore || !isOnline) return [];
+    try {
+      const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where(field, '==', value), limit(100));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+    } catch { return []; }
+  }, [businessId, firestore, products]);
+
+  const findProductBySku = useCallback(async (sku: string) => {
+    if (!sku) return null;
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    
+    if (products && products.length > 0) {
+      const local = products.find(p => p.sku === sku);
+      if (local) return local;
+    }
+    
+    if (!user || !businessId || !firestore || !isOnline) return null;
+    try {
+      const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where('sku', '==', sku), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      return { ...snap.docs[0].data(), id: snap.docs[0].id } as Product;
+    } catch { return null; }
+  }, [businessId, firestore, products]);
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
@@ -835,14 +953,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!isMounted || !isTauri || !businessId || !firestore || isFullSyncingCustomers || !navigator.onLine) return;
 
     const checkFullSyncStatus = async () => {
-      const lastFullSync = await getLastSyncMetadata(businessId, 'full_customers_sync');
+      const [lastCustSync, lastProdSync] = await Promise.all([
+        getLastSyncMetadata(businessId, 'full_customers_sync'),
+        getLastSyncMetadata(businessId, 'full_products_sync')
+      ]);
+      
       const now = Date.now();
       const oneHour = 60 * 60 * 1000;
       
-      // We do a full background sync if it hasn't been done in the last hour
-      // and we are connected to the internet.
-      if (now - lastFullSync > oneHour) {
+      if (now - lastCustSync > oneHour && !isFullSyncingCustomers) {
         fetchFullCustomers();
+      }
+
+      if (now - lastProdSync > oneHour && !isFullSyncingProducts) {
+        fetchFullProducts();
       }
     };
 
@@ -984,10 +1108,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isLoading: (isUserLoading && !offlineProfile) ||
                (!!user && !businessId) ||
                (isLoadingBusiness && !business) || 
-               (isLoadingProducts && (!products || products.length === 0)) || 
-               (isLoadingCustomers && (!customers || customers.length === 0)) || 
-               (isSyncing && (!products || products.length === 0)) ||
-               (isFullSyncingCustomers && (!customers || customers.length === 0)) ||
+               (isLoadingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+               (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+               (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+               (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+               (isFullSyncingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
                !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
     user, firestore,
@@ -998,11 +1123,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     paymentMethod, setPaymentMethod, autoPrint, setAutoPrint, resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
-    mutateBusiness, isSyncing, isFullSyncingCustomers, optimisticProducts: [],
+    mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, optimisticProducts: [],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
-    searchCustomers, searchCustomersByField: async () => [], searchReceipts: async () => [],
-    fetchReceiptsInRange, searchProducts, searchProductsByField: async () => [],
+    searchCustomers, searchCustomersByField, searchReceipts: async () => [],
+    fetchReceiptsInRange, searchProducts, searchProductsByField, findProductBySku,
     fetchDetailedAnalytics, 
     fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
