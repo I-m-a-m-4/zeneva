@@ -182,7 +182,7 @@ jobs:
         continue-on-error: true
 
       - name: Generate App Icons
-        run: npm run tauri icon public/zeneva.png
+        run: npm run tauri icon public/zeneva-app-icon.png
         continue-on-error: true
 
       - name: Build Android APK

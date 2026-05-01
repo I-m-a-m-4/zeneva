@@ -50,11 +50,11 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/zeneva-app-icon.png', type: 'image/png', sizes: '512x512' },
+      { url: '/icon-pwa.png', type: 'image/png', sizes: '512x512' },
       { url: '/favicon.ico', sizes: 'any' },
     ],
     apple: [
-      { url: '/zeneva-app-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   appleWebApp: {
