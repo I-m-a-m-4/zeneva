@@ -107,7 +107,17 @@ export default function CustomersPage() {
   const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
 
-  const isLoading = isPosLoading;
+  const [isDataLoaded, setIsDataLoaded] = React.useState(false);
+  const isLoading = isPosLoading || (!isDataLoaded && customers === null);
+
+  // Prevent flicker of "No Customers Found"
+  React.useEffect(() => {
+    if (!isPosLoading && customers !== null) {
+      // Small delay to ensure any background syncs have a chance to start
+      const timer = setTimeout(() => setIsDataLoaded(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isPosLoading, customers]);
 
   // Global Search Logic
   React.useEffect(() => {
@@ -311,6 +321,22 @@ export default function CustomersPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"><Checkbox disabled /></TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Code</TableHead>
+                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                  <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
+                  <TableHead className="text-right">Total Spent</TableHead>
+                  <TableHead className="text-right text-destructive">Debt</TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              </TableBody>
+            </Table>
+          ) : !isDataLoaded ? (
             <Table>
               <TableHeader>
                 <TableRow>

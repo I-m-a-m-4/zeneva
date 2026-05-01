@@ -1,4 +1,4 @@
-// Force rules update - Version 2.0.4
+// Force rules update - Version 2.0.5
 rules_version = '2';
 
 service cloud.firestore {
@@ -52,10 +52,9 @@ service cloud.firestore {
     }
 
     function isSubscriptionActive(businessId) {
-      if (isSuperAdmin()) return true;
-      let businessDocPath = /databases/$(database)/documents/businessInstances/$(businessId);
-      return exists(businessDocPath) && 
-             (get(businessDocPath).data.get('status', 'active') in ['active', 'trialing']);
+      return isSuperAdmin() || 
+             (exists(/databases/$(database)/documents/businessInstances/$(businessId)) && 
+              get(/databases/$(database)/documents/businessInstances/$(businessId)).data.get('status', 'active') in ['active', 'trialing']);
     }
 
     // =================================================================
