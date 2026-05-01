@@ -11,6 +11,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
 import Confetti from '@/components/shared/confetti';
 import { usePOS } from '@/context/pos-context';
+import Admin2FAGate from '@/components/admin/admin-2fa-gate';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
@@ -106,7 +107,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 overflow-y-auto">
-          {children}
+          <Admin2FAGate>
+            {children}
+          </Admin2FAGate>
         </main>
       </div>
     );
