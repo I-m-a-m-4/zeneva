@@ -135,7 +135,7 @@
 
   .pattern-bg {
     background-color: hsl(var(--background));
-    background-image: radial-gradient(hsl(var(--foreground) / 0.08) 0.5px, transparent 0.5px);
+    background-image: radial-gradient(hsl(var(--foreground) / 0.04) 0.5px, transparent 0.5px);
     background-size: 14px 14px;
     background-attachment: fixed;
   }

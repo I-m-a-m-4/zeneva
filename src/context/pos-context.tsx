@@ -158,7 +158,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
   const businessId = isProfileReady ? currentUserProfile.businessId : (offlineProfile?.businessId || null);
 
-  const businessDocRef = useMemoFirebase(() => (businessId ? doc(firestore, 'businessInstances', businessId) : null), [businessId, firestore]);
+  const businessDocRef = useMemoFirebase(() => (user && businessId ? doc(firestore, 'businessInstances', businessId) : null), [user, businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   // Sync to local storage for fast subsequent loads
@@ -170,7 +170,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
   }, [initialBusiness]);
 
-  const canFetchSubData = !!businessId && !!initialBusiness;
+  const canFetchSubData = !!businessId && !!initialBusiness && !!user;
 
   const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
@@ -330,7 +330,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // --- Functions ---
   const refreshData = useCallback(async () => {
-    if (!businessId || !firestore || isSyncing) return;
+    if (!user || !businessId || !firestore || isSyncing) return;
     
     setIsSyncing(true);
     try {
@@ -616,7 +616,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const local = customers.filter(c => c.name.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term));
       if (local.length >= 10 || !isFullSyncingCustomers) return local.slice(0, 20);
     }
-    if (!businessId || !firestore) return [];
+    if (!user || !businessId || !firestore) return [];
     try {
       const q = (field: string) => query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '>=', lower), where(field, '<=', lower + '\uf8ff'), limit(20));
       const [nameSnap, emailSnap] = await Promise.all([getDocs(q('lowercaseName')), getDocs(q('lowercaseEmail'))]);
@@ -632,7 +632,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const local = products.filter(p => p.name.toLowerCase().includes(lower) || p.sku?.toLowerCase().includes(lower));
       if (local.length >= 10 || !isSyncing) return local.slice(0, 30);
     }
-    if (!businessId || !firestore) return [];
+    if (!user || !businessId || !firestore) return [];
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where('lowercaseName', '>=', lower), where('lowercaseName', '<=', lower + '\uf8ff'), limit(30));
       const snap = await getDocs(q);
@@ -641,7 +641,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, products, isSyncing]);
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
-    if (!businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
+    if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
     
     try {
       const q = query(

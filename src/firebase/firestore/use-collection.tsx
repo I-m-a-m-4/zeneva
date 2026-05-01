@@ -114,6 +114,7 @@ export function useCollection<T = any>(
 
     return () => {
       isMounted = false;
+      if (unsubscribe) unsubscribe();
     };
   }, [memoizedTargetRefOrQuery]);
 

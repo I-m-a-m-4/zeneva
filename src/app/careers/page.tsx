@@ -164,7 +164,7 @@ export default function CareersPage() {
       <MarketingHeader />
 
       <main className="relative">
-        <div className="fixed inset-0 grid-lines w-full h-full top-[var(--tauri-title-height,0)] pointer-events-none z-0"></div>
+        <div className="fixed inset-0 grid-lines w-full h-full top-[var(--tauri-title-height,0)] pointer-events-none z-0 opacity-[0.05]"></div>
         
         {/* Hero Section with Interactive Grid Pattern */}
         <section className="relative flex items-center justify-center px-6 pt-48 pb-20 md:py-48 overflow-hidden bg-transparent">

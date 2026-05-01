@@ -102,6 +102,7 @@ export function useDoc<T = any>(
 
     return () => {
       isMounted = false;
+      if (unsubscribe) unsubscribe();
     };
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 

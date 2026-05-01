@@ -419,7 +419,7 @@ export default function Home() {
     return (
         <ThemeProvider forcedTheme="light">
             <div className="h-full overflow-y-auto w-full antialiased overflow-x-hidden text-slate-900 bg-[#F9F8F6] relative">
-                <div className="fixed grid-lines w-full h-full top-[var(--tauri-title-height,0)] right-0 left-0 pointer-events-none z-0"></div>
+                <div className="fixed grid-lines w-full h-full top-[var(--tauri-title-height,0)] right-0 left-0 pointer-events-none z-0 opacity-[0.05]"></div>
                 <div className="relative z-10">
                     <Head>
                         <script
@@ -598,7 +598,7 @@ export default function Home() {
                     </section>
 
                     <section id="features" className="py-24 px-6 bg-white border-t-2 border-slate-100 relative overflow-hidden">
-                        <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
+                        <div className="absolute inset-0 z-0 opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                         <div className="max-w-7xl mx-auto relative z-10">
                             <div className="text-center max-w-2xl mx-auto mb-16">
                                 <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
@@ -754,7 +754,7 @@ export default function Home() {
                     </section>
 
                     <section ref={zenAIRef} id="how-it-works" className="py-24 px-6 bg-white border-t-2 border-slate-100 relative overflow-hidden bg-noise">
-                        <div className="absolute inset-0 z-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
+                        <div className="absolute inset-0 z-0 opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, hsl(var(--border)) 1px, transparent 0%)', backgroundSize: '50px 50px' }}></div>
                         <div className="aura-background"></div>
                         <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
                             <div className="text-center mb-16">
@@ -1299,7 +1299,7 @@ export default function Home() {
                         <div className="max-w-7xl mx-auto">
                             <div className="relative overflow-hidden rounded-3xl bg-stone-950 text-white p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-12 group shadow-2xl border border-white/5">
                                 {/* Abstract background pattern */}
-                                <div className="absolute inset-0 z-0 opacity-10" style={{
+                                <div className="absolute inset-0 z-0 opacity-[0.05]" style={{
                                     backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
                                     backgroundSize: '32px 32px'
                                 }}></div>
