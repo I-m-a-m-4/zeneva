@@ -334,6 +334,10 @@ export default function CustomersPage() {
                   <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
+              <TableBody>
+                <CustomerRowSkeleton />
+                <CustomerRowSkeleton />
+                <CustomerRowSkeleton />
               </TableBody>
             </Table>
           ) : !isDataLoaded ? (
