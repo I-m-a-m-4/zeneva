@@ -79,6 +79,7 @@ import {
     collection,
     doc,
     updateDoc,
+    addDoc,
     deleteDoc,
     writeBatch,
     where,
@@ -218,6 +219,9 @@ export default function CyberShield() {
 
     const businessesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'businessInstances')) : null, [firestore]);
     const { data: allBusinesses, isLoading: isLoadingBusinesses } = useCollection<any>(businessesQuery);
+
+    const logsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'terminationLogs'), orderBy('terminatedAt', 'desc'), limit(10)) : null, [firestore]);
+    const { data: terminationLogs } = useCollection<any>(logsQuery);
 
     const filteredBusinesses = useMemo(() => {
         if (!allBusinesses) return [];
@@ -408,6 +412,21 @@ export default function CyberShield() {
             setDestructionStatus('Finalizing sanitization...');
             await deleteDoc(doc(firestore, 'businessInstances', businessId));
             
+            setDestructionProgress(95);
+            setDestructionStatus('Recording termination in permanent logs...');
+            try {
+                await addDoc(collection(firestore, 'terminationLogs'), {
+                    businessId: businessId,
+                    name: businessData.name || 'Unnamed',
+                    email: businessData.email,
+                    terminatedAt: serverTimestamp(),
+                    terminatedBy: authUser?.email,
+                    stats: targetStats || { products: 0, customers: 0, sizeKB: 0 }
+                });
+            } catch (logErr) {
+                console.error("Failed to write termination log:", logErr);
+            }
+
             setDestructionProgress(100);
             setDestructionStatus('Entity Terminated');
 
@@ -430,7 +449,7 @@ export default function CyberShield() {
             setTimeout(() => {
                 setIsDestructionModalOpen(false);
                 setDestructionEmail('');
-                setDestructionKey('');
+                setDestructionId('');
                 setHasConfirmedDestruction(false);
                 setIsDestroying(false);
                 setDestructionProgress(0);
@@ -685,6 +704,52 @@ export default function CyberShield() {
                         <span className="text-[9px] font-bold text-primary">Direct Link Active</span>
                     </div>
                 </CardFooter>
+            </Card>
+
+            {/* Terminated Entities Log */}
+            <Card className="border-rose-500/10 bg-white/40 backdrop-blur-md shadow-lg overflow-hidden mt-8">
+                <CardHeader className="bg-rose-50/30 border-b p-4">
+                    <CardTitle className="text-xs flex items-center gap-2 font-bold text-rose-600 uppercase tracking-widest">
+                        <Trash2 className="h-3 w-3" />
+                        Termination Archive
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent border-border/50">
+                                    <TableHead className="text-[10px] font-bold">Purged Entity</TableHead>
+                                    <TableHead className="text-[10px] font-bold">Email Signature</TableHead>
+                                    <TableHead className="text-[10px] font-bold">Termination Date</TableHead>
+                                    <TableHead className="text-[10px] font-bold">Scrubbed Data</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {!terminationLogs || terminationLogs.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-20 text-center text-[10px] text-muted-foreground font-bold italic">
+                                            No recent purges recorded in this sector
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    terminationLogs.map((log: any) => (
+                                        <TableRow key={log.id} className="border-border/50 group hover:bg-rose-50/30 transition-colors">
+                                            <TableCell className="text-[10px] font-bold text-rose-950/70">{log.name}</TableCell>
+                                            <TableCell className="text-[10px] font-medium text-muted-foreground/60">{log.email}</TableCell>
+                                            <TableCell className="text-[10px] font-mono text-muted-foreground/40">
+                                                {log.terminatedAt?.toDate ? format(log.terminatedAt.toDate(), 'MMM dd, HH:mm') : 'Pending...'}
+                                            </TableCell>
+                                            <TableCell className="text-[10px] font-bold text-rose-600/50">
+                                                {log.stats?.products}P / {log.stats?.customers}C
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
             </Card>
 
             {/* Termination Confirmation Dialog */}
