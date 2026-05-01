@@ -380,7 +380,6 @@ export default function CustomersPage() {
               )}
             </div>
           )}
-          )}
         </CardContent>
         {!isNative && filtered && filtered.length > 0 && (
           <CardFooter className="flex flex-col border-t py-4 gap-4">
