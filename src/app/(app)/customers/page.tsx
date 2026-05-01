@@ -127,13 +127,32 @@ export default function CustomersPage() {
   }, [searchTerm, searchCustomers]);
 
   const filtered = React.useMemo(() => {
-    let base = [...(customers || [])];
+    const receiptTotals: Record<string, number> = {};
+    if (receipts) {
+      receipts.forEach(r => {
+        if (r.customer?.id) {
+          receiptTotals[r.customer.id] = (receiptTotals[r.customer.id] || 0) + (Number(r.total) || 0);
+        }
+      });
+    }
+
+    let base = [...(customers || [])].map(c => {
+      const fromReceipts = receiptTotals[c.id] || 0;
+      return {
+        ...c,
+        computedTotalSpent: Math.max(Number(c.totalSpent) || 0, fromReceipts)
+      };
+    });
     
     // Combine with remote search results
     if (searchedCustomers && searchedCustomers.length > 0) {
       searchedCustomers.forEach(rc => {
         if (!base.find(bc => bc.id === rc.id)) {
-          base.push(rc);
+          const fromReceipts = receiptTotals[rc.id] || 0;
+          base.push({
+            ...rc,
+            computedTotalSpent: Math.max(Number(rc.totalSpent) || 0, fromReceipts)
+          } as any);
         }
       });
     }
@@ -150,7 +169,7 @@ export default function CustomersPage() {
     // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === 'spent') {
-        return (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0);
+        return (Number((b as any).computedTotalSpent) || 0) - (Number((a as any).computedTotalSpent) || 0);
       }
       if (sortBy === 'loyalty') {
         return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
@@ -165,7 +184,7 @@ export default function CustomersPage() {
     });
 
     return filtered;
-  }, [searchTerm, customers, sortBy]);
+  }, [searchTerm, customers, sortBy, searchedCustomers, receipts]);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -337,7 +356,7 @@ export default function CustomersPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((customer) => {
-                  const totalSpent = customer.totalSpent ?? 0;
+                  const totalSpent = (customer as any).computedTotalSpent ?? customer.totalSpent ?? 0;
                   const customerReceipts = (receipts || []).filter(r => r.customer?.id === customer.id && r.status === 'unpaid');
                   const debt = customerReceipts.reduce((sum, r) => sum + r.total, 0);
                   return (
