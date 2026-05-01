@@ -251,7 +251,7 @@ export default function CyberShield() {
         
         const targetEmail = (destructionEmail || "").trim();
         
-        if (targetEmail === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
+        if (destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
             toast({ variant: 'destructive', title: "Auth Failure", description: "Termination parameters invalid or incomplete." });
             return;
         }
@@ -685,15 +685,7 @@ export default function CyberShield() {
                             </div>
 
                             <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold text-muted-foreground">Verify Business Email</Label>
-                                    <Input 
-                                        placeholder="Enter target business email..." 
-                                        value={destructionEmail}
-                                        onChange={(e) => setDestructionEmail(e.target.value)}
-                                        className="h-11 font-bold text-sm border-rose-200 focus:ring-rose-500"
-                                    />
-                                </div>
+
 
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-bold text-muted-foreground">Admin Security Key</Label>
@@ -736,7 +728,7 @@ export default function CyberShield() {
                             <Button 
                                 variant="destructive" 
                                 size="sm"
-                                disabled={destructionEmail.trim() === "" || destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction}
+                                disabled={destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction}
                                 onClick={handleEntityTermination}
                                 className="bg-rose-600 hover:bg-rose-700 font-bold text-[10px] px-8 shadow-lg shadow-rose-500/20"
                             >
