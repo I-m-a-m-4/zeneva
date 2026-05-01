@@ -102,7 +102,6 @@ export default function CustomersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
 
-  const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
   const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
@@ -112,13 +111,6 @@ export default function CustomersPage() {
 
   // Global Search Logic
   React.useEffect(() => {
-    setCurrentPage(1);
-    
-    if (!searchTerm.trim()) {
-      setSearchedCustomers(null);
-      return;
-    }
-
     const delayDebounceFn = setTimeout(async () => {
       setIsSearching(true);
       try {
@@ -174,14 +166,6 @@ export default function CustomersPage() {
 
     return filtered;
   }, [searchTerm, customers, sortBy]);
-
-  const paginatedCustomers = React.useMemo(() => {
-    if (isNative) return filtered;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filtered.slice(startIndex, startIndex + itemsPerPage);
-  }, [filtered, currentPage, isNative, itemsPerPage]);
-
-  const pageCount = Math.ceil(filtered.length / itemsPerPage);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -352,23 +336,28 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedCustomers.map((customer) => {
+                {filtered.map((customer) => {
                   const totalSpent = customer.totalSpent ?? 0;
                   const customerReceipts = (receipts || []).filter(r => r.customer?.id === customer.id && r.status === 'unpaid');
                   const debt = customerReceipts.reduce((sum, r) => sum + r.total, 0);
                   return (
-                    <TableRow key={customer.id} data-state={selectedCustomerIds.includes(customer.id) && "selected"}>
-                      <TableCell>
+                    <TableRow 
+                      key={customer.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors group"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button, input')) return;
+                        NProgress.start(); 
+                        router.push(`/customers/details?id=${customer.id}`); 
+                      }}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedCustomerIds.includes(customer.id)}
                           onCheckedChange={() => handleRowSelect(customer.id)}
                         />
                       </TableCell>
                       <TableCell>
-                        <div
-                          className="font-medium hover:underline cursor-pointer"
-                          onClick={() => { NProgress.start(); router.push(`/customers/details?id=${customer.id}`); }}
-                        >
+                        <div className="font-medium">
                           {customer.name}
                         </div>
                         <div className="text-sm text-muted-foreground">{customer.email}</div>
@@ -384,7 +373,7 @@ export default function CustomersPage() {
                       <TableCell className="text-right text-destructive font-bold">
                         {debt > 0 ? `${currencySymbol}${debt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>
                             <Pencil className="h-4 w-4" />
@@ -417,32 +406,18 @@ export default function CustomersPage() {
             </div>
           )}
         </CardContent>
-        {!isNative && filtered && filtered.length > 0 && (
+        {filtered && filtered.length > 0 && (
           <CardFooter className="flex flex-col border-t py-4 gap-4">
-            <div className="flex items-center justify-between w-full">
-              <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> to <strong>{Math.min(currentPage * itemsPerPage, filtered.length)}</strong> of <strong>{filtered.length}</strong> customers
-              </div>
+            <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  disabled={currentPage <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  disabled={currentPage >= pageCount}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+                <span className="font-medium text-foreground">{filtered.length}</span>
+                <span>{filtered.length === 1 ? 'Customer' : 'Customers'} matched</span>
               </div>
+              {searchTerm && (
+                <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setSearchTerm('')}>
+                  Clear filters
+                </Button>
+              )}
             </div>
 
             {/* Background Sync & Deep Retrieval Bridge */}
