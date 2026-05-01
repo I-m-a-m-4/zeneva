@@ -75,6 +75,7 @@ import {
     orderBy, 
     limit, 
     getDocs,
+    getDoc,
     collection,
     doc,
     updateDoc,
@@ -146,6 +147,7 @@ export default function CyberShield() {
     // Entity Termination State
     const [isDestructionModalOpen, setIsDestructionModalOpen] = useState(false);
     const [destructionEmail, setDestructionEmail] = useState('');
+    const [destructionId, setDestructionId] = useState('');
     const [targetStats, setTargetStats] = useState<{ products: number; customers: number; sizeKB: number } | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
 
@@ -298,18 +300,16 @@ export default function CyberShield() {
         setDestructionStatus('Locating entity in grid...');
 
         try {
-            // 1. Find the business instance
-            const businessesRef = collection(firestore, 'businessInstances');
-            const bQuery = query(businessesRef, where("email", "==", targetEmail.toLowerCase()));
-            const bSnap = await getDocs(bQuery);
+            // 1. Target the business instance directly
+            const businessRef = doc(firestore, 'businessInstances', destructionId);
+            const businessSnap = await getDoc(businessRef);
 
-            if (bSnap.empty) {
-                throw new Error("Entity not found in current grid. Verify email signature.");
+            if (!businessSnap.exists()) {
+                throw new Error("Entity not found in current grid. Node ID may be invalid.");
             }
 
-            const businessDoc = bSnap.docs[0];
-            const businessId = businessDoc.id;
-            const businessData = businessDoc.data();
+            const businessId = businessSnap.id;
+            const businessData = businessSnap.data();
 
             setDestructionProgress(15);
             setDestructionStatus(`Target Locked: ${businessData.name || 'Unnamed'}. Initializing wipe...`);
@@ -653,6 +653,7 @@ export default function CyberShield() {
                                                     className="h-8 text-[9px] font-bold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-600/20 hover:border-rose-600 transition-all rounded-md"
                                                     onClick={() => {
                                                         setDestructionEmail(business.email || "");
+                                                        setDestructionId(business.id);
                                                         setIsDestructionModalOpen(true);
                                                         fetchTargetStats(business.id);
                                                     }}
