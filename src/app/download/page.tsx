@@ -64,7 +64,7 @@ import { cn } from "@/lib/utils";
 
 
 export default function DownloadPage() {
-  const version = AppConfig.version || "1.7.0";
+  const version = AppConfig.version || "1.8.1";
   const [mounted, setMounted] = useState(false);
   const androidMockups = [
     { src: "/zeneva_android_dashboard_mockup.png", label: "Dashboard" },
@@ -341,7 +341,7 @@ export default function DownloadPage() {
                 <div className="w-full border-x-[2.5px] border-dashed border-slate-200">
                     {/* Upper Header Bar */}
                     <div className="flex items-center px-12 h-16 border-b-[2.5px] border-dashed border-slate-200">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.7.0</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.1</span>
                     </div>
 
                     <div className="grid lg:grid-cols-2">
