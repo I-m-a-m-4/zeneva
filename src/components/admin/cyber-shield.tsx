@@ -299,6 +299,11 @@ export default function CyberShield() {
             return;
         }
 
+        if (!destructionId) {
+            toast({ variant: 'destructive', title: "Target Missing", description: "No entity selected for termination." });
+            return;
+        }
+
         setIsDestroying(true);
         setDestructionProgress(5);
         setDestructionStatus('Locating entity in grid...');
@@ -418,7 +423,7 @@ export default function CyberShield() {
                 await addDoc(collection(firestore, 'terminationLogs'), {
                     businessId: businessId,
                     name: businessData.name || 'Unnamed',
-                    email: businessData.email,
+                    email: businessData.email || destructionEmail || "N/A",
                     terminatedAt: serverTimestamp(),
                     terminatedBy: authUser?.email,
                     stats: targetStats || { products: 0, customers: 0, sizeKB: 0 }
