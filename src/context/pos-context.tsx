@@ -156,7 +156,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile } = useDoc<UserProfile>(userDocRef);
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
-  const businessId = isProfileReady ? currentUserProfile.businessId : (offlineProfile?.businessId || null);
+  const businessId = isProfileReady ? currentUserProfile.businessId : (user ? null : (offlineProfile?.businessId || null));
 
   const businessDocRef = useMemoFirebase(() => (user && businessId ? doc(firestore, 'businessInstances', businessId) : null), [user, businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
@@ -170,7 +170,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
   }, [initialBusiness]);
 
-  const canFetchSubData = !!businessId && !!initialBusiness && !!user;
+  const canFetchSubData = !!businessId && !!initialBusiness && !!user && isProfileReady;
 
   const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
@@ -958,7 +958,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const value: POSContextType = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile: profile, 
-    isLoading: (isLoadingBusiness && !business) || 
+    isLoading: (isUserLoading && !offlineProfile) ||
+               (!!user && !businessId) ||
+               (isLoadingBusiness && !business) || 
                (isLoadingProducts && (!products || products.length === 0)) || 
                (isLoadingCustomers && (!customers || customers.length === 0)) || 
                (isSyncing && (!products || products.length === 0)) ||

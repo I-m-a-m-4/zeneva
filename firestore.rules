@@ -1,4 +1,4 @@
-// Force rules update - Version 2.0.2
+// Force rules update - Version 2.0.3
 rules_version = '2';
 
 service cloud.firestore {
@@ -41,21 +41,21 @@ service cloud.firestore {
     }
     
     function isRequestingUserAdmin() {
-      return request.auth != null && getCurrentUserRole() == 'admin';
+      return request.auth != null && getCurrentUserRole() in ['admin', 'owner', 'super-admin'];
     }
 
     function isRequestingUserManager() {
-      return request.auth != null && getCurrentUserRole() in ['admin', 'manager'];
+      return request.auth != null && getCurrentUserRole() in ['admin', 'manager', 'owner', 'super-admin'];
     }
 
     function isRequestingUserStaff() {
-      return request.auth != null && getCurrentUserRole() in ['admin', 'manager', 'vendor_operator'];
+      return request.auth != null && getCurrentUserRole() in ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'];
     }
 
     function isBusinessOwner(businessId) {
        return request.auth != null && 
               getCurrentUserBusinessId() == businessId && 
-              getCurrentUserRole() == 'admin';
+              getCurrentUserRole() in ['admin', 'owner'];
     }
 
     function isFieldUntouched(fieldName) {
@@ -117,7 +117,7 @@ service cloud.firestore {
                     (isUserAuthenticated() && resource != null && resource.data.get('ownerId', null) == request.auth.uid) ||
                     (resource != null && resource.data.get(['settings', 'publicStore', 'enabled'], false) == true);
       
-      allow list: if request.query.limit <= 1 || isSuperAdmin();
+      allow list: if (isUserAuthenticated() && request.query.limit <= 1) || isSuperAdmin();
       
       allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerId;
       allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId) && 
@@ -125,22 +125,22 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
       
       match /subscription_history/{historyId} {
-        allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
         allow create: if isUserAuthenticated();
         allow update, delete: if false;
       }
 
       match /auditLogs/{logId} {
-        allow list, get: if (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
-        allow create: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+        allow list, get: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId));
+        allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
         allow update, delete: if false;
       }
 
       match /onlineOrders/{orderId} {
-         allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+         allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
          // Allow public to create orders, but restrict updates to staff
          allow create: if true; 
-         allow update: if (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) || isSuperAdmin();
+         allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
          allow delete: if false;
       }
 
@@ -158,8 +158,8 @@ service cloud.firestore {
                     
       // Only SuperAdmin can list globally. Business Admins fetch their own staff.
       allow list: if isSuperAdmin() || 
-                  (isUserAuthenticated() && 
-                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
+                   (isUserAuthenticated() && 
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == resource.data.businessId);
       
       // Self-update or Super Admin
       allow update: if isSuperAdmin() || (request.auth != null && request.auth.uid == userId);
@@ -187,14 +187,15 @@ service cloud.firestore {
       allow read: if true; // Publicly readable by anyone with the unguessable link ID
       allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && request.resource.data.get('businessId', null) == getCurrentUserBusinessId());
       allow list: if isSuperAdmin() || isUserAuthenticated();
-      allow delete: if (isUserAuthenticated() && isRequestingUserAdmin() && getCurrentUserBusinessId() == resource.data.get('businessId', 'none')) || 
-                       isSuperAdmin() ||
+      allow delete: if isSuperAdmin() || 
+                       (isUserAuthenticated() && isRequestingUserAdmin() && getCurrentUserBusinessId() == resource.data.get('businessId', 'none')) || 
                        (isUserAuthenticated() && 'email' in request.auth.token && request.auth.token.email.lower() == resource.data.get('email', '').lower());
     }
 
 
     match /products/{productId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if true; // Products are publicly listable for store fronts
       allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && 
                       request.resource.data.get('businessId', null) == getCurrentUserBusinessId() && 
                       isSubscriptionActive(request.resource.data.get('businessId', null)));
@@ -207,7 +208,10 @@ service cloud.firestore {
     }
 
     match /receipts/{receiptId} {
-        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
+        allow get: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
+        // Support aggregation queries by checking businessId in query filters instead of document content
+        allow list: if isSuperAdmin() || (isUserAuthenticated() && (request.query.filters.businessId == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
+        
         allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                         isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
                         isSubscriptionActive(request.resource.data.get('businessId', null)));
@@ -218,7 +222,10 @@ service cloud.firestore {
     }
     
     match /customers/{customerId} {
-      allow read, list: if (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null))) || isSuperAdmin();
+      allow get: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      // Support aggregation queries by checking businessId in query filters instead of document content
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && request.query.filters.businessId == getCurrentUserBusinessId());
+      
       allow create: if true; 
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 

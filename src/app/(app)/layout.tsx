@@ -312,7 +312,8 @@ export default function AuthenticatedLayout({
   }, [isLoading, user, router]);
 
   React.useEffect(() => {
-    if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding') {
+    const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
+    if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding' && !isSuperAdmin) {
       router.replace('/onboarding');
     }
   }, [isLoading, currentUserProfile, pathname, router]);
@@ -322,23 +323,27 @@ export default function AuthenticatedLayout({
     if (isLoading || isUserLoading || !currentUserProfile) return;
 
     const userRole = currentUserProfile.role;
+    const isSuperAdmin = currentUserProfile.email === 'belloimam431@gmail.com';
+
+    if (isSuperAdmin) return; // Super admin has access to everything
+
     const ROUTE_PERMISSIONS: Record<string, string[]> = {
-      '/dashboard': ['admin', 'manager', 'vendor_operator'],
-      '/inventory': ['admin', 'manager', 'vendor_operator'],
-      '/sales': ['admin', 'manager', 'vendor_operator'],
-      '/storefront': ['admin'],
-      '/online-orders': ['admin', 'manager'],
-      '/receipts': ['admin', 'manager', 'vendor_operator'],
-      '/invoices': ['admin', 'manager'],
-      '/reports': ['admin', 'manager'],
-      '/ai-insights': ['admin', 'manager', 'vendor_operator'],
-      '/customers': ['admin', 'manager', 'vendor_operator'],
-      '/users': ['admin'],
-      '/audit-log': ['admin'],
-      '/billing': ['admin'],
-      '/settings': ['admin'],
-      '/support': ['admin', 'manager', 'vendor_operator'],
-      '/achievements': ['admin', 'manager', 'vendor_operator'],
+      '/dashboard': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/inventory': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/sales': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/storefront': ['admin', 'owner', 'super-admin'],
+      '/online-orders': ['admin', 'manager', 'owner', 'super-admin'],
+      '/receipts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/invoices': ['admin', 'manager', 'owner', 'super-admin'],
+      '/reports': ['admin', 'manager', 'owner', 'super-admin'],
+      '/ai-insights': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/users': ['admin', 'owner', 'super-admin'],
+      '/audit-log': ['admin', 'owner', 'super-admin'],
+      '/billing': ['admin', 'owner', 'super-admin'],
+      '/settings': ['admin', 'owner', 'super-admin'],
+      '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     };
 
     const protectedRoute = Object.keys(ROUTE_PERMISSIONS)
