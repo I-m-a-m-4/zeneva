@@ -564,7 +564,7 @@ export default function AuthenticatedLayout({
             className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
             <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
-            <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
+            <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print overflow-hidden">
               <SidebarHeader className="p-2 flex items-center gap-2 justify-center">
                 <Link href="/dashboard" className="flex items-center justify-center h-10 w-full">
                   {/* Expanded state logo */}
