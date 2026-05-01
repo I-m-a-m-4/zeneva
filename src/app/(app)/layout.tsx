@@ -559,7 +559,7 @@ export default function AuthenticatedLayout({
   return (
     <>
       <TooltipProvider>
-        <SidebarProvider defaultOpen={true}>
+        <SidebarProvider defaultOpen={true} className="h-full">
           <div
             className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
