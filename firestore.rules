@@ -1,4 +1,4 @@
-// Force rules update - Version 2.0.5
+// Force rules update - Version 2.0.6
 rules_version = '2';
 
 service cloud.firestore {
@@ -133,7 +133,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && getUserData().businessId == resource.data.businessId);
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && getCurrentUserBusinessId() == resource.data.businessId);
       allow update: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
       allow create: if isUserAuthenticated() && request.auth.uid == userId;
       allow delete: if isSuperAdmin();
@@ -160,7 +160,7 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && resource.data.get('businessId', 'none') == getCurrentUserBusinessId());
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
       
       allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
