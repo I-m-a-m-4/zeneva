@@ -212,7 +212,10 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   workboxOptions: {
-    importScripts: ['https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.7/runtime.min.js'],
+    importScripts: [
+      'https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.7/runtime.min.js',
+      '/sw-helpers.js'
+    ],
     runtimeCaching: [
       {
         urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/_vercel/'),
