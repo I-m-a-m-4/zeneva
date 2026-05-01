@@ -210,7 +210,7 @@ service cloud.firestore {
     match /receipts/{receiptId} {
         allow get: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
         // Support aggregation queries by checking businessId in query filters instead of document content
-        allow list: if isSuperAdmin() || (isUserAuthenticated() && (request.query.filters.businessId == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
+        allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
         
         allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                         isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
@@ -224,7 +224,7 @@ service cloud.firestore {
     match /customers/{customerId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
       // Support aggregation queries by checking businessId in query filters instead of document content
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && request.query.filters.businessId == getCurrentUserBusinessId());
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && resource.data.get('businessId', 'none') == getCurrentUserBusinessId());
       
       allow create: if true; 
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 
