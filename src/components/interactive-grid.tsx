@@ -27,7 +27,7 @@ export function InteractiveGrid() {
             <svg
                 width="100%"
                 height="100%"
-                className="absolute inset-0 h-full w-full border-gray-200/10 dark:border-gray-800/10"
+                className="absolute inset-0 h-full w-full border-gray-200/20 dark:border-gray-800/20"
                 style={{
                     maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
                     WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)"
@@ -46,7 +46,7 @@ export function InteractiveGrid() {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={1}
-                        className="text-gray-200/15 dark:text-gray-800/15"
+                        className="text-gray-200/25 dark:text-gray-800/25"
                     />
                 </pattern>
                 <rect width="100%" height="100%" fill="url(#grid-pattern)" />
@@ -71,7 +71,7 @@ export function InteractiveGrid() {
                                 y={y}
                                 width={gridSize}
                                 height={gridSize}
-                                className="stroke-gray-200/5 dark:stroke-gray-800/5 transition-all duration-100 ease-in-out [&:not(:hover)]:duration-1000 fill-transparent hover:fill-gray-100/10 dark:hover:fill-gray-800/10 pointer-events-auto cursor-crosshair"
+                                className="stroke-gray-200/10 dark:stroke-gray-800/10 transition-all duration-100 ease-in-out [&:not(:hover)]:duration-1000 fill-transparent hover:fill-gray-100/30 dark:hover:fill-gray-800/30 pointer-events-auto cursor-crosshair"
                             />
                         );
                     })}

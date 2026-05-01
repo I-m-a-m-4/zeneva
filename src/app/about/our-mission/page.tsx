@@ -44,7 +44,7 @@ export default function OurMissionPage() {
 
   return (
     <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden relative">
-      <div className="fixed grid-lines w-full h-full top-0 right-0 left-0 pointer-events-none z-0 opacity-[0.05]"></div>
+      <div className="fixed grid-lines w-full h-full top-0 right-0 left-0 pointer-events-none z-0 opacity-[0.15]"></div>
       
       <div className="absolute top-0 left-0 w-full h-[800px] overflow-hidden pointer-events-none z-0">
         <InteractiveGrid />
