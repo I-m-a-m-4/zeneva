@@ -130,12 +130,12 @@ const SidebarProvider = React.forwardRef<
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
                 "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
-                minHeight: 'calc(100vh - var(--tauri-title-height, 0px))',
+                height: 'calc(100vh - var(--tauri-title-height, 0px))',
                 ...style,
               } as React.CSSProperties
             }
             className={cn(
-              "group/sidebar-wrapper flex w-full",
+              "group/sidebar-wrapper flex h-full w-full",
               className
             )}
             ref={ref}
