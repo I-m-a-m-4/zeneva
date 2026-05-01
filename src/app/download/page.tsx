@@ -358,7 +358,7 @@ export default function DownloadPage() {
                                     </p>
                                 </div>
                                 <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md">
-                                    Download Zeneva
+                                    Download Zeneva (113MB)
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                 </Button>
                             </div>
@@ -370,6 +370,7 @@ export default function DownloadPage() {
                                     { k: "Offline Data Storage", v: "Secure Local Database" },
                                     { k: "Checkout Speed", v: "< 10ms Transaction" },
                                     { k: "Processor Optimization", v: "High-Speed Execution" },
+                                    { k: "Binary Size (Win)", v: "113 MB" },
                                     { k: "Data Encryption", v: "Enterprise Grade" },
                                     { k: "Inventory Sync Rate", v: "Instant Updates" }
                                 ].map((spec, i) => (
@@ -440,7 +441,7 @@ export default function DownloadPage() {
                                 </div>
                                 <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
                                     <a href={latestReleaseUrl}>
-                                        Download Zeneva
+                                        Download Zeneva (116MB)
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
                                 </Button>
@@ -454,6 +455,7 @@ export default function DownloadPage() {
                                     { k: "Interface Quality", v: "Retina Display P3" },
                                     { k: "Graphics Core", v: "Metal Accelerated" },
                                     { k: "Build Integrity", v: "Apple Notarized" },
+                                    { k: "Binary Size (macOS)", v: "116 MB" },
                                     { k: "System Security", v: "Sandboxed Enclave" }
                                 ].map((spec, i) => (
                                     <div key={i} className="flex justify-between items-center py-4 border-b border-dashed border-slate-200">
@@ -523,7 +525,7 @@ export default function DownloadPage() {
                                 </div>
                                 <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
                                     <a href={latestReleaseUrl}>
-                                        Download Zeneva
+                                        Download Zeneva (132MB)
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
                                 </Button>
@@ -537,7 +539,8 @@ export default function DownloadPage() {
                                     { k: "Sync Protocol", v: "Hub WebSocket" },
                                     { k: "Offline Storage", v: "SQLite Encryption" },
                                     { k: "Scanning SDK", v: "Multi-Barcode AI" },
-                                    { k: "Update Channel", v: "Direct OTA" }
+                                    { k: "Update Channel", v: "Direct OTA" },
+                                    { k: "Binary Size (Android)", v: "132 MB" }
                                 ].map((spec, i) => (
                                     <div key={i} className="flex justify-between items-center py-4 border-b border-dashed border-slate-200">
                                         <span className="text-[12px] font-bold text-slate-950 tracking-tight font-display">{spec.k}:</span>
