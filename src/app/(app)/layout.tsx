@@ -163,7 +163,8 @@ export default function AuthenticatedLayout({
     setIsConfettiActive,
     products,
     queuedActions,
-    isSubscriptionActive
+    isSubscriptionActive,
+    onlineOrders
   } = usePOS();
 
   const { notify } = useNativeNotifications();
