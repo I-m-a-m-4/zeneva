@@ -76,7 +76,7 @@ function CustomerRowSkeleton() {
   )
 }
 
-const CUSTOMERS_PER_PAGE_WEB = 200;
+const CUSTOMERS_PER_PAGE_WEB = 500;
 const CUSTOMERS_PER_PAGE_NATIVE = 100000;
 
 export default function CustomersPage() {
@@ -104,17 +104,15 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
-  const [displayLimit, setDisplayLimit] = React.useState(250);
 
   const isLoading = isPosLoading;
 
   // Local-First Search for Instant Performance
   React.useEffect(() => {
     setCurrentPage(1);
-    setDisplayLimit(500);
   }, [searchTerm]);
 
-  const { filtered, displayedList } = React.useMemo(() => {
+  const filtered = React.useMemo(() => {
     let base = [...(customers || [])];
     
     let filtered = searchTerm.trim() 
@@ -143,16 +141,16 @@ export default function CustomersPage() {
       return Number(dateB) - Number(dateA);
     });
 
-    return { filtered, displayedList: filtered.slice(0, displayLimit) };
-  }, [searchTerm, customers, sortBy, displayLimit]);
+    return filtered;
+  }, [searchTerm, customers, sortBy]);
 
   const paginatedCustomers = React.useMemo(() => {
-    if (isNative) return displayedList;
+    if (isNative) return filtered;
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return displayedList.slice(startIndex, startIndex + itemsPerPage);
-  }, [displayedList, currentPage, isNative, itemsPerPage]);
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [filtered, currentPage, isNative, itemsPerPage]);
 
-  const pageCount = Math.ceil(displayedList.length / itemsPerPage);
+  const pageCount = Math.ceil(filtered.length / itemsPerPage);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -161,7 +159,7 @@ export default function CustomersPage() {
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      setSelectedCustomerIds(displayedList.map(c => c.id));
+      setSelectedCustomerIds(filtered.map(c => c.id));
     } else {
       setSelectedCustomerIds([]);
     }
@@ -246,7 +244,7 @@ export default function CustomersPage() {
             </div>
             <div className="flex items-center gap-2">
               {(() => {
-                const visibleSelectedCount = selectedCustomerIds.filter(id => displayedList.some(c => c.id === id)).length;
+                const visibleSelectedCount = selectedCustomerIds.filter(id => filtered.some(c => c.id === id)).length;
                 return visibleSelectedCount > 0 && (
                   <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
                     <Trash2 className="h-3.5 w-3.5" />
@@ -293,13 +291,13 @@ export default function CustomersPage() {
                 <CustomerRowSkeleton />
               </TableBody>
             </Table>
-          ) : displayedList && displayedList.length > 0 ? (
+          ) : filtered && filtered.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={displayedList.length > 0 && selectedCustomerIds.length === displayedList.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
+                      checked={filtered.length > 0 && selectedCustomerIds.length === filtered.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -382,24 +380,13 @@ export default function CustomersPage() {
               )}
             </div>
           )}
-          {filtered.length > displayLimit && (
-            <div className="mt-6 flex justify-center pb-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setDisplayLimit(prev => prev + 500)}
-                className="gap-2 h-10 px-8 border-dashed"
-              >
-                Load More Results
-                <span className="text-xs text-muted-foreground">({filtered.length - displayLimit} hidden)</span>
-              </Button>
-            </div>
           )}
         </CardContent>
-        {!isNative && displayedList && displayedList.length > 0 && (
+        {!isNative && filtered && filtered.length > 0 && (
           <CardFooter className="flex flex-col border-t py-4 gap-4">
             <div className="flex items-center justify-between w-full">
               <div className="text-sm text-muted-foreground">
-                Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> to <strong>{Math.min(currentPage * itemsPerPage, displayedList.length)}</strong> of <strong>{displayedList.length}</strong> customers
+                Showing <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> to <strong>{Math.min(currentPage * itemsPerPage, filtered.length)}</strong> of <strong>{filtered.length}</strong> customers
               </div>
               <div className="flex items-center gap-2">
                 <Button
