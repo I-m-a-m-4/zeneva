@@ -89,7 +89,8 @@ export default function CustomersPage() {
     business, 
     currentUserProfile: currentUser, 
     triggerRefresh, 
-    isFullSyncingCustomers 
+    isFullSyncingCustomers,
+    searchCustomers
   } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -104,17 +105,47 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
+  const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
 
   const isLoading = isPosLoading;
 
-  // Local-First Search for Instant Performance
+  // Global Search Logic
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+    
+    if (!searchTerm.trim()) {
+      setSearchedCustomers(null);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchCustomers(searchTerm);
+        setSearchedCustomers(results);
+      } catch (err) {
+        console.error("Global search failed:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, searchCustomers]);
 
   const filtered = React.useMemo(() => {
     let base = [...(customers || [])];
     
+    // Combine with remote search results
+    if (searchedCustomers && searchedCustomers.length > 0) {
+      searchedCustomers.forEach(rc => {
+        if (!base.find(bc => bc.id === rc.id)) {
+          base.push(rc);
+        }
+      });
+    }
+
     let filtered = searchTerm.trim() 
       ? base.filter(c => 
           c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -224,10 +255,15 @@ export default function CustomersPage() {
                   <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     placeholder="Search name, email, or code..."
-                    className="pl-8 ring-offset-background focus-visible:ring-primary"
+                    className="pl-8 pr-8 ring-offset-background focus-visible:ring-primary"
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                   />
+                  {isSearching && (
+                    <div className="absolute right-2.5 top-2.5">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    </div>
+                  )}
                 </div>
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                   <SelectTrigger className="w-[180px]">

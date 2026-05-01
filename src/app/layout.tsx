@@ -99,7 +99,7 @@ const jsonLd = {
       '@id': `${siteUrl}/#organization`,
       name: 'Zeneva',
       url: siteUrl,
-      logo: `${siteUrl}/zeneva-og-image.png?v=4`,
+      logo: `${siteUrl}/zeneva-og-image.png?v=5`,
       sameAs: [
         'https://x.com/zeneva_retail',
         'https://www.instagram.com/zeneva_pos/',

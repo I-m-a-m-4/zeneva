@@ -37,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { logAuditEvent } from '@/lib/audit';
 import Image from 'next/image';
 import Link from 'next/link';
-import { safeToDate } from '@/lib/utils';
+import { safeToDate, cn } from '@/lib/utils';
 
 export default function CustomerDetailPage() {
     return (
@@ -237,6 +237,11 @@ function CustomerDetailContent() {
         }
     };
 
+    const totalSpent = React.useMemo(() => {
+        const fromReceipts = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
+        return Math.max(customer?.totalSpent || 0, fromReceipts);
+    }, [customer, receipts]);
+
     const isLoading = isPosLoading || isFetchingReceipts;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
@@ -263,11 +268,6 @@ function CustomerDetailContent() {
             </div>
         )
     }
-
-    const totalSpent = React.useMemo(() => {
-        const fromReceipts = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
-        return Math.max(customer?.totalSpent || 0, fromReceipts);
-    }, [customer, receipts]);
 
     return (
         <div className="space-y-6">
