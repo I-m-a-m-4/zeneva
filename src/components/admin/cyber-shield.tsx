@@ -146,7 +146,6 @@ export default function CyberShield() {
     // Entity Termination State
     const [isDestructionModalOpen, setIsDestructionModalOpen] = useState(false);
     const [destructionEmail, setDestructionEmail] = useState('');
-    const [destructionKey, setDestructionKey] = useState('');
     const [targetStats, setTargetStats] = useState<{ products: number; customers: number; sizeKB: number } | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
 
@@ -188,7 +187,6 @@ export default function CyberShield() {
     const [destructionProgress, setDestructionProgress] = useState(0);
     const [destructionStatus, setDestructionStatus] = useState('');
 
-    const REQUIRED_KEY = "ZENEVA-ALPHA-TERMINATE";
 
     // MFA Enrollment State
     const [isMfaModalOpen, setIsMfaModalOpen] = useState(false);
@@ -290,8 +288,8 @@ export default function CyberShield() {
         
         const targetEmail = (destructionEmail || "").trim();
         
-        if (destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction) {
-            toast({ variant: 'destructive', title: "Auth Failure", description: "Termination parameters invalid or incomplete." });
+        if (!hasConfirmedDestruction) {
+            toast({ variant: 'destructive', title: "Confirmation Required", description: "Please acknowledge the destructive nature of this action." });
             return;
         }
 
@@ -761,16 +759,6 @@ export default function CyberShield() {
                             <div className="space-y-4">
 
 
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold text-muted-foreground">Admin Security Key</Label>
-                                    <Input 
-                                        type="password"
-                                        placeholder={`Type "${REQUIRED_KEY}"`}
-                                        value={destructionKey}
-                                        onChange={(e) => setDestructionKey(e.target.value)}
-                                        className="h-11 font-mono font-bold text-sm border-rose-200 focus:ring-rose-500"
-                                    />
-                                </div>
 
                                 <div className="flex items-center space-x-2 pt-2">
                                     <input 
@@ -802,7 +790,7 @@ export default function CyberShield() {
                             <Button 
                                 variant="destructive" 
                                 size="sm"
-                                disabled={destructionKey !== REQUIRED_KEY || !hasConfirmedDestruction}
+                                disabled={!hasConfirmedDestruction}
                                 onClick={handleEntityTermination}
                                 className="bg-rose-600 hover:bg-rose-700 font-bold text-[10px] px-8 shadow-lg shadow-rose-500/20"
                             >
