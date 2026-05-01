@@ -273,9 +273,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     // Client-side sort by createdAt desc
     return merged.sort((a, b) => {
-      const dateA = a.createdAt?.toMillis?.() || a.createdAt?.seconds || (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0);
-      const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0);
-      return dateB - dateA;
+      const getMillis = (dateVal: any) => {
+        if (!dateVal) return 0;
+        if (dateVal.toMillis) return dateVal.toMillis();
+        if (dateVal.seconds) return dateVal.seconds * 1000;
+        if (dateVal instanceof Date) return dateVal.getTime();
+        if (typeof dateVal === 'string' || typeof dateVal === 'number') return new Date(dateVal).getTime();
+        return 0;
+      };
+      return getMillis(b.createdAt) - getMillis(a.createdAt);
     });
   }, [initialReceipts, syncedReceipts, queuedActions]);
 

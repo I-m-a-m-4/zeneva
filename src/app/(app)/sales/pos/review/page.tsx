@@ -248,9 +248,23 @@ function ReviewPageContent() {
         if (autoPrint && !hasPrintedRef.current) {
             hasPrintedRef.current = true;
             setTimeout(() => {
+                const handleAfterPrint = () => {
+                    window.removeEventListener('afterprint', handleAfterPrint);
+                    router.push('/sales/pos/select-products');
+                    resetPOS();
+                };
+                window.addEventListener('afterprint', handleAfterPrint);
                 window.print();
-                router.push('/sales/pos/select-products');
-                resetPOS();
+                
+                // Fallback for browsers that don't reliably fire afterprint or if it fails
+                setTimeout(() => {
+                    window.removeEventListener('afterprint', handleAfterPrint);
+                    // Check if we haven't already navigated (resetPOS clears cart)
+                    if (cart.length > 0) {
+                       router.push('/sales/pos/select-products');
+                       resetPOS();
+                    }
+                }, 60000); // 1 minute fallback
             }, 500);
         } else if (!autoPrint) {
             router.push('/sales/pos/select-products');
