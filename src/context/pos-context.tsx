@@ -958,7 +958,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const value: POSContextType = useMemo(() => ({
     business, products, receipts, customers, onlineOrders, currentUserProfile: profile, 
-    isLoading: (isLoadingBusiness && !business) || (isLoadingProducts && (!products || products.length === 0)) || !isMounted, 
+    isLoading: (isLoadingBusiness && !business) || 
+               (isLoadingProducts && (!products || products.length === 0)) || 
+               (isLoadingCustomers && (!customers || customers.length === 0)) || 
+               (isSyncing && (!products || products.length === 0)) ||
+               (isFullSyncingCustomers && (!customers || customers.length === 0)) ||
+               !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
     user, firestore,
     isProfileReady,
@@ -979,7 +984,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }
