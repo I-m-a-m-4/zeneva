@@ -51,7 +51,13 @@ import {
     Trash2,
     Database,
     Users,
-    Package
+    Package,
+    Cpu,
+    Radio,
+    ArrowRight,
+    Server,
+    Signal,
+    Crosshair
 } from 'lucide-react';
 import { deleteBusinessUsersAuth } from '@/actions/admin-actions';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -524,7 +530,7 @@ export default function CyberShield() {
                         label="Encryption" 
                         value="AES-256"
                         subValue="End-to-end verified"
-                        icon={LockIcon}
+                        icon={Lock}
                         colorClass="text-purple-600"
                     />
                     <SecurityMetric 
@@ -816,7 +822,7 @@ export default function CyberShield() {
                                 <DialogHeader>
                                     <DialogTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
                                         <div className="p-2 bg-primary/10 rounded-lg">
-                                            <LockIcon className="h-5 w-5 text-primary" />
+                                            <Lock className="h-5 w-5 text-primary" />
                                         </div>
                                         Secure Identity Link
                                     </DialogTitle>
