@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { sendInvitationEmail } from '@/lib/email';
 import { v4 as uuidv4 } from 'uuid';
+import { usePOS } from '@/context/pos-context';
 
 interface AddUserDialogProps {
     isOpen: boolean;
