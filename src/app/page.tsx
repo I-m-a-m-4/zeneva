@@ -763,7 +763,7 @@ export default function Home() {
                                     The Operating System for Profit-Driven Retail
                                 </span>
                                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
-                                    <Link href="/about/our-mission" className="hover:text-primary transition-colors cursor-pointer">
+                                    <Link href="/about/our-mission" className="text-primary transition-colors cursor-pointer">
                                         Zen AI: The Brain Behind Every Sale
                                     </Link>
                                 </h2>
