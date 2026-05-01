@@ -6,6 +6,7 @@ on:
 
 jobs:
   release:
+    name: Build & Release (${{ matrix.platform }})
     permissions:
       contents: write
     strategy:
@@ -93,6 +94,7 @@ jobs:
           node scripts/generate-latest-json.mjs
 
   release-android:
+    name: Build & Release (Android)
     runs-on: ubuntu-latest
     permissions:
       contents: write
