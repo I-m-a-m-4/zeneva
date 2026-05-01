@@ -460,6 +460,23 @@ function SettingsPageContent() {
         }
     };
 
+    const handleSendTestNotification = async () => {
+        if (!currentUserProfile?.id) return;
+        try {
+            await addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
+                title: "Test Notification",
+                body: "This is a test notification from Zeneva Settings. If you see this, notifications are working!",
+                createdAt: serverTimestamp(),
+                read: false,
+                type: 'system'
+            });
+            toast({ title: "Test Notification Sent", description: "You should see it in your notification panel shortly." });
+        } catch (error) {
+            console.error("Error sending test notification:", error);
+            toast({ variant: "destructive", title: "Test Failed", description: "Could not send test notification." });
+        }
+    };
+
     const handleAddShippingOption = () => {
         const name = newShippingOption.name.trim();
         const price = parseFloat(newShippingOption.price);
@@ -771,14 +788,26 @@ function SettingsPageContent() {
                                             : "Enable push notifications to stay updated on orders and stock."}
                                 </p>
                             </div>
-                            <Button
-                                onClick={fcmToken ? unsubscribe : requestPermission}
-                                disabled={isFcmLoading}
-                                variant={fcmToken ? "destructive" : "default"}
-                            >
-                                {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {fcmToken ? "Disable" : "Enable"}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {permission === 'granted' && (
+                                    <Button
+                                        onClick={handleSendTestNotification}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        Send Test
+                                    </Button>
+                                )}
+                                <Button
+                                    onClick={fcmToken ? unsubscribe : requestPermission}
+                                    disabled={isFcmLoading}
+                                    variant={fcmToken ? "destructive" : "default"}
+                                    size="sm"
+                                >
+                                    {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    {fcmToken ? "Disable" : "Enable"}
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

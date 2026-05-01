@@ -13,8 +13,13 @@ export function FirebaseErrorListener() {
   const [error, setError] = useState<FirestorePermissionError | null>(null);
 
   useEffect(() => {
+    const mountTime = Date.now();
     // The callback now expects a strongly-typed error, matching the event payload.
     const handleError = (error: FirestorePermissionError) => {
+      // Ignore permission errors for the first 5 seconds of the session
+      // to allow auth state and profile documents to stabilize.
+      if (Date.now() - mountTime < 5000) return;
+      
       // Set error in state to trigger a re-render.
       setError(error);
     };

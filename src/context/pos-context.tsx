@@ -431,7 +431,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
       
       setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
-      toast({ title: "Full Sync Successful", description: `Synchronized ${allFetched.length} customers for offline access.` });
+      
+      // Only show the toast if it's been more than 24 hours since the last success
+      // to avoid annoying the user on every app start.
+      const lastToast = Number(localStorage.getItem('last_sync_toast_time') || 0);
+      if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
+        toast({ title: "Full Sync Successful", description: `Synchronized ${allFetched.length} customers for offline access.` });
+        localStorage.setItem('last_sync_toast_time', Date.now().toString());
+      }
     } catch (error) {
       console.error("Full Customer Sync Failed:", error);
     } finally {
@@ -484,6 +491,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
               totalRevenue: increment(action.payload.receiptData.total),
               totalUnitsSold: increment(totalUnits)
             }, { merge: true });
+
+            // Low Stock Alert Check
+            action.payload.productUpdates.forEach((u: any) => {
+              const product = products?.find(p => p.id === u.id);
+              if (product && product.lowStockThreshold && u.newStock <= product.lowStockThreshold) {
+                 const notifRef = doc(collection(firestore, `users/${currentUserProfile.id}/notifications`));
+                 batch.set(notifRef, {
+                    title: "Low Stock Alert",
+                    body: `${product.name} is running low. Remaining: ${u.newStock}`,
+                    createdAt: serverTimestamp(),
+                    read: false,
+                    type: 'inventory',
+                    productId: product.id
+                 });
+              }
+            });
 
             const customerUpdate = action.payload.customerUpdate;
             if (customerUpdate && customerUpdate.id) {
@@ -824,7 +847,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     };
 
     checkFullSyncStatus();
-  }, [isMounted, businessId, firestore, fetchFullCustomers]);
+  }, [isMounted, businessId, firestore]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);

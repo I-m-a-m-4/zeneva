@@ -386,6 +386,69 @@ export default function AuthenticatedLayout({
     }
   }, [userNotifications, lastNotifiedId, notify]);
 
+  // --- Automated Notification Triggers ---
+
+  // 1. Subscription Reminders (3 days before expiry)
+  React.useEffect(() => {
+    if (businessInstance && businessInstance.trialExpiresAt && currentUserProfile) {
+      const expiryDate = safeToDate(businessInstance.trialExpiresAt);
+      const now = new Date();
+      const diffTime = expiryDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 3 && diffDays > 0) {
+        const lastReminded = localStorage.getItem(`reminded_expiry_${businessInstance.id}`);
+        const todayStr = now.toISOString().split('T')[0];
+        
+        if (lastReminded !== todayStr) {
+          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
+            title: "Subscription Reminder",
+            body: `Your Zeneva subscription will expire in ${diffDays} day${diffDays === 1 ? '' : 's'}. Renew now to avoid any service interruption.`,
+            createdAt: serverTimestamp(),
+            read: false,
+            type: 'billing'
+          }).then(() => {
+            localStorage.setItem(`reminded_expiry_${businessInstance.id}`, todayStr);
+          }).catch(console.error);
+        }
+      }
+    }
+  }, [businessInstance, currentUserProfile, firestore]);
+
+  // 2. New Online Orders Alerts
+  const [lastOnlineOrderId, setLastOnlineOrderId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (onlineOrders && onlineOrders.length > 0 && currentUserProfile) {
+      // Find the latest pending order
+      const latestPendingOrder = [...onlineOrders]
+        .sort((a, b) => {
+          const dateA = safeToDate(a.createdAt).getTime();
+          const dateB = safeToDate(b.createdAt).getTime();
+          return dateB - dateA;
+        })
+        .find(o => o.status === 'pending');
+
+      if (latestPendingOrder && latestPendingOrder.id !== lastOnlineOrderId) {
+        const orderDate = safeToDate(latestPendingOrder.createdAt);
+        const now = new Date();
+        const diffSeconds = (now.getTime() - orderDate.getTime()) / 1000;
+
+        // Only notify if it's a "fresh" order (less than 10 mins old) to avoid back-notifying
+        if (diffSeconds < 600) {
+          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
+            title: "New Online Order!",
+            body: `You received a new order for ${businessInstance?.settings?.currency || 'NGN'} ${latestPendingOrder.total}.`,
+            createdAt: serverTimestamp(),
+            read: false,
+            type: 'order',
+            orderId: latestPendingOrder.id
+          }).catch(console.error);
+        }
+        setLastOnlineOrderId(latestPendingOrder.id);
+      }
+    }
+  }, [onlineOrders, lastOnlineOrderId, currentUserProfile, businessInstance, firestore]);
+
   if (isLoggingOut) {
     return <AppLoader text="Logging out..." />;
   }
@@ -497,7 +560,7 @@ export default function AuthenticatedLayout({
       <TooltipProvider>
         <SidebarProvider defaultOpen={true}>
           <div
-            className="relative flex h-screen w-full overflow-hidden high-fidelity-shell"
+            className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
             <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print">
@@ -551,7 +614,7 @@ export default function AuthenticatedLayout({
                   </SidebarMenu>
                 </div>
               </SidebarContent>
-              <SidebarFooter className="p-2">
+              <SidebarFooter className="p-2 pb-12 md:pb-8">
                 <SidebarMenu>
                   {isMounted && visibleBottomLinks.map((link) => (
                     <SidebarMenuItem key={link.href}>

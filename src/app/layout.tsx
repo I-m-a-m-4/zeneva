@@ -205,11 +205,11 @@ export default function RootLayout({
         </Script>
 
         {/* Smartsupp Chat */}
-        {process.env.NODE_ENV === 'production' && (
+        {process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SMARTSUPP_KEY && (
           <Script id="smartsupp-chat" strategy="lazyOnload">
             {`
               var _smartsupp = _smartsupp || {};
-              _smartsupp.key = 'e82362095ce846b43f9a764720e7a17688000000'; // Placeholder key from reference structure
+              _smartsupp.key = '${process.env.NEXT_PUBLIC_SMARTSUPP_KEY}';
               window.smartsupp||(function(d){
               var s=d.getElementsByTagName('script')[0],c=d.createElement('script');
               c.type='text/javascript';c.charset='utf-8';c.async=true;
