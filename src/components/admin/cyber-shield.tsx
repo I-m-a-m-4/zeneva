@@ -48,17 +48,12 @@ import {
     CheckCircle2,
     Eye,
     Globe,
-    Cpu,
-    Radar,
-    LockIcon,
-    Radio,
-    Signal,
-    Power,
-    Server,
-    Crosshair,
-    ArrowRight,
-    Trash2
+    Trash2,
+    Database,
+    Users,
+    Package
 } from 'lucide-react';
+import { deleteBusinessUsersAuth } from '@/actions/admin-actions';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { 
     multiFactor,
@@ -67,6 +62,7 @@ import {
     RecaptchaVerifier
 } from 'firebase/auth';
 import { 
+    getCountFromServer,
     collectionGroup, 
     query, 
     orderBy, 
@@ -144,6 +140,42 @@ export default function CyberShield() {
     const [isDestructionModalOpen, setIsDestructionModalOpen] = useState(false);
     const [destructionEmail, setDestructionEmail] = useState('');
     const [destructionKey, setDestructionKey] = useState('');
+    const [targetStats, setTargetStats] = useState<{ products: number; customers: number; sizeKB: number } | null>(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+    const fetchTargetStats = async (businessId: string) => {
+        if (!firestore) return;
+        setIsLoadingStats(true);
+        setTargetStats(null);
+        try {
+            const collections = ['products', 'customers', 'receipts', 'purchases', 'expenses', 'inventory_logs'];
+            let totalDocs = 0;
+            let productCount = 0;
+            let customerCount = 0;
+
+            for (const collName of collections) {
+                const q = query(collection(firestore, collName), where("businessId", "==", businessId));
+                const snapshot = await getCountFromServer(q);
+                const count = snapshot.data().count;
+                totalDocs += count;
+                if (collName === 'products') productCount = count;
+                if (collName === 'customers') customerCount = count;
+            }
+
+            // Rough estimate: 0.8KB per document
+            const sizeKB = Math.max(1, Math.round(totalDocs * 0.8));
+            
+            setTargetStats({
+                products: productCount,
+                customers: customerCount,
+                sizeKB
+            });
+        } catch (err) {
+            console.error("Footprint scan failed:", err);
+        } finally {
+            setIsLoadingStats(false);
+        }
+    };
     const [hasConfirmedDestruction, setHasConfirmedDestruction] = useState(false);
     const [isDestroying, setIsDestroying] = useState(false);
     const [destructionProgress, setDestructionProgress] = useState(0);
@@ -321,6 +353,14 @@ export default function CyberShield() {
             const usersSnap = await getDocs(usersQuery);
 
             if (!usersSnap.empty) {
+                const uids = usersSnap.docs.map(d => d.id);
+                setDestructionStatus('Deauthorizing user identities (Auth Cleanup)...');
+                try {
+                    await deleteBusinessUsersAuth(uids);
+                } catch (authErr) {
+                    console.error("Auth deauthorization partial failure:", authErr);
+                }
+
                 for (const userDoc of usersSnap.docs) {
                     const userId = userDoc.id;
                     // Purge user notifications
@@ -609,6 +649,7 @@ export default function CyberShield() {
                                                     onClick={() => {
                                                         setDestructionEmail(business.email || "");
                                                         setIsDestructionModalOpen(true);
+                                                        fetchTargetStats(business.id);
                                                     }}
                                                 >
                                                     <Trash2 className="h-3 w-3 mr-2" />
@@ -651,6 +692,32 @@ export default function CyberShield() {
                         <DialogDescription className="text-xs font-bold text-muted-foreground mt-2 border-b pb-4">
                             You are about to permanently delete a business and all its data.
                         </DialogDescription>
+                        
+                        {targetStats && (
+                            <div className="grid grid-cols-3 gap-2 mt-4">
+                                <div className="bg-rose-50/50 border border-rose-100 rounded p-2 text-center">
+                                    <Package className="h-3 w-3 text-rose-500 mx-auto mb-1" />
+                                    <p className="text-[9px] font-bold text-rose-900">{targetStats.products}</p>
+                                    <p className="text-[8px] text-rose-600 uppercase font-bold">Products</p>
+                                </div>
+                                <div className="bg-rose-50/50 border border-rose-100 rounded p-2 text-center">
+                                    <Users className="h-3 w-3 text-rose-500 mx-auto mb-1" />
+                                    <p className="text-[9px] font-bold text-rose-900">{targetStats.customers}</p>
+                                    <p className="text-[8px] text-rose-600 uppercase font-bold">Customers</p>
+                                </div>
+                                <div className="bg-rose-50/50 border border-rose-100 rounded p-2 text-center">
+                                    <Database className="h-3 w-3 text-rose-500 mx-auto mb-1" />
+                                    <p className="text-[9px] font-bold text-rose-900">{targetStats.sizeKB > 1024 ? `${(targetStats.sizeKB/1024).toFixed(1)}MB` : `${targetStats.sizeKB}KB`}</p>
+                                    <p className="text-[8px] text-rose-600 uppercase font-bold">Data Size</p>
+                                </div>
+                            </div>
+                        )}
+                        {isLoadingStats && (
+                            <div className="flex items-center justify-center gap-2 mt-4 py-2 border border-dashed border-rose-200 rounded">
+                                <RefreshCw className="h-3 w-3 text-rose-500 animate-spin" />
+                                <span className="text-[9px] font-bold text-rose-500 uppercase tracking-widest">Scanning Entity Footprint...</span>
+                            </div>
+                        )}
                     </DialogHeader>
 
                     {isDestroying ? (
