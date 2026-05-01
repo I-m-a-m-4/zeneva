@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { authenticator } from 'otplib';
+import * as OTPAuth from 'otpauth';
 import { QRCodeSVG } from 'qrcode.react';
-import { Shield, Lock, Key, Loader, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Loader } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUser } from '@/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
@@ -32,13 +32,11 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
     useEffect(() => {
         if (isUserLoading) return;
 
-        // If not the admin, we don't need this gate (the layout will redirect them anyway)
         if (user?.email !== ADMIN_EMAIL) {
             setIsLoading(false);
             return;
         }
 
-        // Check session storage for existing verification
         const sessionVerified = sessionStorage.getItem('zeneva_admin_verified');
         if (sessionVerified === 'true') {
             setIsVerified(true);
@@ -72,19 +70,40 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
     };
 
     const generateNewSecret = () => {
-        const newSecret = authenticator.generateSecret();
-        const otpauth = authenticator.keyuri(ADMIN_EMAIL, 'Zeneva Admin', newSecret);
+        const newSecret = new OTPAuth.Secret().base32;
         setSecret(newSecret);
-        setQrCodeUrl(otpauth);
+        
+        const totp = new OTPAuth.TOTP({
+            issuer: 'Zeneva Platform',
+            label: ADMIN_EMAIL,
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+            secret: newSecret,
+        });
+        
+        setQrCodeUrl(totp.toString());
     };
 
     const handleVerify = async () => {
         setIsProcessing(true);
         try {
-            const isValid = authenticator.check(otp, secret);
-            if (isValid) {
+            const totpInstance = new OTPAuth.TOTP({
+                issuer: 'Zeneva Platform',
+                label: ADMIN_EMAIL,
+                algorithm: 'SHA1',
+                digits: 6,
+                period: 30,
+                secret: secret,
+            });
+
+            const delta = totpInstance.validate({
+                token: otp,
+                window: 1,
+            });
+
+            if (delta !== null) {
                 if (setupMode) {
-                    // Save secret to Firestore if this was the initial setup
                     await setDoc(doc(firestore, 'admin_config', 'totp'), {
                         secret: secret,
                         updatedAt: new Date(),
@@ -120,7 +139,7 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
 
     if (isLoading) {
         return (
-            <div className="flex h-screen w-full items-center justify-center bg-background">
+            <div className="flex h-[400px] w-full items-center justify-center bg-background">
                 <div className="flex flex-col items-center gap-4">
                     <Loader className="h-10 w-10 animate-spin text-primary" />
                     <p className="text-muted-foreground font-medium">Initializing Security Protocol...</p>
@@ -134,13 +153,13 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-xl">
+        <div className="flex items-center justify-center min-h-[600px] py-10">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-md p-4"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-md px-4"
             >
-                <Card className="border-2 shadow-2xl bg-card/50 backdrop-blur-md">
+                <Card className="border-2 shadow-2xl bg-card">
                     <CardHeader className="text-center">
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                             <Shield className="h-8 w-8 text-primary" />
@@ -150,16 +169,16 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
                         </CardTitle>
                         <CardDescription>
                             {setupMode 
-                                ? 'Set up your authenticator app to secure the Zeneva Command Center.' 
-                                : 'Please enter the 6-digit code from your authenticator app.'}
+                                ? 'Scan the QR code below with Google Authenticator or Authy.' 
+                                : 'Enter the 6-digit code from your authenticator app.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {setupMode && qrCodeUrl && (
-                            <div className="flex flex-col items-center gap-4 rounded-xl bg-white p-6 shadow-inner">
+                            <div className="flex flex-col items-center gap-4 rounded-xl bg-white p-6 shadow-inner border">
                                 <QRCodeSVG value={qrCodeUrl} size={180} level="H" />
                                 <div className="text-center">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Backup Secret</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Manual Setup Key</p>
                                     <code className="bg-slate-100 px-3 py-1 rounded text-xs font-mono text-slate-600 select-all">
                                         {secret.match(/.{1,4}/g)?.join(' ')}
                                     </code>
@@ -181,27 +200,26 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
                                 />
                             </div>
                             <p className="text-[10px] text-center text-muted-foreground">
-                                Verification codes refresh every 30 seconds
+                                Codes refresh every 30 seconds
                             </p>
                         </div>
                     </CardContent>
                     <CardFooter>
                         <Button 
-                            className="w-full h-12 text-base font-bold" 
+                            className="w-full h-12 text-base font-bold shadow-lg" 
                             disabled={otp.length !== 6 || isProcessing}
                             onClick={handleVerify}
                         >
                             {isProcessing ? (
                                 <Loader className="mr-2 h-5 w-5 animate-spin" />
                             ) : (
-                                setupMode ? 'Finalize Setup' : 'Unlock Dashboard'
+                                setupMode ? 'Verify and Save' : 'Unlock Dashboard'
                             )}
                         </Button>
                     </CardFooter>
                 </Card>
-                
-                <p className="mt-6 text-center text-[11px] text-muted-foreground font-medium">
-                    ZENEVA SHIELD PROTOCOL v2.0 • ENCRYPTED SESSION
+                <p className="mt-6 text-center text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-60">
+                    Secure Zeneva Retail OS Command
                 </p>
             </motion.div>
         </div>
