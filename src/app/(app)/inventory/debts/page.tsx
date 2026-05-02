@@ -15,8 +15,7 @@ import {
     Receipt,
     Search,
     Info,
-    RefreshCw,
-    Loader2
+    RefreshCw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,6 +49,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { format } from 'date-fns';
+
+
 
 export default function DebtsPage() {
     const { 
