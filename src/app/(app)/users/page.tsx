@@ -18,7 +18,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2 } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { UserProfile, Invitation } from '@/types';
@@ -256,7 +256,46 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     return (
         <>
             <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
+            
             <div className="grid gap-6 md:grid-cols-2">
+                <Card className="md:col-span-2 border-primary/10 bg-primary/5 shadow-none overflow-hidden">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <CardTitle className="text-sm font-semibold">Role Permissions Guide</CardTitle>
+                        </div>
+                        <CardDescription className="text-xs">
+                            Understand the capabilities and access levels assigned to each role.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="default" className="text-[10px] h-4.5 px-1.5">Admin / Owner</Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                <strong>Full Authority:</strong> Can manage business settings, invite staff, change roles, and handle all inventory and financial records.
+                            </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5">Manager</Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                <strong>Operations Lead:</strong> Full inventory management (create, update, delete), management of sales receipts, and customer records.
+                            </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] h-4.5 px-1.5 bg-background">Vendor Operator</Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                <strong>Store Staff:</strong> Authorized to add/update products, adjust stock levels, and record sales. No deletion rights for sensitive data.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card className="w-full md:col-span-2">
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -482,6 +521,10 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                 ? <>This will mark <strong>{userToUpdate?.user?.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
                                 : <>This will reactivate <strong>{userToUpdate?.user?.name}</strong>'s account, allowing them to log in again.</>
                             }
+                            <span className="mt-4 text-amber-600 font-medium flex items-center gap-1.5 text-xs">
+                                <Globe className="h-3.5 w-3.5" />
+                                This action requires an active internet connection.
+                            </span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -501,7 +544,10 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                         <AlertDialogDescription>
                             Are you sure you want to change <strong>{userRoleToUpdate?.user?.name}</strong>&apos;s role to <strong>{userRoleToUpdate?.newRole.replace('_', ' ')}</strong>?
                             <br /><br />
-                            This will update their permissions immediately.
+                            <span className="text-amber-600 font-medium flex items-center gap-1.5 text-xs">
+                                <Globe className="h-3.5 w-3.5" />
+                                This action requires an active internet connection.
+                            </span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

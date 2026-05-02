@@ -1,4 +1,4 @@
-// Force rules update - Version 2.0.6
+// Force rules update - Version 2.0.7
 rules_version = '2';
 
 service cloud.firestore {
@@ -134,7 +134,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
       allow list: if isSuperAdmin() || (isUserAuthenticated() && getCurrentUserBusinessId() == resource.data.businessId);
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
+      allow update: if isSuperAdmin() || 
+                       (isUserAuthenticated() && request.auth.uid == userId) ||
+                       (isRequestingUserAdmin() && isRequestingUserMemberOf(resource.data.get('businessId', 'none')));
       allow create: if isUserAuthenticated() && request.auth.uid == userId;
       allow delete: if isSuperAdmin();
       
