@@ -24,6 +24,9 @@ import CustomerAnalytics from '@/components/reports/customer-analytics';
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
 import PaymentMethodDistribution from '@/components/reports/payment-method-analysis';
+import DeadStockAnalysis from '@/components/reports/dead-stock-analysis';
+import HourlySalesHeatmap from '@/components/reports/hourly-sales-heatmap';
+import BasketAnalysis from '@/components/reports/basket-analysis';
 
 function ReportStatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) {
     return (
@@ -359,6 +362,12 @@ export default function ReportsDashboard() {
                             <div className="lg:col-span-2">
                                 <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
+                            <HourlySalesHeatmap receipts={allReceipts || []} />
+                            <BasketAnalysis receipts={allReceipts || []} />
                         </div>
 
 
