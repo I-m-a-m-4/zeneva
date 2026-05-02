@@ -76,9 +76,11 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     
     const newCustomers = customerArray.filter(c => c.firstOrder > oneMonthAgo).length;
     const returningCustomers = customerArray.filter(c => c.orderCount > 1).length;
+    const totalUniqueBuyers = customerArray.filter(c => c.orderCount >= 1).length;
 
     return {
       totalCustomers: customerArray.length,
+      totalUniqueBuyers,
       newCustomers,
       returningCustomers,
       topCustomersBySpend,
@@ -141,11 +143,11 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                         <CardDescription>Returning Customers</CardDescription>
                         <CardTitle className="text-4xl flex items-baseline gap-1">
                             {analyticsData.returningCustomers}
-                            <span className="text-sm font-normal text-muted-foreground">/ {analyticsData.totalCustomers}</span>
+                            <span className="text-sm font-normal text-muted-foreground">/ {analyticsData.totalUniqueBuyers}</span>
                         </CardTitle>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                            {analyticsData.totalCustomers > 0 
-                                ? ((analyticsData.returningCustomers / analyticsData.totalCustomers) * 100).toFixed(1) 
+                            {analyticsData.totalUniqueBuyers > 0 
+                                ? ((analyticsData.returningCustomers / analyticsData.totalUniqueBuyers) * 100).toFixed(1) 
                                 : '0'}% retention rate
                         </p>
                     </CardHeader>
