@@ -330,6 +330,9 @@ export default function AuthenticatedLayout({
 
     const ROUTE_PERMISSIONS: Record<string, string[]> = {
       '/dashboard': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/inventory/debts': ['admin', 'manager', 'owner', 'super-admin'],
+      '/inventory/troubleshoot': ['admin', 'manager', 'owner', 'super-admin'],
+      '/inventory/add': ['admin', 'manager', 'owner', 'super-admin'],
       '/inventory': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/sales': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/storefront': ['admin', 'owner', 'super-admin'],
@@ -337,7 +340,7 @@ export default function AuthenticatedLayout({
       '/receipts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/invoices': ['admin', 'manager', 'owner', 'super-admin'],
       '/reports': ['admin', 'owner', 'super-admin'],
-      '/ai-insights': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/ai-insights': ['admin', 'manager', 'owner', 'super-admin'],
       '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/users': ['admin', 'owner', 'super-admin'],
       '/audit-log': ['admin', 'owner', 'super-admin'],

@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { usePOS } from "@/context/pos-context";
 import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit, Flame, ShieldAlert, Info } from "lucide-react";
 import React, { useState, useTransition, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import {
   Dialog,
@@ -98,12 +99,20 @@ const severityIcons = {
 }
 
 export default function TroubleshootPage() {
+    const { products, business, isLoading: isDataLoading, currentUserProfile, isLoading: isUserLoading } = usePOS();
+    const isLoading = isDataLoading || isUserLoading;
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!isLoading && currentUserProfile?.role === 'vendor_operator') {
+            router.push('/dashboard');
+        }
+    }, [currentUserProfile, isLoading, router]);
+
     const [isPending, startTransition] = useTransition();
     const [suggestions, setSuggestions] = useState<AISuggestions | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState<{ title: string, items: Product[] } | null>(null);
-
-    const { products, business, isLoading } = usePOS();
     const firestore = useFirestore();
     const { toast } = useToast();
 

@@ -7,6 +7,8 @@ import { Receipt } from '@/types';
 import { ShoppingBag, Plus, ArrowRight, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 interface BasketAnalysisProps {
     receipts: Receipt[];
 }
@@ -41,8 +43,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
         });
 
         return Object.values(pairs)
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
+            .sort((a, b) => b.count - a.count);
     }, [receipts]);
 
     return (
@@ -64,33 +65,35 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                             </p>
                         </div>
 
-                        <div className="space-y-3">
-                            {topPairs.map((pair, index) => (
-                                <div key={index} className="relative p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex flex-wrap items-center gap-2 min-w-0">
-                                            <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameA}>
-                                                {pair.nameA}
-                                            </Badge>
-                                            <Plus className="h-3 w-3 text-muted-foreground" />
-                                            <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameB}>
-                                                {pair.nameB}
-                                            </Badge>
+                        <ScrollArea className="h-[350px] pr-4">
+                            <div className="space-y-3">
+                                {topPairs.map((pair, index) => (
+                                    <div key={index} className="relative p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors mb-3">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                                <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameA}>
+                                                    {pair.nameA}
+                                                </Badge>
+                                                <Plus className="h-3 w-3 text-muted-foreground" />
+                                                <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameB}>
+                                                    {pair.nameB}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex-shrink-0 text-right">
+                                                <p className="text-lg font-bold text-primary">{pair.count}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Joint Sales</p>
+                                            </div>
                                         </div>
-                                        <div className="flex-shrink-0 text-right">
-                                            <p className="text-lg font-bold text-primary">{pair.count}</p>
-                                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">Joint Sales</p>
+                                        <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-primary/40 rounded-full" 
+                                                style={{ width: `${(pair.count / topPairs[0].count) * 100}%` }}
+                                            />
                                         </div>
                                     </div>
-                                    <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-primary/40 rounded-full" 
-                                            style={{ width: `${(pair.count / topPairs[0].count) * 100}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
                     </div>
                 ) : (
                     <div className="text-center py-12 text-muted-foreground">

@@ -582,12 +582,14 @@ function InventoryPageContent() {
                 <span className="sm:whitespace-nowrap">Import</span>
               </Button>
             )}
-            <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
-              <Link href="/inventory/debts">
-                <TrendingDown className="h-3.5 w-3.5" />
-                <span className="sm:whitespace-nowrap">Manage Debts</span>
-              </Link>
-            </Button>
+            {canManageStock && (
+              <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
+                <Link href="/inventory/debts">
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  <span className="sm:whitespace-nowrap">Manage Debts</span>
+                </Link>
+              </Button>
+            )}
             {canManageStock && (
               <Button size="sm" asChild className="h-9 gap-1">
                 <Link href="/inventory/add">
@@ -692,11 +694,13 @@ function InventoryPageContent() {
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuItem asChild>
-                  <Link href="/inventory/debts">
-                    <TrendingDown className="mr-2 h-4 w-4" /> Manage Debts
-                  </Link>
-                </DropdownMenuItem>
+                {canManageStock && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/inventory/debts">
+                      <TrendingDown className="mr-2 h-4 w-4" /> Manage Debts
+                    </Link>
+                  </DropdownMenuItem>
+                )}
 
                 <DropdownMenuSeparator />
                 

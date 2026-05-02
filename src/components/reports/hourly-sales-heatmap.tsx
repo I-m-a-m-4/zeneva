@@ -87,7 +87,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                             </div>
                         )}
 
-                        <div className="h-[180px] w-full">
+                        <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={hourlyData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
@@ -140,7 +140,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                             </div>
                         )}
 
-                        <div className="h-[180px] w-full">
+                        <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={dailyData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />

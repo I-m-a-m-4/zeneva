@@ -50,9 +50,36 @@ import {
 } from "@/components/ui/dialog";
 import { format } from 'date-fns';
 
+import { useRouter } from "next/navigation";
+import { usePOS } from "@/context/pos-context";
+
 export default function DebtsPage() {
+    const { 
+        products, 
+        receipts, 
+        onlineOrders, 
+        currencySymbol, 
+        isLoading: isDataLoading, 
+        triggerRefresh,
+        currentUserProfile,
+        isLoading: isUserLoading
+    } = usePOS();
     const router = useRouter();
-    const { products, receipts, onlineOrders, currencySymbol, isLoading, triggerRefresh } = usePOS();
+    const isLoading = isDataLoading || isUserLoading;
+
+    React.useEffect(() => {
+        if (!isLoading && currentUserProfile?.role === 'vendor_operator') {
+            router.push('/dashboard');
+        }
+    }, [currentUserProfile, isLoading, router]);
+
+    if (isLoading || currentUserProfile?.role === 'vendor_operator') {
+        return (
+            <div className="flex items-center justify-center h-[50vh]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
     const [searchTerm, setSearchTerm] = React.useState('');
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [selectedProductOrders, setSelectedProductOrders] = React.useState<any[] | null>(null);

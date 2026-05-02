@@ -10,6 +10,8 @@ import { safeToDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 interface DeadStockAnalysisProps {
     products: Product[];
     receipts: Receipt[];
@@ -37,8 +39,7 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                 ...p,
                 lockedCapital: (p.costPrice || p.price * 0.7) * p.stock // Estimate cost if missing
             }))
-            .sort((a, b) => b.lockedCapital - a.lockedCapital)
-            .slice(0, 5);
+            .sort((a, b) => b.lockedCapital - a.lockedCapital);
     }, [products, receipts]);
 
     const totalLockedCapital = React.useMemo(() => {
@@ -65,25 +66,27 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                             <span className="text-lg font-bold text-destructive">{currencySymbol}{totalLockedCapital.toLocaleString()}</span>
                         </div>
 
-                        <div className="space-y-2">
-                            {deadStock.map(product => (
-                                <div key={product.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors border">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium truncate">{product.name}</p>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <Badge variant="outline" className="text-[10px] h-4">
-                                                {product.stock} units left
-                                            </Badge>
-                                            <span className="text-[10px] text-muted-foreground">SKU: {product.sku}</span>
+                        <ScrollArea className="h-[350px] pr-4">
+                            <div className="space-y-2">
+                                {deadStock.map(product => (
+                                    <div key={product.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors border">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">{product.name}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <Badge variant="outline" className="text-[10px] h-4">
+                                                    {product.stock} units left
+                                                </Badge>
+                                                <span className="text-[10px] text-muted-foreground">SKU: {product.sku}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <p className="text-sm font-bold text-primary">{currencySymbol}{product.lockedCapital.toLocaleString()}</p>
+                                            <p className="text-[10px] text-muted-foreground">Value Locked</p>
                                         </div>
                                     </div>
-                                    <div className="text-right flex-shrink-0">
-                                        <p className="text-sm font-bold text-primary">{currencySymbol}{product.lockedCapital.toLocaleString()}</p>
-                                        <p className="text-[10px] text-muted-foreground">Value Locked</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
 
                         <div className="pt-2">
                             <Link href="/inventory?sortBy=stock-desc" className="text-xs text-primary flex items-center gap-1 hover:underline">

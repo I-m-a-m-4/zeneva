@@ -282,7 +282,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                 <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5">Manager</Badge>
                             </div>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                <strong>Operations Lead:</strong> Full inventory management (create, update, delete), management of sales receipts, and customer records.
+                                <strong>Operations Lead:</strong> Full inventory management (create, update, delete) and customer records. Restricted from high-level financial reporting and revenue analytics.
                             </p>
                         </div>
                         <div className="space-y-1.5">
@@ -290,7 +290,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                 <Badge variant="outline" className="text-[10px] h-4.5 px-1.5 bg-background">Vendor Operator</Badge>
                             </div>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                <strong>Store Staff:</strong> Authorized to add/update products, adjust stock levels, and record sales. No deletion rights for sensitive data.
+                                <strong>Store Staff:</strong> Strictly authorized to record sales and manage POS transactions. No access to product creation, stock adjustments, or financial reports.
                             </p>
                         </div>
                     </CardContent>
