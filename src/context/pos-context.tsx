@@ -593,6 +593,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
               batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
             });
             break;
+          case 'add-audit-log':
+            const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
+            batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
+            break;
         }
 
         await batch.commit();

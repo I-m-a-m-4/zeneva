@@ -20,7 +20,8 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { 
     ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil, 
-    Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus, ChevronRight
+    Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus, ChevronRight,
+    Receipt, FileText
 } from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import {
@@ -378,7 +379,7 @@ function CustomerDetailContent() {
 
             <div className="grid md:grid-cols-2 gap-6">
                 {/* ADVANCED DEBT TRACKING */}
-                <Card className="border-destructive/20">
+                <Card className="border-destructive/20 bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
                             <CardTitle className="flex items-center gap-2"><History className="text-destructive h-5 w-5" /> Debt Ledger</CardTitle>
@@ -401,13 +402,13 @@ function CustomerDetailContent() {
                                                 <div className="text-[10px] text-muted-foreground bg-destructive/5 px-1 rounded inline-block ml-1">UNPAID</div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                <Link href={`/receipts?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                                                <Link href={`/receipts/details?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
                                             </Button>
                                         </div>
                                     </div>
                                 ))}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
-                                    <Link href="/receipts">View Full Statement</Link>
+                                    <Link href={`/receipts?customerId=${customer.id}`}>View Full Statement</Link>
                                 </Button>
                             </div>
                         ) : (
@@ -415,6 +416,53 @@ function CustomerDetailContent() {
                                 <CheckCircle2 className="h-8 w-8 text-primary mb-2" />
                                 <p className="text-sm font-medium">Clear Account</p>
                                 <p className="text-xs text-muted-foreground">This customer has no outstanding debts.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* RECEIPT HISTORY */}
+                <Card className="bg-card border-border/60 shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><Receipt className="text-primary h-5 w-5" /> Recent Receipts</CardTitle>
+                            <CardDescription>The last few transactions for this customer.</CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {receipts && receipts.length > 0 ? (
+                            <div className="space-y-4">
+                                {receipts.slice(0, 5).map(receipt => (
+                                    <div key={receipt.id} className="flex items-center justify-between p-3 rounded-md bg-muted/30 border border-transparent hover:border-primary/30 transition-all">
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold text-sm">{receipt.receiptNumber || `REC-${receipt.id.substring(0, 5).toUpperCase()}`}</span>
+                                            <span className="text-[10px] text-muted-foreground">{format(safeToDate(receipt.createdAt), 'PPp')}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <span className="font-bold text-primary">{currencySymbol}{(receipt.total || 0).toLocaleString()}</span>
+                                                <div className={cn(
+                                                    "text-[10px] px-1 rounded inline-block ml-1 uppercase font-bold",
+                                                    receipt.status === 'unpaid' ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                                )}>
+                                                    {receipt.status || 'paid'}
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                <Link href={`/receipts/details?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
+                                    <Link href={`/receipts?customerId=${customer.id}`}>View All Transactions</Link>
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg">
+                                <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
+                                <p className="text-sm font-medium">No Receipts</p>
+                                <p className="text-xs text-muted-foreground">No transaction history found for this customer.</p>
                             </div>
                         )}
                     </CardContent>

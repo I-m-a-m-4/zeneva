@@ -229,6 +229,7 @@ export default function DownloadPage() {
                             <div className="px-5 sm:px-6 flex flex-col justify-center flex-grow py-1">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 mb-1">
+                                        <div className="text-3xl font-bold mb-1">v1.8.3</div>
                                         <span className="text-[8px] font-bold tracking-[0.2em] text-orange-600 uppercase">Hardware Preview</span>
                                     </div>
                                     <h4 className="text-slate-950 font-medium text-lg sm:text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>

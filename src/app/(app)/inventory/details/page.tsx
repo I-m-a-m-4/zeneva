@@ -32,9 +32,22 @@ import { useFieldArray } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FormDescription } from "@/components/ui/form";
-import BarcodeDisplay from 'react-barcode';
-import { Button } from "@/components/ui/button";
+import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import type { Product, UserProfile, AuditLog } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { usePOS } from '@/context/pos-context';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { formatDistanceToNow } from 'date-fns';
+import { History as HistoryIcon } from 'lucide-react';
 import {
     Card,
     CardContent,
@@ -53,13 +66,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import type { UserProfile, Product } from '@/types';
+import { Button } from "@/components/ui/button";
+import BarcodeDisplay from 'react-barcode';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
@@ -146,6 +155,49 @@ function EditProductContent() {
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [isDangerZoneVisible, setIsDangerZoneVisible] = React.useState(false);
+    const [stockLogs, setStockLogs] = React.useState<AuditLog[]>([]);
+    const [isLogsLoading, setIsLogsLoading] = React.useState(true);
+
+    // Fetch Stock Logs
+    React.useEffect(() => {
+        if (!business?.id || !firestore || !product?.id) {
+            if (!isProductLoading) setIsLogsLoading(false);
+            return;
+        }
+
+        const stockQuery = query(
+            collection(firestore, 'businessInstances', business.id, 'auditLogs'),
+            where('entityId', '==', product.id),
+            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update']),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+        );
+
+        // Fallback timer for offline/slow connection to prevent infinite spinner
+        const timeoutId = setTimeout(() => {
+            setIsLogsLoading(false);
+        }, 4000);
+
+
+        const unsubscribe = onSnapshot(stockQuery, (snap) => {
+            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+            // Filter to ensure we only show logs that actually affected stock or are explicit adjustments
+            const filtered = logs.filter(log => {
+                if (log.action === 'product.stock_adjustment' || log.action === 'product.create') return true;
+                if (log.action === 'product.update' && (log.details?.adjustment !== undefined || log.details?.newStock !== undefined)) return true;
+                return false;
+            });
+            setStockLogs(filtered);
+            setIsLogsLoading(false);
+            clearTimeout(timeoutId);
+        });
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timeoutId);
+        };
+    }, [business?.id, firestore, product?.id, isProductLoading]);
+
     const { addToQueue } = usePOS();
 
     const form = useForm<ProductFormValues>({
@@ -245,6 +297,30 @@ function EditProductContent() {
                     values: cleanData
                 }
             }, `Updating product: ${values.name}`);
+
+            // 3. Log stock adjustment if changed via queue for offline support
+            if (values.stock !== product.stock) {
+                addToQueue({
+                    type: 'add-audit-log',
+                    payload: {
+                        businessId: business.id,
+                        userId: currentUserProfile.id,
+                        userName: currentUserProfile.name,
+                        userEmail: currentUserProfile.email,
+                        userRole: currentUserProfile.role,
+                        action: 'product.stock_adjustment',
+                        entityType: 'Product',
+                        entityId: product.id,
+                        details: { 
+                            entityName: product.name,
+                            oldStock: product.stock, 
+                            newStock: values.stock, 
+                            adjustment: values.stock - (product.stock || 0),
+                            reason: 'Full Edit Page'
+                        }
+                    }
+                }, `Logging stock adjustment for ${product.name}`);
+            }
 
             toast({ 
                 variant: 'success', 
@@ -598,6 +674,94 @@ function EditProductContent() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {categoryType === 'product' && (
+                            <Card className="border-primary/10 shadow-sm overflow-hidden">
+                                <CardHeader className="bg-primary/5 pb-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <HistoryIcon className="h-4 w-4 text-primary" />
+                                                Stock Adjustment History
+                                            </CardTitle>
+                                            <CardDescription className="text-xs">
+                                                Track manual additions and changes to stock quantity.
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <Table>
+                                        <TableHeader className="bg-muted/30">
+                                            <TableRow>
+                                                <TableHead className="text-[10px] uppercase font-bold py-2">Action</TableHead>
+                                                <TableHead className="text-[10px] uppercase font-bold py-2">Change</TableHead>
+                                                <TableHead className="text-[10px] uppercase font-bold py-2">User</TableHead>
+                                                <TableHead className="text-[10px] uppercase font-bold py-2 text-right">Date</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLogsLoading ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-24 text-center">
+                                                        <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : stockLogs.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
+                                                        No stock adjustment logs found for this product.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                stockLogs.map((log) => {
+                                                    const adjustment = log.details?.adjustment !== undefined 
+                                                        ? log.details.adjustment 
+                                                        : (log.action === 'product.create' ? log.details?.stock : undefined);
+                                                    const isAddition = adjustment > 0;
+                                                    
+                                                    return (
+                                                        <TableRow key={log.id} className="hover:bg-muted/20">
+                                                            <TableCell>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs font-medium capitalize">
+                                                                        {log.action.split('.').pop()?.replace('_', ' ')}
+                                                                    </span>
+                                                                    {log.details?.reason && (
+                                                                        <span className="text-[10px] text-muted-foreground">{log.details.reason}</span>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {adjustment !== undefined ? (
+                                                                    <Badge 
+                                                                        variant={isAddition ? "success" : "destructive"} 
+                                                                        className="text-[10px] h-5"
+                                                                    >
+                                                                        {isAddition ? '+' : ''}{adjustment}
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">Updated</span>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs">{log.userName}</span>
+                                                                    <span className="text-[9px] text-muted-foreground uppercase">{log.userRole?.replace('_', ' ')}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-[10px] text-muted-foreground">
+                                                                {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'Just now'}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                     <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
                         <Card>

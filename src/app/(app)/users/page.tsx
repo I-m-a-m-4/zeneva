@@ -31,11 +31,20 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import AddUserDialog from '@/components/users/add-user-dialog';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import {
+    Shield,
+    ShieldCheck,
+    ShieldAlert,
+} from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -133,9 +142,11 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
     const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
+    const [userRoleToUpdate, setUserRoleToUpdate] = React.useState<{ user: UserProfile, newRole: UserRole } | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+    const [isUpdatingRole, setIsUpdatingRole] = React.useState(false);
 
-    const { business: businessInstance, isLoading: isPosLoading } = usePOS();
+    const { business: businessInstance, currentUserProfile, isLoading: isPosLoading } = usePOS();
 
     const [refreshKey, setRefreshKey] = React.useState(0);
 
@@ -185,6 +196,16 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 
     const handleUpdateUserStatus = async () => {
         if (!userToUpdate || !firestore) return;
+        
+        if (!navigator.onLine) {
+            toast({
+                title: 'Offline',
+                description: 'Updating user status requires an internet connection.',
+                variant: 'destructive'
+            });
+            return;
+        }
+
         setIsUpdatingStatus(true);
         const userRef = doc(firestore, 'users', userToUpdate.user.id);
         const newStatus = userToUpdate.action === 'activate' ? 'active' : 'inactive';
@@ -198,6 +219,37 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
         } finally {
             setUserToUpdate(null);
             setIsUpdatingStatus(false);
+        }
+    }
+
+    const handleUpdateUserRole = async () => {
+        if (!userRoleToUpdate || !firestore) return;
+
+        if (!navigator.onLine) {
+            toast({
+                title: 'Offline',
+                description: 'Changing user roles requires an internet connection.',
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        setIsUpdatingRole(true);
+        const userRef = doc(firestore, 'users', userRoleToUpdate.user.id);
+
+        try {
+            await updateDoc(userRef, { role: userRoleToUpdate.newRole });
+            toast({ 
+                title: 'Role Updated', 
+                description: `${userRoleToUpdate.user.name}'s role has been changed to ${userRoleToUpdate.newRole.replace('_', ' ')}.`, 
+                variant: 'success' 
+            });
+            triggerRefresh();
+        } catch (e: any) {
+            toast({ title: 'Error', description: e.message || 'Could not update user role.', variant: 'destructive' });
+        } finally {
+            setUserRoleToUpdate(null);
+            setIsUpdatingRole(false);
         }
     }
 
@@ -306,9 +358,34 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                                 <UserCheck className="mr-2 h-4 w-4" /> Activate User
                                                             </DropdownMenuItem>
                                                         ) : (
-                                                            <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
-                                                                <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                                                            </DropdownMenuItem>
+                                                            <>
+                                                                {currentUserProfile?.role === 'admin' && user.role !== 'admin' && (
+                                                                    <DropdownMenuSub>
+                                                                        <DropdownMenuSubTrigger className="cursor-pointer">
+                                                                            <Shield className="mr-2 h-4 w-4" /> Change Role
+                                                                        </DropdownMenuSubTrigger>
+                                                                        <DropdownMenuPortal>
+                                                                            <DropdownMenuSubContent>
+                                                                                <DropdownMenuItem 
+                                                                                    disabled={user.role === 'manager'}
+                                                                                    onSelect={(e) => { e.preventDefault(); setUserRoleToUpdate({ user, newRole: 'manager' }); }}
+                                                                                >
+                                                                                    <ShieldCheck className="mr-2 h-4 w-4" /> Manager
+                                                                                </DropdownMenuItem>
+                                                                                <DropdownMenuItem 
+                                                                                    disabled={user.role === 'vendor_operator'}
+                                                                                    onSelect={(e) => { e.preventDefault(); setUserRoleToUpdate({ user, newRole: 'vendor_operator' }); }}
+                                                                                >
+                                                                                    <ShieldAlert className="mr-2 h-4 w-4" /> Vendor Operator
+                                                                                </DropdownMenuItem>
+                                                                            </DropdownMenuSubContent>
+                                                                        </DropdownMenuPortal>
+                                                                    </DropdownMenuSub>
+                                                                )}
+                                                                <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
+                                                                    <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                                                                </DropdownMenuItem>
+                                                            </>
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -416,6 +493,26 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <AlertDialog open={!!userRoleToUpdate} onOpenChange={(open) => !open && setUserRoleToUpdate(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Change User Role</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to change <strong>{userRoleToUpdate?.user?.name}</strong>&apos;s role to <strong>{userRoleToUpdate?.newRole.replace('_', ' ')}</strong>?
+                            <br /><br />
+                            This will update their permissions immediately.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isUpdatingRole}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleUpdateUserRole} disabled={isUpdatingRole}>
+                            {isUpdatingRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Change Role
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
@@ -428,7 +525,7 @@ export default function UsersPage() {
         return <UsersPageSkeleton />;
     }
 
-    if (currentUser?.role !== 'admin') {
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'manager') {
         return (
             <>
                 <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />

@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp, type Firestore } from 'firebase/fi
 import type { UserProfile } from '@/types';
 
 type AuditAction =
-    | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update'
+    | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update' | 'product.stock_adjustment'
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete'
     | 'user.invite' | 'user.update_status' | 'user.impersonate' | 'user.stop_impersonate'

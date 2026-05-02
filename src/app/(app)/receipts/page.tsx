@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import {
   Table,
   TableBody,
@@ -48,6 +50,18 @@ function ReceiptRowSkeleton() {
 }
 
 export default function ReceiptsPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+      <ReceiptsContent />
+    </Suspense>
+  );
+}
+
+function ReceiptsContent() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const customerId = searchParams.get('customerId');
+  
   const { 
     receipts, 
     isLoading: isPosLoading, 
@@ -62,7 +76,7 @@ export default function ReceiptsPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
@@ -79,7 +93,9 @@ export default function ReceiptsPage() {
     if (!receipts) return [];
     let filtered = receipts.filter(r => r && r.paymentMethod !== 'Invoice');
     
-    if (searchTerm.trim()) {
+    if (customerId) {
+      filtered = filtered.filter(r => r.customer?.id === customerId);
+    } else if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
       filtered = filtered.filter(r => 
         (r.id || '').toLowerCase().includes(lower) || 
@@ -89,7 +105,7 @@ export default function ReceiptsPage() {
       );
     }
     return filtered;
-  }, [receipts, searchTerm]);
+  }, [receipts, searchTerm, customerId]);
 
   const handleLoadMore = async () => {
     setIsFetchingMore(true);

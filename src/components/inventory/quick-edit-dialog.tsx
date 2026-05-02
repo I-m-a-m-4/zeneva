@@ -110,6 +110,29 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         dataToUpdate.brand = values.brand;
         dataToUpdate.packaging = values.packaging;
         dataToUpdate.spiceLevel = values.spiceLevel;
+
+        if (values.stock !== product.stock) {
+          addToQueue({
+            type: 'add-audit-log',
+            payload: {
+              businessId: business.id,
+              userId: userProfile.id,
+              userName: userProfile.name,
+              userEmail: userProfile.email,
+              userRole: userProfile.role,
+              action: 'product.stock_adjustment',
+              entityType: 'Product',
+              entityId: product.id,
+              details: { 
+                entityName: product.name,
+                oldStock: product.stock, 
+                newStock: values.stock, 
+                adjustment: values.stock - (product.stock || 0),
+                reason: 'Manual Quick Edit'
+              }
+            }
+          }, `Logging stock adjustment for ${product.name}`);
+        }
       }
 
       addToQueue({

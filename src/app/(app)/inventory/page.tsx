@@ -93,8 +93,8 @@ function ProductRowSkeleton() {
   return (
     <TableRow>
       <TableCell className="w-12"><Skeleton className="h-4 w-4" /></TableCell>
-      <TableCell className="hidden w-[100px] sm:table-cell">
-        <Skeleton className="h-16 w-16 rounded-md" />
+      <TableCell className="w-16 sm:w-[100px]">
+        <Skeleton className="h-12 w-12 sm:h-16 sm:w-16 rounded-md" />
       </TableCell>
       <TableCell>
         <div className="space-y-2">
@@ -736,7 +736,7 @@ function InventoryPageContent() {
                         onCheckedChange={handleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="hidden w-[100px] sm:table-cell">
+                    <TableHead className="w-16 sm:w-[100px]">
                       <span className="sr-only">Image</span>
                     </TableHead>
                     <TableHead className="font-semibold">Name</TableHead>
@@ -756,10 +756,10 @@ function InventoryPageContent() {
                           disabled={(product as any).isOptimistic}
                         />
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
+                      <TableCell className="cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
                         {product.imageUrl ? (
                           <div 
-                            className="relative h-16 w-16" 
+                            className="relative h-12 w-12 sm:h-16 sm:w-16" 
                             onClick={(e) => {
                               e.stopPropagation();
                               setPreviewImage({ src: product.imageUrl!, alt: product.name });
@@ -778,8 +778,8 @@ function InventoryPageContent() {
                             )}
                           </div>
                         ) : (
-                          <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
-                            <Package />
+                          <div className="h-12 w-12 sm:h-16 sm:w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
+                            <Package className="h-5 w-5 sm:h-6 sm:w-6" />
                             {(product as any).isOptimistic && (
                               <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
                                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
