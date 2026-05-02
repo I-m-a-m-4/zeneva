@@ -15,7 +15,8 @@ import {
     Receipt,
     Search,
     Info,
-    RefreshCw
+    RefreshCw,
+    Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -49,9 +50,6 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { format } from 'date-fns';
-
-import { useRouter } from "next/navigation";
-import { usePOS } from "@/context/pos-context";
 
 export default function DebtsPage() {
     const { 
