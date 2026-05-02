@@ -264,14 +264,18 @@ function ReceiptsContent() {
                 </TableHeader>
                 <TableBody>
                   {displayedReceipts.map((receipt: Receipt) => (
-                    <TableRow key={receipt.id}>
+                    <TableRow 
+                      key={receipt.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/receipts/details?id=${receipt.id}`)}
+                    >
                       <TableCell className="font-medium">{(receipt.id || '').substring(0, 8)}...</TableCell>
                       <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
                       <TableCell className="whitespace-nowrap">{safeFormatDate(receipt.createdAt)}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{safeFormatTime(receipt.createdAt)}</TableCell>
                       <TableCell>{receipt.paymentMethod || 'N/A'}</TableCell>
                       <TableCell className="text-right">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button aria-haspopup="true" size="icon" variant="ghost">
