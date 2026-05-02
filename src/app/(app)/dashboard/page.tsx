@@ -335,7 +335,7 @@ export default function DashboardPage() {
 
   const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
 
-  const isOperator = currentUserProfile?.role === 'vendor_operator';
+  const isRestricted = currentUserProfile?.role === 'manager' || currentUserProfile?.role === 'vendor_operator';
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1 pb-10 sm:pb-1">
@@ -349,7 +349,7 @@ export default function DashboardPage() {
       </PageTitle>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
-        {!isOperator && (
+        {!isRestricted && (
           <SummaryCard
             title="Total Revenue"
             value={`${currencySymbol}${(totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -372,7 +372,7 @@ export default function DashboardPage() {
           description="Signed up in this period"
           href="/customers"
         />
-        {!isOperator && (
+        {!isRestricted && (
           <SummaryCard
             title="POS Sales"
             value={`${currencySymbol}${(totalSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -381,7 +381,7 @@ export default function DashboardPage() {
             href="/receipts"
           />
         )}
-        {!isOperator && (
+        {!isRestricted && (
           <SummaryCard
             title="Online Sales"
             value={`${currencySymbol}${(totalOnlineSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -408,7 +408,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {!isOperator && (
+      {!isRestricted && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <OverviewChart receipts={receipts || []} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
@@ -418,7 +418,7 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className={cn("shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer", isOperator ? "md:col-span-3" : "md:col-span-2")}>
+        <Card className={cn("shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer", isRestricted ? "md:col-span-3" : "md:col-span-2")}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
@@ -446,7 +446,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        {!isOperator && (
+        {!isRestricted && (
           <Card className="shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 cursor-pointer">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -553,8 +553,8 @@ export default function DashboardPage() {
                 </ul>
                 <div className="pt-4">
                   <Button variant="outline" size="sm" asChild className="w-full">
-                    <Link href="/reports">
-                      View Deep Sales Analysis <ArrowRight className="ml-2 h-4 w-4" />
+                    <Link href="/inventory">
+                      View Inventory Details <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </div>
