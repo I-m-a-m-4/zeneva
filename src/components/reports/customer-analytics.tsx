@@ -139,7 +139,15 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                 <Card>
                     <CardHeader className="pb-2">
                         <CardDescription>Returning Customers</CardDescription>
-                        <CardTitle className="text-4xl">{analyticsData.returningCustomers}</CardTitle>
+                        <CardTitle className="text-4xl flex items-baseline gap-1">
+                            {analyticsData.returningCustomers}
+                            <span className="text-sm font-normal text-muted-foreground">/ {analyticsData.totalCustomers}</span>
+                        </CardTitle>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                            {analyticsData.totalCustomers > 0 
+                                ? ((analyticsData.returningCustomers / analyticsData.totalCustomers) * 100).toFixed(1) 
+                                : '0'}% retention rate
+                        </p>
                     </CardHeader>
                 </Card>
             </div>
