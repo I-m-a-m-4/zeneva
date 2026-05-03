@@ -66,25 +66,27 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                             <span className="text-lg font-bold text-destructive">{currencySymbol}{totalLockedCapital.toLocaleString()}</span>
                         </div>
 
-                        <ScrollArea className="h-[350px] pr-4">
-                            <div className="space-y-2">
-                                {deadStock.map(product => (
-                                    <div key={product.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors border">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium truncate">{product.name}</p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <Badge variant="outline" className="text-[10px] h-4">
-                                                    {product.stock} units left
-                                                </Badge>
-                                                <span className="text-[10px] text-muted-foreground">SKU: {product.sku}</span>
+                        <ScrollArea className="h-[350px]">
+                            <div className="overflow-x-auto pb-2">
+                                <div className="space-y-2 min-w-[350px] pr-4">
+                                    {deadStock.map(product => (
+                                        <div key={product.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors border">
+                                            <div className="min-w-0 pr-2">
+                                                <p className="text-sm font-medium truncate" title={product.name}>{product.name}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <Badge variant="outline" className="text-[10px] h-4">
+                                                        {product.stock} units left
+                                                    </Badge>
+                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">SKU: {product.sku}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <p className="text-sm font-bold text-primary">{currencySymbol}{product.lockedCapital.toLocaleString()}</p>
+                                                <p className="text-[10px] text-muted-foreground whitespace-nowrap">Value Locked</p>
                                             </div>
                                         </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <p className="text-sm font-bold text-primary">{currencySymbol}{product.lockedCapital.toLocaleString()}</p>
-                                            <p className="text-[10px] text-muted-foreground">Value Locked</p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </ScrollArea>
 

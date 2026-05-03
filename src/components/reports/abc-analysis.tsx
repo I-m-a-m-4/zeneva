@@ -210,7 +210,8 @@ function CategoryTable({ products, currencySymbol, onRowClick }: { products: Pro
     }
     return (
         <ScrollArea className="h-[400px]">
-            <Table>
+            <div className="overflow-x-auto">
+                <Table className="min-w-[500px]">
                 <TableHeader className="bg-muted/50">
                     <TableRow>
                         <TableHead>Product</TableHead>
@@ -246,6 +247,7 @@ function CategoryTable({ products, currencySymbol, onRowClick }: { products: Pro
                     ))}
                 </TableBody>
             </Table>
-        </ScrollArea>
-    );
+        </div>
+    </ScrollArea>
+);
 }
