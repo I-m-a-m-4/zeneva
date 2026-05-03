@@ -241,8 +241,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialProducts, syncedProducts, queuedActions]);
 
   const profile = useMemo(() => {
-    return currentUserProfile || offlineProfile;
-  }, [currentUserProfile, offlineProfile]);
+    if (currentUserProfile) return currentUserProfile;
+    if (offlineProfile && user && offlineProfile.id === user.uid) return offlineProfile;
+    return null;
+  }, [currentUserProfile, offlineProfile, user?.uid]);
 
   const business = useMemo(() => {
     const base = initialBusiness || offlineBusiness;
