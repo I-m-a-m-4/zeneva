@@ -432,6 +432,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                                                 </DropdownMenuItem>
                                                                             </DropdownMenuSubContent>
                                                                         </DropdownMenuPortal>
+                                                                    </DropdownMenuSub>
                                                                 )}
                                                                 {currentUserProfile?.role === 'admin' && (
                                                                     <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserPermissionsToUpdate(user); }}>
