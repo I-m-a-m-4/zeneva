@@ -537,9 +537,19 @@ export default function AuthenticatedLayout({
 
   const filterNavByRole = (items: any[]) => {
     if (!userRole) return [];
+    const permissions = currentUserProfile?.permissions || {};
     return items.filter(item => {
       const roleMatch = !item.roles || (item.roles as string[]).includes(userRole);
-      return roleMatch;
+      if (!roleMatch) return false;
+
+      // Granular permission overrides
+      if (item.href === '/reports' && permissions.view_reports === false) return false;
+      if (item.href.startsWith('/inventory') && permissions.manage_inventory === false) return false;
+      if (item.href === '/customers' && permissions.view_customers === false) return false;
+      if (item.href === '/audit-log' && permissions.view_audit_logs === false) return false;
+      if (item.href === '/online-orders' && permissions.manage_online_orders === false) return false;
+
+      return true;
     });
   };
 

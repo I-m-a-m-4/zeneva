@@ -1,0 +1,184 @@
+
+'use client';
+
+import * as React from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useFirestore } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { UserProfile } from '@/types';
+import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock } from 'lucide-react';
+
+interface PermissionItem {
+    id: string;
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+}
+
+const PERMISSIONS: PermissionItem[] = [
+    {
+        id: 'view_reports',
+        label: 'View Reports',
+        description: 'Access to business analytics, revenue reports, and sales charts.',
+        icon: <Layout className="h-4 w-4" />
+    },
+    {
+        id: 'manage_inventory',
+        label: 'Manage Inventory',
+        description: 'Add, edit, or delete products and manage stock levels.',
+        icon: <Package className="h-4 w-4" />
+    },
+    {
+        id: 'view_customers',
+        label: 'Manage Customers',
+        description: 'View customer history, loyalty points, and profiles.',
+        icon: <Users className="h-4 w-4" />
+    },
+    {
+        id: 'apply_discounts',
+        label: 'Apply Discounts',
+        description: 'Ability to apply manual discounts to orders in the POS.',
+        icon: <Tag className="h-4 w-4" />
+    },
+    {
+        id: 'override_prices',
+        label: 'Override Prices',
+        description: 'Manually change product prices during a transaction.',
+        icon: <Lock className="h-4 w-4" />
+    },
+    {
+        id: 'view_audit_logs',
+        label: 'View Audit Logs',
+        description: 'See detailed history of all staff actions and system changes.',
+        icon: <History className="h-4 w-4" />
+    },
+    {
+        id: 'manage_online_orders',
+        label: 'Manage Online Orders',
+        description: 'View and update status of orders from the web storefront.',
+        icon: <ShoppingBag className="h-4 w-4" />
+    }
+];
+
+interface UserPermissionsDialogProps {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    user: UserProfile | null;
+    onSuccess?: () => void;
+}
+
+export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSuccess }: UserPermissionsDialogProps) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [permissions, setPermissions] = React.useState<Record<string, boolean>>({});
+
+    React.useEffect(() => {
+        if (user) {
+            setPermissions(user.permissions || {});
+        }
+    }, [user]);
+
+    const handleToggle = (id: string) => {
+        setPermissions(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
+
+    const handleSave = async () => {
+        if (!user || !firestore) return;
+
+        setIsSaving(true);
+        const userRef = doc(firestore, 'users', user.id);
+
+        try {
+            await updateDoc(userRef, {
+                permissions: permissions
+            });
+
+            toast({
+                title: "Permissions Updated",
+                description: `${user.name}'s access settings have been saved.`,
+                variant: "success"
+            });
+            
+            onSuccess?.();
+            onOpenChange(false);
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Could not save permissions.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (!user) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <Shield className="h-5 w-5 text-primary" />
+                        </div>
+                        <DialogTitle>Access Control</DialogTitle>
+                    </div>
+                    <DialogDescription>
+                        Grant or restrict specific functions for <strong>{user.name}</strong>.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                    {PERMISSIONS.map((item) => (
+                        <div key={item.id} className="flex items-start justify-between gap-4">
+                            <div className="flex gap-3">
+                                <div className="mt-1 p-1.5 bg-muted rounded-md text-muted-foreground">
+                                    {item.icon}
+                                </div>
+                                <div className="space-y-0.5">
+                                    <Label htmlFor={item.id} className="text-sm font-semibold cursor-pointer">
+                                        {item.label}
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground leading-normal max-w-[240px]">
+                                        {item.description}
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch 
+                                id={item.id} 
+                                checked={!!permissions[item.id]} 
+                                onCheckedChange={() => handleToggle(item.id)}
+                            />
+                        </div>
+                    ))}
+                </div>
+
+                <DialogFooter className="pt-4 border-t">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Permissions
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}

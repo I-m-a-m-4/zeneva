@@ -37,6 +37,7 @@ import {
     DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import AddUserDialog from '@/components/users/add-user-dialog';
+import UserPermissionsDialog from '@/components/users/user-permissions-dialog';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -143,6 +144,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
     const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
     const [userRoleToUpdate, setUserRoleToUpdate] = React.useState<{ user: UserProfile, newRole: UserRole } | null>(null);
+    const [userPermissionsToUpdate, setUserPermissionsToUpdate] = React.useState<UserProfile | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
     const [isUpdatingRole, setIsUpdatingRole] = React.useState(false);
 
@@ -430,7 +432,11 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                                                 </DropdownMenuItem>
                                                                             </DropdownMenuSubContent>
                                                                         </DropdownMenuPortal>
-                                                                    </DropdownMenuSub>
+                                                                )}
+                                                                {currentUserProfile?.role === 'admin' && (
+                                                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserPermissionsToUpdate(user); }}>
+                                                                        <Shield className="mr-2 h-4 w-4" /> Manage Permissions
+                                                                    </DropdownMenuItem>
                                                                 )}
                                                                 <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
                                                                     <UserX className="mr-2 h-4 w-4" /> Deactivate User
@@ -509,6 +515,13 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     pendingInvitationCount={invitations?.length || 0}
                 />
             )}
+
+            <UserPermissionsDialog
+                isOpen={!!userPermissionsToUpdate}
+                onOpenChange={(open) => !open && setUserPermissionsToUpdate(null)}
+                user={userPermissionsToUpdate}
+                onSuccess={forceRefresh}
+            />
 
             <AlertDialog open={!!invitationToRevoke} onOpenChange={(open) => !open && setInvitationToRevoke(null)}>
                 <AlertDialogContent>

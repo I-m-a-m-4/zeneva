@@ -59,6 +59,7 @@ export interface UserProfile {
     surveyCompleted?: boolean;
     status?: 'active' | 'inactive' | 'deleted';
     lastSeen?: any;
+    permissions?: Record<string, boolean>;
 }
 
 export interface CustomerInsightsOutput {
