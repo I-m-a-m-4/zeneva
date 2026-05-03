@@ -121,12 +121,14 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
             <CardContent>
                 {hasData ? (
                     <Tabs defaultValue="all">
-                        <TabsList className="grid w-full grid-cols-4 mb-4">
-                            <TabsTrigger value="all">All Products ({all.length})</TabsTrigger>
-                            <TabsTrigger value="classA">Class A ({classA.length})</TabsTrigger>
-                            <TabsTrigger value="classB">Class B ({classB.length})</TabsTrigger>
-                            <TabsTrigger value="classC">Class C ({classC.length})</TabsTrigger>
-                        </TabsList>
+                        <div className="overflow-x-auto pb-2">
+                            <TabsList className="flex w-max md:w-full md:grid md:grid-cols-4 mb-2">
+                                <TabsTrigger value="all" className="px-4">All Products ({all.length})</TabsTrigger>
+                                <TabsTrigger value="classA" className="px-4">Class A ({classA.length})</TabsTrigger>
+                                <TabsTrigger value="classB" className="px-4">Class B ({classB.length})</TabsTrigger>
+                                <TabsTrigger value="classC" className="px-4">Class C ({classC.length})</TabsTrigger>
+                            </TabsList>
+                        </div>
                         <TabsContent value="all">
                             <CategoryTable products={all} currencySymbol={currencySymbol} onRowClick={setSelectedProduct} />
                         </TabsContent>

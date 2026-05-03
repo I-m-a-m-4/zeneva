@@ -90,8 +90,8 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
                 <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
-                    <div className="h-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px] md:h-[300px]">
+                    <div className="h-[250px] md:h-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie

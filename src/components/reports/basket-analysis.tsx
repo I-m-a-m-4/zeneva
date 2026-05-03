@@ -81,7 +81,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
 
     return (
         <Card className="shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         <ShoppingBag className="h-5 w-5 text-primary" />
@@ -89,18 +89,20 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                     </CardTitle>
                     <CardDescription>Discover which products are frequently bought together.</CardDescription>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="relative w-64">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <div className="relative w-full sm:w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="search"
                             placeholder="Search products..."
-                            className="pl-9 h-9 text-xs bg-muted/20"
+                            className="pl-9 h-9 text-xs bg-muted/20 w-full"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                    <div className="flex justify-end">
+                        <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>

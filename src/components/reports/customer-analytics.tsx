@@ -160,28 +160,30 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                         <h4 className="font-semibold">Customer Acquisition</h4>
                         <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
                     </div>
-                    <div className="h-[400px] w-full border rounded-lg p-4 bg-muted/20">
-                        {acquisitionData.length > 0 ? (
-                            <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
-                                <BarChart data={acquisitionData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis 
-                                        dataKey="day" 
-                                        tickFormatter={(val) => val.split('-').slice(1).join('/')}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickMargin={8}
-                                    />
-                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ChartContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                                No acquisition data for this period.
-                            </div>
-                        )}
+                    <div className="overflow-x-auto border rounded-lg p-4 bg-muted/20">
+                        <div className="min-w-[500px] md:min-w-full h-[400px] w-full">
+                            {acquisitionData.length > 0 ? (
+                                <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
+                                    <BarChart data={acquisitionData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis 
+                                            dataKey="day" 
+                                            tickFormatter={(val) => val.split('-').slice(1).join('/')}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={8}
+                                        />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                                        <ChartTooltip content={<ChartTooltipContent />} />
+                                        <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ChartContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                    No acquisition data for this period.
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="md:col-span-1">
