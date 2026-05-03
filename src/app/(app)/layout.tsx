@@ -723,41 +723,56 @@ export default function AuthenticatedLayout({
                           <ScrollArea className="h-[300px]">
                             {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary" /></div> : allNotifications && allNotifications.length > 0 ? (
                               <div className="flex flex-col">
-                                {allNotifications.slice(0, 5).map(notif => (
-                                  <div key={notif.id} className={`border-b last:border-b-0 group relative ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
-                                    <Link
-                                      href={getNotificationLink(notif)}
-                                      className="flex items-start gap-2 p-4 pr-10 hover:bg-muted/30 transition-colors"
-                                    >
-                                      <div className="space-y-1 flex-1">
-                                        <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
-                                          {notif.isGlobal && (
-                                            <Badge variant="outline" className="mr-2 h-4 px-1 text-[8px] uppercase tracking-tighter">System</Badge>
-                                          )}
-                                          {notif.title}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
-                                        <p className="text-[10px] text-muted-foreground/60 mt-1">
-                                          {notif.createdAt ? formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true }) : ''}
-                                        </p>
+                                  {allNotifications.slice(0, 5).map(notif => {
+                                    const isClickable = notif.clickable !== false;
+                                    const content = (
+                                      <div className="flex items-start gap-2 p-4 pr-10">
+                                        <div className="space-y-1 flex-1">
+                                          <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
+                                            {notif.isGlobal && (
+                                              <Badge variant="outline" className="mr-2 h-4 px-1 text-[8px] uppercase tracking-tighter">System</Badge>
+                                            )}
+                                            {notif.title}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
+                                          <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                            {notif.createdAt ? formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true }) : ''}
+                                          </p>
+                                        </div>
                                       </div>
-                                    </Link>
-                                    {!notif.isGlobal && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute top-3 right-3 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteNotification(notif.id, false);
-                                        }}
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                        <span className="sr-only">Delete</span>
-                                      </Button>
-                                    )}
-                                  </div>
-                                ))}
+                                    );
+
+                                    return (
+                                      <div key={notif.id} className={`border-b last:border-b-0 group relative ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
+                                        {isClickable ? (
+                                          <Link
+                                            href={getNotificationLink(notif)}
+                                            className="block hover:bg-muted/30 transition-colors"
+                                          >
+                                            {content}
+                                          </Link>
+                                        ) : (
+                                          <div className="block">
+                                            {content}
+                                          </div>
+                                        )}
+                                        {!notif.isGlobal && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute top-3 right-3 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteNotification(notif.id, false);
+                                            }}
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                            <span className="sr-only">Delete</span>
+                                          </Button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 <Button
                                   variant="ghost"
                                   className="w-full text-xs font-medium py-3 rounded-none border-t hover:bg-muted/50"
