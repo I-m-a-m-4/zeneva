@@ -84,9 +84,36 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
     const [isSaving, setIsSaving] = React.useState(false);
     const [permissions, setPermissions] = React.useState<Record<string, boolean>>({});
 
+    const getInitialValue = (permissionId: string, role: string) => {
+        // Define default capabilities based on role (matching the system's baseline roles)
+        const defaults: Record<string, string[]> = {
+            view_reports: ['admin', 'owner'],
+            manage_inventory: ['admin', 'manager', 'vendor_operator'],
+            view_customers: ['admin', 'manager', 'vendor_operator'],
+            view_audit_logs: ['admin'],
+            manage_online_orders: ['admin', 'manager'],
+            apply_discounts: ['admin', 'manager'],
+            override_prices: ['admin', 'manager'],
+        };
+        
+        return (defaults[permissionId] || []).includes(role);
+    };
+
     React.useEffect(() => {
         if (user) {
-            setPermissions(user.permissions || {});
+            const current = user.permissions || {};
+            const initial: Record<string, boolean> = {};
+            
+            PERMISSIONS.forEach(p => {
+                // Use saved value if it exists, otherwise fall back to role default
+                if (current[p.id] !== undefined) {
+                    initial[p.id] = current[p.id];
+                } else {
+                    initial[p.id] = getInitialValue(p.id, user.role);
+                }
+            });
+            
+            setPermissions(initial);
         }
     }, [user]);
 

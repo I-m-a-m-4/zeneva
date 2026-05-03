@@ -538,11 +538,20 @@ export default function AuthenticatedLayout({
   const filterNavByRole = (items: any[]) => {
     if (!userRole) return [];
     const permissions = currentUserProfile?.permissions || {};
+    
     return items.filter(item => {
+      // 1. Explicitly Enabled Override
+      if (item.href === '/reports' && permissions.view_reports === true) return true;
+      if (item.href.startsWith('/inventory') && permissions.manage_inventory === true) return true;
+      if (item.href === '/customers' && permissions.view_customers === true) return true;
+      if (item.href === '/audit-log' && permissions.view_audit_logs === true) return true;
+      if (item.href === '/online-orders' && permissions.manage_online_orders === true) return true;
+
+      // 2. Role Match
       const roleMatch = !item.roles || (item.roles as string[]).includes(userRole);
       if (!roleMatch) return false;
 
-      // Granular permission overrides
+      // 3. Explicitly Disabled Override (for roles that have it by default)
       if (item.href === '/reports' && permissions.view_reports === false) return false;
       if (item.href.startsWith('/inventory') && permissions.manage_inventory === false) return false;
       if (item.href === '/customers' && permissions.view_customers === false) return false;
