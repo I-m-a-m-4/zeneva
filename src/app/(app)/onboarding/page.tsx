@@ -8,7 +8,8 @@ import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -118,14 +119,21 @@ export default function OnboardingPage() {
   });
 
   const onSubmit = async (data: OnboardingFormValues) => {
-    if (!business?.id || !currentUserProfile?.id) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please re-login.' });
+    const authUser = getAuth().currentUser;
+    const bId = currentUserProfile?.businessId || business?.id;
+
+    if (!authUser || !bId) {
+      toast({ variant: 'destructive', title: 'Session Error', description: 'Your session has expired. Please log in again.' });
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const businessDocRef = doc(firestore, 'businessInstances', business.id);
-      await updateDoc(businessDocRef, {
+      const batch = writeBatch(firestore);
+      
+      // 1. Update Business Instance
+      const businessDocRef = doc(firestore, 'businessInstances', bId);
+      batch.update(businessDocRef, {
         name: data.organizationName,
         address: data.address,
         'settings.industry': data.industry,
@@ -138,31 +146,35 @@ export default function OnboardingPage() {
         'settings.fiscalYearStart': data.fiscalYearStart,
       });
 
-      const userDocRef = doc(firestore, 'users', currentUserProfile.id);
-      await updateDoc(userDocRef, {
+      // 2. Update User Profile
+      const userDocRef = doc(firestore, 'users', authUser.uid);
+      batch.update(userDocRef, {
         surveyCompleted: true,
       });
 
-      // Send welcome notification
-      const notifRef = collection(firestore, `users/${currentUserProfile.id}/notifications`);
-      await addDoc(notifRef, {
+      // 3. Create Welcome Notification
+      const notifRef = doc(collection(firestore, `users/${authUser.uid}/notifications`));
+      batch.set(notifRef, {
           title: "Welcome to Zeneva!",
-          body: `Hi ${currentUserProfile.name}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
+          body: `Hi ${currentUserProfile?.name || 'there'}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
           createdAt: serverTimestamp(),
           read: false,
           type: 'system'
       });
 
+      await batch.commit();
+
+      // Trigger a local context refresh
       triggerRefresh();
 
-      // Wait for the context to refresh and pick up the 'surveyCompleted' change
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Small delay to allow the auth/profile listener to pick up the changes
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       router.push('/dashboard');
     } catch (error) {
       console.error('Onboarding submission error:', error);
-      toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not save your preferences.' });
+      toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not save your preferences. Please try again.' });
       setIsSubmitting(false);
     }
   };
