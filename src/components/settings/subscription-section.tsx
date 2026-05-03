@@ -12,6 +12,7 @@ import { useFirestore } from '@/firebase';
 import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore';
 import { add, format } from 'date-fns';
 import { Badge } from '../ui/badge';
+import { safeToDate } from '@/lib/utils';
 import { useCallback, useState } from 'react';
 import usePaystack from '@/hooks/use-paystack';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -114,7 +115,7 @@ const PaystackSubscriptionButton = ({
             const batch = writeBatch(firestore);
             
             // If renewing, add time to the existing expiry. Otherwise, start from now.
-            const currentExpiry = businessInstance.trialExpiresAt?.toDate() ?? new Date();
+            const currentExpiry = safeToDate(businessInstance.trialExpiresAt);
             const startDate = currentExpiry > new Date() ? currentExpiry : new Date();
             const newExpiryDate = add(startDate, { months: cycle.months });
             
