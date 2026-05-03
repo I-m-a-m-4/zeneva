@@ -47,7 +47,7 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
     }, [deadStock]);
 
     return (
-        <Card className="shadow-md">
+        <Card className="shadow-md overflow-hidden w-full">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <PackageX className="h-5 w-5 text-destructive" />
@@ -65,10 +65,10 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                             </div>
                             <span className="text-lg font-bold text-destructive">{currencySymbol}{totalLockedCapital.toLocaleString()}</span>
                         </div>
-
+ 
                         <ScrollArea className="h-[350px]">
                             <div className="overflow-x-auto pb-2">
-                                <div className="space-y-2 min-w-[350px] pr-4">
+                                <div className="space-y-2 min-w-[500px] pr-4">
                                     {deadStock.map(product => (
                                         <div key={product.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors border">
                                             <div className="min-w-0 pr-2">
