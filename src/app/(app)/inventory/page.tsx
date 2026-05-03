@@ -212,6 +212,15 @@ function InventoryPageContent() {
     return () => clearTimeout(handler);
   }, [searchTerm, performSearch]);
 
+  // Use NProgress for background searching to be non-intrusive
+  React.useEffect(() => {
+    if (isSearching) {
+      NProgress.start();
+    } else {
+      NProgress.done();
+    }
+  }, [isSearching]);
+
   // Update hasMore if products change
   React.useEffect(() => {
     if (products && products.length < 50) {
@@ -723,7 +732,7 @@ function InventoryPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
-          {isLoading || products === null ? (
+          {(isLoading && filteredProducts.length === 0) || products === null ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
               <p className="text-muted-foreground animate-pulse font-medium">Scanning inventory catalogs...</p>
