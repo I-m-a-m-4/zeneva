@@ -107,10 +107,13 @@ const PaystackSubscriptionButton = ({
                 throw new Error(verifyResult.message || 'Payment verification failed. Please contact support.');
             }
 
-            // Step 2: Double-check amount on the backend response
-            if (verifyResult.data.amount !== finalAmount * 100) {
-                // This is a critical security check
+            // Step 2: Double-check amount and currency on the backend response
+            if (verifyResult.data.amount !== Math.round(finalAmount * 100)) {
                 throw new Error(`Paid amount does not match plan price. Please contact support.`);
+            }
+
+            if (verifyResult.data.currency !== currency) {
+                throw new Error(`Transaction currency mismatch. Expected ${currency}, got ${verifyResult.data.currency}.`);
             }
 
             // Step 3: Payment is fully verified. Update Firestore.
