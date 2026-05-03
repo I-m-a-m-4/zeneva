@@ -235,6 +235,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                     </div>
                 </div>
             </div>
+            </div>
         </CardContent>
     </Card>
   );
