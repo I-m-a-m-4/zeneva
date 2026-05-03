@@ -87,8 +87,8 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
     }, [dailyData]);
 
     return (
-        <Card className="shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Card className="shadow-md overflow-hidden w-full">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
                     <CardTitle className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-primary" />
@@ -96,7 +96,9 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                     </CardTitle>
                     <CardDescription>Peak times and days for your business.</CardDescription>
                 </div>
-                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                <div className="flex justify-end">
+                    <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                </div>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="hourly" className="w-full">

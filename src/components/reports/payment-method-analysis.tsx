@@ -78,8 +78,8 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
     };
 
     return (
-        <Card className="shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Card className="shadow-md overflow-hidden w-full">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
                     <CardTitle className="flex items-center gap-2">
                         <PieChartIcon className="h-5 w-5 text-primary" />
@@ -87,7 +87,9 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
                     </CardTitle>
                     <CardDescription>Breakdown of revenue collection by payment channel.</CardDescription>
                 </div>
-                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                <div className="flex justify-end">
+                    <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                </div>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px] md:h-[300px]">

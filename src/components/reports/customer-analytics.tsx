@@ -200,9 +200,10 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                     </div>
                 </div>
                 <div className="md:col-span-1">
-                    <h4 className="font-semibold mb-2">Top 5 Customers by Spending</h4>
-                    <div className="border rounded-lg overflow-x-auto w-full">
-                        <Table className="min-w-[300px]">
+                    <h4 className="font-semibold mb-2 text-sm">Top 5 Customers by Spending</h4>
+                    <div className="border rounded-lg overflow-auto w-full">
+                        <div className="min-w-[500px]">
+                            <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Customer</TableHead>

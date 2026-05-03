@@ -80,7 +80,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
     }, [receipts, searchTerm, timeframe]);
 
     return (
-        <Card className="shadow-md">
+        <Card className="shadow-md overflow-hidden w-full">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
