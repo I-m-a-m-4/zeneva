@@ -68,7 +68,8 @@ const PaystackSubscriptionButton = ({
     businessInstance, 
     isCurrentPlan, 
     isProcessing, 
-    setProcessingPlan 
+    setProcessingPlan,
+    currency
 }: { 
     plan: typeof plans[0], 
     cycle: typeof billingCycles[0],
@@ -78,6 +79,7 @@ const PaystackSubscriptionButton = ({
     isCurrentPlan: boolean,
     isProcessing: boolean,
     setProcessingPlan: (planId: string | null) => void;
+    currency: 'NGN' | 'USD';
 }) => {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -133,7 +135,7 @@ const PaystackSubscriptionButton = ({
                 businessId: businessInstance.id,
                 plan: plan.name,
                 amount: finalAmount,
-                currency: 'NGN',
+                currency: currency,
                 timestamp: serverTimestamp(),
                 reference: transaction.reference,
             });
@@ -143,7 +145,7 @@ const PaystackSubscriptionButton = ({
             batch.set(historyDocRef, {
                 action: `Subscribed to ${plan.name} Plan for ${cycle.label}`,
                 amount: finalAmount,
-                currency: 'NGN',
+                currency: currency,
                 timestamp: serverTimestamp(),
             });
 
@@ -194,7 +196,7 @@ const PaystackSubscriptionButton = ({
             key: PAYSTACK_PUBLIC_KEY,
             email: userProfile.email,
             amount: Math.round(finalAmount * 100), // Ensure it's an integer
-            currency: 'NGN',
+            currency: currency,
             reference: `z-${businessInstance.id.substring(0, 6)}-${Date.now()}`,
             metadata: {
                 custom_fields: [
@@ -299,9 +301,8 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                     const selectedCycleId = selectedCycles[plan.planId as keyof typeof selectedCycles];
                     const selectedCycle = billingCycles.find(c => c.id === selectedCycleId)!;
                     
-                    const finalAmountNGN = plan.price * selectedCycle.months * (1 - selectedCycle.discount / 100);
                     const displayBasePrice = currency === 'NGN' ? plan.price : (plan as any).priceUSD;
-                    const displayFinalPrice = displayBasePrice * selectedCycle.months * (1 - selectedCycle.discount / 100);
+                    const finalAmount = displayBasePrice * selectedCycle.months * (1 - selectedCycle.discount / 100);
                     
                     const isCurrentPlan = plan.planId === businessInstance.plan;
 
@@ -381,12 +382,13 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 <PaystackSubscriptionButton
                                     plan={plan}
                                     cycle={selectedCycle}
-                                    finalAmount={finalAmountNGN}
+                                    finalAmount={finalAmount}
                                     userProfile={userProfile}
                                     businessInstance={businessInstance}
                                     isCurrentPlan={isCurrentPlan}
                                     isProcessing={processingPlan === plan.planId}
                                     setProcessingPlan={setProcessingPlan}
+                                    currency={currency}
                                 />
                             </CardFooter>
                         </Card>
