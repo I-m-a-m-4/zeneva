@@ -243,7 +243,7 @@ function CustomerDetailContent() {
         return Math.max(customer?.totalSpent || 0, fromReceipts);
     }, [customer, receipts]);
 
-    const isLoading = isPosLoading || isFetchingReceipts;
+    const isLoading = isPosLoading || isFetchingReceipts || !firestore;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {

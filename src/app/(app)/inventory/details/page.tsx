@@ -371,7 +371,7 @@ function EditProductContent() {
         router.push('/inventory');
     };
 
-    const isLoading = isProductLoading;
+    const isLoading = isProductLoading || !firestore;
     const canManageProduct = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {

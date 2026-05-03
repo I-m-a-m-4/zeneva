@@ -34,7 +34,7 @@ function InvoiceContent() {
         setMounted(true);
     }, []);
 
-    if (!mounted || isLoading) {
+    if (!mounted || isLoading || !firestore) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Invoice...</span></div>;
     }
 
