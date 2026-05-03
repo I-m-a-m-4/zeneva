@@ -79,8 +79,12 @@ export default function OverviewChart({ receipts, currencySymbol, data }: Overvi
                       dataKey="month"
                       tickLine={false}
                       axisLine={false}
-                      tickMargin={8}
+                      tickMargin={10}
                       interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                      fontSize={11}
                     />
 
                     <YAxis
