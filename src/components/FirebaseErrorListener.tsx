@@ -3,42 +3,47 @@
 import { useState, useEffect } from 'react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { User } from 'firebase/auth';
 
 /**
  * An invisible component that listens for globally emitted 'permission-error' events.
  * It throws any received error to be caught by Next.js's global-error.tsx.
  */
-export function FirebaseErrorListener() {
-  // Use the specific error type for the state for type safety.
+export function FirebaseErrorListener({ user }: { user: User | null }) {
   const [error, setError] = useState<FirestorePermissionError | null>(null);
+  const [stabilizeUntil, setStabilizeUntil] = useState(() => Date.now() + 5000);
+  const [lastUid, setLastUid] = useState<string | null>(null);
 
   useEffect(() => {
-    const mountTime = Date.now();
-    // The callback now expects a strongly-typed error, matching the event payload.
+    // Whenever the user changes (login/logout/signup), reset the stabilization period.
+    // This prevents transient permission errors during auth transitions from crashing the app.
+    if (user?.uid !== lastUid) {
+      setLastUid(user?.uid || null);
+      setStabilizeUntil(Date.now() + 8000); // 8 seconds of silence for rule propagation
+    }
+  }, [user, lastUid]);
+
+  useEffect(() => {
     const handleError = (error: FirestorePermissionError) => {
-      // Ignore permission errors for the first 5 seconds of the session
-      // to allow auth state and profile documents to stabilize.
-      if (Date.now() - mountTime < 5000) return;
+      // Ignore permission errors during the stabilization window.
+      if (Date.now() < stabilizeUntil) {
+        console.warn(`[Firebase] Swallowed transient permission error for ${error.path} during auth stabilization.`);
+        return;
+      }
       
-      // Set error in state to trigger a re-render.
       setError(error);
     };
 
-    // The typed emitter will enforce that the callback for 'permission-error'
-    // matches the expected payload type (FirestorePermissionError).
     errorEmitter.on('permission-error', handleError);
 
-    // Unsubscribe on unmount to prevent memory leaks.
     return () => {
       errorEmitter.off('permission-error', handleError);
     };
-  }, []);
+  }, [stabilizeUntil]);
 
-  // On re-render, if an error exists in state, throw it.
   if (error) {
     throw error;
   }
 
-  // This component renders nothing.
   return null;
 }

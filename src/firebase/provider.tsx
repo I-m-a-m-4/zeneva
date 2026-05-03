@@ -124,7 +124,7 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
 
   return (
     <FirebaseContext.Provider value={contextValue}>
-      <FirebaseErrorListener />
+      <FirebaseErrorListener user={userAuthState.user} />
       {children}
     </FirebaseContext.Provider>
   );
