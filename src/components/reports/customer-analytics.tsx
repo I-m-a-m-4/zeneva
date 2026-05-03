@@ -114,7 +114,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
   }, [customers, timeframe]);
 
   return (
-    <Card>
+    <Card className="overflow-hidden w-full">
         <CardHeader>
             <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
@@ -156,9 +156,11 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
 
             <div className="grid lg:grid-cols-2 gap-6">
                 <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">Customer Acquisition</h4>
-                        <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <h4 className="font-semibold text-sm">Customer Acquisition</h4>
+                        <div className="flex justify-end">
+                            <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
+                        </div>
                     </div>
                     <div className="overflow-x-auto border rounded-lg p-4 bg-muted/20">
                         <div className="min-w-[600px] md:min-w-full h-[400px] w-full">
