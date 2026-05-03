@@ -126,8 +126,11 @@ service cloud.firestore {
       }
 
       match /stats/{statId} {
-        allow read: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
-        allow write: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+        allow read, write: if isSuperAdmin() || 
+                             (isUserAuthenticated() && (
+                               getCurrentUserBusinessId() == businessId || 
+                               get(/databases/$(database)/documents/businessInstances/$(businessId)).data.ownerId == request.auth.uid
+                             ));
       }
     }
 
