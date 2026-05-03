@@ -750,13 +750,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const topPerformers = sortedBusinessRevenues;
 
         // --- New Daily Metrics ---
-        const earliestBusiness = businesses?.reduce((earliest, b) => {
-            if (!b.createdAt) return earliest;
-            const bDate = b.createdAt.toDate();
-            return bDate < earliest ? bDate : earliest;
-        }, new Date());
+        const launchDate = new Date(2026, 1, 17); // February 17, 2026
         
-        const daysActive = Math.max(differenceInDays(new Date(), earliestBusiness), 1);
+        const daysActive = Math.max(differenceInDays(new Date(), launchDate), 1);
+        const earliestBusiness = launchDate;
         const averageSalesPerDay = platformGmv / daysActive;
         const averageReceiptsPerDay = totalReceipts / daysActive;
 
