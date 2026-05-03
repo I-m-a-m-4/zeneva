@@ -16,7 +16,7 @@ import { Loader2, History, ShieldCheck } from 'lucide-react';
 import TrialCountdown from '@/components/settings/trial-countdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate } from '@/lib/utils';
 import RefreshButton from '@/components/shared/refresh-button';
 import { usePOS } from '@/context/pos-context';
 
@@ -118,7 +118,7 @@ function BillingPage() {
                 {currentBusiness.accessLevel === 'lifetime' ? (
                     <LifetimeAccessStatus />
                 ) : (
-                    <TrialCountdown expiryDate={currentBusiness.trialExpiresAt?.toDate() || null} />
+                    <TrialCountdown expiryDate={currentBusiness.trialExpiresAt ? safeToDate(currentBusiness.trialExpiresAt) : null} />
                 )}
                 
             </div>
@@ -147,7 +147,7 @@ function BillingPage() {
                                 <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.action}</TableCell>
                                     <TableCell>₦{item.amount.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(item.timestamp.toDate(), 'PPp') : 'N/A'}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : 'N/A'}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
