@@ -356,7 +356,17 @@ export default function AuthenticatedLayout({
 
     if (protectedRoute) {
       const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
-      if (!allowedRoles.includes(userRole)) {
+      const permissions = currentUserProfile.permissions || {};
+      
+      // Check if this specific route is granted via a granular override
+      const isExplicitlyAllowed = 
+        (protectedRoute === '/reports' && permissions.view_reports === true) ||
+        (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === true) ||
+        (protectedRoute === '/customers' && permissions.view_customers === true) ||
+        (protectedRoute === '/audit-log' && permissions.view_audit_logs === true) ||
+        (protectedRoute === '/online-orders' && permissions.manage_online_orders === true);
+
+      if (!allowedRoles.includes(userRole) && !isExplicitlyAllowed) {
         toast({
           variant: "destructive",
           title: "Access Denied",
