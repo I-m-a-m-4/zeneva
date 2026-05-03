@@ -306,11 +306,11 @@ export default function AuthenticatedLayout({
   const handleConfettiComplete = React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive]);
 
   React.useEffect(() => {
-    // If loading is complete and there's no authenticated user, redirect to login.
-    if (!isLoading && !user) {
+    // If auth checking is complete and there's no authenticated user, redirect to login.
+    if (!isUserLoading && !user) {
       router.replace('/login');
     }
-  }, [isLoading, user, router]);
+  }, [isUserLoading, user, router]);
 
   React.useEffect(() => {
     const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';

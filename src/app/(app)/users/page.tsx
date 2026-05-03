@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, where, deleteDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile, Invitation } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -239,6 +239,17 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 
         try {
             await updateDoc(userRef, { role: userRoleToUpdate.newRole });
+            
+            // Send notification to the updated user
+            const notifRef = collection(firestore, `users/${userRoleToUpdate.user.id}/notifications`);
+            await addDoc(notifRef, {
+                title: "Role Access Updated",
+                body: `Your access level has been changed to ${userRoleToUpdate.newRole.replace('_', ' ')}. Please refresh your dashboard to see new features.`,
+                createdAt: serverTimestamp(),
+                read: false,
+                type: 'system'
+            });
+
             toast({ 
                 title: 'Role Updated', 
                 description: `${userRoleToUpdate.user.name}'s role has been changed to ${userRoleToUpdate.newRole.replace('_', ' ')}.`, 

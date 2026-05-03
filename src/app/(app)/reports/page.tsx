@@ -366,8 +366,8 @@ export default function ReportsDashboard() {
 
                         <div className="grid grid-cols-1 gap-6">
                             <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
-                            <HourlySalesHeatmap receipts={allReceipts || []} />
-                            <BasketAnalysis receipts={allReceipts || []} />
+                            <HourlySalesHeatmap receipts={deepReceipts} />
+                            <BasketAnalysis receipts={deepReceipts} />
                         </div>
 
 

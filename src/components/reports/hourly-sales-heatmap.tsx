@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Receipt } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { Clock, Users, Calendar, TrendingUp } from 'lucide-react';
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -16,28 +18,54 @@ interface HourlySalesHeatmapProps {
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps) {
+    const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+
+    const filteredReceipts = React.useMemo(() => {
+        let results = [...receipts];
+        
+        if (timeframe !== 'all') {
+            const now = new Date();
+            let limitDate: Date;
+            if (timeframe === 'today') limitDate = startOfDay(now);
+            else if (timeframe === '7d') limitDate = subDays(now, 7);
+            else if (timeframe === '30d') limitDate = subDays(now, 30);
+            else limitDate = subDays(now, 90);
+
+            results = receipts.filter(r => {
+                const rd = safeToDate(r.createdAt);
+                return rd >= limitDate;
+            });
+        }
+        return results;
+    }, [receipts, timeframe]);
+
     const hourlyData = React.useMemo(() => {
         const hours: Record<number, number> = {};
         for (let i = 0; i < 24; i++) hours[i] = 0;
 
-        receipts.forEach(r => {
+        filteredReceipts.forEach(r => {
             const date = safeToDate(r.createdAt);
             const hour = date.getHours();
             hours[hour] = (hours[hour] || 0) + 1;
         });
 
-        return Object.entries(hours).map(([hour, count]) => ({
-            hour: parseInt(hour),
-            count,
-            display: `${hour.padStart(2, '0')}:00`
-        }));
-    }, [receipts]);
+        return Object.entries(hours).map(([hour, count]) => {
+            const h = parseInt(hour);
+            const period = h >= 12 ? 'PM' : 'AM';
+            const displayHour = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+            return {
+                hour: h,
+                count,
+                display: `${displayHour}:00 ${period}`
+            };
+        });
+    }, [filteredReceipts]);
 
     const dailyData = React.useMemo(() => {
         const days: Record<number, number> = {};
         for (let i = 0; i < 7; i++) days[i] = 0;
 
-        receipts.forEach(r => {
+        filteredReceipts.forEach(r => {
             const date = safeToDate(r.createdAt);
             const day = date.getDay();
             days[day] = (days[day] || 0) + 1;
@@ -48,7 +76,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
             name: DAYS[parseInt(day)],
             count
         }));
-    }, [receipts]);
+    }, [filteredReceipts]);
 
     const peakHour = React.useMemo(() => {
         return [...hourlyData].sort((a, b) => b.count - a.count)[0];
@@ -60,12 +88,15 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
 
     return (
         <Card className="shadow-md">
-            <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Business Traffic Insights
-                </CardTitle>
-                <CardDescription>Peak times and days for your business.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                    <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-primary" />
+                        Business Traffic Insights
+                    </CardTitle>
+                    <CardDescription>Peak times and days for your business.</CardDescription>
+                </div>
+                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="hourly" className="w-full">
@@ -93,10 +124,16 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                                     <XAxis 
                                         dataKey="hour" 
-                                        tickFormatter={(h) => `${h}`} 
-                                        fontSize={10} 
+                                        tickFormatter={(h) => {
+                                            const hour = parseInt(h);
+                                            if (hour === 0) return '12am';
+                                            if (hour === 12) return '12pm';
+                                            return hour > 12 ? `${hour - 12}pm` : `${hour}am`;
+                                        }} 
+                                        fontSize={9} 
                                         axisLine={false} 
                                         tickLine={false}
+                                        interval={2} // Show every 2nd hour to keep it clean
                                     />
                                     <YAxis hide />
                                     <Tooltip 

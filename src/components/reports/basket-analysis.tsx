@@ -8,6 +8,9 @@ import { ShoppingBag, Plus, ArrowRight, Zap, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface BasketAnalysisProps {
@@ -16,11 +19,28 @@ interface BasketAnalysisProps {
 
 export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
 
     const topSets = React.useMemo(() => {
+        let filteredReceipts = [...receipts];
+        
+        if (timeframe !== 'all') {
+            const now = new Date();
+            let limitDate: Date;
+            if (timeframe === 'today') limitDate = startOfDay(now);
+            else if (timeframe === '7d') limitDate = subDays(now, 7);
+            else if (timeframe === '30d') limitDate = subDays(now, 30);
+            else limitDate = subDays(now, 90);
+
+            filteredReceipts = receipts.filter(r => {
+                const rd = safeToDate(r.createdAt);
+                return rd >= limitDate;
+            });
+        }
+
         const sets: Record<string, { count: number; items: string[] }> = {};
 
-        receipts.forEach(r => {
+        filteredReceipts.forEach(r => {
             if (!r.items || r.items.length < 2) return;
 
             const items = r.items.map(i => ({ id: i.productId, name: i.name }));
@@ -57,7 +77,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                 );
             })
             .sort((a, b) => b.count - a.count);
-    }, [receipts, searchTerm]);
+    }, [receipts, searchTerm, timeframe]);
 
     return (
         <Card className="shadow-md">
@@ -69,15 +89,18 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                     </CardTitle>
                     <CardDescription>Discover which products are frequently bought together.</CardDescription>
                 </div>
-                <div className="relative w-64">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Search products..."
-                        className="pl-9 h-9 text-xs bg-muted/20"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex items-center gap-4">
+                    <div className="relative w-64">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Search products..."
+                            className="pl-9 h-9 text-xs bg-muted/20"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
                 </div>
             </CardHeader>
             <CardContent>

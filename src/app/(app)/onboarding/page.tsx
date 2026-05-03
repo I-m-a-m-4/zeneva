@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -141,6 +141,16 @@ export default function OnboardingPage() {
       const userDocRef = doc(firestore, 'users', currentUserProfile.id);
       await updateDoc(userDocRef, {
         surveyCompleted: true,
+      });
+
+      // Send welcome notification
+      const notifRef = collection(firestore, `users/${currentUserProfile.id}/notifications`);
+      await addDoc(notifRef, {
+          title: "Welcome to Zeneva!",
+          body: `Hi ${currentUserProfile.name}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
+          createdAt: serverTimestamp(),
+          read: false,
+          type: 'system'
       });
 
       triggerRefresh();

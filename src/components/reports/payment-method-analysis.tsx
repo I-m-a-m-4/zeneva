@@ -8,6 +8,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { Wallet, CreditCard, Landmark, FileText, PieChart as PieChartIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
+
 interface PaymentMethodDistributionProps {
     receipts: Receipt[];
     currencySymbol: string;
@@ -16,7 +20,25 @@ interface PaymentMethodDistributionProps {
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 export default function PaymentMethodDistribution({ receipts, currencySymbol }: PaymentMethodDistributionProps) {
+    const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+
     const data = React.useMemo(() => {
+        let filteredReceipts = [...receipts];
+        
+        if (timeframe !== 'all') {
+            const now = new Date();
+            let limitDate: Date;
+            if (timeframe === 'today') limitDate = startOfDay(now);
+            else if (timeframe === '7d') limitDate = subDays(now, 7);
+            else if (timeframe === '30d') limitDate = subDays(now, 30);
+            else limitDate = subDays(now, 90);
+
+            filteredReceipts = receipts.filter(r => {
+                const rd = safeToDate(r.createdAt);
+                return rd >= limitDate;
+            });
+        }
+
         const distribution: Record<string, { total: number; count: number }> = {
             'Cash': { total: 0, count: 0 },
             'Card': { total: 0, count: 0 },
@@ -24,7 +46,7 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
             'Invoice': { total: 0, count: 0 }
         };
 
-        receipts.forEach(receipt => {
+        filteredReceipts.forEach(receipt => {
             const method = receipt.paymentMethod || 'Cash';
             if (!distribution[method]) {
                 distribution[method] = { total: 0, count: 0 };
@@ -41,7 +63,7 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
                 count: stats.count
             }))
             .sort((a, b) => b.value - a.value);
-    }, [receipts]);
+    }, [receipts, timeframe]);
 
     const totalRevenue = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -57,12 +79,15 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
 
     return (
         <Card className="shadow-md">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <PieChartIcon className="h-5 w-5 text-primary" />
-                    Payment Method Reconciliation
-                </CardTitle>
-                <CardDescription>Breakdown of revenue collection by payment channel.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                    <CardTitle className="flex items-center gap-2">
+                        <PieChartIcon className="h-5 w-5 text-primary" />
+                        Payment Method Reconciliation
+                    </CardTitle>
+                    <CardDescription>Breakdown of revenue collection by payment channel.</CardDescription>
+                </div>
+                <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">

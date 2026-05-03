@@ -780,7 +780,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
-            richestBusiness, topPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData
+            richestBusiness, topPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
+            earliestBusiness, daysActive
         };
     }, [users, businesses, products, receipts, purchases]);
 
@@ -1028,6 +1029,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             value={platformAnalytics.businessesWithSales} 
                             icon={Zap} 
                             description="Revenue-generating nodes"
+                        />
+                        <StatCard 
+                            title="Zeneva Age" 
+                            value={analyticsData.daysActive > 365 
+                                ? `${(analyticsData.daysActive / 365).toFixed(1)} Years` 
+                                : `${analyticsData.daysActive} Days`} 
+                            icon={Clock} 
+                            description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')}`}
                         />
                     </div>
                     

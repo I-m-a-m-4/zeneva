@@ -10,16 +10,38 @@ import type { Receipt } from '@/types';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 
+import { TimeframePicker, type Timeframe } from './timeframe-picker';
+import { subDays, startOfDay } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
+
 interface TopCustomersListProps {
   receipts: Receipt[];
   currencySymbol: string;
 }
 
 export default function TopCustomersList({ receipts, currencySymbol }: TopCustomersListProps) {
+  const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+
   const customerData = React.useMemo(() => {
+    let filteredReceipts = [...receipts];
+    
+    if (timeframe !== 'all') {
+        const now = new Date();
+        let limitDate: Date;
+        if (timeframe === 'today') limitDate = startOfDay(now);
+        else if (timeframe === '7d') limitDate = subDays(now, 7);
+        else if (timeframe === '30d') limitDate = subDays(now, 30);
+        else limitDate = subDays(now, 90);
+
+        filteredReceipts = receipts.filter(r => {
+            const rd = safeToDate(r.createdAt);
+            return rd >= limitDate;
+        });
+    }
+
     const customerStats: Record<string, { name: string; email: string, sales: number; totalSpent: number }> = {};
     
-    receipts.forEach(receipt => {
+    filteredReceipts.forEach(receipt => {
       if (receipt.customer) {
         const id = receipt.customer.id;
         if (!customerStats[id]) {
@@ -34,13 +56,16 @@ export default function TopCustomersList({ receipts, currencySymbol }: TopCustom
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 10);
-  }, [receipts]);
+  }, [receipts, timeframe]);
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Top Customers</CardTitle>
-        <CardDescription>Customers with the highest spending in this period.</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+            <CardTitle>Top Customers</CardTitle>
+            <CardDescription>Customers with the highest spending in this period.</CardDescription>
+        </div>
+        <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-72">
