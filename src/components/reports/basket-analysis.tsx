@@ -4,8 +4,9 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Receipt } from '@/types';
-import { ShoppingBag, Plus, ArrowRight, Zap } from 'lucide-react';
+import { ShoppingBag, Plus, ArrowRight, Zap, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -14,49 +15,73 @@ interface BasketAnalysisProps {
 }
 
 export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
-    const topPairs = React.useMemo(() => {
-        const pairs: Record<string, { count: number; nameA: string; nameB: string }> = {};
+    const [searchTerm, setSearchTerm] = React.useState('');
+
+    const topSets = React.useMemo(() => {
+        const sets: Record<string, { count: number; items: string[] }> = {};
 
         receipts.forEach(r => {
             if (!r.items || r.items.length < 2) return;
 
-            // Generate unique pairs from items in this receipt
-            for (let i = 0; i < r.items.length; i++) {
-                for (let j = i + 1; j < r.items.length; j++) {
-                    const itemA = r.items[i];
-                    const itemB = r.items[j];
-                    
-                    // Consistent ordering to avoid duplicates (A+B vs B+A)
-                    const [id1, id2] = [itemA.productId, itemB.productId].sort();
-                    const pairKey = `${id1}_${id2}`;
-
-                    if (!pairs[pairKey]) {
-                        pairs[pairKey] = {
-                            count: 0,
-                            nameA: itemA.name,
-                            nameB: itemB.name
-                        };
+            const items = r.items.map(i => ({ id: i.productId, name: i.name }));
+            
+            // Generate unique pairs
+            for (let i = 0; i < items.length; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const group = [items[i], items[j]].sort((a, b) => a.id.localeCompare(b.id));
+                    const key = group.map(g => g.id).join('_');
+                    if (!sets[key]) {
+                        sets[key] = { count: 0, items: group.map(g => g.name) };
                     }
-                    pairs[pairKey].count += 1;
+                    sets[key].count += 1;
+
+                    // Generate unique trios
+                    for (let k = j + 1; k < items.length; k++) {
+                        const trio = [items[i], items[j], items[k]].sort((a, b) => a.id.localeCompare(b.id));
+                        const trioKey = trio.map(g => g.id).join('_');
+                        if (!sets[trioKey]) {
+                            sets[trioKey] = { count: 0, items: trio.map(g => g.name) };
+                        }
+                        sets[trioKey].count += 1;
+                    }
                 }
             }
         });
 
-        return Object.values(pairs)
+        return Object.values(sets)
+            .filter(set => set.count > 1) // Only show if more than 1 joint sale
+            .filter(set => {
+                if (!searchTerm) return true;
+                return set.items.some(itemName => 
+                    itemName.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            })
             .sort((a, b) => b.count - a.count);
-    }, [receipts]);
+    }, [receipts, searchTerm]);
 
     return (
         <Card className="shadow-md">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <ShoppingBag className="h-5 w-5 text-primary" />
-                    Market Basket Analysis
-                </CardTitle>
-                <CardDescription>Discover which products are frequently bought together.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5 text-primary" />
+                        Market Basket Analysis
+                    </CardTitle>
+                    <CardDescription>Discover which products are frequently bought together.</CardDescription>
+                </div>
+                <div className="relative w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search products..."
+                        className="pl-9 h-9 text-xs bg-muted/20"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </CardHeader>
             <CardContent>
-                {topPairs.length > 0 ? (
+                {topSets.length > 0 ? (
                     <div className="space-y-4">
                         <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-center gap-3">
                             <Zap className="h-5 w-5 text-primary animate-pulse" />
@@ -67,27 +92,28 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
 
                         <ScrollArea className="h-[350px] pr-4">
                             <div className="space-y-3">
-                                {topPairs.map((pair, index) => (
+                                {topSets.map((set, index) => (
                                     <div key={index} className="relative p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors mb-3">
                                         <div className="flex items-center justify-between gap-4">
-                                            <div className="flex flex-wrap items-center gap-2 min-w-0">
-                                                <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameA}>
-                                                    {pair.nameA}
-                                                </Badge>
-                                                <Plus className="h-3 w-3 text-muted-foreground" />
-                                                <Badge variant="secondary" className="max-w-[140px] truncate" title={pair.nameB}>
-                                                    {pair.nameB}
-                                                </Badge>
+                                            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                                                {set.items.map((itemName, i) => (
+                                                    <React.Fragment key={i}>
+                                                        <Badge variant="secondary" className="max-w-[120px] truncate bg-muted/40" title={itemName}>
+                                                            {itemName}
+                                                        </Badge>
+                                                        {i < set.items.length - 1 && <Plus className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                                    </React.Fragment>
+                                                ))}
                                             </div>
                                             <div className="flex-shrink-0 text-right">
-                                                <p className="text-lg font-bold text-primary">{pair.count}</p>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Joint Sales</p>
+                                                <p className="text-lg font-bold text-primary leading-none">{set.count}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-1">Joint Sales</p>
                                             </div>
                                         </div>
                                         <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
                                             <div 
                                                 className="h-full bg-primary/40 rounded-full" 
-                                                style={{ width: `${(pair.count / topPairs[0].count) * 100}%` }}
+                                                style={{ width: `${(set.count / topSets[0].count) * 100}%` }}
                                             />
                                         </div>
                                     </div>
@@ -98,7 +124,13 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                 ) : (
                     <div className="text-center py-12 text-muted-foreground">
                         <ShoppingBag className="mx-auto h-12 w-12 opacity-20 mb-3" />
-                        <p className="text-sm">Not enough multi-item sales yet to detect significant product pairings.</p>
+                        <p className="text-sm">
+                            {searchTerm 
+                                ? "No product pairings found matching your search." 
+                                : "Not enough multi-item sales yet to detect significant product pairings."
+                            }
+                        </p>
+                        <p className="text-xs mt-1">Only sets with more than 1 joint sale are shown.</p>
                     </div>
                 )}
             </CardContent>

@@ -153,7 +153,6 @@ function EditProductContent() {
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-    const [isDangerZoneVisible, setIsDangerZoneVisible] = React.useState(false);
     const [stockLogs, setStockLogs] = React.useState<AuditLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
 
@@ -167,9 +166,9 @@ function EditProductContent() {
         const stockQuery = query(
             collection(firestore, 'businessInstances', business.id, 'auditLogs'),
             where('entityId', '==', product.id),
-            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update']),
+            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update', 'product.bulk_update']),
             orderBy('createdAt', 'desc'),
-            limit(20)
+            limit(50)
         );
 
         // Fallback timer for offline/slow connection to prevent infinite spinner
@@ -183,7 +182,12 @@ function EditProductContent() {
             // Filter to ensure we only show logs that actually affected stock or are explicit adjustments
             const filtered = logs.filter(log => {
                 if (log.action === 'product.stock_adjustment' || log.action === 'product.create') return true;
-                if (log.action === 'product.update' && (log.details?.adjustment !== undefined || log.details?.newStock !== undefined)) return true;
+                if (log.action === 'product.update' || log.action === 'product.bulk_update') {
+                    // Show if it explicitly mentions stock or adjustment
+                    return log.details?.adjustment !== undefined || 
+                           log.details?.newStock !== undefined || 
+                           log.details?.stock !== undefined;
+                }
                 return false;
             });
             setStockLogs(filtered);
@@ -204,7 +208,7 @@ function EditProductContent() {
                 id: a.id,
                 ...a.payload,
                 isPending: true,
-                createdAt: { toDate: () => new Date(parseInt(a.id.substring(0, 13))) }
+                createdAt: { toDate: () => new Date(a.timestamp) }
             }));
 
         const all = [...pendingLogs, ...stockLogs];
@@ -395,6 +399,12 @@ function EditProductContent() {
                         <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
                             Discard
                         </Button>
+                        {canManageProduct && (
+                            <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                            </Button>
+                        )}
                         {canManageProduct && (
                             <Button size="lg" type="submit" disabled={isSaving}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -817,43 +827,7 @@ function EditProductContent() {
                             </Card>
                         )}
 
-                        <div className="pt-4 mt-4 border-t border-muted">
-                            <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                className="text-muted-foreground hover:bg-muted hover:text-foreground w-full justify-between"
-                                onClick={() => setIsDangerZoneVisible(!isDangerZoneVisible)}
-                            >
-                                <span className="text-xs font-medium uppercase tracking-wider">Advanced Options</span>
-                                <AlertCircle className={cn("h-4 w-4 transition-transform duration-200", isDangerZoneVisible && "rotate-180")} />
-                            </Button>
-                            
-                            {isDangerZoneVisible && (
-                                <Card className="mt-4 border-destructive/10 bg-muted/30 shadow-none">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                            Danger Zone
-                                        </CardTitle>
-                                        <CardDescription className="text-xs">
-                                            Irreversible actions. Be careful.
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            className="w-full text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs h-8"
-                                            onClick={() => setIsDeleteDialogOpen(true)}
-                                            disabled={!canManageProduct || isSaving}
-                                        >
-                                            <Trash2 className="mr-2 h-3 w-3" />
-                                            Delete {categoryType === 'service' ? 'Service' : 'Product'}
-                                        </Button>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
+
                     </div>
                 </div>
 
@@ -899,8 +873,8 @@ function EditProductContent() {
                                         combinedLogs.map((log: any) => {
                                             const adjustment = log.details?.adjustment !== undefined 
                                                 ? log.details.adjustment 
-                                                : (log.action === 'product.create' ? log.details?.stock : undefined);
-                                            const isAddition = adjustment > 0;
+                                                : (log.action === 'product.create' ? log.details?.stock : (log.details?.newStock !== undefined && log.details?.oldStock !== undefined ? log.details.newStock - log.details.oldStock : undefined));
+                                            const isAddition = adjustment !== undefined && adjustment > 0;
                                             
                                             return (
                                                 <TableRow key={log.id} className="hover:bg-muted/20">
@@ -955,6 +929,12 @@ function EditProductContent() {
                     <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
                         Discard
                     </Button>
+                    {canManageProduct && (
+                        <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                        </Button>
+                    )}
                     {canManageProduct && (
                         <Button size="lg" type="submit" disabled={isSaving}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
