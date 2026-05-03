@@ -98,7 +98,7 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
     const hasData = classA.length > 0 || classB.length > 0 || classC.length > 0;
 
     return (
-        <Card className="border-primary/5">
+        <Card className="border-primary/5 overflow-hidden w-full">
             <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -209,9 +209,9 @@ function CategoryTable({ products, currencySymbol, onRowClick }: { products: Pro
         return <div className="text-center text-muted-foreground py-10">No products found.</div>
     }
     return (
-        <ScrollArea className="h-[400px]">
-            <div className="overflow-x-auto">
-                <Table className="min-w-[500px]">
+        <div className="h-[400px] overflow-auto border rounded-md">
+            <div className="min-w-[600px]">
+                <Table>
                 <TableHeader className="bg-muted/50">
                     <TableRow>
                         <TableHead>Product</TableHead>
@@ -248,6 +248,6 @@ function CategoryTable({ products, currencySymbol, onRowClick }: { products: Pro
                 </TableBody>
             </Table>
         </div>
-    </ScrollArea>
+    </div>
 );
 }
