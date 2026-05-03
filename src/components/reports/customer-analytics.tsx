@@ -161,17 +161,28 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
                         <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
                     </div>
                     <div className="overflow-x-auto border rounded-lg p-4 bg-muted/20">
-                        <div className="min-w-[500px] md:min-w-full h-[400px] w-full">
+                        <div className="min-w-[600px] md:min-w-full h-[400px] w-full">
                             {acquisitionData.length > 0 ? (
                                 <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
                                     <BarChart data={acquisitionData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                         <XAxis 
                                             dataKey="day" 
-                                            tickFormatter={(val) => val.split('-').slice(1).join('/')}
+                                            tickFormatter={(val) => {
+                                                const parts = val.split('-');
+                                                if (parts.length < 3) return val;
+                                                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                                const m = parseInt(parts[1]) - 1;
+                                                const d = parseInt(parts[2]);
+                                                return `${monthNames[m]} ${d}`;
+                                            }}
                                             tickLine={false}
                                             axisLine={false}
-                                            tickMargin={8}
+                                            tickMargin={12}
+                                            angle={-45}
+                                            textAnchor="end"
+                                            height={60}
+                                            fontSize={10}
                                         />
                                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                                         <ChartTooltip content={<ChartTooltipContent />} />
