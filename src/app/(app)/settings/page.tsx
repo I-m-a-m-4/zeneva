@@ -189,7 +189,7 @@ function SettingsPageContent() {
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
         if (business?.settings) {
-            setBusinessName(business.name || '');
+            setBusinessName((business.name || '').replace(/\s+Business$/i, ''));
             setBusinessAddress(business.address || '');
             setBusinessPhone(business.settings?.phone || '');
             setBusinessEmail(business.settings?.email || '');
@@ -511,6 +511,28 @@ function SettingsPageContent() {
         setProductCategories(productCategories.filter(c => c !== catToDelete));
     }
 
+    const processedSessions = React.useMemo(() => {
+        const groups = new Map<string, any>();
+
+        sessions.forEach(session => {
+            const deviceType = formatUA(session.userAgent || 'Unknown');
+            const platform = session.deviceInfo?.platform || 'Unknown OS';
+            const key = `${deviceType}-${platform}`;
+
+            const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
+            const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
+            const isCurrent = session.id === currentSessionId;
+
+            if (!groups.has(key)) {
+                groups.set(key, session);
+            } else if (isCurrent) {
+                groups.set(key, session);
+            }
+        });
+
+        return Array.from(groups.values());
+    }, [sessions, currentUserProfile?.id]);
+
     return (
         <div className="space-y-6">
             <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
@@ -518,7 +540,7 @@ function SettingsPageContent() {
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Business Profile</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Profile</CardTitle>
                         <CardDescription>Manage your store's fundamental information and branding.</CardDescription>
                     </CardHeader>
 
@@ -818,14 +840,14 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-4">
-                            {sessions.length === 0 ? (
+                            {processedSessions.length === 0 ? (
                                 <div className="text-center py-6 text-muted-foreground">
                                     No active sessions found.
                                 </div>
                             ) : (
                                 <>
                                     <div className="grid gap-4">
-                                        {(showAllSessions ? sessions : sessions.slice(0, 3)).map((session) => {
+                                        {(showAllSessions ? processedSessions : processedSessions.slice(0, 3)).map((session) => {
                                             const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
                                             const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
                                             const isCurrent = session.id === currentSessionId;
@@ -872,7 +894,7 @@ function SettingsPageContent() {
                                         })}
                                     </div>
                                     
-                                    {sessions.length > 3 && (
+                                    {processedSessions.length > 3 && (
                                         <Button 
                                             variant="outline" 
                                             className="w-full mt-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200"
@@ -881,7 +903,7 @@ function SettingsPageContent() {
                                             {showAllSessions ? (
                                                 <>Show Less</>
                                             ) : (
-                                                <>Show More ({sessions.length - 3} more)</>
+                                                <>Show More ({processedSessions.length - 3} more)</>
                                             )}
                                         </Button>
                                     )}
