@@ -386,21 +386,37 @@ export default function AuthenticatedLayout({
       const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
       const permissions = currentUserProfile.permissions || {};
       
-      // Check if this specific route is granted via a granular override
+      // 1. Check for explicit granular DENIAL (Highest Priority)
+      const isExplicitlyDenied = 
+        (protectedRoute.startsWith('/sales') && permissions.record_sales === false) ||
+        (protectedRoute === '/reports' && permissions.view_reports === false) ||
+        (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === false) ||
+        (protectedRoute === '/customers' && permissions.view_customers === false) ||
+        (protectedRoute === '/audit-log' && permissions.view_audit_logs === false) ||
+        (protectedRoute === '/online-orders' && permissions.manage_online_orders === false);
+
+      // 2. Check for explicit granular ALLOWANCE
       const isExplicitlyAllowed = 
         (protectedRoute === '/reports' && permissions.view_reports === true) ||
         (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === true) ||
         (protectedRoute === '/customers' && permissions.view_customers === true) ||
         (protectedRoute === '/audit-log' && permissions.view_audit_logs === true) ||
-        (protectedRoute === '/online-orders' && permissions.manage_online_orders === true);
+        (protectedRoute === '/online-orders' && permissions.manage_online_orders === true) ||
+        (protectedRoute.startsWith('/sales') && permissions.record_sales === true);
 
-      if (!allowedRoles.includes(userRole) && !isExplicitlyAllowed) {
+      // Final decision logic
+      const hasAccess = isSuperAdmin || (allowedRoles.includes(userRole) && !isExplicitlyDenied) || isExplicitlyAllowed;
+
+      if (!hasAccess) {
         toast({
           variant: "destructive",
           title: "Access Denied",
           description: "You do not have permission to view this page.",
         });
-        router.replace('/sales/pos/select-products');
+        
+        // If they can't access POS, send them to dashboard. Otherwise send to POS.
+        const canAccessPos = permissions.record_sales !== false && (userRole === 'admin' || userRole === 'manager' || userRole === 'vendor_operator');
+        router.replace(canAccessPos ? '/sales/pos/select-products' : '/dashboard');
       }
     }
   }, [pathname, currentUserProfile, isLoading, isUserLoading, router, toast]);
@@ -587,6 +603,7 @@ export default function AuthenticatedLayout({
     
     return items.filter(item => {
       // 1. Explicitly Enabled Override
+      if (item.href.startsWith('/sales') && permissions.record_sales === true) return true;
       if (item.href === '/reports' && permissions.view_reports === true) return true;
       if (item.href.startsWith('/inventory') && permissions.manage_inventory === true) return true;
       if (item.href === '/customers' && permissions.view_customers === true) return true;
@@ -598,6 +615,7 @@ export default function AuthenticatedLayout({
       if (!roleMatch) return false;
 
       // 3. Explicitly Disabled Override (for roles that have it by default)
+      if (item.href.startsWith('/sales') && permissions.record_sales === false) return false;
       if (item.href === '/reports' && permissions.view_reports === false) return false;
       if (item.href.startsWith('/inventory') && permissions.manage_inventory === false) return false;
       if (item.href === '/customers' && permissions.view_customers === false) return false;

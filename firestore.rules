@@ -57,6 +57,11 @@ service cloud.firestore {
               get(/databases/$(database)/documents/businessInstances/$(businessId)).data.get('status', 'active') in ['active', 'trialing']);
     }
 
+    function hasPermission(permission) {
+      return isSuperAdmin() || 
+             getUserData().get('permissions', {}).get(permission, true) != false;
+    }
+
     // =================================================================
     // Public & Admin-Only Collections
     // =================================================================
@@ -169,12 +174,17 @@ service cloud.firestore {
       
       allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
+                      hasPermission('manage_inventory') &&
                       isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
                       isSubscriptionActive(request.resource.data.get('businessId', null)));
-      allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserStaff() && 
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && 
+                      isRequestingUserStaff() && 
+                      hasPermission('manage_inventory') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                       isSubscriptionActive(resource.data.get('businessId', null)));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserManager() && 
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
+                      isRequestingUserManager() && 
+                      hasPermission('manage_inventory') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                       isSubscriptionActive(resource.data.get('businessId', null)));
     }
@@ -185,9 +195,11 @@ service cloud.firestore {
         
         allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                         isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
+                        hasPermission('record_sales') &&
                         isSubscriptionActive(request.resource.data.get('businessId', null)));
         allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && 
                                 isRequestingUserManager() && 
+                                hasPermission('record_sales') &&
                                 isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                                 isSubscriptionActive(resource.data.get('businessId', null)));
     }
@@ -196,13 +208,15 @@ service cloud.firestore {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && (isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
       allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
       
-      allow create: if isUserAuthenticated(); 
+      allow create: if isUserAuthenticated() && hasPermission('view_customers'); 
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
+                      hasPermission('view_customers') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                       isSubscriptionActive(resource.data.get('businessId', null)));
       allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserManager() && 
+                      hasPermission('view_customers') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                       isSubscriptionActive(resource.data.get('businessId', null)));
     }

@@ -655,6 +655,34 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true;
     if (!isSubscriptionActive) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'Your subscription has expired.' }); return null; }
     
+    // --- RBAC Permission Check ---
+    const permissions = currentUserProfile?.permissions || {};
+    const userRole = currentUserProfile?.role;
+    const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
+    
+    if (!isSuperAdmin) {
+      // 1. Record Sales check
+      if (action.type === 'complete-sale' && permissions.record_sales === false) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to record sales.' });
+        return null;
+      }
+      
+      // 2. Manage Inventory check
+      const inventoryActions = ['add-product', 'update-product', 'delete-product', 'bulk-update-products'];
+      if (inventoryActions.includes(action.type) && permissions.manage_inventory === false) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to manage inventory.' });
+        return null;
+      }
+
+      // 3. Customer Management check
+      const customerActions = ['add-customer', 'update-customer', 'delete-customer'];
+      if (customerActions.includes(action.type) && permissions.view_customers === false) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to manage customers.' });
+        return null;
+      }
+    }
+    // --- End RBAC Check ---
+
     const id = uuidv4();
     const newAction: QueuedAction = { ...action, description, id, timestamp: Date.now(), status: 'pending' };
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
@@ -667,7 +695,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     
     return id;
-  }, [businessId, business, toast, processQueue]);
+  }, [businessId, business, toast, processQueue, currentUserProfile]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // If there's an image, we handle it. Ideally in background but for now let's just queue the data.
