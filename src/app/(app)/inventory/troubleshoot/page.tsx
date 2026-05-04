@@ -104,8 +104,11 @@ export default function TroubleshootPage() {
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && currentUserProfile?.role === 'vendor_operator') {
-            router.push('/dashboard');
+        if (!isLoading && currentUserProfile) {
+            const hasPermission = currentUserProfile.permissions?.manage_inventory ?? (currentUserProfile.role === 'admin' || currentUserProfile.role === 'manager');
+            if (!hasPermission) {
+                router.push('/dashboard');
+            }
         }
     }, [currentUserProfile, isLoading, router]);
 

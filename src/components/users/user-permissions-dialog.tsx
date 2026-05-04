@@ -88,7 +88,7 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
         // Define default capabilities based on role (matching the system's baseline roles)
         const defaults: Record<string, string[]> = {
             view_reports: ['admin', 'owner'],
-            manage_inventory: ['admin', 'manager', 'vendor_operator'],
+            manage_inventory: ['admin', 'manager'],
             view_customers: ['admin', 'manager', 'vendor_operator'],
             view_audit_logs: ['admin'],
             manage_online_orders: ['admin', 'manager'],

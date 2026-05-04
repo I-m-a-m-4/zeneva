@@ -169,9 +169,8 @@ const features = [
         iconColor: "text-sky-600"
     },
     {
-        icon: UserCog,
-        title: "User & Role Management",
-        description: "Securely manage your team by inviting staff and assigning roles like 'Admin', 'Manager', or 'Vendor Operator', each with specific, pre-set permissions.",
+        title: "Granular User Permissions",
+        description: "Control exactly what your staff can see or do. Assign roles like 'Admin', 'Manager', or 'Vendor Operator', then customize granular permissions for inventory, reports, and sales.",
         bgColor: "bg-yellow-100",
         iconColor: "text-yellow-600"
     },
@@ -654,9 +653,8 @@ export default function Home() {
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
-                                        icon: UserCog,
-                                        title: "User & Role Management",
-                                        description: "Securely manage your team by inviting staff and assigning roles with specific permissions.",
+                                        title: "Granular User Permissions",
+                                        description: "Securely manage your team by inviting staff and assigning roles with granular permissions for inventory, reports, and sales.",
                                         bgColor: "bg-yellow-100",
                                         iconColor: "text-yellow-600",
                                         hoverBg: "bg-[#FFF1F2]" // Light Pink

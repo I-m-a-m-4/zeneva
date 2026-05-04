@@ -517,20 +517,26 @@ function SettingsPageContent() {
         sessions.forEach(session => {
             const deviceType = formatUA(session.userAgent || 'Unknown');
             const platform = session.deviceInfo?.platform || 'Unknown OS';
-            const key = `${deviceType}-${platform}`;
+            // Group by device type and platform more aggressively
+            const key = `${deviceType}-${platform}`.toLowerCase();
 
             const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
             const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
             const isCurrent = session.id === currentSessionId;
 
-            if (!groups.has(key)) {
-                groups.set(key, session);
-            } else if (isCurrent) {
+            // Priority: 1. Current Session, 2. Latest active session for that device
+            if (isCurrent || !groups.has(key)) {
                 groups.set(key, session);
             }
         });
 
-        return Array.from(groups.values());
+        return Array.from(groups.values()).sort((a, b) => {
+            const currentSessionIdKey = `zeneva_session_id_${currentUserProfile?.id}`;
+            const currentSessionId = typeof window !== 'undefined' ? sessionStorage.getItem(currentSessionIdKey) : null;
+            if (a.id === currentSessionId) return -1;
+            if (b.id === currentSessionId) return 1;
+            return (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0);
+        });
     }, [sessions, currentUserProfile?.id]);
 
     return (

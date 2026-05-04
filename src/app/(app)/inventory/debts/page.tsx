@@ -68,17 +68,25 @@ export default function DebtsPage() {
     const isLoading = isDataLoading || isUserLoading;
 
     React.useEffect(() => {
-        if (!isLoading && currentUserProfile?.role === 'vendor_operator') {
-            router.push('/dashboard');
+        if (!isLoading && currentUserProfile) {
+            const hasPermission = currentUserProfile.permissions?.manage_inventory ?? (currentUserProfile.role === 'admin' || currentUserProfile.role === 'manager');
+            if (!hasPermission) {
+                router.push('/dashboard');
+            }
         }
     }, [currentUserProfile, isLoading, router]);
 
-    if (isLoading || currentUserProfile?.role === 'vendor_operator') {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
+    }
+
+    const hasDebtPermission = currentUserProfile?.permissions?.manage_inventory ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager');
+    if (!hasDebtPermission) {
+        return null; // Effect will handle redirect
     }
     const [searchTerm, setSearchTerm] = React.useState('');
     const [isRefreshing, setIsRefreshing] = React.useState(false);

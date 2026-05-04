@@ -251,8 +251,7 @@ function InventoryPageContent() {
 
   // Subscription logic removed here as it is now handled by the root layout's subscription guard overlay.
 
-  const userRole = currentUserProfile?.role;
-  const canManageStock = userRole === 'admin' || userRole === 'manager';
+  const canManageStock = currentUserProfile?.permissions?.manage_inventory ?? (userRole === 'admin' || userRole === 'manager');
 
   // Get IDs of products queued for deletion
   const queuedDeletionIds = React.useMemo(() => {

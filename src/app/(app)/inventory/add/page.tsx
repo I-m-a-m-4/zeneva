@@ -101,9 +101,12 @@ export default function AddProductPage() {
   const userProfile = currentUserProfile;
 
   React.useEffect(() => {
-    if (userProfile && userProfile.role === 'vendor_operator') {
-      toast({ variant: 'destructive', title: 'Permission Denied', description: 'Vendor operators cannot add products.' });
-      router.push('/inventory');
+    if (userProfile) {
+      const hasPermission = userProfile.permissions?.manage_inventory ?? (userProfile.role === 'admin' || userProfile.role === 'manager');
+      if (!hasPermission) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
+        router.push('/inventory');
+      }
     }
   }, [userProfile, router, toast]);
 
@@ -222,8 +225,8 @@ export default function AddProductPage() {
       return;
     }
 
-    const canAddProduct = userProfile.role === 'admin' || userProfile.role === 'manager';
-    if (!canAddProduct) {
+    const hasInventoryPermission = userProfile.permissions?.manage_inventory ?? (userProfile.role === 'admin' || userProfile.role === 'manager');
+    if (!hasInventoryPermission) {
       toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
       router.push('/inventory');
       return;

@@ -335,7 +335,8 @@ export default function DashboardPage() {
 
   const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
 
-  const isRestricted = currentUserProfile?.role === 'manager' || currentUserProfile?.role === 'vendor_operator';
+  const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
+  const isRestricted = !hasReportPermission;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1 pb-10 sm:pb-1">

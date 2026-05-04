@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddUserDialog from '@/components/users/add-user-dialog';
 import UserPermissionsDialog from '@/components/users/user-permissions-dialog';
+import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +59,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
 import { usePOS } from '@/context/pos-context';
+import { Separator } from '@/components/ui/separator';
 
 
 function UserRowSkeleton() {
@@ -147,6 +149,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [userPermissionsToUpdate, setUserPermissionsToUpdate] = React.useState<UserProfile | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
     const [isUpdatingRole, setIsUpdatingRole] = React.useState(false);
+    const [openMenuUserId, setOpenMenuUserId] = React.useState<string | null>(null);
 
     const { business: businessInstance, currentUserProfile, isLoading: isPosLoading } = usePOS();
 
@@ -306,6 +309,10 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                 <strong>Store Staff:</strong> Strictly authorized to record sales and manage POS transactions. No access to product creation, stock adjustments, or financial reports.
                             </p>
                         </div>
+                        <Separator className="my-2" />
+                        <p className="text-[10px] text-muted-foreground italic leading-tight">
+                            * Baseline capabilities can be customized or extended for individual staff members using the <strong>Manage Permissions</strong> action in the staff list.
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -391,7 +398,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu>
+                                                <DropdownMenu open={openMenuUserId === user.id} onOpenChange={(open) => setOpenMenuUserId(open ? user.id : null)}>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button
                                                             aria-haspopup="true"
@@ -406,7 +413,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                         {user.status === 'inactive' ? (
-                                                            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'activate' }); }}>
+                                                            <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserToUpdate({ user, action: 'activate' })}>
                                                                 <UserCheck className="mr-2 h-4 w-4" /> Activate User
                                                             </DropdownMenuItem>
                                                         ) : (
@@ -420,13 +427,13 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                                             <DropdownMenuSubContent>
                                                                                 <DropdownMenuItem 
                                                                                     disabled={user.role === 'manager'}
-                                                                                    onSelect={(e) => { e.preventDefault(); setUserRoleToUpdate({ user, newRole: 'manager' }); }}
+                                                                                    onSelect={() => setUserRoleToUpdate({ user, newRole: 'manager' })}
                                                                                 >
                                                                                     <ShieldCheck className="mr-2 h-4 w-4" /> Manager
                                                                                 </DropdownMenuItem>
                                                                                 <DropdownMenuItem 
                                                                                     disabled={user.role === 'vendor_operator'}
-                                                                                    onSelect={(e) => { e.preventDefault(); setUserRoleToUpdate({ user, newRole: 'vendor_operator' }); }}
+                                                                                    onSelect={() => setUserRoleToUpdate({ user, newRole: 'vendor_operator' })}
                                                                                 >
                                                                                     <ShieldAlert className="mr-2 h-4 w-4" /> Vendor Operator
                                                                                 </DropdownMenuItem>
@@ -435,11 +442,11 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                                     </DropdownMenuSub>
                                                                 )}
                                                                 {currentUserProfile?.role === 'admin' && (
-                                                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserPermissionsToUpdate(user); }}>
+                                                                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserPermissionsToUpdate(user)}>
                                                                         <Shield className="mr-2 h-4 w-4" /> Manage Permissions
                                                                     </DropdownMenuItem>
                                                                 )}
-                                                                <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
+                                                                <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={() => setUserToUpdate({ user, action: 'deactivate' })}>
                                                                     <UserX className="mr-2 h-4 w-4" /> Deactivate User
                                                                 </DropdownMenuItem>
                                                             </>

@@ -140,10 +140,10 @@ export default function DownloadPage() {
   };
 
   const latestReleaseUrl = "https://github.com/I-m-a-m-4/zeneva/releases";
-  const windowsDownloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
-  const macDownloadUrlIntel = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
-  const macDownloadUrlSilicon = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
-  const androidDownloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
+  const windowsDownloadUrl = `/api/download/windows`;
+  const macDownloadUrlIntel = `/api/download/macos-intel`;
+  const macDownloadUrlSilicon = `/api/download/macos-silicon`;
+  const androidDownloadUrl = `/api/download/android`;
 
   const scrollToDownloads = () => {
     document.getElementById('downloads')?.scrollIntoView({ behavior: 'smooth' });
@@ -230,7 +230,7 @@ export default function DownloadPage() {
                             <div className="px-5 sm:px-6 flex flex-col justify-center flex-grow py-1">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="text-3xl font-bold mb-1">v1.8.3</div>
+                                        <div className="text-3xl font-bold mb-1">v1.8.5</div>
                                         <span className="text-[8px] font-bold tracking-[0.2em] text-orange-600 uppercase">Hardware Preview</span>
                                     </div>
                                     <h4 className="text-slate-950 font-medium text-lg sm:text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
@@ -343,7 +343,7 @@ export default function DownloadPage() {
                 <div className="w-full border-x-[2.5px] border-dashed border-slate-200">
                     {/* Upper Header Bar */}
                     <div className="flex items-center px-12 h-16 border-b-[2.5px] border-dashed border-slate-200">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.2</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.5</span>
                     </div>
 
                     <div className="grid lg:grid-cols-2">
