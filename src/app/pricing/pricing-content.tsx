@@ -187,6 +187,7 @@ export default function PricingContent() {
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
+                                    <li className="flex items-center gap-3 text-slate-700 font-semibold"><Check className="h-5 w-5 text-primary" /> Granular Staff Permissions (RBAC)</li>
                                 </ul>
                                 <div className="mt-auto pt-8">
                                     <Button asChild size="lg" className="w-full">
@@ -215,6 +216,7 @@ export default function PricingContent() {
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
+                                    <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Granular Role-Based Access Control</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
                                 </ul>
                                 <div className="mt-auto pt-8">

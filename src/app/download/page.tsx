@@ -143,6 +143,7 @@ export default function DownloadPage() {
   const windowsDownloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
   const macDownloadUrlIntel = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
   const macDownloadUrlSilicon = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
+  const androidDownloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
 
   const scrollToDownloads = () => {
     document.getElementById('downloads')?.scrollIntoView({ behavior: 'smooth' });
@@ -358,9 +359,11 @@ export default function DownloadPage() {
                                         Zeneva is a multi-store retail platform built for high-volume transactions at busy retail locations such as supermarkets, shopping malls, and large-scale boutique outlets.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md">
-                                    Download Zeneva (113MB)
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
+                                    <a href={windowsDownloadUrl}>
+                                        Download Zeneva (113MB)
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </a>
                                 </Button>
                             </div>
 
@@ -441,7 +444,7 @@ export default function DownloadPage() {
                                     </p>
                                 </div>
                                 <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                    <a href={latestReleaseUrl}>
+                                    <a href={macDownloadUrlSilicon}>
                                         Download Zeneva (116MB)
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
@@ -525,7 +528,7 @@ export default function DownloadPage() {
                                     </p>
                                 </div>
                                 <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                    <a href={latestReleaseUrl}>
+                                    <a href={androidDownloadUrl}>
                                         Download Zeneva (132MB)
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </a>
