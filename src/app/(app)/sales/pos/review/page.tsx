@@ -23,7 +23,7 @@ import { logAuditEvent } from '@/lib/audit';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint, addToQueue } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
@@ -389,6 +389,12 @@ function ReviewPageContent() {
                         <Button size="lg" className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all" onClick={handleCompleteSale} disabled={isCompleting}>
                             {isCompleting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                             {isCompleting ? 'Finalizing...' : (paymentMethod === 'Invoice' ? 'Issue Professional Invoice' : 'Complete Sale')}
+                        </Button>
+                        <Button size="lg" className="w-full h-12" variant="outline" onClick={() => {
+                            holdCurrentSale();
+                            router.push('/sales/pos/select-products');
+                        }} disabled={isCompleting}>
+                            Park Sale
                         </Button>
                         <Button size="lg" className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/payment">Back to Payment</Link>

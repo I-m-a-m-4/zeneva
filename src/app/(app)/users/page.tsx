@@ -59,7 +59,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
 import { usePOS } from '@/context/pos-context';
-import { Separator } from '@/components/ui/separator';
 
 
 function UserRowSkeleton() {
@@ -398,7 +397,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu open={openMenuUserId === user.id} onOpenChange={(open) => setOpenMenuUserId(open ? user.id : null)}>
+                                                <DropdownMenu modal={false} open={openMenuUserId === user.id} onOpenChange={(open) => setOpenMenuUserId(open ? user.id : null)}>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button
                                                             aria-haspopup="true"

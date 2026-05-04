@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import *as React from "react";
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
 import { QrCode } from "lucide-react";
 import { ImageDialog } from "@/components/shared/image-dialog";
+import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
 
 
 function ProductCardSkeleton() {
@@ -123,7 +124,19 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 ProductItem.displayName = 'ProductItem';
 
 const CartContents = () => {
-    const { cart, removeFromCart, updateQuantity, subtotal, currencySymbol, clearCart } = usePOS();
+    const { 
+        cart, 
+        removeFromCart, 
+        updateQuantity, 
+        subtotal, 
+        currencySymbol, 
+        clearCart,
+        holdCurrentSale,
+        heldSales,
+        resumeHeldSale,
+        deleteHeldSale
+    } = usePOS();
+
     return (
         <>
             {cart.length === 0 ? (
@@ -133,7 +146,18 @@ const CartContents = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <div className="flex justify-end">
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => holdCurrentSale()}
+                                className="h-8 gap-1.5 px-2 text-xs font-medium border-dashed"
+                            >
+                                <Archive className="h-3.5 w-3.5" />
+                                Hold
+                            </Button>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -195,7 +219,11 @@ export default function SelectProductsPage() {
         searchProductsByField,
         findProductBySku,
         fetchMoreProducts,
-        isSyncing
+        isSyncing,
+        heldSales,
+        resumeHeldSale,
+        deleteHeldSale,
+        holdCurrentSale
     } = usePOS();
     const router = useRouter();
     const { toast } = useToast();

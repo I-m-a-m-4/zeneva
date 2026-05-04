@@ -37,7 +37,8 @@ import {
   POS_AUTO_PRINT_KEY, 
   CURRENCY_SYMBOLS,
   USER_PROFILE_KEY,
-  BUSINESS_INSTANCE_KEY
+  BUSINESS_INSTANCE_KEY,
+  POS_HELD_SALES_KEY
 } from '@/lib/constants';
 import { safeToDate } from '@/lib/utils';
 
@@ -107,6 +108,10 @@ interface POSContextType {
   isImpersonating: boolean;
   isSubscriptionActive: boolean;
   firestore: any;
+  heldSales: HeldSale[];
+  holdCurrentSale: (notes?: string) => void;
+  resumeHeldSale: (heldSaleId: string) => void;
+  deleteHeldSale: (heldSaleId: string) => void;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -150,6 +155,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const s = secureStorage.getItem<boolean>(POS_AUTO_PRINT_KEY);
     return s === null ? true : s;
   });
+  const [heldSales, setHeldSales] = useState<HeldSale[]>(() => secureStorage.getItem<HeldSale[]>(POS_HELD_SALES_KEY) || []);
   const [lastUserId, setLastUserId] = useState<string | null>(null);
   const [isSubscriptionActiveFromRust, setIsSubscriptionActiveFromRust] = useState(true);
 
@@ -886,6 +892,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem(POS_DISCOUNT_KEY, discount); }, [discount]);
   useEffect(() => { secureStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); }, [paymentMethod]);
   useEffect(() => { secureStorage.setItem(POS_AUTO_PRINT_KEY, autoPrint); }, [autoPrint]);
+  useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
   
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -994,10 +1001,61 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const stopImpersonation = useCallback(() => {
     setImpersonatedUserId(null);
     sessionStorage.removeItem('zeneva_impersonated_user_id');
-    toast({ title: 'Impersonation Stopped', description: 'Returning to your profile.' });
+    toast({ title: 'Impersonation Ended', description: 'Returning to your administrator view.' });
     nuclearReset();
     triggerRefresh();
   }, [toast, nuclearReset, triggerRefresh]);
+
+  const holdCurrentSale = useCallback((notes?: string) => {
+    if (cart.length === 0) return;
+    
+    const newHeldSale: HeldSale = {
+      id: uuidv4(),
+      items: [...cart],
+      customer: selectedCustomer,
+      timestamp: Date.now(),
+      total: total,
+      notes
+    };
+    
+    setHeldSales(prev => {
+      const updated = [newHeldSale, ...prev];
+      secureStorage.setItem(POS_HELD_SALES_KEY, updated);
+      return updated;
+    });
+    
+    resetPOS();
+    toast({
+      title: "Sale Parked",
+      description: "You can resume this sale later from the 'Parked Sales' list.",
+    });
+  }, [cart, selectedCustomer, total, resetPOS, toast]);
+
+  const resumeHeldSale = useCallback((heldSaleId: string) => {
+    const saleToResume = heldSales.find(s => s.id === heldSaleId);
+    if (!saleToResume) return;
+    
+    // Clear current POS state then set to resumed sale
+    setCart(saleToResume.items);
+    setSelectedCustomer(saleToResume.customer || null);
+    
+    // Remove from held sales
+    const updatedHeldSales = heldSales.filter(s => s.id !== heldSaleId);
+    setHeldSales(updatedHeldSales);
+    secureStorage.setItem(POS_HELD_SALES_KEY, updatedHeldSales);
+    
+    toast({
+      title: "Sale Resumed",
+      description: "The parked items have been added back to your cart.",
+    });
+  }, [heldSales, toast]);
+
+  const deleteHeldSale = useCallback((heldSaleId: string) => {
+    const updated = heldSales.filter(s => s.id !== heldSaleId);
+    setHeldSales(updated);
+    secureStorage.setItem(POS_HELD_SALES_KEY, updated);
+  }, [heldSales]);
+
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
     if (!businessId || !firestore) return [];
@@ -1138,9 +1196,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
 
+    heldSales, holdCurrentSale, resumeHeldSale, deleteHeldSale,
+
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

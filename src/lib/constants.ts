@@ -15,3 +15,4 @@ export const POS_AUTO_PRINT_KEY = 'zeneva_pos_auto_print';
 export const QUEUED_ACTIONS_KEY = 'zeneva_offline_queue';
 export const USER_PROFILE_KEY = 'zeneva_user_profile';
 export const BUSINESS_INSTANCE_KEY = 'zeneva_business_instance';
+export const POS_HELD_SALES_KEY = 'zeneva_pos_held_sales';

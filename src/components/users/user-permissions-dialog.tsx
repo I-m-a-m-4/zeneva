@@ -17,7 +17,8 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/types';
-import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock } from 'lucide-react';
+import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock, ShoppingCart } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface PermissionItem {
     id: string;
@@ -27,6 +28,12 @@ interface PermissionItem {
 }
 
 const PERMISSIONS: PermissionItem[] = [
+    {
+        id: 'record_sales',
+        label: 'Record Sales (POS)',
+        description: 'Ability to process transactions and record sales in the Point of Sale.',
+        icon: <ShoppingCart className="h-4 w-4" />
+    },
     {
         id: 'view_reports',
         label: 'View Reports',
@@ -87,6 +94,7 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
     const getInitialValue = (permissionId: string, role: string) => {
         // Define default capabilities based on role (matching the system's baseline roles)
         const defaults: Record<string, string[]> = {
+            record_sales: ['admin', 'manager', 'vendor_operator'],
             view_reports: ['admin', 'owner'],
             manage_inventory: ['admin', 'manager'],
             view_customers: ['admin', 'manager', 'vendor_operator'],
@@ -166,8 +174,13 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
                         </div>
                         <DialogTitle>Access Control</DialogTitle>
                     </div>
-                    <DialogDescription>
-                        Grant or restrict specific functions for <strong>{user.name}</strong>.
+                    <DialogDescription asChild>
+                        <div className="text-sm text-muted-foreground">
+                            Grant or restrict specific functions for <strong>{user.name}</strong>.
+                            <Badge variant="outline" className="ml-2 capitalize text-[10px] py-0 h-4">
+                                Role: {user.role.replace('_', ' ')}
+                            </Badge>
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
 

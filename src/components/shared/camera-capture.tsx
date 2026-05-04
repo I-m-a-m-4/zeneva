@@ -28,11 +28,11 @@ export function CameraCapture({ onCapture, isProcessing = false }: CameraCapture
                 return;
             }
 
-            const objectUrl = URL.createObjectURL(file);
-            setPreview(objectUrl);
-
-            // Cleanup previous object URL to avoid leaks
-            return () => URL.revokeObjectURL(objectUrl);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 

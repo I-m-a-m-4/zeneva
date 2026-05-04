@@ -42,6 +42,15 @@ export interface CartItem {
     originalPrice?: number;
 }
 
+export interface HeldSale {
+    id: string;
+    items: CartItem[];
+    customer?: Customer | null;
+    timestamp: number;
+    total: number;
+    notes?: string;
+}
+
 export type TopSellingItem = Product & {
     quantitySold: number;
 };
@@ -292,6 +301,7 @@ export interface BusinessInstance {
         paymentBankCode?: string;
         paymentInstructions?: string;
         paystackSubaccount?: string;
+        usdToNgnRate?: number;
         vendorPolicyEnabled?: boolean;
         vendorPolicyText?: string;
         loyaltyProgramEnabled?: boolean;

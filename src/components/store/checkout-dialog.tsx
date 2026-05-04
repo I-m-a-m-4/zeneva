@@ -118,13 +118,22 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
     const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
         toast({ title: "Processing...", description: "Verifying your payment securely." });
         try {
+            const isUSD = business?.settings?.currency === 'USD';
+            const exchangeRate = business?.settings?.usdToNgnRate || 1500;
+            const expectedPaystackAmount = isUSD ? Math.round(total * exchangeRate * 100) : Math.round(total * 100);
+
             const verifyResponse = await fetch('https://zeneva.space/api/paystack/verify-transaction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference: transaction.reference, expectedAmount: total * 100, businessId: business?.id }),
+                body: JSON.stringify({ 
+                    reference: transaction.reference, 
+                    expectedAmount: expectedPaystackAmount, 
+                    businessId: business?.id,
+                    currency: isUSD ? 'NGN' : (business?.settings?.currency || 'NGN')
+                }),
             });
             const verifyResult = await verifyResponse.json();
-            if (!verifyResponse.ok || verifyResult.status !== 'success' || verifyResult.data.amount !== total * 100) {
+            if (!verifyResponse.ok || verifyResult.status !== 'success' || verifyResult.data.amount !== expectedPaystackAmount) {
                 throw new Error(verifyResult.message || 'Payment verification failed.');
             }
 
@@ -168,10 +177,20 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
                 return;
             }
 
+            // Calculate the amount and currency for Paystack
+            // If the store is in USD, we convert to NGN for Paystack processing
+            const isUSD = business?.settings?.currency === 'USD';
+            const exchangeRate = business?.settings?.usdToNgnRate || 1500;
+            const paystackAmount = isUSD ? Math.round(total * exchangeRate * 100) : Math.round(total * 100);
+            const paystackCurrency = isUSD ? 'NGN' : (business?.settings?.currency || 'NGN');
+
             initializePayment({
-                key: PAYSTACK_PUBLIC_KEY, email, amount: total * 100, currency: 'NGN',
+                key: PAYSTACK_PUBLIC_KEY, 
+                email, 
+                amount: paystackAmount, 
+                currency: paystackCurrency,
                 reference: `z-${business.id.substring(0, 6)}-${Date.now()}`,
-                subaccount: business?.settings?.paystackSubaccount,
+                subaccount: business?.settings?.paystackSubaccount, // Subaccount is NGN-based, so this is now safe
                 onSuccess: handleSuccessfulPayment,
                 onClose: () => setIsSubmitting(false),
             });
@@ -196,9 +215,8 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         onOpenChange(open);
     }
 
-    const hasPaystack = business?.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5;
     const hasBankDetails = business?.settings?.paymentBankName && business.settings?.paymentBankAccountId;
-
+    const currencySymbol = business?.settings?.currency === 'USD' ? '$' : '₦';
     if (!business) return null;
 
     return (
@@ -227,7 +245,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
                                                 <div className="flex flex-col text-left">
                                                     <div className="flex justify-between w-full">
                                                         <span>{opt.name}{opt.type === 'pickup' ? ' (Pickup)' : ''}</span>
-                                                        <span className="font-semibold ml-4">₦{opt.price.toLocaleString()}</span>
+                                                        <span className="font-semibold ml-4">{currencySymbol}{opt.price.toLocaleString()}</span>
                                                     </div>
                                                     {opt.type === 'pickup' && opt.location && (
                                                         <p className="text-xs text-muted-foreground">{opt.location}</p>
@@ -244,10 +262,15 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
                 <div className="mt-auto pt-4 space-y-4">
                     <Separator />
                     <div className="text-sm space-y-2">
-                        <div className="flex justify-between"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>Shipping</span><span>₦{shippingCost.toLocaleString()}</span></div>
-                        <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol}{subtotal.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>Shipping</span><span>{currencySymbol}{shippingCost.toLocaleString()}</span></div>
+                        <div className="flex justify-between font-bold text-lg"><span>Total</span><span>{currencySymbol}{total.toLocaleString()}</span></div>
                     </div>
+                    {business?.settings?.currency === 'USD' && (
+                        <p className="text-[10px] text-muted-foreground text-right italic -mt-3">
+                            You will be charged approximately ₦{(total * (business.settings.usdToNgnRate || 1500)).toLocaleString()} via Paystack
+                        </p>
+                    )}
 
                     <div className="mt-4 p-4 bg-muted/50 rounded-lg">
                         <h4 className="font-semibold mb-2">Payment Instructions</h4>
@@ -266,7 +289,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button onClick={handlePlaceOrder} disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {hasPaystack ? `Pay ₦${total.toLocaleString()}` : `Place Order`}
+                            {hasPaystack ? `Pay ${currencySymbol}${total.toLocaleString()}` : `Place Order`}
                         </Button>
                     </DialogFooter>
                 </div>

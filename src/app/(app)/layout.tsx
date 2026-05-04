@@ -46,6 +46,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CachedImage } from '@/components/shared/cached-image';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
 import { useFCM } from '@/hooks/use-fcm';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
+import { History } from 'lucide-react';
 
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -182,6 +186,30 @@ export default function AuthenticatedLayout({
       return () => clearTimeout(timer);
     }
   }, [user, isUserLoading, handleRequestFcmPermission]);
+
+  const [hasPermissionError, setHasPermissionError] = React.useState(false);
+  const [permissionErrorDetails, setPermissionErrorDetails] = React.useState<FirestorePermissionError | null>(null);
+
+  React.useEffect(() => {
+    const handlePermissionError = (error: FirestorePermissionError) => {
+      console.warn("Global Permission Error Caught:", error);
+      
+      // If the error is related to the current business, we might need to block access
+      if (error.path?.includes('businessInstances') || error.path?.includes('onlineOrders')) {
+        setHasPermissionError(true);
+        setPermissionErrorDetails(error);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Permission Error",
+          description: "You don't have permission to perform this action.",
+        });
+      }
+    };
+
+    errorEmitter.on('permission-error', handlePermissionError);
+    return () => errorEmitter.off('permission-error', handlePermissionError);
+  }, [toast]);
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
@@ -503,7 +531,7 @@ export default function AuthenticatedLayout({
     )
   }
 
-  if (businessInstance?.status === 'deleted') {
+  if (businessInstance?.status === 'deleted' || (hasPermissionError && !isLoading)) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md text-center shadow-lg">
@@ -511,13 +539,21 @@ export default function AuthenticatedLayout({
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
               <ShieldAlert className="h-10 w-10 text-destructive" />
             </div>
-            <CardTitle className="text-2xl font-bold">Business Deleted</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              {businessInstance?.status === 'deleted' ? "Business Deleted" : "Access Revoked"}
+            </CardTitle>
             <CardDescription>
-              The business associated with this account has been deleted by the owner.
+              {businessInstance?.status === 'deleted' 
+                ? "The business associated with this account has been deleted by the owner."
+                : "Your access to this business or resource has been revoked or expired."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">For security, you have been logged out. If you believe this is an error, please contact your business administrator.</p>
+            <p className="text-sm text-muted-foreground">
+              {hasPermissionError && permissionErrorDetails 
+                ? `Details: ${permissionErrorDetails.operation} on ${permissionErrorDetails.path}`
+                : "For security, please log out and contact your administrator if you believe this is an error."}
+            </p>
           </CardContent>
           <CardFooter>
             <Button onClick={handleLogout} className="w-full">
@@ -722,6 +758,14 @@ export default function AuthenticatedLayout({
                 <div className="flex items-center gap-1 md:gap-2 ml-auto">
                   <QueueStatus />
                   <NetworkStatusIndicator />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HeldSalesDrawer />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Parked Sales</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="Calculator" onClick={() => setIsCalculatorOpen(true)}>

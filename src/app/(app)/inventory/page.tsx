@@ -251,6 +251,7 @@ function InventoryPageContent() {
 
   // Subscription logic removed here as it is now handled by the root layout's subscription guard overlay.
 
+  const userRole = currentUserProfile?.role;
   const canManageStock = currentUserProfile?.permissions?.manage_inventory ?? (userRole === 'admin' || userRole === 'manager');
 
   // Get IDs of products queued for deletion
@@ -442,12 +443,16 @@ function InventoryPageContent() {
       );
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `zeneva-products-export-${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const url = reader.result as string;
+        link.setAttribute('href', url);
+        link.setAttribute('download', `zeneva-products-export-${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+      reader.readAsDataURL(blob);
       toast({
         variant: 'success',
         title: 'Export Complete',
