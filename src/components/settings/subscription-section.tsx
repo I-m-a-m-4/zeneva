@@ -17,6 +17,7 @@ import { useCallback, useState } from 'react';
 import usePaystack from '@/hooks/use-paystack';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
+import useDodoPayments from '@/hooks/use-dodopayments';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
@@ -238,6 +239,80 @@ const PaystackSubscriptionButton = ({
     )
 }
 
+const DodoSubscriptionButton = ({ 
+    plan, 
+    cycle,
+    userProfile, 
+    businessInstance, 
+    isCurrentPlan, 
+    isProcessing, 
+    setProcessingPlan
+}: { 
+    plan: typeof plans[0], 
+    cycle: typeof billingCycles[0],
+    userProfile: UserProfile, 
+    businessInstance: BusinessInstance,
+    isCurrentPlan: boolean,
+    isProcessing: boolean,
+    setProcessingPlan: (planId: string | null) => void;
+}) => {
+    const { toast } = useToast();
+    const { initializeCheckout, isScriptLoaded } = useDodoPayments();
+
+    const handleSubscribe = useCallback(async () => {
+        if (!isScriptLoaded) {
+            toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
+            return;
+        }
+        if (isProcessing) return;
+
+        setProcessingPlan(plan.planId);
+
+        try {
+            const response = await fetch('/api/dodo/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planId: plan.planId,
+                    email: userProfile.email,
+                    businessId: businessInstance.id,
+                    cycleMonths: cycle.months
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to initialize checkout');
+            }
+
+            initializeCheckout(data.checkout_url);
+        } catch (error: any) {
+            console.error("Dodo initialization error:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Checkout Failed', 
+                description: error.message || 'Could not connect to the payment server.' 
+            });
+        } finally {
+            setProcessingPlan(null);
+        }
+    }, [isScriptLoaded, isProcessing, plan, userProfile, businessInstance, cycle, initializeCheckout, toast, setProcessingPlan]);
+
+    const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
+
+    return (
+        <Button
+            onClick={handleSubscribe}
+            className="w-full bg-blue-600 hover:bg-blue-700"
+            disabled={isProcessing || !isScriptLoaded}
+        >
+            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            {buttonText} (USD)
+        </Button>
+    )
+}
+
 // Main component that uses the button
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
     const [processingPlan, setProcessingPlan] = useState<string | null>(null);
@@ -382,17 +457,29 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <PaystackSubscriptionButton
-                                    plan={plan}
-                                    cycle={selectedCycle}
-                                    finalAmount={finalAmount}
-                                    userProfile={userProfile}
-                                    businessInstance={businessInstance}
-                                    isCurrentPlan={isCurrentPlan}
-                                    isProcessing={processingPlan === plan.planId}
-                                    setProcessingPlan={setProcessingPlan}
-                                    currency={currency}
-                                />
+                                {currency === 'NGN' ? (
+                                    <PaystackSubscriptionButton
+                                        plan={plan}
+                                        cycle={selectedCycle}
+                                        finalAmount={finalAmount}
+                                        userProfile={userProfile}
+                                        businessInstance={businessInstance}
+                                        isCurrentPlan={isCurrentPlan}
+                                        isProcessing={processingPlan === plan.planId}
+                                        setProcessingPlan={setProcessingPlan}
+                                        currency={currency}
+                                    />
+                                ) : (
+                                    <DodoSubscriptionButton
+                                        plan={plan}
+                                        cycle={selectedCycle}
+                                        userProfile={userProfile}
+                                        businessInstance={businessInstance}
+                                        isCurrentPlan={isCurrentPlan}
+                                        isProcessing={processingPlan === plan.planId}
+                                        setProcessingPlan={setProcessingPlan}
+                                    />
+                                )}
                             </CardFooter>
                         </Card>
                     )
