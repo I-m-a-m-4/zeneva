@@ -1722,7 +1722,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </Card>
                 </TabsContent>
                 <TabsContent value="security">
-                    <CyberShield />
+                    <CyberShield 
+                        allBusinesses={businesses} 
+                        allUsers={users} 
+                        isLoadingBusinesses={businessesLoading} 
+                    />
                 </TabsContent>
             </Tabs>
 

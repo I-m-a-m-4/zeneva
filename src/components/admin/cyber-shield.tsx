@@ -139,7 +139,7 @@ const SecurityMetric = ({ label, value, subValue, icon: Icon, colorClass, border
         </CardContent>
     </Card>
 );
-export default function CyberShield() {
+export default function CyberShield({ allBusinesses, allUsers, isLoadingBusinesses }: { allBusinesses: any[] | null, allUsers: any[] | null, isLoadingBusinesses: boolean }) {
     const { firestore, auth, user: authUser } = useFirebase();
     const { toast } = useToast();
     const [isRevoking, setIsRevoking] = useState<string | null>(null);
@@ -201,8 +201,7 @@ export default function CyberShield() {
     const recaptchaRef = useRef<any>(null);
 
     // Fetch REAL system state
-    const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
-    const { data: allUsers } = useCollection<any>(usersQuery);
+    // Users are now passed as props
 
     const adminCount = useMemo(() => allUsers?.filter(u => u.role === 'admin' || u.role === 'manager').length || 0, [allUsers]);
 
@@ -217,8 +216,7 @@ export default function CyberShield() {
         };
     }, [authUser]);
 
-    const businessesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'businessInstances')) : null, [firestore]);
-    const { data: allBusinesses, isLoading: isLoadingBusinesses } = useCollection<any>(businessesQuery);
+    // Termination logs remain local to CyberShield
 
     const logsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'terminationLogs'), orderBy('terminatedAt', 'desc'), limit(10)) : null, [firestore]);
     const { data: terminationLogs } = useCollection<any>(logsQuery);
@@ -268,6 +266,16 @@ export default function CyberShield() {
             toast({ variant: 'destructive', title: "Core Rejection", description: "Verification signature invalid." });
         } finally {
             setIsEnrolling(false);
+        }
+    };
+
+    const handleDeleteLog = async (logId: string) => {
+        if (!firestore || !window.confirm('Are you sure you want to PERMANENTLY remove this record from the archive?')) return;
+        try {
+            await deleteDoc(doc(firestore, 'terminationLogs', logId));
+            toast({ title: "Log Purged", description: "Termination record has been removed from the archive." });
+        } catch (err) {
+            toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the log record." });
         }
     };
 
@@ -728,12 +736,13 @@ export default function CyberShield() {
                                     <TableHead className="text-[10px] font-bold">Email Signature</TableHead>
                                     <TableHead className="text-[10px] font-bold">Termination Date</TableHead>
                                     <TableHead className="text-[10px] font-bold">Scrubbed Data</TableHead>
+                                    <TableHead className="text-[10px] font-bold text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {!terminationLogs || terminationLogs.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-20 text-center text-[10px] text-muted-foreground font-bold italic">
+                                        <TableCell colSpan={5} className="h-20 text-center text-[10px] text-muted-foreground font-bold italic">
                                             No recent purges recorded in this sector
                                         </TableCell>
                                     </TableRow>
@@ -747,6 +756,16 @@ export default function CyberShield() {
                                             </TableCell>
                                             <TableCell className="text-[10px] font-bold text-rose-600/50">
                                                 {log.stats?.products}P / {log.stats?.customers}C
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-6 w-6 text-muted-foreground hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                                                    onClick={() => handleDeleteLog(log.id)}
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))
