@@ -223,10 +223,15 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
 
     const filteredBusinesses = useMemo(() => {
         if (!allBusinesses) return [];
-        let result = allBusinesses.filter(b => 
-            b.name?.toLowerCase().includes(searchBusiness.toLowerCase()) || 
-            b.email?.toLowerCase().includes(searchBusiness.toLowerCase())
-        );
+        let result = allBusinesses.filter(b => {
+            const searchLower = searchBusiness.toLowerCase();
+            return (
+                b.name?.toLowerCase().includes(searchLower) || 
+                b.email?.toLowerCase().includes(searchLower) ||
+                b.id?.toLowerCase().includes(searchLower) ||
+                b.settings?.email?.toLowerCase().includes(searchLower)
+            );
+        });
 
         // Sort by createdAt descending (newest first)
         return [...result].sort((a, b) => {
@@ -235,6 +240,26 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
             return dateB - dateA;
         });
     }, [allBusinesses, searchBusiness]);
+
+    const [directLookupId, setDirectLookupId] = useState('');
+    const handleDirectLookup = async () => {
+        if (!directLookupId || !allBusinesses) return;
+        const target = allBusinesses.find(b => 
+            b.id === directLookupId || 
+            b.email?.toLowerCase() === directLookupId.toLowerCase() ||
+            b.settings?.email?.toLowerCase() === directLookupId.toLowerCase()
+        );
+
+        if (target) {
+            setDestructionEmail(target.email || target.settings?.email || "");
+            setDestructionId(target.id);
+            setIsDestructionModalOpen(true);
+            fetchTargetStats(target.id);
+            setDirectLookupId('');
+        } else {
+            toast({ variant: 'destructive', title: "Lookup Failed", description: "Entity not found in current sector. Verify ID or Email." });
+        }
+    };
 
     const handleSendCode = async () => {
         if (!auth || !authUser || !phoneNumber) return;
@@ -510,7 +535,7 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                         <h1 className="text-base font-bold tracking-tight text-foreground/90">Cyber Shield Security</h1>
                     </div>
                     <p className="text-[11px] font-medium text-muted-foreground">
-                        Platform Security Monitoring & Management Hub
+                        Platform Security Monitoring & Management Hub | {allBusinesses?.length || 0} Entities Tracked
                     </p>
                 </div>
                 
@@ -611,6 +636,28 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                     </Card>
                 </div>
             </div>
+
+            {/* Direct Entity Lookup (Internal Tool) */}
+            <Card className="border-emerald-500/20 bg-emerald-50/10 backdrop-blur-sm border-dashed mb-6">
+                <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex items-center gap-2 text-emerald-700">
+                        <Terminal className="h-4 w-4" />
+                        <span className="text-xs font-bold uppercase tracking-tight">Direct Entity Terminal</span>
+                    </div>
+                    <div className="flex-1 flex gap-2 w-full">
+                        <Input 
+                            placeholder="Enter Business ID or Owner Email for immediate lock-on..." 
+                            value={directLookupId}
+                            onChange={(e) => setDirectLookupId(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDirectLookup()}
+                            className="h-9 text-xs font-mono bg-white/50"
+                        />
+                        <Button size="sm" onClick={handleDirectLookup} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700">
+                            Lock Target
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Business Intelligence Unit */}
             <Card className="border-primary/20 bg-white/40 backdrop-blur-md shadow-xl overflow-hidden relative z-10 group/biu">
