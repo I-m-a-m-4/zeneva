@@ -27,6 +27,7 @@ type ComboboxProps = {
   searchPlaceholder?: string
   emptyPlaceholder?: string
   triggerClassName?: string
+  disabled?: boolean
 }
 
 export function Combobox({
@@ -37,17 +38,19 @@ export function Combobox({
   searchPlaceholder = "Search...",
   emptyPlaceholder = "No results found.",
   triggerClassName,
+  disabled = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={!disabled ? setOpen : undefined}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
           className={cn("w-full justify-between", triggerClassName)}
+          disabled={disabled}
         >
           {value
             ? options.find((option) => option.value === value)?.label

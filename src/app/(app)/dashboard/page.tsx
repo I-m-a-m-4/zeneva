@@ -198,8 +198,27 @@ export default function DashboardPage() {
         } as TopSellingItem;
       });
 
-    const sortedCustomers = [...allCustomers].sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
-    const topLoyaltyCustomers = sortedCustomers.slice(0, 3);
+    const isLoyaltyEnabled = business?.settings?.loyaltyProgramEnabled;
+    
+    // Calculate spend in range for all customers found in filtered receipts
+    const customerSpendInRange: Record<string, number> = {};
+    filteredReceipts.forEach(r => {
+      if (r.customer?.id) {
+        customerSpendInRange[r.customer.id] = (customerSpendInRange[r.customer.id] || 0) + (r.total || 0);
+      }
+    });
+
+    const sortedCustomers = [...allCustomers].sort((a, b) => {
+      if (isLoyaltyEnabled) {
+        return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
+      }
+      return (customerSpendInRange[b.id] || 0) - (customerSpendInRange[a.id] || 0);
+    });
+
+    const topLoyaltyCustomers = sortedCustomers.slice(0, 3).map(c => ({
+        ...c,
+        spendInRange: customerSpendInRange[c.id] || 0
+    }));
 
     // Default to lifetime stats if no range is selected or if it's broad
     const showLifetime = !date?.from || !date?.to;
@@ -218,6 +237,7 @@ export default function DashboardPage() {
 
       topSellingItems,
       topLoyaltyCustomers,
+      isLoyaltyEnabled,
       debtItemsCount: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).length,
       totalDebtUnits: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).reduce((acc, p) => acc + Math.abs(p.stock || 0), 0),
       serviceUnitsSold,
@@ -333,7 +353,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
 
   const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
   const isRestricted = !hasReportPermission;
@@ -488,9 +508,11 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-primary" />
-              Top Loyalty Customers
+              {isLoyaltyEnabled ? "Top Loyalty Customers" : "Top Customers"}
             </CardTitle>
-            <CardDescription>Your most loyal customers by points.</CardDescription>
+            <CardDescription>
+              {isLoyaltyEnabled ? "Your most loyal customers by points." : "Your top spending customers for the selected period."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {topLoyaltyCustomers.length > 0 ? (
@@ -508,7 +530,9 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-semibold text-primary">{customer.loyaltyPoints || 0} pts</p>
+                      <p className="text-sm font-semibold text-primary">
+                        {isLoyaltyEnabled ? `${customer.loyaltyPoints || 0} pts` : `${currencySymbol}${(customer as any).spendInRange?.toLocaleString() || 0}`}
+                      </p>
                     </div>
                   </li>
                 ))}

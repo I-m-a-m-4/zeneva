@@ -243,15 +243,15 @@ function InventoryPageContent() {
       valid = valid.filter(p => p.category === categoryFilter);
     }
 
-    // 4. Stock Status
+    // 4. Stock Status (Services are usually 0 stock but shouldn't trigger 'Out of Stock' filters)
     if (stockFilter === 'out-of-stock') {
-      valid = valid.filter(p => (p.stock || 0) === 0);
+      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) === 0);
     } else if (stockFilter === 'debt') {
-      valid = valid.filter(p => (p.stock || 0) < 0);
+      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0);
     } else if (stockFilter === 'in-stock') {
-      valid = valid.filter(p => (p.stock || 0) > 0);
+      valid = valid.filter(p => p.categoryType === 'service' || (p.stock || 0) > 0);
     } else if (stockFilter === 'low-stock') {
-      valid = valid.filter(p => (p.stock || 0) <= (p.lowStockThreshold || 10));
+      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) <= (p.lowStockThreshold || 10));
     }
 
     // 5. Apply Sorting
@@ -770,18 +770,30 @@ function InventoryPageContent() {
                       <TableCell>
                         <Badge
                           variant={
+                            product.categoryType === 'service' ? "outline" :
                             (product.stock || 0) > 0 ? "outline" : "destructive"
                           }
                           className={cn(
                             "whitespace-nowrap",
-                            (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                            product.categoryType === 'service' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                            product.categoryType !== 'service' && (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
                           )}
                         >
-                          {(product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
+                          {product.categoryType === 'service' ? "Service" : (product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
                         </Badge>
                       </TableCell>
                       {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                      {canManageStock && <TableCell className="hidden md:table-cell">{product.stock || 0} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span></TableCell>}
+                      {canManageStock && (
+                        <TableCell className="hidden md:table-cell">
+                          {product.categoryType === 'service' ? (
+                            <span className="text-muted-foreground/40 italic">N/A</span>
+                          ) : (
+                            <>
+                              {product.stock || 0} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span>
+                            </>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right pr-6">
                         <DropdownMenu 
                           open={openMenuId === product.id} 

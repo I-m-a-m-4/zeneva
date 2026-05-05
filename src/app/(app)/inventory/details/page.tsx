@@ -72,6 +72,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { logAuditEvent } from '@/lib/audit';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
+import { Combobox } from '@/components/ui/combobox';
 
 const productSchema = z.object({
     name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -584,18 +585,19 @@ function EditProductContent() {
                                                             render={({ field }) => (
                                                                 <FormItem className="sm:col-span-3">
                                                                     <FormLabel className="text-xs">Product</FormLabel>
-                                                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canManageProduct}>
                                                                         <FormControl>
-                                                                            <SelectTrigger>
-                                                                                <SelectValue placeholder="Select component" />
-                                                                            </SelectTrigger>
+                                                                            <Combobox
+                                                                                options={products?.filter(p => (!p.type || p.type === 'single') && p.id !== productId).map(p => ({
+                                                                                    label: `${p.name} (Stock: ${p.stock})`,
+                                                                                    value: p.id
+                                                                                })) || []}
+                                                                                value={field.value}
+                                                                                onChange={field.onChange}
+                                                                                placeholder="Select component"
+                                                                                searchPlaceholder="Search products..."
+                                                                                disabled={!canManageProduct}
+                                                                            />
                                                                         </FormControl>
-                                                                        <SelectContent>
-                                                                            {products?.filter(p => (!p.type || p.type === 'single') && p.id !== productId).map(p => (
-                                                                                <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
                                                                     <FormMessage />
                                                                 </FormItem>
                                                             )}

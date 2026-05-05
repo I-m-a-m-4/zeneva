@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 
+import { Combobox } from '@/components/ui/combobox';
 const productSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters."),
   description: z.string().optional(),
@@ -489,18 +490,18 @@ export default function AddProductPage() {
                               render={({ field }) => (
                                 <FormItem className="sm:col-span-3">
                                   <FormLabel className="text-xs">Product</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select component" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {products?.filter(p => !p.type || p.type === 'single').map(p => (
-                                        <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <FormControl>
+                                    <Combobox
+                                      options={products?.filter(p => !p.type || p.type === 'single').map(p => ({
+                                        label: `${p.name} (Stock: ${p.stock})`,
+                                        value: p.id
+                                      })) || []}
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      placeholder="Select component"
+                                      searchPlaceholder="Search products..."
+                                    />
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
