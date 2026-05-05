@@ -866,7 +866,7 @@ export default function AuthenticatedLayout({
                                   })}
                                 <Button
                                   variant="ghost"
-                                  className="w-full text-xs font-medium py-3 rounded-none border-t hover:bg-foreground hover:text-background transition-colors"
+                                  className="w-full text-xs font-bold py-3 rounded-none border-t hover:bg-black hover:text-white transition-all duration-200"
                                   onClick={() => setIsNotificationsExpanded(true)}
                                 >
                                   View all ({allNotifications.length})

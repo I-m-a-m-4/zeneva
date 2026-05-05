@@ -103,7 +103,19 @@ import {
     deleteDoc,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase, auth } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { logAuditEvent } from '@/lib/audit';
+import { 
+    AlertDialog, 
+    AlertDialogAction, 
+    AlertDialogCancel, 
+    AlertDialogContent, 
+    AlertDialogDescription, 
+    AlertDialogFooter, 
+    AlertDialogHeader, 
+    AlertDialogTitle, 
+    AlertDialogTrigger 
+} from '@/components/ui/alert-dialog';
 import {
     Table,
     TableBody,
@@ -841,6 +853,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     currency: 'NGN',
                     timestamp: serverTimestamp()
                 });
+
+                if (currentUserProfile) {
+                    await logAuditEvent(firestore, userData.businessId, currentUserProfile, {
+                        action: 'billing.grant_lifetime',
+                        entity: { type: 'business', id: userData.businessId, name: userData.name },
+                        details: { targetEmail: grantEmail }
+                    });
+                }
+
                 toast({ variant: 'success', title: 'Lifetime Access Granted!', description: `${userData.name} now has lifetime access.` });
             } else if (grantDate) {
                 await updateDoc(businessDocRef, { trialExpiresAt: grantDate });
@@ -850,6 +871,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     currency: 'NGN',
                     timestamp: serverTimestamp()
                 });
+
+                if (currentUserProfile) {
+                    await logAuditEvent(firestore, userData.businessId, currentUserProfile, {
+                        action: 'billing.extend_trial',
+                        entity: { type: 'business', id: userData.businessId, name: userData.name },
+                        details: { targetEmail: grantEmail, newExpiry: format(grantDate, 'PPP') }
+                    });
+                }
+
                 toast({ variant: 'success', title: 'Access Granted', description: `${userData.name}'s trial now expires on ${format(grantDate, 'PPP')}.` });
             }
             setGrantEmail('');
@@ -961,7 +991,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         }
     };
 
-    const { impersonateUser } = usePOS();
+    const { impersonateUser, currentUserProfile } = usePOS();
     const router = useRouter();
 
     const handleImpersonateUser = (user: UserProfile) => {
@@ -1508,10 +1538,35 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     )}
                                 </CardContent>
                                 <CardFooter>
-                                    <Button onClick={handleGrantAccess} disabled={isGranting} className="w-full">
-                                        {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                                        {grantLifetime ? 'Grant Lifetime' : 'Extend Trial'}
-                                    </Button>
+                                    {grantLifetime ? (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button disabled={isGranting} className="w-full bg-green-600 hover:bg-green-700">
+                                                    {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                                    Grant Lifetime Access
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This will grant <strong className="text-foreground">{grantEmail}</strong> permanent, unlimited access to Zeneva Business. This action is recorded in the audit logs.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={handleGrantAccess} className="bg-green-600 hover:bg-green-700">
+                                                        Yes, Grant Lifetime
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    ) : (
+                                        <Button onClick={handleGrantAccess} disabled={isGranting} className="w-full">
+                                            {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                            Extend Trial
+                                        </Button>
+                                    )}
                                 </CardFooter>
                             </Card>
                         </div>

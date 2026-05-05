@@ -200,8 +200,10 @@ export default function OnboardingPage() {
     <div className="onboarding-bg flex flex-col items-center justify-center min-h-screen p-4 sm:p-6">
       <div className="w-full max-w-3xl space-y-12">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-center mb-2">Welcome, {currentUserProfile.name}!</h1>
-          <p className="text-muted-foreground text-center">Let's set up your organization profile.</p>
+          <h1 className="text-4xl font-bold tracking-tight mb-3">Initialize Your Business Galaxy, {currentUserProfile.name.split(' ')[0]}</h1>
+          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+            You're entering an ecosystem built for exponential growth. Let's configure your Zeneva intelligence profile.
+          </p>
         </div>
 
         <OnboardingStepper currentStep={step} />
@@ -211,9 +213,10 @@ export default function OnboardingPage() {
             <form onSubmit={form.handleSubmit(onSubmit)}>
               {step === 1 && (
                 <CardContent className="pt-6 space-y-6">
-                  <CardTitle className="flex items-center gap-3"><Building className="text-primary" /> Organizational Details</CardTitle>
+                  <CardTitle className="flex items-center gap-3 text-2xl font-bold"><Building className="text-primary h-6 w-6" /> Strategic Identity</CardTitle>
+                  <p className="text-sm text-muted-foreground">Define your organization's core identity to calibrate our intelligence models.</p>
                   <FormField control={form.control} name="organizationName" render={({ field }) => (
-                    <FormItem><FormLabel>Organization Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Organization Name</FormLabel><FormControl><Input placeholder="e.g. Zenith Global" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="industry" render={({ field }) => (
                     <FormItem><FormLabel>Industry</FormLabel>

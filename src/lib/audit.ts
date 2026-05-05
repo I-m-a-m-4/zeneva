@@ -8,7 +8,8 @@ type AuditAction =
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete'
     | 'user.invite' | 'user.update_status' | 'user.impersonate' | 'user.stop_impersonate'
-    | 'settings.update';
+    | 'settings.update'
+    | 'billing.grant_lifetime' | 'billing.extend_trial' | 'billing.assign_plan';
 
 interface AuditEvent {
     action: AuditAction;
