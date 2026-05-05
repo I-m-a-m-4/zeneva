@@ -187,39 +187,16 @@ function InventoryPageContent() {
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
 
-  const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
-  const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);
-  const [isSearching, setIsSearching] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
-  const isLoading = isPosLoading || isSearching;
+  const isLoading = isPosLoading;
   const isPageLoading = isLoading;
 
-  // Surgical Search Helper
+  // Manual search button helper
   const performSearch = React.useCallback(async (term: string) => {
-    if (!term.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    setIsSearching(true);
-    const results = await searchProducts(term.trim());
-    setSearchResults(results);
-    setIsSearching(false);
-  }, [searchProducts]);
+    // No-op for remote search, local filtering is instant via filteredProducts useMemo
+  }, []);
 
-  React.useEffect(() => {
-    const handler = setTimeout(() => performSearch(searchTerm), 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm, performSearch]);
-
-  // Use NProgress for background searching to be non-intrusive
-  React.useEffect(() => {
-    if (isSearching) {
-      NProgress.start();
-    } else {
-      NProgress.done();
-    }
-  }, [isSearching]);
 
   // Update hasMore if products change
   React.useEffect(() => {
@@ -228,19 +205,8 @@ function InventoryPageContent() {
     }
   }, [products]);
 
-  React.useEffect(() => {
-    if (categoryFilter !== 'all') {
-      const fetchGlobal = async () => {
-        setIsSearching(true);
-        const results = await searchProductsByField('category', categoryFilter);
-        setFilterResults(results);
-        setIsSearching(false);
-      };
-      fetchGlobal();
-    } else {
-      setFilterResults(null);
-    }
-  }, [categoryFilter, searchProductsByField]);
+  // Local filtering is handled by useMemo
+
 
   React.useEffect(() => {
     const s = searchParams.get('sortBy');
@@ -263,24 +229,10 @@ function InventoryPageContent() {
   }, [queuedActions]);
 
   const filteredProducts = React.useMemo(() => {
-    // Merge local products + search results
+    // Local products only
     let base = [...(products || [])];
     
-    // Add search results if not already in local cache
-    if (searchResults && searchTerm.trim()) {
-      searchResults.forEach(p => {
-        if (!base.find(b => b.id === p.id)) base.push(p);
-      });
-    }
-
-    // Add filter results if not already in local cache
-    if (filterResults && categoryFilter !== 'all') {
-        filterResults.forEach(p => {
-            if (!base.find(b => b.id === p.id)) base.push(p);
-        });
-    }
-
-    // Apply local substring filter if searching
+    // Apply local search filter
     if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
       base = base.filter(p => 
@@ -289,6 +241,7 @@ function InventoryPageContent() {
         p.category?.toLowerCase().includes(lower)
       );
     }
+
     
     // 1. Combine with optimistic products
     let combined = [...(optimisticProducts || []), ...base];
@@ -483,17 +436,12 @@ function InventoryPageContent() {
                   }
                 }}
               />
-              {isSearching && (
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                </div>
-              )}
+
             </div>
             <Button 
                variant="secondary" 
                className="h-10 px-3 shrink-0 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
                onClick={() => performSearch(searchTerm)}
-               disabled={isSearching}
             >
               <Search className="h-4 w-4" />
               <span className="text-xs font-semibold">Search</span>

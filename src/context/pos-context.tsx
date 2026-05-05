@@ -660,9 +660,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const userRole = currentUserProfile?.role;
     const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
     
-    if (!isSuperAdmin) {
+    // Debug Log to catch the culprit
+    if (action.type === 'complete-sale' || action.type === 'add-product' || action.type === 'update-product' || action.type === 'delete-product') {
+      console.log(`[POS RBAC] Checking action: ${action.type}`, {
+        userRole,
+        permissions,
+        isSuperAdmin,
+        isProfileReady
+      });
+    }
+
+    if (!isSuperAdmin && isProfileReady) {
       // 1. Record Sales check
       if (action.type === 'complete-sale' && permissions.record_sales === false) {
+        console.warn(`[POS RBAC] Blocked ${action.type} due to record_sales: false`);
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to record sales.' });
         return null;
       }
@@ -670,6 +681,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // 2. Manage Inventory check
       const inventoryActions = ['add-product', 'update-product', 'delete-product', 'bulk-update-products'];
       if (inventoryActions.includes(action.type) && permissions.manage_inventory === false) {
+        console.warn(`[POS RBAC] Blocked ${action.type} due to manage_inventory: false`);
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to manage inventory.' });
         return null;
       }
@@ -677,6 +689,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // 3. Customer Management check
       const customerActions = ['add-customer', 'update-customer', 'delete-customer'];
       if (customerActions.includes(action.type) && permissions.view_customers === false) {
+        console.warn(`[POS RBAC] Blocked ${action.type} due to view_customers: false`);
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to manage customers.' });
         return null;
       }

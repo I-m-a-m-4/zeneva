@@ -232,30 +232,25 @@ export default function SelectProductsPage() {
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
-    const [isSearching, setIsSearching] = React.useState(false);
+
+
     const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
 
 
     // Subscription status is now managed by the background glassmorphism overlay in layout.tsx.
 
-    const [searchResults, setSearchResults] = React.useState<Product[] | null>(null);
-    const [filterResults, setFilterResults] = React.useState<Product[] | null>(null);
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
-    const isLoading = isPosLoading || isSearching;
+    const isLoading = isPosLoading;
 
-    const performManualSearch = async () => {
+    const performManualSearch = () => {
         if (!searchTerm.trim()) return;
-        setIsSearching(true);
-        let exactMatch = products?.find(p =>
+        
+        const exactMatch = products?.find(p =>
             p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
             p.name.toLowerCase() === searchTerm.toLowerCase()
         );
-
-        if (!exactMatch && searchTerm.trim()) {
-            exactMatch = await findProductBySku(searchTerm.trim()) || undefined;
-        }
 
         if (exactMatch) {
             addToCart(exactMatch);
@@ -265,62 +260,19 @@ export default function SelectProductsPage() {
                 description: exactMatch.name
             });
         }
-        setIsSearching(false);
     };
 
-    // Surgical Search Effect
-    React.useEffect(() => {
-        const performSearch = async () => {
-            if (!searchTerm.trim()) {
-                setSearchResults(null);
-                return;
-            }
-            setIsSearching(true);
-            const results = await searchProducts(searchTerm.trim());
-            setSearchResults(results);
-            setIsSearching(false);
-        };
-
-        const handler = setTimeout(performSearch, 500);
-        return () => clearTimeout(handler);
-    }, [searchTerm, searchProducts]);
-
-    React.useEffect(() => {
-        if (categoryFilter !== 'all') {
-            const fetchGlobal = async () => {
-                setIsSearching(true);
-                const results = await searchProductsByField('category', categoryFilter);
-                setFilterResults(results);
-                setIsSearching(false);
-            };
-            fetchGlobal();
-        } else {
-            setFilterResults(null);
-        }
-    }, [categoryFilter, searchProductsByField]);
 
     const filteredProducts = React.useMemo(() => {
-        // Combined Local + DB Results
         let base = [...(products || [])];
         
-        if (searchResults && searchTerm.trim()) {
-            searchResults.forEach(p => {
-                if (!base.find(b => b.id === p.id)) base.push(p);
-            });
-        }
-
-        if (filterResults && categoryFilter !== 'all') {
-            filterResults.forEach(p => {
-                if (!base.find(b => b.id === p.id)) base.push(p);
-            });
-        }
-
         // Apply instant local substring filter
         if (searchTerm.trim()) {
             const lower = searchTerm.toLowerCase();
             base = base.filter(p => 
                 p.name.toLowerCase().includes(lower) || 
-                p.sku?.toLowerCase().includes(lower)
+                p.sku?.toLowerCase().includes(lower) ||
+                p.category?.toLowerCase().includes(lower)
             );
         }
 
@@ -329,7 +281,7 @@ export default function SelectProductsPage() {
         }
 
         return base;
-    }, [products, searchResults, searchTerm, categoryFilter]);
+    }, [products, searchTerm, categoryFilter]);
 
     const handleLoadMore = async () => {
         setIsFetchingMore(true);
@@ -342,14 +294,9 @@ export default function SelectProductsPage() {
         addToCart(product);
     }, [addToCart]);
 
-    const handleScan = async (sku: string) => {
-        let product = products?.find(p => p.sku === sku);
+    const handleScan = (sku: string) => {
+        const product = products?.find(p => p.sku === sku);
         
-        if (!product) {
-            // Surgical search in DB
-            product = await findProductBySku(sku) || undefined;
-        }
-
         if (product) {
             addToCart(product);
             toast({
@@ -365,6 +312,7 @@ export default function SelectProductsPage() {
             });
         }
     };
+
 
     const handleNext = () => {
         setIsNavigating(true);
@@ -389,18 +337,14 @@ export default function SelectProductsPage() {
                                     }
                                 }}
                             />
-                            {isSearching && (
-                                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                </div>
-                            )}
+
                         </div>
                         <Button 
                             variant="secondary" 
                             className="h-11 px-3 sm:px-4 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
                             onClick={performManualSearch}
-                            disabled={isSearching}
                         >
+
                             <Search className="h-4 w-4" />
                             <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Search</span>
                         </Button>
