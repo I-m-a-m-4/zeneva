@@ -44,7 +44,7 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
                     </Button>
                 )}
             </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px]">
+            <SheetContent className="w-full sm:max-w-[540px]">
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                         <Archive className="h-5 w-5" />
