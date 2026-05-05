@@ -379,7 +379,12 @@ export default function ReportsDashboard() {
                             featureName="Customer Intelligence"
                             featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
                         >
-                            <CustomerAnalytics customers={customers || []} receipts={deepReceipts} currencySymbol={currencySymbol} />
+                            <CustomerAnalytics 
+                                customers={customers || []} 
+                                receipts={deepReceipts} 
+                                currencySymbol={currencySymbol} 
+                                totalBusinessCustomers={stats?.totalCustomers} 
+                            />
                         </FeatureGate>
 
                         <FeatureGate

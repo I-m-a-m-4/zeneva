@@ -18,9 +18,10 @@ interface CustomerAnalyticsProps {
   customers: Customer[];
   receipts: Receipt[];
   currencySymbol: string;
+  totalBusinessCustomers?: number;
 }
 
-export default function CustomerAnalytics({ customers, receipts, currencySymbol }: CustomerAnalyticsProps) {
+export default function CustomerAnalytics({ customers, receipts, currencySymbol, totalBusinessCustomers }: CustomerAnalyticsProps) {
   const [timeframe, setTimeframe] = React.useState<Timeframe>('90d');
 
   const analyticsData = React.useMemo(() => {
@@ -79,13 +80,13 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol 
     const totalUniqueBuyers = customerArray.filter(c => c.orderCount >= 1).length;
 
     return {
-      totalCustomers: customerArray.length,
+      totalCustomers: totalBusinessCustomers && totalBusinessCustomers > customerArray.length ? totalBusinessCustomers : customerArray.length,
       totalUniqueBuyers,
       newCustomers,
       returningCustomers,
       topCustomersBySpend,
     };
-  }, [customers, receipts]);
+  }, [customers, receipts, totalBusinessCustomers]);
 
   const acquisitionData = React.useMemo(() => {
     if (!customers) return [];
