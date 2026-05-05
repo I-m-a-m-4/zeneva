@@ -179,7 +179,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const canFetchSubData = !!businessId && !!initialBusiness && initialBusiness.status !== 'deleted' && !!user && isProfileReady;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
@@ -213,10 +213,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [canFetchSubData, businessId, !!initialStats]);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 

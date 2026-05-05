@@ -185,9 +185,7 @@ function InventoryPageContent() {
 
   const [stockFilter, setStockFilter] = React.useState('all');
   const [categoryFilter, setCategoryFilter] = React.useState('all');
-  const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc'>(initialSortBy);
-
-  const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
+  const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc' | 'newest'>((searchParams.get('sortBy') as any) || 'newest');
 
   const isLoading = isPosLoading;
   const isPageLoading = isLoading;
@@ -198,20 +196,11 @@ function InventoryPageContent() {
   }, []);
 
 
-  // Update hasMore if products change
-  React.useEffect(() => {
-    if (products && products.length < 50) {
-      setHasMore(false);
-    }
-  }, [products]);
-
-  // Local filtering is handled by useMemo
-
-
+  // Update sorting from URL
   React.useEffect(() => {
     const s = searchParams.get('sortBy');
-    if (s === 'stock-desc' || s === 'stock-asc' || s === 'name') {
-      setSortBy(s);
+    if (s === 'stock-desc' || s === 'stock-asc' || s === 'name' || s === 'newest') {
+      setSortBy(s as any);
     }
   }, [searchParams]);
 
@@ -277,6 +266,11 @@ function InventoryPageContent() {
         const stockDiff = (a.stock || 0) - (b.stock || 0);
         if (stockDiff !== 0) return stockDiff;
         return a.name.localeCompare(b.name);
+      } else if (sortBy === 'newest') {
+        const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds || 0;
+        const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds || 0;
+        if (dateB !== dateA) return dateB - dateA;
+        return a.name.localeCompare(b.name);
       }
       return 0;
     });
@@ -285,11 +279,6 @@ function InventoryPageContent() {
   }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
   const totalCount = filteredProducts.length;
-
-  const handleLoadMore = async () => {
-    const count = await fetchMoreProducts();
-    if (count === 0) setHasMore(false);
-  };
 
 
 
@@ -516,6 +505,7 @@ function InventoryPageContent() {
                   <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                      <DropdownMenuRadioItem value="newest">Newest Added</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="stock-desc">Highest Stock First</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="stock-asc">Lowest Stock First</DropdownMenuRadioItem>
@@ -525,7 +515,7 @@ function InventoryPageContent() {
                 {activeFilterCount > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('name'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('newest'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                       Clear Filters
                     </DropdownMenuItem>
                   </>
@@ -634,6 +624,7 @@ function InventoryPageContent() {
                       <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
                         <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                          <DropdownMenuRadioItem value="newest">Newest Added</DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="stock-desc">Highest Stock</DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="stock-asc">Lowest Stock</DropdownMenuRadioItem>
