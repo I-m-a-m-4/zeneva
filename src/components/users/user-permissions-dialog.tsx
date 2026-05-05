@@ -142,6 +142,27 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
             await updateDoc(userRef, {
                 permissions: permissions
             });
+            
+            // Determine if any permissions were granted
+            const grantedPermissions = [];
+            for (const key in permissions) {
+                if (permissions[key]) {
+                    const permDef = PERMISSIONS.find(p => p.id === key);
+                    if (permDef) grantedPermissions.push(permDef.label);
+                }
+            }
+            
+            if (grantedPermissions.length > 0) {
+                const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+                const notifRef = collection(firestore, `users/${user.id}/notifications`);
+                await addDoc(notifRef, {
+                    title: "Access Permissions Updated",
+                    body: `Your permissions have been updated. You now have access to: ${grantedPermissions.join(', ')}.`,
+                    createdAt: serverTimestamp(),
+                    read: false,
+                    type: 'permission_update'
+                });
+            }
 
             toast({
                 title: "Permissions Updated",

@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -425,9 +425,18 @@ export default function AuthenticatedLayout({
   
   // New Effect: Trigger Push Notifications when new unread notifications arrive
   const [lastNotifiedId, setLastNotifiedId] = React.useState<string | null>(null);
+  const [permissionPopup, setPermissionPopup] = React.useState<{ id: string, title: string, body: string } | null>(null);
 
   React.useEffect(() => {
     if (userNotifications && userNotifications.length > 0) {
+      // Check for unread permission updates to show as a popup
+      const unreadPermissionNotifs = userNotifications.filter(n => !n.read && (n as any).type === 'permission_update');
+      if (unreadPermissionNotifs.length > 0 && !permissionPopup) {
+        // Show the oldest unread one first
+        const notif = unreadPermissionNotifs[unreadPermissionNotifs.length - 1];
+        setPermissionPopup({ id: notif.id, title: notif.title, body: notif.body });
+      }
+
       const latestNotif = userNotifications[0]; // Already ordered by desc createdAt
       if (!latestNotif.read && latestNotif.id !== lastNotifiedId) {
         // We only notify if the notification is less than 30 seconds old to avoid 
@@ -1070,6 +1079,34 @@ export default function AuthenticatedLayout({
               )}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permission Update Popup */}
+      <Dialog open={!!permissionPopup} onOpenChange={(open) => {
+        if (!open) {
+          // If closed, also mark as read in firestore so it doesn't pop up again
+          if (permissionPopup && firestore && currentUserProfile) {
+            updateDoc(doc(firestore, `users/${currentUserProfile.id}/notifications`, permissionPopup.id), { read: true }).catch(console.error);
+          }
+          setPermissionPopup(null);
+        }
+      }}>
+        <DialogContent className="max-w-md sm:max-w-lg border-2 border-primary/20 bg-background shadow-2xl">
+          <DialogHeader className="mb-4">
+            <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-primary shadow-sm border border-primary/20">
+              <ShieldCheck className="h-8 w-8" />
+            </div>
+            <DialogTitle className="text-center text-2xl font-bold">{permissionPopup?.title}</DialogTitle>
+            <DialogDescription className="text-center text-base pt-2">
+              {permissionPopup?.body}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center pt-2">
+            <Button onClick={() => setPermissionPopup(null)} className="w-full sm:w-1/2" size="lg">
+              Got it, thanks!
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
