@@ -550,7 +550,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
             resultData.newId = cRef.id; break;
           case 'update-customer': batch.update(doc(firestore, 'customers', action.payload.id), { ...action.payload.values, updatedAt: serverTimestamp() }); break;
           case 'delete-customer': batch.delete(doc(firestore, 'customers', action.payload.id)); batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); break;
-          case 'add-product': batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(1) }, { merge: true }); break;
+          case 'add-product':
+            batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(1) }, { merge: true });
+            // Update local state immediately
+            setSyncedProducts(prev => [...prev, action.payload]);
+            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+              syncProductToOffline(businessId, action.payload);
+            }
+            break;
           case 'complete-sale':
             const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
             batch.set(rRef, { ...action.payload.receiptData, createdAt: serverTimestamp() });
@@ -597,11 +605,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
             break;
           case 'update-product':
             batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
+            // Update local state immediately to prevent "revert flickers" when the queue clears
+            setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
+            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+              const current = syncedProducts.find(p => p.id === action.payload.productId);
+              if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+            }
             break;
           case 'bulk-update-products':
             action.payload.productIds.forEach((id: string) => {
               batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
             });
+            // Update local state immediately
+            setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
+            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+              action.payload.productIds.forEach((id: string) => {
+                const current = syncedProducts.find(p => p.id === id);
+                if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+              });
+            }
             break;
           case 'add-audit-log':
             const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
