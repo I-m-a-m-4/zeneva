@@ -35,6 +35,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
+  const isSavingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (customer) {
@@ -47,12 +48,8 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customer) return;
-    if (!name) {
-      toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
-      return;
-    }
-
+    if (isSaving || isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -75,7 +72,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Error', description: 'Could not update customer.', variant: 'destructive' });
-    } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };

@@ -88,6 +88,7 @@ export default function AddProductPage() {
   const { business, products, currentUserProfile, isLoading, addToQueue, addProductWithImage } = usePOS();
   const firestore = useFirestore();
   const [isSaving, setIsSaving] = React.useState(false);
+  const isSubmitting = React.useRef(false);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
 
@@ -218,7 +219,8 @@ export default function AddProductPage() {
   };
 
   const onSubmit = async (values: ProductFormValues) => {
-    if (isSaving) return;
+    if (isSaving || isSubmitting.current) return;
+    isSubmitting.current = true;
     setIsSaving(true);
 
     if (!userProfile || !firestore || !business || !products) {
@@ -246,19 +248,21 @@ export default function AddProductPage() {
       return;
     }
 
-    // Parse expiry date manually if provided
-    if (expiryDateInput) {
-      const parsedDate = parseDateString(expiryDateInput);
-      if (parsedDate) {
-        values.expiryDate = parsedDate;
-      } else {
-        toast({ variant: "destructive", title: "Invalid Date", description: "Please use DD/MM/YY format." });
-        return;
-      }
-    }
-
     // Optimistic Add via Context (handles background upload)
     try {
+      // Parse expiry date manually if provided
+      if (expiryDateInput) {
+        const parsedDate = parseDateString(expiryDateInput);
+        if (parsedDate) {
+          values.expiryDate = parsedDate;
+        } else {
+          toast({ variant: "destructive", title: "Invalid Date", description: "Please use DD/MM/YY format." });
+          isSubmitting.current = false;
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // 1. Prepare data
       const newProductId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
 
@@ -286,15 +290,14 @@ export default function AddProductPage() {
 
       // 4. Navigate immediately
       toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
-      setIsSaving(false);
       router.push('/inventory');
 
     } catch (error: any) {
       console.error("Failed to prepare product:", error);
       toast({ variant: 'destructive', title: 'Save Failed', description: error.message || "Could not save the product." });
+      isSubmitting.current = false;
       setIsSaving(false);
     }
-
   };
 
   return (

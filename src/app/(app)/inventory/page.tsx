@@ -244,14 +244,16 @@ function InventoryPageContent() {
     }
 
     // 4. Stock Status (Services are usually 0 stock but shouldn't trigger 'Out of Stock' filters)
+    const isService = (p: Product) => p.categoryType === 'service' || p.category?.toLowerCase() === 'service' || p.category?.toLowerCase() === 'services';
+
     if (stockFilter === 'out-of-stock') {
-      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) === 0);
+      valid = valid.filter(p => !isService(p) && (p.stock || 0) === 0);
     } else if (stockFilter === 'debt') {
-      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0);
+      valid = valid.filter(p => !isService(p) && (p.stock || 0) < 0);
     } else if (stockFilter === 'in-stock') {
-      valid = valid.filter(p => p.categoryType === 'service' || (p.stock || 0) > 0);
+      valid = valid.filter(p => isService(p) || (p.stock || 0) > 0);
     } else if (stockFilter === 'low-stock') {
-      valid = valid.filter(p => p.categoryType !== 'service' && (p.stock || 0) <= (p.lowStockThreshold || 10));
+      valid = valid.filter(p => !isService(p) && (p.stock || 0) <= (p.lowStockThreshold || 10));
     }
 
     // 5. Apply Sorting
@@ -770,16 +772,16 @@ function InventoryPageContent() {
                       <TableCell>
                         <Badge
                           variant={
-                            product.categoryType === 'service' ? "outline" :
+                            (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? "outline" :
                             (product.stock || 0) > 0 ? "outline" : "destructive"
                           }
                           className={cn(
                             "whitespace-nowrap",
-                            product.categoryType === 'service' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                            product.categoryType !== 'service' && (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                            (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                            (product.categoryType !== 'service' && product.category?.toLowerCase() !== 'service' && product.category?.toLowerCase() !== 'services') && (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
                           )}
                         >
-                          {product.categoryType === 'service' ? "Service" : (product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
+                          {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? "Service" : (product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
                         </Badge>
                       </TableCell>
                       {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}

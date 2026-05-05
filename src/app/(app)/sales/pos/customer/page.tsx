@@ -32,6 +32,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
     const [phone, setPhone] = React.useState('');
     const [code, setCode] = React.useState('');
     const [isSaving, setIsSaving] = React.useState(false);
+    const isSavingRef = React.useRef(false);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -64,7 +65,8 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             }
         }
 
-        if (isSaving) return;
+        if (isSaving || isSavingRef.current) return;
+        isSavingRef.current = true;
         setIsSaving(true);
         try {
             const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -102,7 +104,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 
         } catch (error) {
             toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
-        } finally {
+            isSavingRef.current = false;
             setIsSaving(false);
         }
     }

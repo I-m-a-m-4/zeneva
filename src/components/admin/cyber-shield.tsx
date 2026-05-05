@@ -224,12 +224,13 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
     const filteredBusinesses = useMemo(() => {
         if (!allBusinesses) return [];
         let result = allBusinesses.filter(b => {
-            const searchLower = searchBusiness.toLowerCase();
+            const searchLower = searchBusiness.trim().toLowerCase();
+            if (!searchLower) return true;
             return (
-                b.name?.toLowerCase().includes(searchLower) || 
-                b.email?.toLowerCase().includes(searchLower) ||
-                b.id?.toLowerCase().includes(searchLower) ||
-                b.settings?.email?.toLowerCase().includes(searchLower)
+                (b.name || '').toLowerCase().includes(searchLower) || 
+                (b.email || '').toLowerCase().includes(searchLower) ||
+                (b.id || '').toLowerCase().includes(searchLower) ||
+                (b.settings?.email || '').toLowerCase().includes(searchLower)
             );
         });
 
@@ -243,25 +244,26 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
 
     const [directLookupId, setDirectLookupId] = useState('');
     const handleDirectLookup = async () => {
-        if (!directLookupId || !allBusinesses) return;
+        const lookupId = directLookupId.trim();
+        if (!lookupId || !allBusinesses) return;
         
         // 1. Try to find by business fields directly (ID, Email, Settings Email)
         let target = allBusinesses.find(b => 
-            b.id === directLookupId || 
-            b.email?.toLowerCase() === directLookupId.toLowerCase() ||
-            b.settings?.email?.toLowerCase() === directLookupId.toLowerCase()
+            b.id === lookupId || 
+            (b.email || '').toLowerCase() === lookupId.toLowerCase() ||
+            (b.settings?.email || '').toLowerCase() === lookupId.toLowerCase()
         );
 
         // 2. Fallback: Find by Owner Email (searching across users)
         if (!target && allUsers) {
-            const ownerMatch = allUsers.find(u => u.email?.toLowerCase() === directLookupId.toLowerCase());
+            const ownerMatch = allUsers.find(u => (u.email || '').toLowerCase() === lookupId.toLowerCase());
             if (ownerMatch && ownerMatch.businessId) {
                 target = allBusinesses.find(b => b.id === ownerMatch.businessId);
             }
         }
 
         if (target) {
-            setDestructionEmail(target.email || target.settings?.email || directLookupId);
+            setDestructionEmail(target.email || target.settings?.email || lookupId);
             setDestructionId(target.id);
             setIsDestructionModalOpen(true);
             fetchTargetStats(target.id);
@@ -656,7 +658,7 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                     </div>
                     <div className="flex-1 flex gap-2 w-full">
                         <Input 
-                            placeholder="Enter Business ID or Owner Email for immediate lock-on..." 
+                            placeholder="Enter Business ID or Owner Email (e.g. bim.ex4@gmail.com)..." 
                             value={directLookupId}
                             onChange={(e) => setDirectLookupId(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleDirectLookup()}
@@ -664,6 +666,15 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                         />
                         <Button size="sm" onClick={handleDirectLookup} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700">
                             Lock Target
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-9 border-emerald-500/20 hover:bg-emerald-100 text-emerald-700 shrink-0"
+                            onClick={() => window.location.reload()}
+                            title="Hard Refresh Sync"
+                        >
+                            <RefreshCw className="h-4 w-4" />
                         </Button>
                     </div>
                 </CardContent>

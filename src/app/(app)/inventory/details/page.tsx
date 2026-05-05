@@ -150,6 +150,7 @@ function EditProductContent() {
     const { data: product, isLoading: isProductLoading } = useDoc<Product>(productDocRef);
 
     const [isSaving, setIsSaving] = React.useState(false);
+    const isSubmitting = React.useRef(false);
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -287,9 +288,11 @@ function EditProductContent() {
     };
 
     const onSubmit = async (values: ProductFormValues) => {
+        if (isSaving || isSubmitting.current) return;
+        isSubmitting.current = true;
+        setIsSaving(true);
         if (!product || !currentUserProfile || !business) return;
 
-        setIsSaving(true);
         let imageUrl = product?.imageUrl || '';
 
         try {
@@ -355,7 +358,7 @@ function EditProductContent() {
         } catch (error: any) {
             console.error("Failed to queue product update:", error);
             toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
-        } finally {
+            isSubmitting.current = false;
             setIsSaving(false);
         }
     };

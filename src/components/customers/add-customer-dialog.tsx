@@ -37,6 +37,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
+  const isSavingRef = React.useRef(false);
 
 
 
@@ -45,6 +46,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
     setEmail('');
     setPhone('');
     setCode('');
+    isSavingRef.current = false;
     setIsSaving(false);
   };
 
@@ -83,7 +85,8 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
       }
     }
 
-    if (isSaving) return;
+    if (isSaving || isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -123,7 +126,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
       }
     } catch (error) {
       toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
-    } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };

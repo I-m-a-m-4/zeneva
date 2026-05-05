@@ -73,7 +73,11 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
             <CardHeader className="px-4 py-1 flex-grow">
                 <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground flex items-center gap-1.5 flex-wrap">
                     {product.name}
-                    {product.categoryType === 'service' && <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">Service</Badge>}
+                    {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? (
+                        <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">Service</Badge>
+                    ) : (
+                        (product.stock || 0) <= 0 && <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/10 text-red-500 border-red-500/20">Out of Stock</Badge>
+                    )}
                 </CardTitle>
             </CardHeader>
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">

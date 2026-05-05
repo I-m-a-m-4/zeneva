@@ -47,6 +47,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
   const firestore = useFirestore();
   const { triggerRefresh, addToQueue, business } = usePOS();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const isSubmittingRef = React.useRef(false);
   const industryConfig = getIndustryConfig(business?.settings?.industry);
 
 
@@ -92,7 +93,8 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
 
 
   const handleUpdate = async (values: QuickEditFormValues) => {
-    if (!product) return;
+    if (!product || isSubmitting || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       const dataToUpdate: any = {};
@@ -155,7 +157,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         title: 'Update Failed',
         description: 'Could not queue product update. Please try again.',
       });
-    } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }

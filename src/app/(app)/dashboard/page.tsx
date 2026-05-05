@@ -531,7 +531,10 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-semibold text-primary">
-                        {isLoyaltyEnabled ? `${customer.loyaltyPoints || 0} pts` : `${currencySymbol}${(customer as any).spendInRange?.toLocaleString() || 0}`}
+                        {(isLoyaltyEnabled && (customer.loyaltyPoints || 0) > 0) 
+                          ? `${customer.loyaltyPoints} pts` 
+                          : `${currencySymbol}${(customer as any).spendInRange?.toLocaleString() || 0}`
+                        }
                       </p>
                     </div>
                   </li>
