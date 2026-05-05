@@ -213,10 +213,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [canFetchSubData, businessId, !!initialStats]);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
+  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(50000)) : null), [canFetchSubData, businessId, firestore]);
+  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
@@ -272,6 +272,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
   const receipts = useMemo(() => {
+    if (initialReceipts === null && syncedReceipts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine) && !!businessId) return null;
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
     syncedReceipts.forEach(r => { if (!existingIds.has(r.id)) merged.push(r); });
@@ -1216,6 +1217,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                (isLoadingBusiness && !business) || 
                ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine)) || 
                (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+               (isLoadingReceipts && (!receipts || receipts.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
                (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
                (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
                (isFullSyncingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
