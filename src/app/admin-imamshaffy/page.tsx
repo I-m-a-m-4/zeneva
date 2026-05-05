@@ -1725,7 +1725,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <CyberShield 
                         allBusinesses={businesses} 
                         allUsers={users} 
-                        isLoadingBusinesses={businessesLoading} 
+                        isLoadingBusinesses={false} 
                     />
                 </TabsContent>
             </Tabs>
