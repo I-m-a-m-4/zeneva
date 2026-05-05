@@ -244,20 +244,30 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
     const [directLookupId, setDirectLookupId] = useState('');
     const handleDirectLookup = async () => {
         if (!directLookupId || !allBusinesses) return;
-        const target = allBusinesses.find(b => 
+        
+        // 1. Try to find by business fields directly (ID, Email, Settings Email)
+        let target = allBusinesses.find(b => 
             b.id === directLookupId || 
             b.email?.toLowerCase() === directLookupId.toLowerCase() ||
             b.settings?.email?.toLowerCase() === directLookupId.toLowerCase()
         );
 
+        // 2. Fallback: Find by Owner Email (searching across users)
+        if (!target && allUsers) {
+            const ownerMatch = allUsers.find(u => u.email?.toLowerCase() === directLookupId.toLowerCase());
+            if (ownerMatch && ownerMatch.businessId) {
+                target = allBusinesses.find(b => b.id === ownerMatch.businessId);
+            }
+        }
+
         if (target) {
-            setDestructionEmail(target.email || target.settings?.email || "");
+            setDestructionEmail(target.email || target.settings?.email || directLookupId);
             setDestructionId(target.id);
             setIsDestructionModalOpen(true);
             fetchTargetStats(target.id);
             setDirectLookupId('');
         } else {
-            toast({ variant: 'destructive', title: "Lookup Failed", description: "Entity not found in current sector. Verify ID or Email." });
+            toast({ variant: 'destructive', title: "Lookup Failed", description: "No entity or owner found with that identifier." });
         }
     };
 
