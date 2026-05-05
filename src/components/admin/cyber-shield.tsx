@@ -223,10 +223,17 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
 
     const filteredBusinesses = useMemo(() => {
         if (!allBusinesses) return [];
-        return allBusinesses.filter(b => 
+        let result = allBusinesses.filter(b => 
             b.name?.toLowerCase().includes(searchBusiness.toLowerCase()) || 
             b.email?.toLowerCase().includes(searchBusiness.toLowerCase())
         );
+
+        // Sort by createdAt descending (newest first)
+        return [...result].sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            return dateB - dateA;
+        });
     }, [allBusinesses, searchBusiness]);
 
     const handleSendCode = async () => {

@@ -1881,7 +1881,7 @@ export default function AdminDashboardPage() {
     const firestore = useFirestore();
 
     const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
-    const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances'), orderBy('name')), [firestore]);
+    const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
