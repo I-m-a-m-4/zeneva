@@ -224,6 +224,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const products = useMemo(() => {
+    if (initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine) && !!businessId) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
@@ -244,7 +245,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
       return dateB - dateA;
     });
-  }, [initialProducts, syncedProducts, queuedActions]);
+  }, [initialProducts, syncedProducts, queuedActions, businessId]);
 
   const profile = useMemo(() => {
     if (currentUserProfile) return currentUserProfile;
@@ -1213,7 +1214,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isLoading: (isUserLoading && !offlineProfile) ||
                (!!user && !businessId) ||
                (isLoadingBusiness && !business) || 
-               (isLoadingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+               ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine)) || 
                (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
                (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
                (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||

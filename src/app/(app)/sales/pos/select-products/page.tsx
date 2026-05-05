@@ -425,7 +425,7 @@ export default function SelectProductsPage() {
                                         {searchTerm ? `We couldn't find matches for "${searchTerm}" in your synchronized catalog.` : "This category is currently empty."}
                                     </p>
                                     {searchTerm ? (
-                                        <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setSearchResults(null); }}>
+                                        <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); }}>
                                             Clear Search
                                         </Button>
                                     ) : (

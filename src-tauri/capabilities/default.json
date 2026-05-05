@@ -24,6 +24,9 @@
     "shell:default",
     "log:default",
     "dialog:default",
-    "process:default"
+    "process:default",
+    "notification:default",
+    "http:default"
   ]
 }
+

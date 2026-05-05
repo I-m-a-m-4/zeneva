@@ -592,48 +592,7 @@ const PredictiveDebtInsightCard = ({ products, currencySymbol }: { products: Pro
 
 // --- New UI Card Components ---
 
-const TopPerformingProductsCard = ({ products, onProductClick, currencySymbol }: { products: TopPerformingProduct[], onProductClick: (product: TopPerformingProduct) => void, currencySymbol: string }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><TrendingUp /> Top Performing Products</CardTitle>
-            <CardDescription>Your highest-revenue products from the last 30 days. Click a product for details.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {products.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {products.map(p => (
-                        <button key={p.productId} onClick={() => onProductClick(p)} className="block group text-left">
-                            <Card className="overflow-hidden h-full flex flex-col hover:border-primary transition-all">
-                                <div className="aspect-square bg-muted relative overflow-hidden">
-                                    {p.imageUrl ? (
-                                        <Image
-                                            src={p.imageUrl}
-                                            alt={p.name}
-                                            fill
-                                            className="object-cover group-hover:scale-105 transition-transform"
-                                        />
-                                    ) : (
-                                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20 group-hover:scale-105 transition-transform"><Package className="h-12 w-12" /></div>
-                                    )}
-                                </div>
-                                <div className="p-3 flex-grow flex flex-col">
-                                    <h4 className="text-sm font-semibold line-clamp-2">{p.name}</h4>
-                                    <p className="text-lg font-bold text-primary mt-1">{currencySymbol}{(p.revenue || 0).toLocaleString()}</p>
-                                    <p className="text-xs text-muted-foreground">{p.unitsSold || 0} units · {p.orderCount || 0} orders</p>
-                                    <Badge variant="secondary" className="mt-2 text-xs w-full text-center block whitespace-normal h-auto line-clamp-2">{p.insight}</Badge>
-                                </div>
-                            </Card>
-                        </button>
-                    ))}
-                </div>
-            ) : (
-                <div className="text-center py-10 text-muted-foreground">
-                    <p>No sales data available to determine top products.</p>
-                </div>
-            )}
-        </CardContent>
-    </Card>
-);
+
 
 const ProductPerformanceCard = ({ products, analysis, searchTerm, onSearchChange, onProductClick, currencySymbol }: { products: TopPerformingProduct[], analysis: BusinessAnalysisOutput | null, searchTerm: string, onSearchChange: (val: string) => void, onProductClick: (p: TopPerformingProduct) => void, currencySymbol: string }) => {
     const filteredProducts = useMemo(() => {
@@ -760,8 +719,9 @@ const SmartStockRecommendationCard = ({ recommendations, allProducts, searchTerm
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Bot /> Smart Stock Recommendation</CardTitle>
-                <CardDescription>Predictive forecast to avoid stockouts. The AI will recommend at least 20 items if enough data is available.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Bot /> 30-Day Stock Forecast</CardTitle>
+                <CardDescription>Hardcore logic predicting inventory needs for the next 30 days based on recent sales velocity.</CardDescription>
+
                 <div className="relative pt-2">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
                     <Input placeholder="Search for a product..." value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} className="pl-9" />
@@ -779,8 +739,10 @@ const SmartStockRecommendationCard = ({ recommendations, allProducts, searchTerm
                                 <TableRow>
                                     <TableHead>Product</TableHead>
                                     <TableHead className="text-center">Current Stock</TableHead>
-                                    <TableHead className="text-center">Recommended Stock</TableHead>
-                                    <TableHead>AI Reasoning</TableHead>
+                                    <TableHead className="text-center">Stock for next 30 Days</TableHead>
+
+                                    <TableHead>Algorithmic Forecast</TableHead>
+
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1264,7 +1226,7 @@ function ExecutiveBriefingTab() {
         return allStats.sort((a, b) => b.revenue - a.revenue);
     }, [receipts, onlineOrders, products]);
 
-    const topPerformingProducts = useMemo(() => allProductPerformance.slice(0, 5), [allProductPerformance]);
+
 
 
     const handleGenerateAnalysis = () => {
@@ -1451,7 +1413,46 @@ function ExecutiveBriefingTab() {
                     customers: customerInput,
                     currencySymbol
                 });
-                const dataToSave: BusinessAnalysisOutput = { ...result, createdAt: new Date() };
+
+                // --- HARDCORE STOCK LOGIC (Deterministic) ---
+                const last30Days = subDays(new Date(), 30);
+                const salesLast30 = recentSales.filter(s => safeToDate(s.createdAt) >= last30Days);
+                
+                const unitsSoldLast30: Record<string, number> = {};
+                salesLast30.forEach(s => {
+                    (s.items || []).forEach(item => {
+                        if (item.productId) {
+                            unitsSoldLast30[item.productId] = (unitsSoldLast30[item.productId] || 0) + (item.quantity || 0);
+                        }
+                    });
+                });
+
+                const hardcoreStockRecs: SmartStockRecommendation[] = products.map(p => {
+                    const sold = unitsSoldLast30[p.id] || 0;
+                    const ads = sold / 30;
+                    const buffer = 1.5; // 50% safety buffer
+                    const recommended = Math.ceil(sold * buffer);
+                    
+                    if (recommended > 0 || (p.stock || 0) < 5) {
+                        return {
+                            productId: p.id,
+                            name: p.name,
+                            recommendedStock: Math.max(recommended, 10), // Min 10 for any active product
+                            confidence: 100,
+                            reason: `Based on a sales velocity of ${sold} units/month, you need ${recommended} units to cover the next 30 days (includes 50% safety buffer for growth).`
+                        };
+                    }
+                    return null;
+                }).filter((r): r is SmartStockRecommendation => r !== null)
+                  .sort((a, b) => b.recommendedStock - a.recommendedStock)
+                  .slice(0, 50); // Top 50 recommendations
+
+                const dataToSave: BusinessAnalysisOutput = { 
+                    ...result, 
+                    smartStockRecommendations: hardcoreStockRecs, // Override AI with Hardcore Logic
+                    createdAt: new Date() 
+                };
+
 
                 const businessDocRef = doc(firestore, 'businessInstances', business.id);
                 await updateDoc(businessDocRef, { 'settings.businessAnalysis': { ...result, createdAt: serverTimestamp() } });
@@ -1494,12 +1495,6 @@ function ExecutiveBriefingTab() {
                     </Card>
                 ) : (
                     <div className="space-y-6">
-                        <TopPerformingProductsCard
-                            products={topPerformingProducts}
-                            onProductClick={(p) => setDetailProduct(p)}
-                            currencySymbol={currencySymbol}
-                        />
-
                         <ProductPerformanceCard
                             products={allProductPerformance}
                             analysis={analysis}

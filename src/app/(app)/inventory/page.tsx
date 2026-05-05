@@ -282,7 +282,7 @@ function InventoryPageContent() {
     });
 
     return valid;
-  }, [products, searchResults, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
+  }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
   const totalCount = filteredProducts.length;
 
