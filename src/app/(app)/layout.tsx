@@ -713,7 +713,17 @@ export default function AuthenticatedLayout({
       return part;
     });
   };
-
+  const handleClosePermissionPopup = React.useCallback(async () => {
+    if (permissionPopup && firestore && currentUserProfile) {
+      try {
+        const docRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, permissionPopup.id);
+        await updateDoc(docRef, { read: true });
+      } catch (e) {
+        console.error('Error marking permission notification as read:', e);
+      }
+    }
+    setPermissionPopup(null);
+  }, [permissionPopup, firestore, currentUserProfile]);
   return (
     <>
       <TooltipProvider>
@@ -1159,11 +1169,7 @@ export default function AuthenticatedLayout({
       {/* Permission Update Popup */}
       <Dialog open={!!permissionPopup} onOpenChange={(open) => {
         if (!open) {
-          // If closed, also mark as read in firestore so it doesn't pop up again
-          if (permissionPopup && firestore && currentUserProfile) {
-            updateDoc(doc(firestore, `users/${currentUserProfile.id}/notifications`, permissionPopup.id), { read: true }).catch(console.error);
-          }
-          setPermissionPopup(null);
+          handleClosePermissionPopup();
         }
       }}>
         <DialogContent className="max-w-md sm:max-w-lg border-2 border-primary/20 bg-background shadow-2xl">
@@ -1177,7 +1183,7 @@ export default function AuthenticatedLayout({
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-center pt-2">
-            <Button onClick={() => setPermissionPopup(null)} className="w-full sm:w-1/2" size="lg">
+            <Button onClick={handleClosePermissionPopup} className="w-full sm:w-1/2" size="lg">
               Got it, thanks!
             </Button>
           </div>
