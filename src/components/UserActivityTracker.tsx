@@ -69,6 +69,10 @@ export function UserActivityTracker() {
                     console.log("User session updated successfully");
                 }
             } catch (error: any) {
+                if (error?.message?.includes('Missing or insufficient permissions') || error?.code === 'permission-denied') {
+                    // Silently ignore during logout as auth state is cleared before the request finishes
+                    return;
+                }
                 console.error("Error updating user activity/session:", error);
             }
         };
