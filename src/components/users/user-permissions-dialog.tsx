@@ -143,21 +143,51 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
                 permissions: permissions
             });
             
-            // Determine if any permissions were granted
-            const grantedPermissions = [];
+            // Determine which permissions were granted or revoked compared to original
+            const originalPermissions: Record<string, boolean> = {};
+            const currentSaved = user.permissions || {};
+            PERMISSIONS.forEach(p => {
+                if (currentSaved[p.id] !== undefined) {
+                    originalPermissions[p.id] = currentSaved[p.id];
+                } else {
+                    originalPermissions[p.id] = getInitialValue(p.id, user.role);
+                }
+            });
+
+            const granted: string[] = [];
+            const revoked: string[] = [];
+
             for (const key in permissions) {
-                if (permissions[key]) {
+                const originalVal = !!originalPermissions[key];
+                const newVal = !!permissions[key];
+
+                if (newVal !== originalVal) {
                     const permDef = PERMISSIONS.find(p => p.id === key);
-                    if (permDef) grantedPermissions.push(permDef.label);
+                    if (permDef) {
+                        if (newVal) {
+                            granted.push(permDef.label);
+                        } else {
+                            revoked.push(permDef.label);
+                        }
+                    }
                 }
             }
-            
-            if (grantedPermissions.length > 0) {
+
+            if (granted.length > 0 || revoked.length > 0) {
+                let notifBody = "Your permissions have been updated.";
+                if (granted.length > 0 && revoked.length > 0) {
+                    notifBody = `Your permissions have been updated. Granted: ${granted.join(', ')}. Revoked: ${revoked.join(', ')}.`;
+                } else if (granted.length > 0) {
+                    notifBody = `Your permissions have been updated. You now have access to: ${granted.join(', ')}.`;
+                } else if (revoked.length > 0) {
+                    notifBody = `Your permissions have been updated. Your access has been restricted for: ${revoked.join(', ')}.`;
+                }
+
                 const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
                 const notifRef = collection(firestore, `users/${user.id}/notifications`);
                 await addDoc(notifRef, {
                     title: "Access Permissions Updated",
-                    body: `Your permissions have been updated. You now have access to: ${grantedPermissions.join(', ')}.`,
+                    body: notifBody,
                     createdAt: serverTimestamp(),
                     read: false,
                     type: 'permission_update'
