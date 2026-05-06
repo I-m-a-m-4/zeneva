@@ -703,6 +703,17 @@ export default function AuthenticatedLayout({
     hasRouteAccess = isSuperAdmin || (allowedRoles.includes(userRole) && !isExplicitlyDenied) || isExplicitlyAllowed;
   }
 
+  const formatBodyText = (text: string) => {
+    if (!text) return '';
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
   return (
     <>
       <TooltipProvider>
@@ -1162,7 +1173,7 @@ export default function AuthenticatedLayout({
             </div>
             <DialogTitle className="text-center text-2xl font-bold">{permissionPopup?.title}</DialogTitle>
             <DialogDescription className="text-center text-base pt-2">
-              {permissionPopup?.body}
+              {formatBodyText(permissionPopup?.body || '')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-center pt-2">

@@ -174,13 +174,14 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
             }
 
             if (granted.length > 0 || revoked.length > 0) {
+                const boldList = (items: string[]) => items.map(item => `**${item}**`).join(', ');
                 let notifBody = "Your permissions have been updated.";
                 if (granted.length > 0 && revoked.length > 0) {
-                    notifBody = `Your permissions have been updated. Granted: ${granted.join(', ')}. Revoked: ${revoked.join(', ')}.`;
+                    notifBody = `Your permissions have been updated. Granted: ${boldList(granted)}. Revoked: ${boldList(revoked)}.`;
                 } else if (granted.length > 0) {
-                    notifBody = `Your permissions have been updated. You now have access to: ${granted.join(', ')}.`;
+                    notifBody = `Your permissions have been updated. You now have access to: ${boldList(granted)}.`;
                 } else if (revoked.length > 0) {
-                    notifBody = `Your permissions have been updated. Your access has been restricted for: ${revoked.join(', ')}.`;
+                    notifBody = `Your permissions have been updated. Your access has been restricted for: ${boldList(revoked)}.`;
                 }
 
                 const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
