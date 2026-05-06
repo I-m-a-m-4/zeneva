@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
 import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, LogOut } from 'lucide-react';
 import {
     Select,
