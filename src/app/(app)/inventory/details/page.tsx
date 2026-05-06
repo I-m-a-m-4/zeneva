@@ -366,6 +366,8 @@ function EditProductContent() {
     const handleDelete = async () => {
         if (!productId || !business || !currentUserProfile) return;
 
+        setIsDeleteDialogOpen(false);
+
         addToQueue({
             type: 'delete-product',
             payload: { productIds: [productId] }
