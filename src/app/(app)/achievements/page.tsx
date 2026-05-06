@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import { CachedImage } from "@/components/shared/cached-image";
+import Image from "next/image";
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users, Download } from 'lucide-react';
