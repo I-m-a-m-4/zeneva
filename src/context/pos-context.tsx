@@ -4,6 +4,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useMemo, use
 import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { getAuth } from 'firebase/auth';
 import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
@@ -191,8 +192,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     const reconcileStats = async () => {
       try {
+        if (!getAuth().currentUser) return;
         const customersCount = await getAggregateFromServer(query(collection(firestore, "customers"), where("businessId", "==", businessId)), { total: count() });
+        if (!getAuth().currentUser) return;
         const productsCount = await getAggregateFromServer(query(collection(firestore, "products"), where("businessId", "==", businessId)), { total: count() });
+        if (!getAuth().currentUser) return;
         
         const realTotalCustomers = customersCount.data().total;
         const realTotalProducts = productsCount.data().total;
@@ -204,7 +208,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           }, { merge: true });
         }
       } catch (e) {
-        console.error("Failed to reconcile stats:", e);
+        // Only log error if the user is actually still logged in (to suppress normal abort/logout permission errors)
+        if (getAuth().currentUser) {
+          console.error("Failed to reconcile stats:", e);
+        }
       }
     };
 

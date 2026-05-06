@@ -427,6 +427,19 @@ export default function AuthenticatedLayout({
   const [lastNotifiedId, setLastNotifiedId] = React.useState<string | null>(null);
   const [permissionPopup, setPermissionPopup] = React.useState<{ id: string, title: string, body: string } | null>(null);
 
+  const handleClosePermissionPopup = React.useCallback(async () => {
+    if (permissionPopup && firestore && currentUserProfile) {
+      try {
+        const docRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, permissionPopup.id);
+        const { updateDoc } = await import('firebase/firestore');
+        await updateDoc(docRef, { read: true });
+      } catch (e) {
+        console.error('Error marking permission notification as read:', e);
+      }
+    }
+    setPermissionPopup(null);
+  }, [permissionPopup, firestore, currentUserProfile]);
+
   React.useEffect(() => {
     if (userNotifications && userNotifications.length > 0) {
       // Check for unread permission updates to show as a popup
@@ -713,17 +726,6 @@ export default function AuthenticatedLayout({
       return part;
     });
   };
-  const handleClosePermissionPopup = React.useCallback(async () => {
-    if (permissionPopup && firestore && currentUserProfile) {
-      try {
-        const docRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, permissionPopup.id);
-        await updateDoc(docRef, { read: true });
-      } catch (e) {
-        console.error('Error marking permission notification as read:', e);
-      }
-    }
-    setPermissionPopup(null);
-  }, [permissionPopup, firestore, currentUserProfile]);
   return (
     <>
       <TooltipProvider>
