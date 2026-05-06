@@ -77,6 +77,18 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
         setIsStarting(true);
         setCameraError(null);
         try {
+            // Force permission prompt natively before attempting to list cameras
+            // This is required for mobile webviews and Tauri apps to trigger the OS dialog
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    // Stop the stream immediately, we just needed the permission granted
+                    stream.getTracks().forEach(track => track.stop());
+                } catch (permissionErr) {
+                    console.warn("Explicit getUserMedia failed, continuing to getCameras anyway...", permissionErr);
+                }
+            }
+
             const devices = await Html5Qrcode.getCameras();
             if (devices && devices.length > 0) {
                 setHasCamera(true);
