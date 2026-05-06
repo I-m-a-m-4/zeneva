@@ -21,8 +21,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil } from "lucide-react";
-import { useFirestore } from '@/firebase';
-import { doc, writeBatch } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, writeBatch, query, collection, where } from 'firebase/firestore';
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
@@ -107,17 +107,25 @@ export default function CustomersPage() {
   const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
 
+  // Fetch ALL customers for this page without limits
+  const allCustomersQuery = useMemoFirebase(() => (business?.id && firestore ? query(collection(firestore, "customers"), where("businessId", "==", business.id)) : null), [business?.id, firestore]);
+  const { data: allCustomers, isLoading: isLoadingAllCustomers } = useCollection<Customer>(allCustomersQuery);
+
   const [isDataLoaded, setIsDataLoaded] = React.useState(false);
-  const isLoading = isPosLoading || (!isDataLoaded && customers === null);
+  
+  // Use allCustomers if available, otherwise fallback to the POS context customers
+  const displayCustomers = allCustomers || customers;
+  
+  const isLoading = isPosLoading || isLoadingAllCustomers || (!isDataLoaded && displayCustomers === null);
 
   // Prevent flicker of "No Customers Found"
   React.useEffect(() => {
-    if (!isPosLoading && customers !== null) {
+    if (!isPosLoading && displayCustomers !== null) {
       // Small delay to ensure any background syncs have a chance to start
       const timer = setTimeout(() => setIsDataLoaded(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, [isPosLoading, customers]);
+  }, [isPosLoading, displayCustomers]);
 
   // Global Search Logic
   React.useEffect(() => {
@@ -146,7 +154,7 @@ export default function CustomersPage() {
       });
     }
 
-    let base = [...(customers || [])].map(c => {
+    let base = [...(displayCustomers || [])].map(c => {
       const fromReceipts = receiptTotals[c.id] || 0;
       return {
         ...c,
@@ -194,7 +202,7 @@ export default function CustomersPage() {
     });
 
     return filtered;
-  }, [searchTerm, customers, sortBy, searchedCustomers, receipts]);
+  }, [searchTerm, displayCustomers, sortBy, searchedCustomers, receipts]);
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
@@ -230,7 +238,7 @@ export default function CustomersPage() {
       const docRef = doc(firestore, 'customers', id);
       batch.delete(docRef);
 
-      const deletedCustomer = customers?.find(p => p.id === id);
+      const deletedCustomer = displayCustomers?.find(p => p.id === id);
       if (deletedCustomer) {
         auditPromises.push(logAuditEvent(firestore, business.id, currentUser, {
           action: 'customer.delete',
@@ -502,7 +510,7 @@ export default function CustomersPage() {
           isOpen={isAddCustomerOpen}
           onOpenChange={setIsAddCustomerOpen}
           businessId={currentUser.businessId}
-          customers={customers}
+          customers={displayCustomers}
         />
       )}
       {currentUser?.businessId && (
@@ -510,7 +518,7 @@ export default function CustomersPage() {
           isOpen={isImportOpen}
           onOpenChange={setIsImportOpen}
           businessId={currentUser.businessId}
-          existingCustomers={customers || []}
+          existingCustomers={displayCustomers || []}
           onSuccess={() => {
             triggerRefresh();
             setIsImportOpen(false);
