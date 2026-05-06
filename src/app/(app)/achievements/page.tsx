@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import Image from 'next/image';
+import { CachedImage } from "@/components/shared/cached-image";
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users, Download } from 'lucide-react';
@@ -349,7 +349,7 @@ export default function AchievementsPage() {
                                             </div>
 
                                             <div className="relative z-10 flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-full bg-background/50 backdrop-blur-sm flex-shrink-0 overflow-hidden border shadow-sm group-hover:scale-110 transition-transform duration-500">
-                                                <Image src={milestone.imageUrl} alt={milestone.label} width={96} height={96} className="object-contain p-2" />
+                                                 <CachedImage src={milestone.imageUrl} alt={milestone.label} className="object-contain p-2 w-full h-full" />
                                             </div>
                                             <div className="flex-1 relative z-10">
                                                 <p className="font-bold text-base md:text-lg text-foreground mb-1 group-hover:text-primary transition-colors">{milestone.label}</p>
@@ -403,12 +403,10 @@ export default function AchievementsPage() {
 
                         <div className="relative z-10 w-32 h-32 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-primary/20">
                             {selectedMilestone && (
-                                <Image
+                                <CachedImage
                                     src={selectedMilestone.imageUrl}
                                     alt="Achievement"
-                                    width={128} // Increased size
-                                    height={128}
-                                    className="object-cover rounded-full" // Removed p-2, added object-cover
+                                    className="object-cover rounded-full w-full h-full" // Removed p-2, added object-cover
                                 />
                             )}
                         </div>

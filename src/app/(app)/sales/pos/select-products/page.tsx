@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
 import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock } from "lucide-react";
-import Image from "next/image";
+import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
 import *as React from "react";
 import type { Product } from '@/types';
@@ -56,11 +56,10 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
             >
                 {product.imageUrl ? (
                     <div className="relative w-full h-full">
-                        <Image
+                        <CachedImage
                             src={product.imageUrl}
                             alt={product.name}
-                            fill
-                            className="object-contain hover:scale-105 transition-transform"
+                            className="w-full h-full object-contain hover:scale-105 transition-transform"
                         />
                     </div>
 

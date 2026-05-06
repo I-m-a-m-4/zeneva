@@ -970,9 +970,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       });
       
-      // 2. Hydrate POS from SQLite for instant start
+       // 2. Hydrate POS from SQLite for instant start
       getCachedProducts(businessId).then(p => { if (p.length > 0) setSyncedProducts(p); });
       getCachedCustomers(businessId).then(c => { if (c.length > 0) setSyncedCustomers(c); });
+      getCachedReceipts(businessId).then(r => { if (r.length > 0) setSyncedReceipts(r); });
       getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
       getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
     }

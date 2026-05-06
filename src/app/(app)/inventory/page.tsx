@@ -66,7 +66,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
+import { CachedImage } from "@/components/shared/cached-image";
 import { useFirestore } from '@/firebase';
 import { collection, doc, writeBatch, serverTimestamp, query, where, orderBy, limit, startAfter, onSnapshot, count, getAggregateFromServer, getDocs, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import VisualCountDialog from '@/components/inventory/visual-count-dialog';
@@ -723,10 +723,9 @@ function InventoryPageContent() {
                               setPreviewImage({ src: product.imageUrl!, alt: product.name });
                             }}
                           >
-                            <Image
+                            <CachedImage
                               alt={product.name}
-                              className="aspect-square rounded-md object-cover hover:ring-2 ring-primary/50 transition-all"
-                              fill
+                              className="aspect-square rounded-md object-cover hover:ring-2 ring-primary/50 transition-all w-full h-full"
                               src={product.imageUrl}
                             />
                             {(product as any).isOptimistic && (
