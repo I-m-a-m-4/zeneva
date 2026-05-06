@@ -177,7 +177,12 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 
     const staffUsers = React.useMemo(() => {
         if (!users) return [];
-        return users.filter(user => user.id !== currentUserId);
+        // Sort current logged-in user to the top of the list, then sort others alphabetically by name
+        return [...users].sort((a, b) => {
+            if (a.id === currentUserId) return -1;
+            if (b.id === currentUserId) return 1;
+            return (a.name || '').localeCompare(b.name || '');
+        });
     }, [users, currentUserId]);
 
     const totalUsers = (users?.length || 0) + (invitations?.length || 0);
