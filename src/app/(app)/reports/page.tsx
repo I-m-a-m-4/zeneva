@@ -160,6 +160,7 @@ export default function ReportsDashboard() {
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold,
             uniqueProductsSold: uniqueProductIds.size,
+            catalogSize: Math.max(stats?.totalProducts || 0, products.length),
             dailyAverageSales: totalSales / activeDays,
             dailyAverageRevenue: totalRevenue / activeDays
         }
@@ -322,6 +323,12 @@ export default function ReportsDashboard() {
                                 value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
                                 icon={TrendingUp}
                                 description="Sales per day"
+                            />
+                            <ReportStatCard
+                                title="Catalog Size"
+                                value={finalReportData?.catalogSize?.toLocaleString() || '0'}
+                                icon={Package}
+                                description="Total unique products in inventory"
                             />
                             <ReportStatCard
                                 title="Avg Order"
