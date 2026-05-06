@@ -651,6 +651,58 @@ export default function AuthenticatedLayout({
     return currentPathname.startsWith(linkHref);
   };
 
+  const ROUTE_PERMISSIONS: Record<string, string[]> = {
+    '/dashboard': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/inventory/debts': ['admin', 'manager', 'owner', 'super-admin'],
+    '/inventory/troubleshoot': ['admin', 'manager', 'owner', 'super-admin'],
+    '/inventory/add': ['admin', 'manager', 'owner', 'super-admin'],
+    '/inventory': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/sales': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/storefront': ['admin', 'owner', 'super-admin'],
+    '/online-orders': ['admin', 'manager', 'owner', 'super-admin'],
+    '/receipts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/invoices': ['admin', 'manager', 'owner', 'super-admin'],
+    '/reports': ['admin', 'owner', 'super-admin'],
+    '/ai-insights': ['admin', 'manager', 'owner', 'super-admin'],
+    '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/users': ['admin', 'owner', 'super-admin'],
+    '/audit-log': ['admin', 'owner', 'super-admin'],
+    '/billing': ['admin', 'owner', 'super-admin'],
+    '/settings': ['admin', 'owner', 'super-admin'],
+    '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+  };
+
+  const protectedRoute = Object.keys(ROUTE_PERMISSIONS)
+    .sort((a, b) => b.length - a.length)
+    .find(route => pathname.startsWith(route));
+
+  let hasRouteAccess = true;
+  if (protectedRoute && currentUserProfile && !isLoading && !isUserLoading) {
+    const userRole = currentUserProfile.role;
+    const isSuperAdmin = currentUserProfile.email === 'belloimam431@gmail.com';
+    const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
+    const permissions = currentUserProfile.permissions || {};
+
+    const isExplicitlyDenied = 
+      (protectedRoute.startsWith('/sales') && permissions.record_sales === false) ||
+      (protectedRoute === '/reports' && permissions.view_reports === false) ||
+      (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === false) ||
+      (protectedRoute === '/customers' && permissions.view_customers === false) ||
+      (protectedRoute === '/audit-log' && permissions.view_audit_logs === false) ||
+      (protectedRoute === '/online-orders' && permissions.manage_online_orders === false);
+
+    const isExplicitlyAllowed = 
+      (protectedRoute === '/reports' && permissions.view_reports === true) ||
+      (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === true) ||
+      (protectedRoute === '/customers' && permissions.view_customers === true) ||
+      (protectedRoute === '/audit-log' && permissions.view_audit_logs === true) ||
+      (protectedRoute === '/online-orders' && permissions.manage_online_orders === true) ||
+      (protectedRoute.startsWith('/sales') && permissions.record_sales === true);
+
+    hasRouteAccess = isSuperAdmin || (allowedRoles.includes(userRole) && !isExplicitlyDenied) || isExplicitlyAllowed;
+  }
+
   return (
     <>
       <TooltipProvider>
@@ -944,7 +996,18 @@ export default function AuthenticatedLayout({
               </header>
               <main id="app-main-content" className="flex-1 overflow-y-auto p-4 sm:p-6 md:pb-6 font-body smooth-scroll bg-background relative">
                 <div className={cn("w-full transition-all duration-700 min-h-full pb-32 md:pb-0", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
-                  {children}
+                  {hasRouteAccess ? children : (
+                    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6 bg-card rounded-2xl border shadow-sm animate-in fade-in duration-300">
+                      <div className="p-4 bg-destructive/10 rounded-full text-destructive mb-4">
+                        <ShieldAlert className="h-10 w-10" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-foreground mb-2">Access Denied</h3>
+                      <p className="text-muted-foreground max-w-sm mb-6">
+                        You do not have the required permissions to view this page. Redirecting you...
+                      </p>
+                      <Loader className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  )}
                 </div>
                 {showSubscriptionBlock && (
                    <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] animate-in fade-in duration-500">

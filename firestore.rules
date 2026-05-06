@@ -150,7 +150,12 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
       
       match /notifications/{notificationId} {
-        allow read, write: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
+        allow read: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
+        allow write: if isSuperAdmin() || 
+                        (isUserAuthenticated() && (
+                          request.auth.uid == userId || 
+                          (isRequestingUserAdmin() && isRequestingUserMemberOf(get(/databases/$(database)/documents/users/$(userId)).data.get('businessId', 'none')))
+                        ));
       }
 
       match /fcmTokens/{tokenId} {
