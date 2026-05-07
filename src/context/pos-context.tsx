@@ -663,19 +663,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         successfulIds.forEach(id => removeActionFromOfflineQueue(id as string));
       }
 
-      // Mark as synced first
-      const nextActions = prev.map(a => 
-        successfulIds.has(a.id) ? { ...a, status: 'synced' as any } : a
-      );
-
-      // Actually clear them after 2 seconds
-      if (successfulIds.size > 0) {
-        setTimeout(() => {
-          setQueuedActions(current => current.filter(a => !successfulIds.has(a.id)));
-        }, 2000);
-      }
-
-      return nextActions;
+      // Clear successfully synced actions immediately
+      return prev.filter(a => !successfulIds.has(a.id));
     });
     } finally {
       setIsQueueProcessing(false);

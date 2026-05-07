@@ -16,7 +16,7 @@ export function Toaster() {
   const { toasts } = useToast();
 
   return (
-    <ToastProvider>
+    <ToastProvider duration={3000}>
       {toasts.map(function ({ id, title, description, action, variant, ...props }) {
         let icon: React.ReactNode = null;
         if (variant === 'success') {
