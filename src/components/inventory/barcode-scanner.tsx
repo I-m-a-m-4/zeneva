@@ -81,9 +81,15 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
             // This is required for mobile webviews and Tauri apps to trigger the OS dialog
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                    // Stop the stream immediately, we just needed the permission granted
-                    stream.getTracks().forEach(track => track.stop());
+                    let stream;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    } catch {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    }
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
                 } catch (permissionErr) {
                     console.warn("Explicit getUserMedia failed, continuing to getCameras anyway...", permissionErr);
                 }
