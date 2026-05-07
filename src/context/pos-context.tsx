@@ -138,9 +138,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
-  const [syncedProducts, setSyncedProducts] = useState<Product[]>([]);
-  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>([]);
-  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>([]);
+  const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => secureStorage.getItem<Product[]>('pos_synced_products') || []);
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => secureStorage.getItem<Customer[]>('pos_synced_customers') || []);
+  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => secureStorage.getItem<Receipt[]>('pos_synced_receipts') || []);
   const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
@@ -953,6 +953,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem(POS_DISCOUNT_KEY, discount); }, [discount]);
   useEffect(() => { secureStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); }, [paymentMethod]);
   useEffect(() => { secureStorage.setItem(POS_AUTO_PRINT_KEY, autoPrint); }, [autoPrint]);
+  useEffect(() => { secureStorage.setItem('pos_synced_products', syncedProducts); }, [syncedProducts]);
+  useEffect(() => { secureStorage.setItem('pos_synced_customers', syncedCustomers); }, [syncedCustomers]);
+  useEffect(() => { secureStorage.setItem('pos_synced_receipts', syncedReceipts); }, [syncedReceipts]);
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
   
   useEffect(() => {
