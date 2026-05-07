@@ -143,7 +143,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => secureStorage.getItem<Receipt[]>('pos_synced_receipts') || []);
   const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
-  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(null);
+  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => secureStorage.getItem<BusinessStats>('pos_offline_stats'));
   const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => Date.now());
 
   // --- POS Local States ---
@@ -957,6 +957,59 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem('pos_synced_customers', syncedCustomers); }, [syncedCustomers]);
   useEffect(() => { secureStorage.setItem('pos_synced_receipts', syncedReceipts); }, [syncedReceipts]);
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
+
+  // Background online-to-offline syncing effects for instant offline availability on all pages
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setSyncedProducts(prev => {
+        const merged = [...prev];
+        const existingIds = new Set(merged.map(p => p.id));
+        initialProducts.forEach(p => {
+          const idx = merged.findIndex(m => m.id === p.id);
+          if (idx !== -1) merged[idx] = p;
+          else merged.push(p);
+        });
+        return merged;
+      });
+    }
+  }, [initialProducts]);
+
+  useEffect(() => {
+    if (initialCustomers && initialCustomers.length > 0) {
+      setSyncedCustomers(prev => {
+        const merged = [...prev];
+        const existingIds = new Set(merged.map(c => c.id));
+        initialCustomers.forEach(c => {
+          const idx = merged.findIndex(m => m.id === c.id);
+          if (idx !== -1) merged[idx] = c;
+          else merged.push(c);
+        });
+        return merged;
+      });
+    }
+  }, [initialCustomers]);
+
+  useEffect(() => {
+    if (initialReceipts && initialReceipts.length > 0) {
+      setSyncedReceipts(prev => {
+        const merged = [...prev];
+        const existingIds = new Set(merged.map(r => r.id));
+        initialReceipts.forEach(r => {
+          const idx = merged.findIndex(m => m.id === r.id);
+          if (idx !== -1) merged[idx] = r;
+          else merged.push(r);
+        });
+        return merged;
+      });
+    }
+  }, [initialReceipts]);
+
+  useEffect(() => {
+    if (initialStats) {
+      setOfflineStats(initialStats);
+      secureStorage.setItem('pos_offline_stats', initialStats);
+    }
+  }, [initialStats]);
   
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;

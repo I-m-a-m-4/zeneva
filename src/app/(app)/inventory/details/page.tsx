@@ -143,11 +143,18 @@ function EditProductContent() {
     const productId = searchParams.get('id');
 
     const { toast } = useToast();
-    const { currentUserProfile, business, queuedActions, addToQueue } = usePOS();
+    const { currentUserProfile, business, queuedActions, addToQueue, products } = usePOS();
     const firestore = useFirestore();
 
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
-    const { data: product, isLoading: isProductLoading } = useDoc<Product>(productDocRef);
+    const { data: remoteProduct, isLoading: isRemoteProductLoading } = useDoc<Product>(productDocRef);
+
+    const localProduct = React.useMemo(() => {
+        return products?.find(p => p.id === productId) || null;
+    }, [products, productId]);
+
+    const product = remoteProduct || localProduct;
+    const isProductLoading = isRemoteProductLoading && !localProduct;
 
     const [isSaving, setIsSaving] = React.useState(false);
     const isSubmitting = React.useRef(false);
@@ -253,7 +260,7 @@ function EditProductContent() {
 
     const productType = form.watch("type");
     const categoryType = form.watch("categoryType");
-    const { products } = usePOS();
+
 
     React.useEffect(() => {
         if (product) {
