@@ -340,7 +340,7 @@ function CustomerDetailContent() {
                         <CardTitle>Purchase History</CardTitle>
                         <CardDescription>Products this customer has purchased, sorted by most recent.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="max-h-[380px] overflow-y-auto pr-2 scrollbar-thin">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -445,7 +445,7 @@ function CustomerDetailContent() {
                                                     "text-[10px] px-1 rounded inline-block ml-1 uppercase font-bold",
                                                     receipt.status === 'unpaid' ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                                 )}>
-                                                    {receipt.status || 'paid'}
+                                                    {receipt.status === 'unpaid' ? 'unpaid' : 'paid'}
                                                 </div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
