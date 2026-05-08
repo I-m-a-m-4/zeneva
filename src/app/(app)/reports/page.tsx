@@ -103,8 +103,8 @@ export default function ReportsDashboard() {
         const toDate = date?.to;
 
         return allReceipts.filter(receipt => {
-            if (!receipt.createdAt?.toDate) return false;
-            const createdAt = receipt.createdAt.toDate();
+            if (!receipt.createdAt) return false;
+            const createdAt = safeToDate(receipt.createdAt);
 
             if (fromDate && createdAt < fromDate) return false;
             if (toDate) {
@@ -116,7 +116,10 @@ export default function ReportsDashboard() {
         });
     }, [allReceipts, date]);
 
-    const isLoading = isPosLoading || isFetchingBatch;
+    const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    const isLoading = isNative 
+        ? ((isPosLoading && (!allReceipts || allReceipts.length === 0)) || isFetchingBatch)
+        : (isPosLoading || isFetchingBatch);
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);

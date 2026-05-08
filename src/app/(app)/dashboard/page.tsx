@@ -101,7 +101,8 @@ export default function DashboardPage() {
   const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);
   const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
-  const isLoading = isPosLoading; // Primary connection loading only
+  const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+  const isLoading = isNative ? (isPosLoading && (!products || products.length === 0)) : isPosLoading; // Primary connection loading only
   const isUpdating = isFetchingBatch; // Secondary background update state
 
   const dashboardData = React.useMemo(() => {

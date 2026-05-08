@@ -245,7 +245,8 @@ export default function SelectProductsPage() {
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
-    const isLoading = isPosLoading;
+    const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    const isLoading = isNative ? (isPosLoading && (!products || products.length === 0)) : isPosLoading;
 
     const performManualSearch = () => {
         if (!searchTerm.trim()) return;

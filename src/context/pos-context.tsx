@@ -1379,12 +1379,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isLoading: (isUserLoading && !offlineProfile) ||
                (!!user && !businessId) ||
                (isLoadingBusiness && !business) || 
-               ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine)) || 
-               (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
-               (isLoadingReceipts && (!receipts || receipts.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-               (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-               (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-               (isFullSyncingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+               ((() => {
+                 const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+                 if (isTauri) {
+                   return syncedProducts.length === 0;
+                 }
+                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+                        (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
+                        (isLoadingReceipts && (!receipts || receipts.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+                        (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+                        (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
+                        (isFullSyncingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine));
+               })()) ||
                !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
     user, firestore,

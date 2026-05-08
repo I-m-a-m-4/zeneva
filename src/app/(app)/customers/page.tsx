@@ -113,19 +113,27 @@ export default function CustomersPage() {
 
   const [isDataLoaded, setIsDataLoaded] = React.useState(false);
   
+  const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+
   // Use allCustomers if available, otherwise fallback to the POS context customers
-  const displayCustomers = allCustomers || customers;
+  const displayCustomers = isNative ? customers : (allCustomers || customers);
   
-  const isLoading = isPosLoading || isLoadingAllCustomers || (!isDataLoaded && displayCustomers === null);
+  const isLoading = isNative 
+    ? (isPosLoading && (!customers || customers.length === 0))
+    : (isPosLoading || isLoadingAllCustomers || (!isDataLoaded && displayCustomers === null));
 
   // Prevent flicker of "No Customers Found"
   React.useEffect(() => {
+    if (isNative && customers && customers.length > 0) {
+      setIsDataLoaded(true);
+      return;
+    }
     if (!isPosLoading && displayCustomers !== null) {
       // Small delay to ensure any background syncs have a chance to start
       const timer = setTimeout(() => setIsDataLoaded(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, [isPosLoading, displayCustomers]);
+  }, [isPosLoading, displayCustomers, isNative, customers]);
 
   // Global Search Logic
   React.useEffect(() => {
