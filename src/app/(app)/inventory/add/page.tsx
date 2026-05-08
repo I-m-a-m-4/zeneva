@@ -302,8 +302,8 @@ export default function AddProductPage() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4 max-w-full overflow-x-hidden">
-        <div className="flex items-center gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4 w-full max-w-full px-1.5 sm:px-0 overflow-x-hidden">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <Button variant="outline" size="icon" className="h-7 w-7" asChild>
             <Link href="/inventory">
               <ChevronLeft className="h-4 w-4" />
@@ -739,7 +739,7 @@ export default function AddProductPage() {
             </Card>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-2 md:hidden">
+        <div className="flex flex-wrap items-center justify-center gap-2 w-full px-4 md:hidden">
           <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
             Discard
           </Button>
