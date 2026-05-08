@@ -113,6 +113,7 @@ interface POSContextType {
   holdCurrentSale: (notes?: string) => void;
   resumeHeldSale: (heldSaleId: string) => void;
   deleteHeldSale: (heldSaleId: string) => void;
+  voidReceipt: (receiptId: string) => Promise<void>;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -1173,6 +1174,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
     secureStorage.setItem(POS_HELD_SALES_KEY, updated);
   }, [heldSales]);
 
+  const voidReceipt = useCallback(async (receiptId: string) => {
+    setSyncedReceipts(prev => prev.filter(r => r.id !== receiptId));
+    try {
+      const currentSynced = secureStorage.getItem<any[]>('pos_synced_receipts') || [];
+      const updatedSynced = currentSynced.filter(r => r.id !== receiptId);
+      secureStorage.setItem('pos_synced_receipts', updatedSynced);
+    } catch (err) {
+      console.error("Failed to update secureStorage for voided receipt:", err);
+    }
+
+    try {
+      const { deleteReceiptFromOffline } = await import('@/lib/sqlite-sync');
+      await deleteReceiptFromOffline(receiptId);
+    } catch (err) {
+      console.error("Failed to delete receipt from SQLite:", err);
+    }
+  }, []);
+
+
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
     if (!businessId || !firestore) return [];
@@ -1314,11 +1334,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
 
-    heldSales, holdCurrentSale, resumeHeldSale, deleteHeldSale,
+    heldSales, holdCurrentSale, resumeHeldSale, deleteHeldSale, voidReceipt,
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

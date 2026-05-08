@@ -283,6 +283,18 @@ export async function syncReceiptToOffline(businessId: string, receipt: any) {
   }
 }
 
+export async function deleteReceiptFromOffline(receiptId: string) {
+  const db = await getOfflineDb();
+  if (!db) return;
+  
+  try {
+    await db.execute('DELETE FROM receipts WHERE id = $1', [receiptId]);
+  } catch (err) {
+    console.error('SQLite Delete Error (Receipt):', err);
+  }
+}
+
+
 export async function getCachedReceipts(businessId: string, limit: number = 50) {
   const db = await getOfflineDb();
   if (!db) return [];

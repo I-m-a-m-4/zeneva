@@ -70,7 +70,8 @@ function ReceiptsContent() {
     currencySymbol, 
     triggerRefresh,
     searchReceipts,
-    fetchMoreReceipts
+    fetchMoreReceipts,
+    voidReceipt
   } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -194,6 +195,7 @@ function ReceiptsContent() {
 
       toast({ title: 'Sale Voided', description: `Receipt ${receiptToDelete.id.substring(0, 8)} has been voided and stock levels restored.`, variant: 'success' });
       triggerRefresh();
+      await voidReceipt(receiptToDelete.id);
     } catch (e: any) {
       console.error("Failed to void sale:", e);
       toast({ title: 'Error', description: e.message || 'Could not void the sale.', variant: 'destructive' });
