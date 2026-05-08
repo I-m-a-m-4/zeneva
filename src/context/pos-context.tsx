@@ -165,7 +165,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile } = useDoc<UserProfile>(userDocRef);
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
-  const businessId = isProfileReady ? currentUserProfile.businessId : (user ? null : (offlineProfile?.businessId || null));
+  const businessId = isProfileReady ? currentUserProfile.businessId : (offlineProfile?.businessId || null);
 
   const businessDocRef = useMemoFirebase(() => (user && businessId ? doc(firestore, 'businessInstances', businessId) : null), [user, businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
@@ -552,7 +552,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       try {
         switch (action.type) {
           case 'add-customer':
-            const cRef = doc(collection(firestore, 'customers'));
+            const cRef = doc(firestore, 'customers', action.payload.id);
             batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name.toLowerCase(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
             batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(1) }, { merge: true });
             resultData.newId = cRef.id; break;
@@ -677,9 +677,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!isSubscriptionActive) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'Your subscription has expired.' }); return null; }
     
     // --- RBAC Permission Check ---
-    const permissions = currentUserProfile?.permissions || {};
-    const userRole = currentUserProfile?.role;
-    const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
+    const effectiveProfile = currentUserProfile || offlineProfile;
+    const permissions = effectiveProfile?.permissions || {};
+    const userRole = effectiveProfile?.role;
+    const isSuperAdmin = effectiveProfile?.email === 'belloimam431@gmail.com';
     
     // Debug Log to catch the culprit
     if (action.type === 'complete-sale' || action.type === 'add-product' || action.type === 'update-product' || action.type === 'delete-product') {
