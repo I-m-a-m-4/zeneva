@@ -254,9 +254,20 @@ function ReviewPageContent() {
                     resetPOS();
                 };
                 window.addEventListener('afterprint', handleAfterPrint);
-                window.print();
                 
-                // Fallback for browsers that don't reliably fire afterprint or if it fails
+                try {
+                    if (typeof window !== 'undefined' && window.print) {
+                        window.print();
+                    } else {
+                        handleAfterPrint();
+                    }
+                } catch (printError) {
+                    console.warn("Printing failed or unsupported on this device:", printError);
+                    handleAfterPrint();
+                }
+                
+                // Fallback for browsers (especially mobile and standalone PWAs) that don't reliably fire afterprint
+                const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
                 setTimeout(() => {
                     window.removeEventListener('afterprint', handleAfterPrint);
                     // Check if we haven't already navigated (resetPOS clears cart)
@@ -264,7 +275,7 @@ function ReviewPageContent() {
                        router.push('/sales/pos/select-products');
                        resetPOS();
                     }
-                }, 60000); // 1 minute fallback
+                }, isMobile ? 1500 : 3000); // 1.5s on mobile, 3s on desktop fallback instead of 60s
             }, 500);
         } else if (!autoPrint) {
             router.push('/sales/pos/select-products');
