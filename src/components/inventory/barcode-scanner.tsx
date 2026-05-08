@@ -36,6 +36,19 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
 
             if (isOpen && isInstanceActive && !scannerInstanceRef.current) {
                 try {
+                    // Robust check: Wait until the element is present in the DOM
+                    let element = document.getElementById("barcode-reader");
+                    let retries = 0;
+                    while (!element && retries < 10 && isInstanceActive) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        element = document.getElementById("barcode-reader");
+                        retries++;
+                    }
+
+                    if (!element) {
+                        throw new Error("Scanner container element ('barcode-reader') not found in DOM.");
+                    }
+
                     const newScanner = new Html5Qrcode("barcode-reader", {
                         formatsToSupport: [
                             Html5QrcodeSupportedFormats.EAN_13,
@@ -217,6 +230,49 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
         onClose();
     };
 
+    const handleTryAgain = async () => {
+        setCameraError(null);
+        setIsStarting(true);
+        try {
+            // Wait for Dialog to be fully mounted
+            let element = document.getElementById("barcode-reader");
+            let retries = 0;
+            while (!element && retries < 10) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+                element = document.getElementById("barcode-reader");
+                retries++;
+            }
+
+            if (!element) {
+                throw new Error("Scanner container element ('barcode-reader') not found in DOM.");
+            }
+
+            if (!scannerInstanceRef.current) {
+                const newScanner = new Html5Qrcode("barcode-reader", {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ],
+                    verbose: false
+                });
+                scannerInstanceRef.current = newScanner;
+                await startScanning(newScanner);
+            } else {
+                await startScanning(scannerInstanceRef.current);
+            }
+        } catch (err) {
+            console.error("Try again error", err);
+            setCameraError("Could not access camera. Please check permissions.");
+        } finally {
+            setIsStarting(false);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="p-0 overflow-hidden bg-black border-none h-full sm:h-[80vh] sm:max-w-xl max-w-none w-full gap-0">
@@ -301,7 +357,7 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                                 </div>
                                 <h3 className="text-white font-semibold mb-2">Camera Access Error</h3>
                                 <p className="text-white/60 text-sm mb-6 max-w-[250px]">{cameraError}</p>
-                                <Button onClick={() => scannerInstanceRef.current && startScanning(scannerInstanceRef.current)} variant="secondary" className="rounded-full">
+                                <Button onClick={handleTryAgain} variant="secondary" className="rounded-full">
                                     Try Again
                                 </Button>
                             </motion.div>
