@@ -405,7 +405,7 @@ function EditProductContent() {
                             <span className="sr-only">Back</span>
                         </Link>
                     </Button>
-                    <h1 className="flex-1 shrink-0 text-xl font-semibold tracking-tight sm:grow-0 break-words whitespace-normal">
+                    <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words">
                         Edit {categoryType === 'service' ? 'Service' : 'Product'}: {product.name}
                     </h1>
                     <div className="hidden items-center gap-2 md:ml-auto md:flex">

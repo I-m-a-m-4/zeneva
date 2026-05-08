@@ -10,9 +10,9 @@ export async function GET(
   let assets: Array<{ name: string; browser_download_url: string }> = [];
 
   try {
-    const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest', {
+    const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest?t=' + Date.now(), {
       headers: { 'User-Agent': 'zeneva-website' },
-      next: { revalidate: 60 } // Cache latest release for 1 minute
+      cache: 'no-store'
     });
     if (res.ok) {
       const data = await res.json();
@@ -58,23 +58,27 @@ export async function GET(
     }
   }
 
-  // Fallback to hardcoded naming pattern if GitHub API failed or assets were empty
+  // Fallback to hardcoded naming pattern or latest releases page if GitHub API failed or assets were empty
   if (!downloadUrl) {
-    switch (platform) {
-      case 'windows':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
-        break;
-      case 'macos-silicon':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
-        break;
-      case 'macos-intel':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
-        break;
-      case 'android':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+    if (version === AppConfig.version) {
+      downloadUrl = 'https://github.com/I-m-a-m-4/zeneva/releases/latest';
+    } else {
+      switch (platform) {
+        case 'windows':
+          downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
+          break;
+        case 'macos-silicon':
+          downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
+          break;
+        case 'macos-intel':
+          downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
+          break;
+        case 'android':
+          downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
+          break;
+        default:
+          return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+      }
     }
   }
 

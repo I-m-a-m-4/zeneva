@@ -310,15 +310,15 @@ export default function AddProductPage() {
               <span className="sr-only">Back</span>
             </Link>
           </Button>
-          <h1 className="flex-1 shrink-0 text-xl font-semibold tracking-tight sm:grow-0 break-words whitespace-normal">
+          <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words">
             Add New {categoryType === 'service' ? 'Service' : 'Product'}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
             <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
               Discard
             </Button>
-            <Button size="default" type="submit" disabled={isSaving || isLoading}>
-              {(isSaving || isLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button size="default" type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save {categoryType === 'service' ? 'Service' : 'Product'}
             </Button>
           </div>
@@ -743,8 +743,8 @@ export default function AddProductPage() {
           <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
             Discard
           </Button>
-          <Button size="default" type="submit" disabled={isSaving || isLoading}>
-            {(isSaving || isLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button size="default" type="submit" disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save {categoryType === 'service' ? 'Service' : 'Product'}
           </Button>
         </div>
