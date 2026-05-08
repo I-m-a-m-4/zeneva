@@ -7,16 +7,20 @@ export async function GET(
 ) {
   const { platform } = params;
   let version = AppConfig.version;
+  let assets: Array<{ name: string; browser_download_url: string }> = [];
 
   try {
     const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest', {
       headers: { 'User-Agent': 'zeneva-website' },
-      next: { revalidate: 300 } // Cache latest release for 5 minutes
+      next: { revalidate: 60 } // Cache latest release for 1 minute
     });
     if (res.ok) {
       const data = await res.json();
       if (data.tag_name) {
         version = data.tag_name.replace(/^v/, '');
+      }
+      if (Array.isArray(data.assets)) {
+        assets = data.assets;
       }
     }
   } catch (err) {
@@ -25,24 +29,54 @@ export async function GET(
 
   let downloadUrl = '';
 
-  switch (platform) {
-    case 'windows':
-      downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
-      break;
-    case 'macos-silicon':
-      downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
-      break;
-    case 'macos-intel':
-      downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
-      break;
-    case 'android':
-      downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
-      break;
-    default:
-      return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+  // Helper to find asset by pattern
+  const findAssetUrl = (endsWithStr: string, containsStr?: string) => {
+    const matched = assets.find(asset => {
+      const name = asset.name.toLowerCase();
+      const matchEnds = name.endsWith(endsWithStr.toLowerCase());
+      const matchContains = containsStr ? name.includes(containsStr.toLowerCase()) : true;
+      return matchEnds && matchContains;
+    });
+    return matched ? matched.browser_download_url : '';
+  };
+
+  if (assets.length > 0) {
+    switch (platform) {
+      case 'windows':
+        // Try MSI first, then setup EXE
+        downloadUrl = findAssetUrl('.msi') || findAssetUrl('.exe');
+        break;
+      case 'macos-silicon':
+        downloadUrl = findAssetUrl('aarch64.dmg') || findAssetUrl('.dmg', 'aarch64');
+        break;
+      case 'macos-intel':
+        downloadUrl = findAssetUrl('x64.dmg') || findAssetUrl('.dmg', 'x64') || findAssetUrl('.dmg');
+        break;
+      case 'android':
+        downloadUrl = findAssetUrl('signed.apk') || findAssetUrl('.apk');
+        break;
+    }
   }
 
-  // Redirect to the GitHub asset URL
-  // This achieves the "download from our website" look while leveraging GitHub's hosting
+  // Fallback to hardcoded naming pattern if GitHub API failed or assets were empty
+  if (!downloadUrl) {
+    switch (platform) {
+      case 'windows':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
+        break;
+      case 'macos-silicon':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
+        break;
+      case 'macos-intel':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
+        break;
+      case 'android':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+    }
+  }
+
   return NextResponse.redirect(downloadUrl);
 }
