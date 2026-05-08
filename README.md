@@ -1,54 +1,154 @@
-# ZENEVA | Industrial Retail OS v1.7.0
+# 🌌 ZENEVA | Industrial Retail Operating System (POS & ERP)
 
-![Zeneva Logo](https://zeneva.space/logo.png)
+![Zeneva Platform](https://zeneva.space/logo.png)
 
-## Never Lose Sale, Never Waste Stock.
-
-Zeneva is a borderless retail operating system designed for the modern era. It unifies high-performance inventory management, multi-store POS, real-time analytics, and localized payment gateways into a single, cohesive engine.
-
-### 🚀 Key Platforms
-
-*   **Desktop Station (Windows/macOS)**: The heavyweight workstation optimized for high-volume retail, thermal printing, and multi-monitor setups.
-*   **Active Manager (Android)**: A tactical mobile command center for inventory audits, floor sales, and real-time mobile reporting.
-*   **Web Portal**: Access your business intelligence and settings from any browser, anywhere in the world.
-
-### 📥 Downloads
-
-Get the latest version of Zeneva for your device:
-
-*   **[Download for Windows (v1.7.0)](https://github.com/I-m-a-m-4/zeneva/releases/latest)** - MSIX/MSI Installer
-*   **[Download for macOS (v1.7.0)](https://github.com/I-m-a-m-4/zeneva/releases/latest)** - Apple Silicon & Intel DMG
-*   **[Download for Android (v1.7.0)](https://github.com/I-m-a-m-4/zeneva/releases/latest)** - Optimized APK
-
-Visit our [Download Page](https://zeneva.space/download) for more options and system requirements.
-
-### 🛡️ Core Capabilities
-
-- **Zen AI Integration**: Predictive analytics that tracks "trapped cash" in inventory and suggests optimal restocking parameters.
-- **Local-First Engine**: Work offline for days—sync in seconds when connectivity returns. Built for high-reliability environments.
-- **Unified Global Sync**: Real-time parity between your physical store registers and your online storefront.
-- **Industrial Performance**: Sub-10ms UI response times across all modules, even with 10k+ SKUs.
-
-### 🛠️ Developer Setup (Next.js 15 + Tauri 2.0)
-
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/I-m-a-m-4/zeneva.git
-    cd zeneva
-    ```
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-3.  **Run Dev Environment**:
-    ```bash
-    npm run dev
-    ```
-4.  **Tauri Dev (Desktop Mode)**:
-    ```bash
-    npm run tauri dev
-    ```
+Welcome to **Zeneva**, a borderless, industrial-grade retail operating system built for high-performance retail operations, multi-store POS, predictive inventory analytics, and local-first reliability. Zeneva is designed to unify your physical brick-and-mortar storefronts and digital inventory into a single, cohesive, sub-10ms operational engine.
 
 ---
 
-© 2026 Zeneva POS. All Rights Reserved. Built for the future of retail.
+## 🚀 Key Platforms & Deployment Targets
+
+1. **Desktop Workstation (Windows/macOS)**
+   * Built with **Tauri 2.0** and **Next.js 15** for native, ultra-lightweight performance.
+   * Directly interfaces with physical hardware (thermal receipt printers, barcode scanners, cash drawers).
+   * Sub-10ms UI responsiveness, managing 10k+ SKUs completely offline.
+
+2. **Tactical Mobile Manager (Android)**
+   * Multi-platform Progressive Web App (PWA) compiled natively or deployed as a PWA using `@ducanh2912/next-pwa`.
+   * Enables on-the-floor inventory auditing, direct sales scanning via camera, and real-time push alerts.
+
+3. **Cloud Web Portal & Admin Console**
+   * Access global analytics, multi-tenant reports, and administrative management panels from any modern browser.
+
+---
+
+## 🛠️ Technical Stack & Architecture
+
+Zeneva is built on a modern, robust, resilient stack designed for secure multi-tenant execution and lightning-fast speed:
+
+```mermaid
+graph TD
+    A[Zeneva Client Interface] --> B[Next.js 15 + React 19]
+    B --> C{Platform Context}
+    C -->|Desktop App| D[Tauri 2.0 Core]
+    C -->|PWA / Web Portal| E[Web Browser Engine]
+    
+    D --> F[Tauri SQL Plugin - Local SQLite]
+    D --> G[Tauri Stronghold - Secure Key Vault]
+    D --> H[Local Peripherals - Printers/Scanners]
+    
+    E --> I[Service Workers - Offline PWA Cache]
+    
+    B --> J[Zen AI Engine - Genkit + Google GenAI]
+    B --> K[Firebase SDK v11 - Firestore Real-time Sync]
+    K --> L[(Cloud Firestore Database)]
+```
+
+### 1. Front-end Framework & Desktop Shell
+* **Next.js 15.5.9** (using App Router, Turbopack, and **React 19**) for state-of-the-art server/client components and fast rendering.
+* **Tauri 2.0** (Rust-backed desktop framework) for native compilation. It provides highly secure and lightweight native OS windows, running with a fraction of the memory footprint of Electron.
+* **Framer Motion** for premium, fluid transitions and subtle micro-animations that improve tactile UX.
+
+### 2. Local-First Engine & Storage
+* **Tauri SQL Plugin (`@tauri-apps/plugin-sql`)**: Local **SQLite** database hydration. Zeneva is fully functional offline; sales and inventory updates are performed instantly against SQLite and queued for sync.
+* **Firebase SDK v11.9.1**: Connects client states to **Cloud Firestore** and Real-time Database for multi-tenant, cloud-synced storage when internet connectivity is active.
+* **Firebase Admin SDK v13.6.1**: Provides multi-tenant data validation, user authorization, and secure back-end operations.
+
+### 3. Zen AI Engine (Predictive Analytics)
+* **Genkit v1.20.0** combined with **Google GenAI** (`@genkit-ai/google-genai`).
+* **Core Capabilities**: Analyzes product sales velocity, highlights "trapped cash" in slow-moving inventory, identifies potential duplicates or pricing discrepancies, and provides deterministic replenishment suggestions.
+
+### 4. Peripherals, Printing & Imaging
+* **`html5-qrcode`**: Leverages device camera feeds for high-fidelity, real-time barcode scanning.
+* **`react-barcode`** & **`qrcode.react`**: Programmatic generation of physical barcodes and dynamic payment/receipt QR codes.
+* **`html2canvas`** & **`jspdf`**: Client-side rendering of beautiful receipts, which can be instantly compiled into PDFs and sent to thermal or system printers.
+
+### 5. Security & Cryptography
+* **`@tauri-apps/plugin-stronghold`**: Rust-implemented secure, encrypted key-value vault to protect enterprise API credentials, offline session keys, and database secrets.
+* **`crypto-js`** & **`otpauth`**: Cryptographically secure OTP (One-Time Password) generation, multi-factor authentication, and locally encrypted transaction states.
+
+### 6. Communications & Notifications
+* **Resend & Nodemailer**: Enterprise email dispatching for digital receipts, audit logs, and critical operational reports.
+* **Tauri Notification Plugin (`@tauri-apps/plugin-notification`)**: Native system notification integrations for desktop platforms.
+
+---
+
+## 🛡️ Core Capabilities & Modules
+
+* **Multi-Tenant Inventory Management**: Complete product catalogs bound securely by `businessId`. Supports product variants (grouped by same product name with separate SKU/price matrices) and seamless CSV bulk importing/exporting with `papaparse`.
+* **Guided POS Workflow**: Intuitive cash-register workflow supporting fluid cart item increments, coupon or discount processing, customer profile associations, and instant receipt generation.
+* **Real-time Inventory Troubleshooter**: Algorithmic scanner checking for missing pricing, lack of categorized products, or redundant stock.
+* **Role-Based Access Control (RBAC)**: Fine-grained user access management restricting screens and workflows based on roles (`admin`, `manager`, `vendor_operator`).
+
+---
+
+## ⚙️ Developer Setup & Installation
+
+Follow these steps to set up and run Zeneva in your local development environment:
+
+### Prerequisites
+* **Node.js**: v18.x or higher
+* **Rust & Cargo** (Required for Tauri desktop builds): See [Tauri Prerequisites Guide](https://v2.tauri.app/start/prerequisites/)
+
+### 1. Clone the Codebase
+```bash
+git clone https://github.com/I-m-a-m-4/zeneva.git
+cd zeneva
+```
+
+### 2. Configure Environment Variables
+Create a `.env.local` file in the root directory and specify your Firebase, Genkit, and API secrets:
+```env
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Google Gemini AI Secret
+GEMINI_API_KEY=your_gemini_api_key
+
+# Email Dispatcher Configurations (Resend / Nodemailer)
+RESEND_API_KEY=your_resend_api_key
+```
+
+### 3. Install Dependencies
+Ensure package overrides are respected and apply necessary package patches:
+```bash
+npm install
+```
+
+### 4. Run Development Servers
+* **Run Web Application (Next.js)**:
+  ```bash
+  npm run dev
+  ```
+  The NextJS portal will be accessible locally at `http://localhost:9007`.
+
+* **Run Desktop Workstation (Tauri Dev Mode)**:
+  ```bash
+  npm run tauri dev
+  ```
+  This will launch the native Tauri desktop shell with hot-reloading active.
+
+### 5. Build for Production
+* **Compile Web/PWA distribution**:
+  ```bash
+  npm run build
+  ```
+* **Compile Native Desktop Executables (Windows/macOS/Linux)**:
+  ```bash
+  npm run tauri build
+  ```
+
+---
+
+## 🔄 Git Branching & CI/CD Workflow
+* **`main`**: Production-ready code. Releases are triggered automatically via GitHub Actions `.github/workflows/release.yml`.
+* **Development Flow**: Create descriptive feature branches (e.g., `feature/pos-offline-sync`), perform rigorous typechecks (`npm run typecheck`), and verify code compliance before opening Pull Requests.
+
+---
+
+© 2026 Zeneva POS & Retail OS. All Rights Reserved. Engineered for the future of borderless retail operations.

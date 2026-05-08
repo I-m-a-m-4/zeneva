@@ -15,9 +15,11 @@ export function InteractiveGrid() {
     const cols = Math.ceil(width / gridSize);
 
     const [mounted, setMounted] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(false);
 
     useEffect(() => {
         setMounted(true);
+        setIsDesktop(window.innerWidth >= 1024);
     }, []);
 
     if (!mounted) return null;
@@ -54,28 +56,30 @@ export function InteractiveGrid() {
                 {/* 
                   To make it truly interactive (hover individual cells), we need actual rects.
                   Pattern just draws lines. 
-                  Below we render interactive rects for the hover effect.
+                  Below we render interactive rects for the hover effect on desktop only for performance.
                 */}
-                <svg x="50%" y={0} className="overflow-visible">
-                    {Array.from({ length: rows * cols }).map((_, i) => {
-                        const row = Math.floor(i / cols);
-                        const col = i % cols;
-                        // Center the grid relative to x=50%
-                        const x = (col - cols / 2) * gridSize;
-                        const y = row * gridSize;
+                {isDesktop && (
+                    <svg x="50%" y={0} className="overflow-visible">
+                        {Array.from({ length: rows * cols }).map((_, i) => {
+                            const row = Math.floor(i / cols);
+                            const col = i % cols;
+                            // Center the grid relative to x=50%
+                            const x = (col - cols / 2) * gridSize;
+                            const y = row * gridSize;
 
-                        return (
-                            <rect
-                                key={i}
-                                x={x}
-                                y={y}
-                                width={gridSize}
-                                height={gridSize}
-                                className="stroke-gray-200/10 dark:stroke-gray-800/10 transition-all duration-100 ease-in-out [&:not(:hover)]:duration-1000 fill-transparent hover:fill-gray-100/30 dark:hover:fill-gray-800/30 pointer-events-auto cursor-crosshair"
-                            />
-                        );
-                    })}
-                </svg>
+                            return (
+                                <rect
+                                    key={i}
+                                    x={x}
+                                    y={y}
+                                    width={gridSize}
+                                    height={gridSize}
+                                    className="stroke-gray-200/10 dark:stroke-gray-800/10 transition-all duration-100 ease-in-out [&:not(:hover)]:duration-1000 fill-transparent hover:fill-gray-100/30 dark:hover:fill-gray-800/30 pointer-events-auto cursor-crosshair"
+                                />
+                            );
+                        })}
+                    </svg>
+                )}
             </svg>
         </div>
     );
