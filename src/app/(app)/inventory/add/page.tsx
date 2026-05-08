@@ -302,7 +302,7 @@ export default function AddProductPage() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4 max-w-full overflow-x-hidden">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-7 w-7" asChild>
             <Link href="/inventory">
@@ -310,7 +310,7 @@ export default function AddProductPage() {
               <span className="sr-only">Back</span>
             </Link>
           </Button>
-          <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
+          <h1 className="flex-1 shrink-0 text-xl font-semibold tracking-tight sm:grow-0 break-words whitespace-normal">
             Add New {categoryType === 'service' ? 'Service' : 'Product'}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">

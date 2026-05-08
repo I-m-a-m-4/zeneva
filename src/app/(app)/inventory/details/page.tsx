@@ -397,7 +397,7 @@ function EditProductContent() {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid flex-1 auto-rows-max gap-4 max-w-full overflow-x-hidden">
                 <div className="flex items-center gap-4">
                     <Button variant="outline" size="icon" className="h-7 w-7" asChild>
                         <Link href="/inventory">
@@ -405,7 +405,7 @@ function EditProductContent() {
                             <span className="sr-only">Back</span>
                         </Link>
                     </Button>
-                    <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
+                    <h1 className="flex-1 shrink-0 text-xl font-semibold tracking-tight sm:grow-0 break-words whitespace-normal">
                         Edit {categoryType === 'service' ? 'Service' : 'Product'}: {product.name}
                     </h1>
                     <div className="hidden items-center gap-2 md:ml-auto md:flex">
@@ -829,8 +829,8 @@ function EditProductContent() {
                                 </CardHeader>
                                 <CardContent>
                                     {product.sku ? (
-                                        <div className="flex justify-center bg-white p-2 rounded-md">
-                                            <BarcodeDisplay value={product.sku} />
+                                        <div className="flex justify-center bg-white p-2 rounded-md w-full overflow-x-auto">
+                                            <BarcodeDisplay value={product.sku} width={1.5} height={60} />
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground text-center">
