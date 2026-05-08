@@ -113,7 +113,7 @@ export default function CustomersPage() {
 
   const [isDataLoaded, setIsDataLoaded] = React.useState(false);
   
-  const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+
 
   // Use allCustomers if available, otherwise fallback to the POS context customers
   const displayCustomers = isNative ? customers : (allCustomers || customers);
