@@ -298,7 +298,11 @@ function EditProductContent() {
         if (isSaving || isSubmitting.current) return;
         isSubmitting.current = true;
         setIsSaving(true);
-        if (!product || !currentUserProfile || !business) return;
+        if (!product || !currentUserProfile || !business) {
+            isSubmitting.current = false;
+            setIsSaving(false);
+            return;
+        }
 
         let imageUrl = product?.imageUrl || '';
 
@@ -360,6 +364,9 @@ function EditProductContent() {
                 description: `${values.name} will be updated ${navigator.onLine ? 'momentarily' : 'when connection is restored'}.` 
             });
             
+            isSubmitting.current = false;
+            setIsSaving(false);
+            
             router.push('/inventory');
 
         } catch (error: any) {
@@ -405,7 +412,7 @@ function EditProductContent() {
                             <span className="sr-only">Back</span>
                         </Link>
                     </Button>
-                    <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words">
+                    <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words leading-normal md:leading-relaxed">
                         Edit {categoryType === 'service' ? 'Service' : 'Product'}: {product.name}
                     </h1>
                     <div className="hidden items-center gap-2 md:ml-auto md:flex">

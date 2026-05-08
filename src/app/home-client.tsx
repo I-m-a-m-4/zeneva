@@ -508,7 +508,7 @@ export default function Home() {
 
                             {/* Right Column: UI Mockups */}
                             <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-                                <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" />
+                                <Image src="/computer-P.png" alt="Product UI" width={1600} height={1200} className="w-full h-auto block" priority />
                             </div>
                         </div>
                     </main>
@@ -523,21 +523,25 @@ export default function Home() {
                         <div className="flex flex-col items-center">
                             <div className="relative w-full rounded-xl overflow-hidden  ">
                                 <div className="relative aspect-[16/10] w-full bg-slate-50">
-                                    {slides.map((slide, index) => (
-                                        <div
-                                            key={index}
-                                            className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${index === activeSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                                        >
-                                            <Image
-                                                src={slide.src}
-                                                alt={slide.alt}
-                                                width={1400}
-                                                height={900}
-                                                className="w-full h-full object-contain"
-                                                priority={index === 0}
-                                            />
-                                        </div>
-                                    ))}
+                                    {slides.map((slide, index) => {
+                                        const isActive = index === activeSlide;
+                                        if (!isActive && index !== 0) return null;
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                                            >
+                                                <Image
+                                                    src={slide.src}
+                                                    alt={slide.alt}
+                                                    width={1400}
+                                                    height={900}
+                                                    className="w-full h-full object-contain"
+                                                    priority={index === 0}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 

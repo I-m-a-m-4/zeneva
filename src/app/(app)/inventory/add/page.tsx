@@ -225,12 +225,16 @@ export default function AddProductPage() {
 
     if (!userProfile || !firestore || !business || !products) {
       toast({ variant: 'destructive', title: 'Error', description: 'Session data not found. Please refresh.' });
+      isSubmitting.current = false;
+      setIsSaving(false);
       return;
     }
 
     const hasInventoryPermission = userProfile.permissions?.manage_inventory ?? (userProfile.role === 'admin' || userProfile.role === 'manager');
     if (!hasInventoryPermission) {
       toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
+      isSubmitting.current = false;
+      setIsSaving(false);
       router.push('/inventory');
       return;
     }
@@ -244,6 +248,7 @@ export default function AddProductPage() {
         title: 'Product Limit Reached',
         description: `You have reached your limit of ${limit} products for the ${currentPlan} plan. Please upgrade to add more.`,
       });
+      isSubmitting.current = false;
       setIsSaving(false);
       return;
     }
@@ -290,6 +295,11 @@ export default function AddProductPage() {
 
       // 4. Navigate immediately
       toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
+      
+      // Ensure we release loading states immediately so the button isn't stuck if transition has small lag
+      isSubmitting.current = false;
+      setIsSaving(false);
+
       router.push('/inventory');
 
     } catch (error: any) {
@@ -310,7 +320,7 @@ export default function AddProductPage() {
               <span className="sr-only">Back</span>
             </Link>
           </Button>
-          <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words">
+          <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words leading-normal md:leading-relaxed">
             Add New {categoryType === 'service' ? 'Service' : 'Product'}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
