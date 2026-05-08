@@ -6,7 +6,22 @@ export async function GET(
   { params }: { params: { platform: string } }
 ) {
   const { platform } = params;
-  const version = AppConfig.version;
+  let version = AppConfig.version;
+
+  try {
+    const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest', {
+      headers: { 'User-Agent': 'zeneva-website' },
+      next: { revalidate: 300 } // Cache latest release for 5 minutes
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.tag_name) {
+        version = data.tag_name.replace(/^v/, '');
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch latest release from GitHub API:", err);
+  }
 
   let downloadUrl = '';
 

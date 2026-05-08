@@ -64,7 +64,19 @@ import { cn } from "@/lib/utils";
 
 
 export default function DownloadPage() {
-  const version = AppConfig.version || "1.8.1";
+  const [version, setVersion] = useState(AppConfig.version || "2.0.9");
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest')
+      .then(res => res.json())
+      .then(data => {
+        if (data.tag_name) {
+          setVersion(data.tag_name.replace(/^v/, ''));
+        }
+      })
+      .catch(err => console.error("Failed to fetch latest version in UI:", err));
+  }, []);
+
   const [mounted, setMounted] = useState(false);
   const androidMockups = [
     { src: "/zeneva_android_dashboard_mockup.png", label: "Dashboard" },
@@ -230,7 +242,7 @@ export default function DownloadPage() {
                             <div className="px-5 sm:px-6 flex flex-col justify-center flex-grow py-1">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="text-3xl font-bold mb-1">v1.8.5</div>
+                                        <div className="text-3xl font-bold mb-1">v{version}</div>
                                         <span className="text-[8px] font-bold tracking-[0.2em] text-orange-600 uppercase">Hardware Preview</span>
                                     </div>
                                     <h4 className="text-slate-950 font-medium text-lg sm:text-xl tracking-tighter font-display leading-none">Cross-Platform Sync</h4>
@@ -343,7 +355,7 @@ export default function DownloadPage() {
                 <div className="w-full border-x-[2.5px] border-dashed border-slate-200">
                     {/* Upper Header Bar */}
                     <div className="flex items-center px-12 h-16 border-b-[2.5px] border-dashed border-slate-200">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v1.8.5</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.3em] font-display">Core Retail Engine // Zeneva v{version}</span>
                     </div>
 
                     <div className="grid lg:grid-cols-2">
