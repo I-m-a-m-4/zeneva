@@ -864,38 +864,78 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
     
-    try {
-      const q = query(
-        collection(firestore, "receipts"),
-        where("businessId", "==", businessId),
-        where("createdAt", ">=", safeToDate(from)),
-        where("createdAt", "<=", safeToDate(to))
-      );
-      
-      // 100% Accurate Aggregation for Big Numbers
-      const aggregateSnap = await getAggregateFromServer(q, {
-        totalRevenue: sum('total'),
-        totalOrders: count()
-      });
-      
-      const revenue = aggregateSnap.data().totalRevenue || 0;
-      const orderCount = aggregateSnap.data().totalOrders || 0;
-      
-      // For unique customers, we still need to fetch IDs or documents 
-      // We cap this at 5,000 due to Firestore structured query limits
-      const docSnap = await getDocs(query(q, limit(5000)));
-      const customers = new Set(docSnap.docs.map(d => d.data().customer?.id).filter(Boolean)).size;
-      
-      return { revenue, count: orderCount, customers };
-    } catch (err) {
-      console.error("fetchDetailedAnalytics failed:", err);
-      if (receipts && receipts.length > 0) {
-        const filtered = receipts.filter(r => { const rd = safeToDate(r.createdAt); return rd >= from && rd <= to; });
-        return { revenue: filtered.reduce((acc, r) => acc + r.total, 0), count: filtered.length, customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size };
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (isOnline) {
+      try {
+        const q = query(
+          collection(firestore, "receipts"),
+          where("businessId", "==", businessId),
+          where("createdAt", ">=", safeToDate(from)),
+          where("createdAt", "<=", safeToDate(to))
+        );
+        
+        // 100% Accurate Aggregation for Big Numbers
+        const aggregateSnap = await getAggregateFromServer(q, {
+          totalRevenue: sum('total'),
+          totalOrders: count()
+        });
+        
+        const revenue = aggregateSnap.data().totalRevenue || 0;
+        const orderCount = aggregateSnap.data().totalOrders || 0;
+        
+        // For unique customers, we still need to fetch IDs or documents 
+        // We cap this at 5,000 due to Firestore structured query limits
+        const docSnap = await getDocs(query(q, limit(5000)));
+        const customers = new Set(docSnap.docs.map(d => d.data().customer?.id).filter(Boolean)).size;
+        
+        return { revenue, count: orderCount, customers };
+      } catch (err) {
+        console.error("fetchDetailedAnalytics online failed:", err);
       }
-      return { revenue: 0, count: 0, customers: 0 };
     }
-  }, [businessId, firestore, receipts]);
+
+    // Fallback 1: SQLite (Tauri)
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri) {
+      try {
+        const { getCachedReceipts } = await import('@/lib/sqlite-sync');
+        const cached = await getCachedReceipts(businessId, 10000);
+        if (cached && cached.length > 0) {
+          const fromTime = from.getTime();
+          const toTime = to.getTime();
+          const filtered = cached.filter(r => {
+            const rt = safeToDate(r.createdAt).getTime();
+            return rt >= fromTime && rt <= toTime;
+          });
+          return {
+            revenue: filtered.reduce((acc, r) => acc + r.total, 0),
+            count: filtered.length,
+            customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size
+          };
+        }
+      } catch (err) {
+        console.error("fetchDetailedAnalytics SQLite fallback failed:", err);
+      }
+    }
+
+    // Fallback 2: State / SecureStorage receipts (Web/PWA)
+    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+    if (targetReceipts && targetReceipts.length > 0) {
+      const fromTime = from.getTime();
+      const toTime = to.getTime();
+      const filtered = targetReceipts.filter(r => {
+        const rt = safeToDate(r.createdAt).getTime();
+        return rt >= fromTime && rt <= toTime;
+      });
+      return {
+        revenue: filtered.reduce((acc, r) => acc + r.total, 0),
+        count: filtered.length,
+        customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size
+      };
+    }
+
+    return { revenue: 0, count: 0, customers: 0 };
+  }, [businessId, firestore, syncedReceipts, receipts, user]);
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
@@ -1197,35 +1237,64 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
     if (!businessId || !firestore) return [];
     
-    try {
-      const q = query(
-        collection(firestore, 'receipts'),
-        where('businessId', '==', businessId),
-        where('createdAt', '>=', safeToDate(from)),
-        where('createdAt', '<=', safeToDate(to)),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-      
-      const snap = await getDocs(q);
-      const receipts = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
-      
-      // Sync these to offline for future use
-      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-        import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (isOnline) {
+      try {
+        const q = query(
+          collection(firestore, 'receipts'),
+          where('businessId', '==', businessId),
+          where('createdAt', '>=', safeToDate(from)),
+          where('createdAt', '<=', safeToDate(to)),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+        
+        const snap = await getDocs(q);
+        const receipts = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+        
+        // Sync these to offline for future use
+        if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+          import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
+        }
+        
+        return receipts;
+      } catch (err) {
+        console.error("Fetch Receipts In Range online failed:", err);
       }
-      
-      return receipts;
-    } catch (err) {
-      console.error("Fetch Receipts In Range Failed:", err);
-      // Fallback to local receipts if available
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-      if (isTauri) {
-        return getCachedReceipts(businessId, limitCount);
-      }
-      return [];
     }
-  }, [businessId, firestore]);
+
+    // Fallback 1: SQLite (Tauri)
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (isTauri) {
+      try {
+        const { getCachedReceipts } = await import('@/lib/sqlite-sync');
+        const cached = await getCachedReceipts(businessId, limitCount);
+        if (cached && cached.length > 0) {
+          const fromTime = from.getTime();
+          const toTime = to.getTime();
+          return cached.filter(r => {
+            const rt = safeToDate(r.createdAt).getTime();
+            return rt >= fromTime && rt <= toTime;
+          });
+        }
+      } catch (err) {
+        console.error("Fetch Receipts In Range SQLite fallback failed:", err);
+      }
+    }
+
+    // Fallback 2: State / SecureStorage receipts (Web/PWA)
+    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+    if (targetReceipts && targetReceipts.length > 0) {
+      const fromTime = from.getTime();
+      const toTime = to.getTime();
+      return targetReceipts.filter(r => {
+        const rt = safeToDate(r.createdAt).getTime();
+        return rt >= fromTime && rt <= toTime;
+      });
+    }
+
+    return [];
+  }, [businessId, firestore, syncedReceipts, receipts]);
 
   const currencyCode = business?.settings?.currency || 'NGN';
 
@@ -1289,10 +1358,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 3. Fallback to receipts in state (volatile)
-    if (receipts && receipts.length > 0) {
+    // 3. Fallback to synced receipts (volatile or cached)
+    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+    if (targetReceipts && targetReceipts.length > 0) {
       const monthly: Record<string, number> = {};
-      receipts.forEach(r => {
+      targetReceipts.forEach(r => {
         const date = safeToDate(r.createdAt);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         monthly[key] = (monthly[key] || 0) + (r.total || 0);
@@ -1301,7 +1371,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     
     return [];
-  }, [businessId, firestore, receipts]);
+  }, [businessId, firestore, syncedReceipts, receipts]);
 
 
   const value: POSContextType = useMemo(() => ({

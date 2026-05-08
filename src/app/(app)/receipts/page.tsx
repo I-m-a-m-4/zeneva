@@ -199,6 +199,12 @@ function ReceiptsContent() {
     } catch (e: any) {
       console.error("Failed to void sale:", e);
       toast({ title: 'Error', description: e.message || 'Could not void the sale.', variant: 'destructive' });
+      
+      // If the receipt was not found or already deleted on Firestore, make sure we still clear it locally!
+      if (e.message?.includes("Receipt not found") || e.message?.includes("already been deleted")) {
+        await voidReceipt(receiptToDelete.id);
+        triggerRefresh();
+      }
     } finally {
       setReceiptToDelete(null);
       setIsDeleting(false);
