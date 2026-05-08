@@ -160,7 +160,15 @@ export default function MarketingFooter() {
               <form id="subscribe" className="mt-3 flex items-center gap-2">
                 <div className="relative flex-1">
                   <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40" />
-                  <input type="email" name="subscribeEmail" required placeholder="you@example.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-xs w-full border rounded pt-2.5 pr-3 pb-2.5 pl-9 text-white bg-white/10 border-white/10" />
+                  <input 
+                    type="email" 
+                    name="subscribeEmail" 
+                    id="subscribeEmail"
+                    aria-label="Email address for subscription"
+                    required 
+                    placeholder="you@example.com" 
+                    className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-xs w-full border rounded pt-2.5 pr-3 pb-2.5 pl-9 text-white bg-white/10 border-white/10" 
+                  />
                 </div>
                 <button type="submit" className="inline-flex gap-2 transition text-xs font-medium ring-1 rounded pt-2.5 pr-3.5 pb-2.5 pl-3.5 gap-x-2 gap-y-2 items-center hover:bg-amber-300 hover:ring-amber-200 text-neutral-900 bg-white ring-white/80">
                   Join
