@@ -680,6 +680,56 @@ export function POSProvider({ children }: { children: ReactNode }) {
             await batch.commit();
             chunk.forEach(c => successfullyCommitIds.push(c.id));
 
+            // 🚀 OPTIMIZATION FIX: Re-inject transaction records into the local edge cache
+            // since real-time Firestore listeners have been severed to eliminate cost overruns.
+            const finalizedReceipts = chunk.map(c => {
+              const rd = c.payload.receiptData;
+              return {
+                 ...rd,
+                 createdAt: rd.createdAt || new Date() // Locally normalize Timestamp format if needed
+              };
+            });
+
+            // 1. Instant UI population for the Receipts Page
+            setSyncedReceipts(prev => {
+              const deduped = [...prev];
+              finalizedReceipts.forEach(r => {
+                const exists = deduped.some(d => d.id === r.id);
+                if (!exists) deduped.unshift(r); // Adds new records to top
+              });
+              return deduped;
+            });
+
+            // 2. Fast-track locally synchronized stock reductions to avoid edge-desync
+            if (combinedStocks.size > 0) {
+              setSyncedProducts(prev => {
+                 const fresh = [...prev];
+                 combinedStocks.forEach((stockVal, productId) => {
+                   const idx = fresh.findIndex(p => p.id === productId);
+                   if (idx !== -1) fresh[idx] = { ...fresh[idx], stock: stockVal };
+                 });
+                 return fresh;
+              });
+            }
+
+            // 3. Cascade customer total-spend velocity changes directly to local state
+            if (consolidatedCust.size > 0) {
+              setSyncedCustomers(prev => {
+                 const fresh = [...prev];
+                 consolidatedCust.forEach((cData, cId) => {
+                   const idx = fresh.findIndex(c => c.id === cId);
+                   if (idx !== -1) {
+                     fresh[idx] = {
+                       ...fresh[idx],
+                       totalSpent: (Number(fresh[idx].totalSpent) || 0) + cData.totalSpent,
+                       loyaltyPoints: cData.loyaltyPoints !== undefined ? cData.loyaltyPoints : fresh[idx].loyaltyPoints
+                     };
+                   }
+                 });
+                 return fresh;
+              });
+            }
+
           } catch (execError) {
             console.error("❌ POS Queue Engine :: Batch write execution failed.", execError);
             break; // Stop further processing on this tick to preserve logical ordering for safe retry later
