@@ -51,21 +51,21 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
             <CardContent 
-                className="p-4 relative aspect-square w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
+                className="p-4 relative h-36 w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
                 onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
             >
                 {product.imageUrl ? (
-                    <div className="relative w-full h-full">
+                    <div className="relative w-full h-full flex items-center justify-center">
                         <CachedImage
                             src={product.imageUrl}
                             alt={product.name}
-                            className="w-full h-full object-contain hover:scale-105 transition-transform"
+                            className="max-w-full max-h-full object-contain hover:scale-105 transition-transform"
                         />
                     </div>
 
                 ) : (
                     <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground/40">
-                        <Package size={48} />
+                        <Package size={40} />
                     </div>
                 )}
             </CardContent>
