@@ -51,7 +51,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
             <CardContent 
-                className="p-4 relative h-36 w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
+                className="p-4 relative h-44 w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
                 onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
             >
                 {product.imageUrl ? (
