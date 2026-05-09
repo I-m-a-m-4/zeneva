@@ -73,8 +73,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Zeneva {0}', github.ref_name) || '' }}
+          tagName: v__VERSION__
+          releaseName: 'Zeneva v__VERSION__'
           releaseBody: 'Zeneva Multi-Platform Release (Windows/macOS). For the best experience, use the auto-updater within the application settings.'
           releaseDraft: false
           prerelease: false
@@ -167,6 +167,11 @@ jobs:
           node-version: 'lts/*'
           cache: 'npm'
 
+      - name: Extract App Version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -232,9 +237,9 @@ jobs:
             echo "Using apksigner at: $APKSIGNER"
             
             # Sign the APK
-            $APKSIGNER sign --ks zeneva.keystore --ks-key-alias zeneva --ks-pass pass:zenevapass --key-pass pass:zenevapass --out "./zeneva-${{ github.ref_name }}-SIGNED.apk" "$APK_PATH"
+            $APKSIGNER sign --ks zeneva.keystore --ks-key-alias zeneva --ks-pass pass:zenevapass --key-pass pass:zenevapass --out "./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk" "$APK_PATH"
             
-            echo "SIGNED APK ready at ./zeneva-${{ github.ref_name }}-SIGNED.apk"
+            echo "SIGNED APK ready at ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk"
           else
             echo "CRITICAL: No APK file found!"
             exit 1
@@ -242,10 +247,9 @@ jobs:
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./zeneva-${{ github.ref_name }}-SIGNED.apk
-          tag_name: ${{ github.ref_name }}
+          files: ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk
+          tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload APK as Workflow Artifact
