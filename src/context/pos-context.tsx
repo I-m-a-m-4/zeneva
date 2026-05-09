@@ -181,7 +181,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const canFetchSubData = !!businessId && !!initialBusiness && initialBusiness.status !== 'deleted' && !!user && isProfileReady;
 
-  const productsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "products"), where("businessId", "==", businessId), limit(200)) : null), [canFetchSubData, businessId, firestore]);
+  // Optimized: Disabled real-time listener for large collection to cut Firestore read costs. 
+  // System relies on fast local SQLite cache (syncedProducts) and periodic background/delta syncs.
+  const productsQuery = useMemoFirebase(() => null, []);
   const { data: initialProducts, isLoading: isLoadingProducts, mutate: mutateProducts } = useCollection<Product>(productsQuery);
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
@@ -221,10 +223,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [canFetchSubData, businessId, !!initialStats]);
 
-  const receiptsQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "receipts"), where("businessId", "==", businessId), limit(10000)) : null), [canFetchSubData, businessId, firestore]);
+  // Optimized: Disabled real-time listener to avoid quadratic listener scaling cost.
+  const receiptsQuery = useMemoFirebase(() => null, []);
   const { data: initialReceipts, isLoading: isLoadingReceipts, mutate: mutateReceipts } = useCollection<Receipt>(receiptsQuery);
 
-  const customersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, "customers"), where("businessId", "==", businessId), limit(200)) : null), [canFetchSubData, businessId, firestore]);
+  // Optimized: Disabled real-time listener for customers to minimize daily reads.
+  const customersQuery = useMemoFirebase(() => null, []);
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
@@ -408,6 +412,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast]);
 
+  const fetchInitialReceipts = useCallback(async () => {
+    if (!user || !businessId || !firestore || !navigator.onLine) return;
+    try {
+      const q = query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(200));
+      const snap = await getDocs(q);
+      const fetchedRecs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+      setSyncedReceipts(fetchedRecs);
+      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, fetchedRecs));
+      }
+    } catch (error) {
+      console.error("Failed to fetch initial receipts:", error);
+    }
+  }, [businessId, firestore, user]);
+
+  // Effect to pull initial historical receipts once on startup if the local array is empty.
+  useEffect(() => {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (businessId && firestore && syncedReceipts.length === 0 && isOnline) {
+      fetchInitialReceipts();
+    }
+  }, [businessId, firestore, syncedReceipts.length, fetchInitialReceipts]);
+
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
     if (!businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
@@ -546,131 +573,209 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setIsQueueProcessing(true);
     
     try {
-      const results = await Promise.allSettled(pending.map(async (action) => {
-      const batch = writeBatch(firestore);
-      const resultData: any = { id: action.id };
-      try {
-        switch (action.type) {
-          case 'add-customer':
-            const cRef = doc(firestore, 'customers', action.payload.id);
-            batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name.toLowerCase(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(1) }, { merge: true });
-            resultData.newId = cRef.id; break;
-          case 'update-customer': batch.update(doc(firestore, 'customers', action.payload.id), { ...action.payload.values, updatedAt: serverTimestamp() }); break;
-          case 'delete-customer': batch.delete(doc(firestore, 'customers', action.payload.id)); batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); break;
-          case 'add-product':
-            batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(1) }, { merge: true });
-            // Update local state immediately
-            setSyncedProducts(prev => [...prev, action.payload]);
-            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-              syncProductToOffline(businessId, action.payload);
-            }
-            break;
-          case 'complete-sale':
-            const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
-            batch.set(rRef, { ...action.payload.receiptData, createdAt: serverTimestamp() });
-            action.payload.productUpdates.forEach((u:any) => batch.update(doc(firestore, 'products', u.id), { stock: u.newStock, updatedAt: serverTimestamp() }));
-            const totalUnits = action.payload.receiptData.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
-            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { 
-              totalSales: increment(1), 
-              totalRevenue: increment(action.payload.receiptData.total),
-              totalUnitsSold: increment(totalUnits)
-            }, { merge: true });
+      // PERFORMANCE & COST OPTIMIZATION:
+      // Efficiently gather sequential 'complete-sale' triggers into unified Firestore batches.
+      // This guarantees transactional consistency while collapsing high-traffic writes.
+      const operationalSequence: any[][] = [];
+      let activeSalesAccum: any[] = [];
 
-            // Low Stock Alert Check
-            action.payload.productUpdates.forEach((u: any) => {
-              const product = products?.find(p => p.id === u.id);
-              if (product && product.lowStockThreshold && u.newStock <= product.lowStockThreshold) {
-                 const notifRef = doc(collection(firestore, `users/${currentUserProfile.id}/notifications`));
-                 batch.set(notifRef, {
+      for (const action of pending) {
+        if (action.type === 'complete-sale') {
+          activeSalesAccum.push(action);
+          if (activeSalesAccum.length >= 10) { // Groups up to 10 sales into ONE network payload
+            operationalSequence.push(activeSalesAccum);
+            activeSalesAccum = [];
+          }
+        } else {
+          // Flush cumulative sale block before interrupting with different operations
+          if (activeSalesAccum.length > 0) {
+            operationalSequence.push(activeSalesAccum);
+            activeSalesAccum = [];
+          }
+          operationalSequence.push([action]); // Individual execution path for administrative security
+        }
+      }
+      if (activeSalesAccum.length > 0) operationalSequence.push(activeSalesAccum);
+
+      const successfullyCommitIds: string[] = [];
+
+      // Execute each defined operation sequence loop
+      for (const chunk of operationalSequence) {
+        const batch = writeBatch(firestore);
+
+        // ----------------------------------------------------------------
+        // MODE A: The Sale Aggregation Pipeline
+        // ----------------------------------------------------------------
+        if (chunk.length > 1 || (chunk.length === 1 && chunk[0].type === 'complete-sale')) {
+          
+          const combinedStocks = new Map<string, number>();
+          const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number }>();
+          let aggregateSales = 0;
+          let aggregateRev = 0;
+          let aggregateUnits = 0;
+
+          try {
+            chunk.forEach(action => {
+              // Write Discrete Receipt Record
+              const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
+              batch.set(rRef, { ...action.payload.receiptData, createdAt: serverTimestamp() });
+
+              // Cascade product stock values (LIFO sequence logic applies naturally via Map overwrite)
+              action.payload.productUpdates.forEach((u: any) => combinedStocks.set(u.id, u.newStock));
+
+              // Cumulate operational metrics
+              aggregateSales += 1;
+              aggregateRev += (action.payload.receiptData.total || 0);
+              aggregateUnits += (action.payload.receiptData.items?.reduce((a: number, item: any) => a + (item.quantity || 0), 0) || 0);
+
+              // Aggregate Customer Ledger Deltas
+              const cu = action.payload.customerUpdate;
+              if (cu && cu.id) {
+                const existing = consolidatedCust.get(cu.id) || { totalSpent: 0 };
+                consolidatedCust.set(cu.id, {
+                  totalSpent: existing.totalSpent + (cu.totalSpent || 0),
+                  loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints
+                });
+              }
+
+              // Populate Notification Bus (Uses randomized Unique Subcollection Doc IDs)
+              action.payload.productUpdates.forEach((u: any) => {
+                const currentProduct = products?.find(p => p.id === u.id);
+                if (currentProduct && currentProduct.lowStockThreshold && u.newStock <= currentProduct.lowStockThreshold) {
+                  const alertRef = doc(collection(firestore, `users/${currentUserProfile.id}/notifications`));
+                  batch.set(alertRef, {
                     title: "Low Stock Alert",
-                    body: `${product.name} is running low. Remaining: ${u.newStock}`,
+                    body: `${currentProduct.name} is running low. Remaining: ${u.newStock}`,
                     createdAt: serverTimestamp(),
                     read: false,
                     type: 'inventory',
-                    productId: product.id
-                 });
-              }
-            });
-
-            const customerUpdate = action.payload.customerUpdate;
-            if (customerUpdate && customerUpdate.id) {
-              const custRef = doc(firestore, 'customers', customerUpdate.id);
-              const updates: any = { 
-                updatedAt: serverTimestamp() 
-              };
-              if (customerUpdate.loyaltyPoints !== undefined) updates.loyaltyPoints = customerUpdate.loyaltyPoints;
-              if (customerUpdate.totalSpent !== undefined) updates.totalSpent = increment(customerUpdate.totalSpent);
-              
-              batch.update(custRef, updates);
-            }
-
-            resultData.newReceiptId = rRef.id; break;
-          case 'delete-product':
-            action.payload.productIds.forEach((id: string) => batch.delete(doc(firestore, 'products', id)));
-            batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(-action.payload.productIds.length) }, { merge: true });
-            break;
-          case 'update-product':
-            batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
-            // Update local state immediately to prevent "revert flickers" when the queue clears
-            setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
-            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-              const current = syncedProducts.find(p => p.id === action.payload.productId);
-              if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
-            }
-            break;
-          case 'bulk-update-products':
-            action.payload.productIds.forEach((id: string) => {
-              batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
-            });
-            // Update local state immediately
-            setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
-            if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-              action.payload.productIds.forEach((id: string) => {
-                const current = syncedProducts.find(p => p.id === id);
-                if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+                    productId: currentProduct.id
+                  });
+                }
               });
+            });
+
+            // Step B: Flush all cumulative values from the local aggregation buffer into Firestore batch commands.
+            combinedStocks.forEach((stockVal, pId) => {
+              batch.update(doc(firestore, 'products', pId), { stock: stockVal, updatedAt: serverTimestamp() });
+            });
+
+            consolidatedCust.forEach((data, cId) => {
+              const updatesObj: any = { updatedAt: serverTimestamp() };
+              if (data.totalSpent > 0) updatesObj.totalSpent = increment(data.totalSpent);
+              if (data.loyaltyPoints !== undefined) updatesObj.loyaltyPoints = data.loyaltyPoints;
+              batch.update(doc(firestore, 'customers', cId), updatesObj);
+            });
+
+            // Reduce business-wide write traffic from "Per Transaction" down to "One per Cluster"
+            if (aggregateSales > 0 || aggregateRev > 0 || aggregateUnits > 0) {
+              batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), {
+                totalSales: increment(aggregateSales),
+                totalRevenue: increment(aggregateRev),
+                totalUnitsSold: increment(aggregateUnits)
+              }, { merge: true });
             }
-            break;
-          case 'add-audit-log':
-            const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
-            batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
-            break;
+
+            // Ship the final, lightweight consolidated payload!
+            await batch.commit();
+            chunk.forEach(c => successfullyCommitIds.push(c.id));
+
+          } catch (execError) {
+            console.error("❌ POS Queue Engine :: Batch write execution failed.", execError);
+            break; // Stop further processing on this tick to preserve logical ordering for safe retry later
+          }
+        }
+        
+        // ----------------------------------------------------------------
+        // MODE B: Single Secure Command (Inherits 100% of original logic)
+        // ----------------------------------------------------------------
+        else if (chunk.length === 1) {
+          const action = chunk[0];
+          try {
+            switch (action.type) {
+              case 'add-customer': {
+                const cRef = doc(firestore, 'customers', action.payload.id);
+                batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name.toLowerCase(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(1) }, { merge: true });
+                break;
+              }
+              case 'update-customer': 
+                batch.update(doc(firestore, 'customers', action.payload.id), { ...action.payload.values, updatedAt: serverTimestamp() }); 
+                break;
+              case 'delete-customer': 
+                batch.delete(doc(firestore, 'customers', action.payload.id)); 
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); 
+                break;
+              case 'add-product':
+                batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(1) }, { merge: true });
+                setSyncedProducts(prev => [...prev, action.payload]);
+                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) syncProductToOffline(businessId, action.payload);
+                break;
+              case 'delete-product':
+                action.payload.productIds.forEach((id: string) => batch.delete(doc(firestore, 'products', id)));
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(-action.payload.productIds.length) }, { merge: true });
+                break;
+              case 'update-product':
+                batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
+                setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
+                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                  const current = syncedProducts.find(p => p.id === action.payload.productId);
+                  if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+                }
+                break;
+              case 'bulk-update-products':
+                action.payload.productIds.forEach((id: string) => {
+                  batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
+                });
+                setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
+                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                  action.payload.productIds.forEach((id: string) => {
+                    const current = syncedProducts.find(p => p.id === id);
+                    if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+                  });
+                }
+                break;
+              case 'add-audit-log': {
+                const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
+                batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
+                break;
+              }
+            }
+
+            await batch.commit();
+            successfullyCommitIds.push(action.id);
+
+          } catch (singularErr) {
+            console.error(`❌ Standalone sync step failed [${action.type}]:`, singularErr);
+            break; // Maintain strict synchronous chain safety
+          }
+        }
+      }
+
+      // State Resolution Phase
+      setQueuedActions(prev => {
+        const successes = new Set(successfullyCommitIds);
+        const failCount = pending.length - successfullyCommitIds.length;
+
+        if (failCount > 0) {
+           // We simply notify internal log and naturally leave unresolved items in React state queue to auto-trigger retry 
+           console.warn(`Queue resolved with ${failCount} items remaining due to retry conditions.`);
         }
 
-        await batch.commit();
-        return { id: action.id, status: 'fulfilled', ...resultData };
-      } catch (e: any) { 
-        console.error(`Sync failed for action ${action.id} (${action.type}):`, e);
-        return { id: action.id, status: 'rejected', reason: e.message }; 
-      }
-    }));
+        if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+          successfullyCommitIds.forEach(id => removeActionFromOfflineQueue(id));
+        }
 
-    setQueuedActions(prev => {
-      const fulfilledResults = results.filter(r => r.status === 'fulfilled') as any[];
-      const successfulIds = new Set(fulfilledResults.filter(r => r.value.status === 'fulfilled').map(r => r.value.id));
-      const failedActions = fulfilledResults.filter(r => r.value.status === 'rejected');
-      
-      if (failedActions.length > 0) {
-        toast({ 
-          variant: 'destructive', 
-          title: "Sync Error", 
-          description: `${failedActions.length} actions failed to sync. Check console for details.` 
-        });
-      }
+        // Retain non-committed items for safe transparent retries
+        return prev.filter(a => !successes.has(a.id));
+      });
 
-      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-        successfulIds.forEach(id => removeActionFromOfflineQueue(id as string));
-      }
-
-      // Clear successfully synced actions immediately
-      return prev.filter(a => !successfulIds.has(a.id));
-    });
     } finally {
       setIsQueueProcessing(false);
     }
-  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, toast]);
+  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, products, syncedProducts, toast]);
+
 
   const addToQueue = useCallback((action: any, description: string) => {
     const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true;
@@ -1131,13 +1236,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       ]);
       
       const now = Date.now();
-      const oneHour = 60 * 60 * 1000;
+      const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
       
-      if (now - lastCustSync > oneHour && !isFullSyncingCustomers) {
+      if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
         fetchFullCustomers();
       }
 
-      if (now - lastProdSync > oneHour && !isFullSyncingProducts) {
+      if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
         fetchFullProducts();
       }
     };
