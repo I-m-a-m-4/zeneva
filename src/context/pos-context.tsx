@@ -137,7 +137,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
-  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
+  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
   const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => secureStorage.getItem<Product[]>('pos_synced_products') || []);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => secureStorage.getItem<Customer[]>('pos_synced_customers') || []);
@@ -1154,6 +1154,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem('pos_synced_customers', syncedCustomers); }, [syncedCustomers]);
   useEffect(() => { secureStorage.setItem('pos_synced_receipts', syncedReceipts); }, [syncedReceipts]);
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
+  useEffect(() => { secureStorage.setItem('pos_queued_actions', queuedActions); }, [queuedActions]);
 
   // Background online-to-offline syncing effects for instant offline availability on all pages
   useEffect(() => {
