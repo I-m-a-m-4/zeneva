@@ -457,17 +457,29 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <PaystackSubscriptionButton
-                                    plan={plan}
-                                    cycle={selectedCycle}
-                                    finalAmount={finalAmount}
-                                    userProfile={userProfile}
-                                    businessInstance={businessInstance}
-                                    isCurrentPlan={isCurrentPlan}
-                                    isProcessing={processingPlan === plan.planId}
-                                    setProcessingPlan={setProcessingPlan}
-                                    currency={currency}
-                                />
+                                {currency === 'NGN' ? (
+                                    <PaystackSubscriptionButton
+                                        plan={plan}
+                                        cycle={selectedCycle}
+                                        finalAmount={finalAmount}
+                                        userProfile={userProfile}
+                                        businessInstance={businessInstance}
+                                        isCurrentPlan={isCurrentPlan}
+                                        isProcessing={processingPlan === plan.planId}
+                                        setProcessingPlan={setProcessingPlan}
+                                        currency={currency}
+                                    />
+                                ) : (
+                                    <DodoSubscriptionButton
+                                        plan={plan}
+                                        cycle={selectedCycle}
+                                        userProfile={userProfile}
+                                        businessInstance={businessInstance}
+                                        isCurrentPlan={isCurrentPlan}
+                                        isProcessing={processingPlan === plan.planId}
+                                        setProcessingPlan={setProcessingPlan}
+                                    />
+                                )}
                             </CardFooter>
                         </Card>
                     )

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { adminFirestore } from '@/firebase/admin';
 
 // This is the secret you get from the Dodo Dashboard -> Developers -> Webhooks
 const DODO_WEBHOOK_SECRET = process.env.DODO_WEBHOOK_SECRET;
@@ -62,10 +63,86 @@ export async function POST(req: Request) {
         // const { business_id, status, plan_id } = event.data;
         break;
         
-      case 'payment.succeeded':
-        console.log('Payment Succeeded:', event.data?.amount);
-        // TODO: Record payment in audit logs or billing history
+      case 'payment.succeeded': {
+        const pData = event.data;
+        console.log('Processing Payment Success:', pData?.payment_id, 'Amount:', pData?.total_amount);
+        
+        const metadata = pData?.metadata || {};
+        const { businessId, planId, cycleMonths } = metadata;
+
+        if (!adminFirestore) {
+          console.error('Firestore admin failed to initialize, cannot process payment event.');
+          break;
+        }
+
+        if (businessId && planId) {
+          try {
+            const businessRef = adminFirestore.collection('businessInstances').doc(businessId);
+            const businessDoc = await businessRef.get();
+
+            if (businessDoc.exists) {
+              const bData = businessDoc.data() || {};
+              
+              // Calculate proper expiration math identical to Paystack client integration
+              let currentExpiry = new Date();
+              if (bData.trialExpiresAt) {
+                  const ts = bData.trialExpiresAt;
+                  currentExpiry = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+              }
+              
+              const startDate = currentExpiry > new Date() ? currentExpiry : new Date();
+              const monthsToAdd = parseInt(cycleMonths) || 1;
+              
+              const newExpiryDate = new Date(startDate);
+              newExpiryDate.setMonth(newExpiryDate.getMonth() + monthsToAdd);
+
+              const batch = adminFirestore.batch();
+              
+              // 1. Upgrade the business instance
+              batch.update(businessRef, {
+                  plan: planId,
+                  trialExpiresAt: newExpiryDate,
+                  accessLevel: null, // Revoke override access levels if explicitly paying
+                  updatedAt: new Date()
+              });
+              
+              // 2. Record core purchase audit record
+              const purchasesRef = adminFirestore.collection('purchases').doc();
+              batch.set(purchasesRef, {
+                  businessId: businessId,
+                  plan: planId,
+                  amount: (pData.total_amount || 0) / 100, // Dodo yields total_amount in fractional units/cents
+                  currency: pData.currency || 'USD',
+                  timestamp: new Date(),
+                  reference: pData.payment_id || 'dodo_' + Date.now(),
+                  gateway: 'dodopayments'
+              });
+
+              // 3. Log sub-history entry within the business
+              const historyRef = businessRef.collection('subscription_history').doc();
+              batch.set(historyRef, {
+                  action: `Subscribed via Dodo for ${monthsToAdd} month(s)`,
+                  amount: (pData.total_amount || 0) / 100,
+                  currency: pData.currency || 'USD',
+                  timestamp: new Date(),
+                  dodo_payment_id: pData.payment_id
+              });
+
+              await batch.commit();
+              console.log(`✅ Server Successfully applied Dodo update to Business: ${businessId}`);
+            } else {
+              console.error(`Business record NOT FOUND in Firestore: ${businessId}`);
+            }
+          } catch (dbError: any) {
+            console.error("Failed to update Firestore in Dodo Webhook:", dbError.message);
+            // We throw to signal 500 to Dodo, forcing exponential retry until Firestore recovers.
+            throw dbError; 
+          }
+        } else {
+          console.warn('Warning: Received payment.succeeded without valid metadata (businessId/planId). Skipping automation.');
+        }
         break;
+      }
         
       case 'subscription.cancelled':
         console.log('Subscription Cancelled:', event.data?.business_id);
