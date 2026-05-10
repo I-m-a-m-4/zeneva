@@ -30,6 +30,7 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Loader2 } from "lucide-react";
+import { safeToDate } from "@/lib/utils";
 
 function InvoiceRowSkeleton() {
     return (
@@ -79,8 +80,8 @@ export default function InvoicesPage() {
                 return receiptNum.includes(searchLower) || customerName.includes(searchLower);
             })
             .sort((a, b) => {
-                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                const dateA = safeToDate(a.createdAt);
+                const dateB = safeToDate(b.createdAt);
                 return dateB.getTime() - dateA.getTime();
             });
     }, [receipts, searchTerm]);
@@ -168,7 +169,7 @@ export default function InvoicesPage() {
                                                 <span className="text-xs text-muted-foreground">{invoice.customer?.email || ''}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell>{invoice.createdAt.toDate ? format(invoice.createdAt.toDate(), 'PP') : format(new Date(invoice.createdAt), 'PP')}</TableCell>
+                                        <TableCell>{format(safeToDate(invoice.createdAt), 'PP')}</TableCell>
                                         <TableCell>{getStatusBadge(invoice)}</TableCell>
                                         <TableCell className="text-right font-semibold">{currencySymbol}{invoice.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                         <TableCell className="text-right">

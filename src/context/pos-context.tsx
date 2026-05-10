@@ -686,7 +686,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               const rd = c.payload.receiptData;
               return {
                  ...rd,
-                 createdAt: rd.createdAt || new Date() // Locally normalize Timestamp format if needed
+                 createdAt: safeToDate(rd.createdAt) || new Date() // Formally coerce timestamps into healthy JS Dates
               };
             });
 
