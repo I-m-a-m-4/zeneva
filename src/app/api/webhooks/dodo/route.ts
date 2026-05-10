@@ -29,8 +29,18 @@ export async function POST(req: Request) {
     // The signature is an HMAC SHA256 of: webhook-id + '.' + webhook-timestamp + '.' + body
     const signedContent = `${webhookId}.${webhookTimestamp}.${body}`;
     
-    // Webhook secrets from Standard Webhooks usually need to be decoded from base64 if they are in that format,
-    // or used as-is if they are strings. Dodo's whsec_... is usually used as-is.
+    // 1. Replay Attack Protection: Check if timestamp is within 5 minutes (300 seconds)
+    const toleranceSeconds = 300; // 5 minutes
+    const timestampSeconds = parseInt(webhookTimestamp, 10);
+    const currentSeconds = Math.floor(Date.now() / 1000);
+    
+    if (Math.abs(currentSeconds - timestampSeconds) > toleranceSeconds) {
+        console.error('Webhook rejected: Timestamp drift exceeds tolerance window.');
+        return new NextResponse('Request expired', { status: 401 });
+    }
+
+    // 2. Cryptographic Validation
+    // Webhook secrets from Standard Webhooks need to be decoded from base64.
     const secret = DODO_WEBHOOK_SECRET.replace('whsec_', '');
     const secretBuffer = Buffer.from(secret, 'base64');
     
