@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         planId: planId,
         cycleMonths: cycleMonths.toString(),
       },
+      billing_currency: 'USD',
     };
 
     console.log('Dodo API Request Body:', JSON.stringify(body, null, 2));
