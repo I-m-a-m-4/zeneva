@@ -456,42 +456,42 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // Effect to pull initial historical receipts once on startup if the local array is empty.
   useEffect(() => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (businessId && firestore && isOnline) {
+    if (user && businessId && firestore && isOnline) {
       fetchInitialReceipts();
     }
-  }, [businessId, firestore, fetchInitialReceipts, refreshKey]);
+  }, [businessId, firestore, fetchInitialReceipts, refreshKey, user]);
 
   const fetchInitialUsers = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (!businessId || !firestore || !isOnline) return;
+    if (!user || !businessId || !firestore || !isOnline) return;
     try {
       const snap = await getDocs(query(collection(firestore, "users"), where("businessId", "==", businessId)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
       if (fetched.length > 0) setSyncedUsers(fetched);
     } catch (e) { console.error("Fetch initial users failed:", e); }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, user]);
 
   const fetchInitialAuditLogs = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (!businessId || !firestore || !isOnline) return;
+    if (!user || !businessId || !firestore || !isOnline) return;
     try {
       const snap = await getDocs(query(collection(firestore, 'businessInstances', businessId, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as AuditLog));
       if (fetched.length > 0) setSyncedAuditLogs(fetched);
     } catch (e) { console.error("Fetch initial audit logs failed:", e); }
-  }, [businessId, firestore]);
+  }, [businessId, firestore, user]);
 
   useEffect(() => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (businessId && firestore && isOnline) {
+    if (user && businessId && firestore && isOnline) {
       fetchInitialUsers();
       fetchInitialAuditLogs();
     }
-  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey]);
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey, user]);
 
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (!businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
+    if (!user || !businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
     
     setIsFullSyncingCustomers(true);
     let allFetched: Customer[] = [];
@@ -546,11 +546,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFullSyncingCustomers(false);
     }
-  }, [businessId, firestore, isFullSyncingCustomers, toast]);
+  }, [businessId, firestore, isFullSyncingCustomers, toast, user]);
 
   const fetchFullProducts = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (!businessId || !firestore || isFullSyncingProducts || !isOnline) return;
+    if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
     
     setIsFullSyncingProducts(true);
     let allFetched: Product[] = [];
@@ -603,7 +603,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFullSyncingProducts(false);
     }
-  }, [businessId, firestore, isFullSyncingProducts, toast]);
+  }, [businessId, firestore, isFullSyncingProducts, toast, user]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();
