@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
+import { safeToDate } from '@/lib/utils';
 
 function ReceiptRowSkeleton() {
   return (
@@ -117,24 +118,16 @@ function ReceiptsContent() {
 
     const safeFormatDate = (val: any) => {
         if (!val) return 'N/A';
-        try {
-            const date = val?.toDate ? val.toDate() : new Date(val);
-            if (isNaN(date.getTime())) return 'N/A';
-            return format(date, 'PP');
-        } catch (e) {
-            return 'N/A';
-        }
+        const date = safeToDate(val);
+        if (date.getTime() === 0) return 'N/A';
+        return format(date, 'PP');
     };
 
     const safeFormatTime = (val: any) => {
         if (!val) return 'N/A';
-        try {
-            const date = val?.toDate ? val.toDate() : new Date(val);
-            if (isNaN(date.getTime())) return 'N/A';
-            return format(date, 'p');
-        } catch (e) {
-            return 'N/A';
-        }
+        const date = safeToDate(val);
+        if (date.getTime() === 0) return 'N/A';
+        return format(date, 'p');
     };
 
     const isLoading = isPosLoading;

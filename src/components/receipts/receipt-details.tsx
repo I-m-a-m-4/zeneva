@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import type { BusinessInstance } from "@/types";
+import { safeToDate } from "@/lib/utils";
 
 interface ReceiptDetailsProps {
     receipt: Receipt;
@@ -38,7 +39,7 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                                 <h2 className="text-lg font-bold uppercase text-primary">Invoice</h2>
                                 <p className="font-medium text-sm">#{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</p>
                                 <p className="text-[10px] text-muted-foreground">
-                                    {receipt.createdAt ? format(receipt.createdAt instanceof Date ? receipt.createdAt : (receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt)), 'PPP') : 'N/A'}
+                                    {receipt.createdAt ? format(safeToDate(receipt.createdAt), 'PPP') : 'N/A'}
                                 </p>
                             </div>
                         </div>
@@ -142,7 +143,7 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                         </div>
                         <div className="flex justify-between mb-3">
                             <span className="text-gray-500">Date:</span>
-                            <span className="font-mono">{receipt.createdAt ? format(receipt.createdAt instanceof Date ? receipt.createdAt : (receipt.createdAt.toDate ? receipt.createdAt.toDate() : new Date(receipt.createdAt)), 'dd/MM/yy HH:mm') : 'N/A'}</span>
+                            <span className="font-mono">{receipt.createdAt ? format(safeToDate(receipt.createdAt), 'dd/MM/yy HH:mm') : 'N/A'}</span>
                         </div>
 
                         {receipt.customer && (
