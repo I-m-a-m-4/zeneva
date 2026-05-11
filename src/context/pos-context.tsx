@@ -183,10 +183,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
   }, [initialBusiness]);
 
-  useEffect(() => {
-    if (initialStats) secureStorage.setItem('pos_offline_stats', initialStats);
-  }, [initialStats]);
-
   const canFetchSubData = !!businessId && !!initialBusiness && initialBusiness.status !== 'deleted' && !!user && isProfileReady;
 
   // Optimized: Disabled real-time listener for large collection to cut Firestore read costs. 
@@ -196,6 +192,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const statsDocRef = useMemoFirebase(() => (canFetchSubData ? doc(firestore, 'businessInstances', businessId, 'stats', 'overall') : null), [canFetchSubData, businessId, firestore]);
   const { data: initialStats } = useDoc<BusinessStats>(statsDocRef);
+
+  useEffect(() => {
+    if (initialStats) secureStorage.setItem('pos_offline_stats', initialStats);
+  }, [initialStats]);
 
   // Background Stats Reconciliation
   useEffect(() => {
