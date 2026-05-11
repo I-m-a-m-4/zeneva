@@ -59,7 +59,10 @@ function CustomerDetailContent() {
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     
     // FETCH FULL RECEIPT HISTORY FOR THIS CUSTOMER
-    const [allCustomerReceipts, setAllCustomerReceipts] = React.useState<Receipt[]>([]);
+    const [allCustomerReceipts, setAllCustomerReceipts] = React.useState<Receipt[]>(() => {
+        if (!allReceipts || !customerId) return [];
+        return allReceipts.filter(r => r.customer?.id === customerId);
+    });
     const [isFetchingReceipts, setIsFetchingReceipts] = React.useState(true);
 
     React.useEffect(() => {

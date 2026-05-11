@@ -150,28 +150,15 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [isUpdatingRole, setIsUpdatingRole] = React.useState(false);
     const [openMenuUserId, setOpenMenuUserId] = React.useState<string | null>(null);
 
-    const { business: businessInstance, currentUserProfile, isLoading: isPosLoading } = usePOS();
-
-    const [refreshKey, setRefreshKey] = React.useState(0);
-
-    const forceRefresh = React.useCallback(() => {
-        console.log('[UsersPage] Force refresh triggered');
-        setRefreshKey(prev => prev + 1);
-    }, []);
-
-    const usersQuery = useMemoFirebase(() => {
-        if (!businessId || !firestore) return null;
-        console.log('[UsersPage] Updating users query, refreshKey:', refreshKey);
-        return query(collection(firestore, "users"), where("businessId", "==", businessId));
-    }, [businessId, firestore, refreshKey]);
-    const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
+    const { business: businessInstance, currentUserProfile, isLoading: isPosLoading, users } = usePOS();
+    const areUsersLoading = false; // Handled by root lifecycle
 
     const invitationsQuery = useMemoFirebase(() => {
         if (!businessId || !firestore) return null;
-        console.log('[UsersPage] Updating invitations query, refreshKey:', refreshKey);
         return query(collection(firestore, 'invitations'), where('businessId', '==', businessId));
-    }, [businessId, firestore, refreshKey]);
+    }, [businessId, firestore]);
     const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
+    const forceRefresh = triggerRefresh; // Bind locally
 
     const isLoading = isPosLoading || areUsersLoading || areInvitationsLoading;
 

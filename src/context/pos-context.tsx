@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats } from '@/types';
+import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats, AuditLog } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { getAuth } from 'firebase/auth';
@@ -114,6 +114,8 @@ interface POSContextType {
   resumeHeldSale: (heldSaleId: string) => void;
   deleteHeldSale: (heldSaleId: string) => void;
   voidReceipt: (receiptId: string) => Promise<void>;
+  users: UserProfile[];
+  auditLogs: AuditLog[];
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -142,6 +144,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => secureStorage.getItem<Product[]>('pos_synced_products') || []);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => secureStorage.getItem<Customer[]>('pos_synced_customers') || []);
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => secureStorage.getItem<Receipt[]>('pos_synced_receipts') || []);
+  const [syncedUsers, setSyncedUsers] = useState<UserProfile[]>(() => secureStorage.getItem<UserProfile[]>('pos_synced_users') || []);
+  const [syncedAuditLogs, setSyncedAuditLogs] = useState<AuditLog[]>(() => secureStorage.getItem<AuditLog[]>('pos_synced_audit_logs') || []);
   const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => secureStorage.getItem<BusinessStats>('pos_offline_stats'));
@@ -178,6 +182,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
   }, [initialBusiness]);
+
+  useEffect(() => {
+    if (initialStats) secureStorage.setItem('pos_offline_stats', initialStats);
+  }, [initialStats]);
 
   const canFetchSubData = !!businessId && !!initialBusiness && initialBusiness.status !== 'deleted' && !!user && isProfileReady;
 
@@ -351,6 +359,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return merged.sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
   }, [initialCustomers, syncedCustomers, queuedActions]);
 
+  const users = useMemo(() => {
+    if (syncedUsers.length > 0) return syncedUsers;
+    return [];
+  }, [syncedUsers]);
+
+  const auditLogs = useMemo(() => {
+    if (syncedAuditLogs.length > 0) return syncedAuditLogs;
+    return [];
+  }, [syncedAuditLogs]);
+
   const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);
 
   // --- Functions ---
@@ -442,6 +460,34 @@ export function POSProvider({ children }: { children: ReactNode }) {
       fetchInitialReceipts();
     }
   }, [businessId, firestore, fetchInitialReceipts, refreshKey]);
+
+  const fetchInitialUsers = useCallback(async () => {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (!businessId || !firestore || !isOnline) return;
+    try {
+      const snap = await getDocs(query(collection(firestore, "users"), where("businessId", "==", businessId)));
+      const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
+      if (fetched.length > 0) setSyncedUsers(fetched);
+    } catch (e) { console.error("Fetch initial users failed:", e); }
+  }, [businessId, firestore]);
+
+  const fetchInitialAuditLogs = useCallback(async () => {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (!businessId || !firestore || !isOnline) return;
+    try {
+      const snap = await getDocs(query(collection(firestore, 'businessInstances', businessId, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)));
+      const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as AuditLog));
+      if (fetched.length > 0) setSyncedAuditLogs(fetched);
+    } catch (e) { console.error("Fetch initial audit logs failed:", e); }
+  }, [businessId, firestore]);
+
+  useEffect(() => {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (businessId && firestore && isOnline) {
+      fetchInitialUsers();
+      fetchInitialAuditLogs();
+    }
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey]);
 
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
@@ -1161,6 +1207,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem('pos_synced_products', syncedProducts); }, [syncedProducts]);
   useEffect(() => { secureStorage.setItem('pos_synced_customers', syncedCustomers); }, [syncedCustomers]);
   useEffect(() => { secureStorage.setItem('pos_synced_receipts', syncedReceipts); }, [syncedReceipts]);
+  useEffect(() => { secureStorage.setItem('pos_synced_users', syncedUsers); }, [syncedUsers]);
+  useEffect(() => { secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs); }, [syncedAuditLogs]);
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
   useEffect(() => { secureStorage.setItem('pos_queued_actions', queuedActions); }, [queuedActions]);
 
@@ -1576,10 +1624,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
 
     heldSales, holdCurrentSale, resumeHeldSale, deleteHeldSale, voidReceipt,
+    users, auditLogs,
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

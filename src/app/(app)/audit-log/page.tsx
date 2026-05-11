@@ -189,7 +189,7 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 }
 
 function AuditLogPageContent() {
-    const { business, isLoading: isPosLoading } = usePOS();
+    const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs } = usePOS();
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isAnalyzing, startTransition] = React.useTransition();
@@ -200,7 +200,7 @@ function AuditLogPageContent() {
     const [actionFilter, setActionFilter] = React.useState('all');
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(true);
-    const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
+    const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>(() => cachedAuditLogs && cachedAuditLogs.length > 0 ? cachedAuditLogs : []);
 
     // Fetch Initial Logs
     React.useEffect(() => {
