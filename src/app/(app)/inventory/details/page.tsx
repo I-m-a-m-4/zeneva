@@ -158,6 +158,11 @@ function EditProductContent() {
 
     const [isSaving, setIsSaving] = React.useState(false);
     const isSubmitting = React.useRef(false);
+    const [isMounted, setIsMounted] = React.useState(false);
+    
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
     const [imageFile, setImageFile] = React.useState<File | null>(null);
     const [imagePreview, setImagePreview] = React.useState<string | null>(null);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -391,7 +396,7 @@ function EditProductContent() {
         router.push('/inventory');
     };
 
-    const isLoading = isProductLoading || !firestore;
+    const isLoading = !isMounted || isProductLoading || !firestore;
     const canManageProduct = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
