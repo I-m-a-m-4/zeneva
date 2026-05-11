@@ -297,12 +297,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // Client-side sort by createdAt desc
     return merged.sort((a, b) => {
       const getMillis = (dateVal: any) => {
-        if (!dateVal) return 0;
-        if (dateVal.toMillis) return dateVal.toMillis();
-        if (dateVal.seconds) return dateVal.seconds * 1000;
-        if (dateVal instanceof Date) return dateVal.getTime();
-        if (typeof dateVal === 'string' || typeof dateVal === 'number') return new Date(dateVal).getTime();
-        return 0;
+        const date = safeToDate(dateVal);
+        return date.getTime();
       };
       return getMillis(b.createdAt) - getMillis(a.createdAt);
     });
@@ -618,7 +614,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             chunk.forEach(action => {
               // Write Discrete Receipt Record
               const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
-              batch.set(rRef, { ...action.payload.receiptData, createdAt: serverTimestamp() });
+              batch.set(rRef, { ...action.payload.receiptData, businessId: businessId, createdAt: serverTimestamp() });
 
               // Cascade product stock values (LIFO sequence logic applies naturally via Map overwrite)
               action.payload.productUpdates.forEach((u: any) => combinedStocks.set(u.id, u.newStock));
