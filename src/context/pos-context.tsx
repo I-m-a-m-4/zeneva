@@ -366,11 +366,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       
       const pQuery = query(collection(firestore, "products"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
+      const rQuery = query(collection(firestore, "receipts"), where("businessId", "==", businessId), where("createdAt", ">", lastCheck), limit(100));
       
-      const [pSnap, cSnap] = await Promise.all([getDocs(pQuery), getDocs(cQuery)]);
+      const [pSnap, cSnap, rSnap] = await Promise.all([getDocs(pQuery), getDocs(cQuery), getDocs(rQuery)]);
       
       const newProducts = pSnap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
       const newCustomers = cSnap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      const newReceipts = rSnap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
 
       if (newProducts.length > 0) {
         setSyncedProducts(prev => {
@@ -395,10 +397,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
           return merged;
         });
       }
-
+      if (newReceipts.length > 0) {
+        setSyncedReceipts(prev => {
+          const merged = [...prev];
+          newReceipts.forEach(nr => {
+            const idx = merged.findIndex(r => r.id === nr.id);
+            if (idx !== -1) merged[idx] = nr;
+            else merged.push(nr);
+          });
+          return merged;
+        });
+      }
       setLastSyncedTimestamp(Date.now());
-      if ((newProducts.length > 0 || newCustomers.length > 0) && !hasShownSyncToast.current) {
-        toast({ title: "Product Sync Complete", description: `Successfully synchronized inventory and customer data.` });
+      if ((newProducts.length > 0 || newCustomers.length > 0 || newReceipts.length > 0) && !hasShownSyncToast.current) {
+        toast({ title: "Operational Sync Complete", description: `Successfully synchronized inventory, customer, and recent sales data.` });
         hasShownSyncToast.current = true;
       }
     } catch (error) {
@@ -426,10 +438,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // Effect to pull initial historical receipts once on startup if the local array is empty.
   useEffect(() => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-    if (businessId && firestore && syncedReceipts.length === 0 && isOnline) {
+    if (businessId && firestore && isOnline) {
       fetchInitialReceipts();
     }
-  }, [businessId, firestore, syncedReceipts.length, fetchInitialReceipts]);
+  }, [businessId, firestore, fetchInitialReceipts, refreshKey]);
 
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
