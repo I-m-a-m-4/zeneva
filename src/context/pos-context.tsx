@@ -645,7 +645,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [business]);
 
   const processQueue = useCallback(async () => {
-    if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !currentUserProfile) return;
+    const effectiveProfile = currentUserProfile || offlineProfile;
+    if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !effectiveProfile) return;
     const pending = queuedActions.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
     setIsQueueProcessing(true);
@@ -716,23 +717,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 });
               }
 
-              // Populate Notification Bus (Uses randomized Unique Subcollection Doc IDs)
-              action.payload.productUpdates.forEach((u: any) => {
-                const currentProduct = products?.find(p => p.id === u.id);
-                if (currentProduct && currentProduct.lowStockThreshold && u.newStock <= currentProduct.lowStockThreshold) {
-                  const alertRef = doc(collection(firestore, `users/${currentUserProfile.id}/notifications`));
-                  batch.set(alertRef, {
-                    title: "Low Stock Alert",
-                    body: `${currentProduct.name} is running low. Remaining: ${u.newStock}`,
-                    createdAt: serverTimestamp(),
-                    read: false,
-                    type: 'inventory',
-                    productId: currentProduct.id
-                  });
-                }
-              });
-            });
-
             // Step B: Flush all cumulative values from the local aggregation buffer into Firestore batch commands.
             combinedStocks.forEach((stockVal, pId) => {
               batch.update(doc(firestore, 'products', pId), { stock: stockVal, updatedAt: serverTimestamp() });
@@ -745,17 +729,51 @@ export function POSProvider({ children }: { children: ReactNode }) {
               batch.update(doc(firestore, 'customers', cId), updatesObj);
             });
 
-            // Reduce business-wide write traffic from "Per Transaction" down to "One per Cluster"
-            if (aggregateSales > 0 || aggregateRev > 0 || aggregateUnits > 0) {
-              batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), {
-                totalSales: increment(aggregateSales),
-                totalRevenue: increment(aggregateRev),
-                totalUnitsSold: increment(aggregateUnits)
-              }, { merge: true });
-            }
-
             // Ship the final, lightweight consolidated payload!
             await batch.commit();
+
+            // ----------------------------------------------------------------
+            // Secondary Non-Critical Operations (Stats & Notifications)
+            // We run these separately so a permission error for a vendor operator
+            // doesn't cause the entire sale batch to fail and get stuck in the queue.
+            // ----------------------------------------------------------------
+            try {
+              const secondaryBatch = writeBatch(firestore);
+              let hasSecondaryWrites = false;
+
+              if (aggregateSales > 0 || aggregateRev > 0 || aggregateUnits > 0) {
+                secondaryBatch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), {
+                  totalSales: increment(aggregateSales),
+                  totalRevenue: increment(aggregateRev),
+                  totalUnitsSold: increment(aggregateUnits)
+                }, { merge: true });
+                hasSecondaryWrites = true;
+              }
+
+              chunk.forEach(action => {
+                action.payload.productUpdates.forEach((u: any) => {
+                  const currentProduct = products?.find(p => p.id === u.id);
+                  if (currentProduct && currentProduct.lowStockThreshold && u.newStock <= currentProduct.lowStockThreshold) {
+                    const alertRef = doc(collection(firestore, `users/${effectiveProfile.id}/notifications`));
+                    secondaryBatch.set(alertRef, {
+                      title: "Low Stock Alert",
+                      body: `${currentProduct.name} is running low. Remaining: ${u.newStock}`,
+                      createdAt: serverTimestamp(),
+                      read: false,
+                      type: 'inventory',
+                      productId: currentProduct.id
+                    });
+                    hasSecondaryWrites = true;
+                  }
+                });
+              });
+
+              if (hasSecondaryWrites) await secondaryBatch.commit();
+            } catch (secondaryError) {
+              console.warn("POS Queue :: Non-critical stats/notification update failed (likely RBAC). Sale was safely recorded.", secondaryError);
+            }
+
+            // Mark chunk as successfully processed
             chunk.forEach(c => successfullyCommitIds.push(c.id));
 
             // 🚀 OPTIMIZATION FIX: Re-inject transaction records into the local edge cache
@@ -906,7 +924,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsQueueProcessing(false);
     }
-  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, products, syncedProducts, toast]);
+  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, offlineProfile, products, syncedProducts, toast]);
 
 
   const addToQueue = useCallback((action: any, description: string) => {
