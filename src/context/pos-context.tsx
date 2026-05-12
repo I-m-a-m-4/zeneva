@@ -194,7 +194,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     secureStorage.setItem('pos_synced_receipts', syncedReceipts);
   }, [syncedReceipts]);
-
+ 
   useEffect(() => {
     secureStorage.setItem('pos_synced_users', syncedUsers);
   }, [syncedUsers]);
@@ -740,6 +740,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                   loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints
                 });
               }
+            });
 
             // Step B: Flush all cumulative values from the local aggregation buffer into Firestore batch commands.
             combinedStocks.forEach((stockVal, pId) => {
