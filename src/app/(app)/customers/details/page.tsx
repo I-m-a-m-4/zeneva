@@ -58,6 +58,32 @@ function CustomerDetailContent() {
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     
+    const [fetchedCustomer, setFetchedCustomer] = React.useState<Customer | null>(null);
+    const [isFetchingCustomer, setIsFetchingCustomer] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!customer && customerId && firestore && business?.id) {
+            const fetchFallback = async () => {
+                setIsFetchingCustomer(true);
+                try {
+                    const { doc, getDoc } = await import('firebase/firestore');
+                    const ref = doc(firestore, 'customers', customerId);
+                    const snap = await getDoc(ref);
+                    if (snap.exists()) {
+                        setFetchedCustomer({ ...snap.data(), id: snap.id } as Customer);
+                    }
+                } catch(e) {
+                    console.error("Fallback customer fetch failed:", e);
+                } finally {
+                    setIsFetchingCustomer(false);
+                }
+            };
+            fetchFallback();
+        }
+    }, [customer, customerId, firestore, business?.id]);
+
+    const displayCustomer = customer || fetchedCustomer;
+
     // FETCH FULL RECEIPT HISTORY FOR THIS CUSTOMER
     const [allCustomerReceipts, setAllCustomerReceipts] = React.useState<Receipt[]>(() => {
         if (!allReceipts || !customerId) return [];
@@ -214,7 +240,7 @@ function CustomerDetailContent() {
             if (isTauri) {
                 try {
                     const { syncCustomersToOffline } = await import('@/lib/sqlite-sync');
-                    await syncCustomersToOffline(currentUserProfile.businessId, [{ ...customer, aiInsights: insightsWithTimestamp }]);
+                    await syncCustomersToOffline(currentUserProfile.businessId, [{ ...displayCustomer, aiInsights: insightsWithTimestamp }]);
                     console.log("Insights saved to local SQLite.");
                 } catch (e) {
                     console.error("Failed to save insights to SQLite:", e);
@@ -243,10 +269,10 @@ function CustomerDetailContent() {
 
     const totalSpent = React.useMemo(() => {
         const fromReceipts = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
-        return Math.max(customer?.totalSpent || 0, fromReceipts);
-    }, [customer, receipts]);
+        return Math.max(displayCustomer?.totalSpent || 0, fromReceipts);
+    }, [displayCustomer, receipts]);
 
-    const isLoading = isPosLoading || isFetchingReceipts || !firestore;
+    const isLoading = isPosLoading || isFetchingReceipts || isFetchingCustomer || !firestore;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
     if (isLoading) {
@@ -262,7 +288,7 @@ function CustomerDetailContent() {
         );
     }
 
-    if (!customer && !isLoading) {
+    if (!displayCustomer && !isLoading) {
         return (
             <div className="text-center p-8">
                 <p className="font-bold text-lg">Customer not found.</p>
@@ -284,12 +310,12 @@ function CustomerDetailContent() {
                     <CardHeader className="flex flex-col items-center text-center pb-2">
                         <Avatar className="h-24 w-24 mb-4 text-3xl border-2 border-primary/20">
                             <AvatarFallback className="bg-primary/5 text-primary">
-                                {customer.name ? customer.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : 'U'}
+                                {displayCustomer.name ? displayCustomer.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : 'U'}
                             </AvatarFallback>
                         </Avatar>
-                        <CardTitle className="text-2xl font-bold">{customer.name}</CardTitle>
-                        <CardDescription>{customer.email}</CardDescription>
-                        {customer.phone && <CardDescription>{customer.phone}</CardDescription>}
+                        <CardTitle className="text-2xl font-bold">{displayCustomer.name}</CardTitle>
+                        <CardDescription>{displayCustomer.email}</CardDescription>
+                        {displayCustomer.phone && <CardDescription>{displayCustomer.phone}</CardDescription>}
                     </CardHeader>
                     <CardContent className="text-center flex-grow pt-4">
                         <div className="flex items-center justify-center gap-2 mb-6">
@@ -327,11 +353,11 @@ function CustomerDetailContent() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
-                        <Button variant="outline" className="w-full" onClick={() => setCustomerToEdit(customer)}>
+                        <Button variant="outline" className="w-full" onClick={() => setCustomerToEdit(displayCustomer)}>
                             <Pencil className="mr-2 h-4 w-4" /> Edit Profile
                         </Button>
                         {canDelete && (
-                            <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(customer)} disabled={isDeleting}>
+                            <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(displayCustomer)} disabled={isDeleting}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
                             </Button>
                         )}
@@ -411,7 +437,7 @@ function CustomerDetailContent() {
                                     </div>
                                 ))}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
-                                    <Link href={`/receipts?customerId=${customer.id}`}>View Full Statement</Link>
+                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>View Full Statement</Link>
                                 </Button>
                             </div>
                         ) : (
@@ -458,7 +484,7 @@ function CustomerDetailContent() {
                                     </div>
                                 ))}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
-                                    <Link href={`/receipts?customerId=${customer.id}`}>View All Transactions</Link>
+                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>View All Transactions</Link>
                                 </Button>
                             </div>
                         ) : (

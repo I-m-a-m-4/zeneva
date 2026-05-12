@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Dialog,
   DialogContent,
@@ -101,29 +102,22 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         updatedAt: serverTimestamp(),
       };
 
-      if (isTauri) {
-        // Use offline queue for desktop
-        addToQueue({
-          type: 'add-customer',
-          payload: newCustomerData,
-        }, `Adding customer: ${name}`);
-        
-        toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
-        triggerRefresh();
-        onOpenChange(false);
-        resetForm();
-      } else {
-        // Use direct firestore for web
-        await addDoc(collection(firestore, 'customers'), {
+      // Use offline-first queue for all platforms to ensure optimistic updates
+      // and resilience across PWA and Native environments.
+      const actionId = addToQueue({
+        type: 'add-customer',
+        payload: {
           ...newCustomerData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
-        triggerRefresh();
-        onOpenChange(false);
-        resetForm();
-      }
+          id: uuidv4(), // Generate ID here so optimistic UI can navigate to it
+          lowercaseName: name.toLowerCase(),
+          lowercaseEmail: email ? email.toLowerCase() : '',
+        },
+      }, `Adding customer: ${name}`);
+      
+      toast({ title: 'Success', description: `${name} has been added to the system.`, variant: 'success' });
+      triggerRefresh();
+      onOpenChange(false);
+      resetForm();
     } catch (error) {
       toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
       isSavingRef.current = false;

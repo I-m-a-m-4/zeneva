@@ -393,7 +393,31 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return [];
   }, [syncedAuditLogs]);
 
-  const stats = useMemo(() => initialStats || offlineStats, [initialStats, offlineStats]);
+  const stats = useMemo(() => {
+    const baseStats = initialStats || offlineStats;
+    if (!baseStats) return null;
+
+    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending');
+    if (queuedSales.length === 0) return baseStats;
+
+    // Optimistically apply pending offline sales to display metrics
+    let pendingRevenue = 0;
+    let pendingUnits = 0;
+    
+    queuedSales.forEach(sale => {
+      const data = sale.payload.receiptData || sale.payload;
+      pendingRevenue += Number(data.total) || 0;
+      const items = data.items || [];
+      items.forEach((i: any) => pendingUnits += (Number(i.quantity) || 0));
+    });
+
+    return {
+      ...baseStats,
+      totalRevenue: (baseStats.totalRevenue || 0) + pendingRevenue,
+      totalSales: (baseStats.totalSales || 0) + queuedSales.length,
+      totalUnitsSold: (baseStats.totalUnitsSold || 0) + pendingUnits,
+    };
+  }, [initialStats, offlineStats, queuedActions]);
 
   // --- Functions ---
   const refreshData = useCallback(async () => {
