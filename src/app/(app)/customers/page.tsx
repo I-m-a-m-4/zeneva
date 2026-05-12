@@ -80,7 +80,14 @@ const CUSTOMERS_PER_PAGE_WEB = 500;
 const CUSTOMERS_PER_PAGE_NATIVE = 100000;
 
 export default function CustomersPage() {
-  const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+  const [mounted, setMounted] = React.useState(false);
+  const [isNative, setIsNative] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+    setIsNative(typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__);
+  }, []);
+
   const itemsPerPage = isNative ? CUSTOMERS_PER_PAGE_NATIVE : CUSTOMERS_PER_PAGE_WEB;
   const { 
     customers, 
@@ -268,6 +275,8 @@ export default function CustomersPage() {
     }
     setIsDeleteDialogOpen(false);
   };
+
+  if (!mounted) return null;
 
   return (
     <>
