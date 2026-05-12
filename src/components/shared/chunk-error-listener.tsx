@@ -15,6 +15,10 @@ export function ChunkErrorListener() {
         msg.includes('Failed to fetch dynamically imported module') ||
         msg.includes('Refused to execute script')
       ) {
+        if (!navigator.onLine) {
+          console.warn('Chunk/Script load error detected while offline, ignoring to prevent reload loop.');
+          return;
+        }
         console.warn('Chunk/Script load error detected, reloading page to fetch latest version...');
         window.location.reload();
         return;
@@ -25,6 +29,10 @@ export function ChunkErrorListener() {
       if (target && target.tagName === 'SCRIPT') {
         const src = (target as HTMLScriptElement).src || '';
         if (src.includes('_next/static') || src.includes('chunks')) {
+          if (!navigator.onLine) {
+            console.warn('Next.js script chunk failed to load while offline:', src);
+            return;
+          }
           console.warn('Next.js script chunk failed to load:', src, 'reloading page to get latest assets...');
           window.location.reload();
         }
@@ -40,6 +48,10 @@ export function ChunkErrorListener() {
         reasonStr.includes('Loading chunk') ||
         reasonStr.includes('Failed to fetch dynamically imported module')
       ) {
+        if (!navigator.onLine) {
+          console.warn('Unhandled ChunkLoadError rejection detected while offline, ignoring.');
+          return;
+        }
         console.warn('Unhandled ChunkLoadError rejection detected, reloading page...');
         window.location.reload();
       }

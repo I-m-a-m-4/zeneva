@@ -180,6 +180,30 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [currentUserProfile]);
 
   useEffect(() => {
+    secureStorage.setItem('pos_queued_actions', queuedActions);
+  }, [queuedActions]);
+
+  useEffect(() => {
+    secureStorage.setItem('pos_synced_products', syncedProducts);
+  }, [syncedProducts]);
+
+  useEffect(() => {
+    secureStorage.setItem('pos_synced_customers', syncedCustomers);
+  }, [syncedCustomers]);
+
+  useEffect(() => {
+    secureStorage.setItem('pos_synced_receipts', syncedReceipts);
+  }, [syncedReceipts]);
+
+  useEffect(() => {
+    secureStorage.setItem('pos_synced_users', syncedUsers);
+  }, [syncedUsers]);
+
+  useEffect(() => {
+    secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs);
+  }, [syncedAuditLogs]);
+
+  useEffect(() => {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
   }, [initialBusiness]);
 
@@ -799,13 +823,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
             switch (action.type) {
               case 'add-customer': {
                 const cRef = doc(firestore, 'customers', action.payload.id);
-                batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name.toLowerCase(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name?.toLowerCase() || '', lowercaseEmail: action.payload.email?.toLowerCase() || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(1) }, { merge: true });
                 break;
               }
-              case 'update-customer': 
-                batch.update(doc(firestore, 'customers', action.payload.id), { ...action.payload.values, updatedAt: serverTimestamp() }); 
+              case 'update-customer': {
+                const updateVals = { ...action.payload.values, updatedAt: serverTimestamp() };
+                if (updateVals.name) updateVals.lowercaseName = updateVals.name.toLowerCase();
+                if ('email' in updateVals) updateVals.lowercaseEmail = updateVals.email?.toLowerCase() || '';
+                batch.update(doc(firestore, 'customers', action.payload.id), updateVals); 
                 break;
+              }
               case 'delete-customer': 
                 batch.delete(doc(firestore, 'customers', action.payload.id)); 
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); 
@@ -987,19 +1015,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const lower = term.toLowerCase().trim();
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
     
+    let local: Customer[] = [];
     if (customers && customers.length > 0) {
-      const local = customers.filter(c => c.name.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term));
-      if (local.length >= 10 || !isOnline) return local.slice(0, 20);
+      local = customers.filter(c => c.name?.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term) || c.code?.toLowerCase().includes(lower));
     }
     
-    if (!user || !businessId || !firestore || !isOnline) return [];
+    if (!user || !businessId || !firestore || !isOnline) return local.slice(0, 20);
     try {
       const q = (field: string) => query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '>=', lower), where(field, '<=', lower + '\uf8ff'), limit(20));
       const [nameSnap, emailSnap] = await Promise.all([getDocs(q('lowercaseName')), getDocs(q('lowercaseEmail'))]);
-      const combined = [...nameSnap.docs, ...emailSnap.docs].map(d => ({ ...d.data() as any, id: d.id } as Customer));
+      const combined = [...local, ...nameSnap.docs.map(d => ({ ...d.data() as any, id: d.id } as Customer)), ...emailSnap.docs.map(d => ({ ...d.data() as any, id: d.id } as Customer))];
       return Array.from(new Map(combined.map(item => [item.id, item])).values()).slice(0, 20);
-    } catch { return []; }
-  }, [businessId, firestore, customers, isFullSyncingCustomers]);
+    } catch { return local.slice(0, 20); }
+  }, [businessId, firestore, customers, isFullSyncingCustomers, user]);
 
   const searchCustomersByField = useCallback(async (field: string, value: string) => {
     if (!value) return [];

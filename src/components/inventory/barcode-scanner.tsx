@@ -104,7 +104,8 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                         stream.getTracks().forEach(track => track.stop());
                     }
                 } catch (permissionErr) {
-                    console.warn("Explicit getUserMedia failed, continuing to getCameras anyway...", permissionErr);
+                    console.warn("Explicit getUserMedia failed:", permissionErr);
+                    throw new Error("Camera permission denied or not available. Please allow access.");
                 }
             }
 
