@@ -31,8 +31,8 @@ export function SplashScreen() {
 
     // Only run the loading simulation if in Tauri
     if (isTauriEnv) {
-      const duration = 2500;
-      const interval = 20;
+      const duration = 800;
+      const interval = 15;
       const step = 100 / (duration / interval);
 
       const timer = setInterval(() => {
@@ -61,7 +61,7 @@ export function SplashScreen() {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#131110] overflow-hidden"
         >
           <div className="relative flex flex-col items-center w-full max-w-[320px]">
