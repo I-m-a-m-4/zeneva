@@ -67,7 +67,7 @@ export default function DownloadPage() {
   const [version, setVersion] = useState(AppConfig.version || "2.0.9");
 
   useEffect(() => {
-    fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest')
+    fetch('https://api.github.com/repos/I-m-a-m-4/zeneva-releases/releases/latest')
       .then(res => res.json())
       .then(data => {
         if (data.tag_name) {
@@ -151,7 +151,7 @@ export default function DownloadPage() {
     }
   };
 
-  const latestReleaseUrl = "https://github.com/I-m-a-m-4/zeneva/releases";
+  const latestReleaseUrl = "https://github.com/I-m-a-m-4/zeneva-releases/releases";
   const windowsDownloadUrl = `/api/download/windows`;
   const macDownloadUrlIntel = `/api/download/macos-intel`;
   const macDownloadUrlSilicon = `/api/download/macos-silicon`;
