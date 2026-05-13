@@ -516,7 +516,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(query(collection(firestore, "users"), where("businessId", "==", businessId)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
       if (fetched.length > 0) setSyncedUsers(fetched);
-    } catch (e) { console.error("Fetch initial users failed:", e); }
+    } catch (e: any) { 
+      if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
+      console.error("Fetch initial users failed:", e); 
+    }
   }, [businessId, firestore, user]);
 
   const fetchInitialAuditLogs = useCallback(async () => {
@@ -526,7 +529,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(query(collection(firestore, 'businessInstances', businessId, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as AuditLog));
       if (fetched.length > 0) setSyncedAuditLogs(fetched);
-    } catch (e) { console.error("Fetch initial audit logs failed:", e); }
+    } catch (e: any) { 
+      if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
+      console.error("Fetch initial audit logs failed:", e); 
+    }
   }, [businessId, firestore, user]);
 
   useEffect(() => {
