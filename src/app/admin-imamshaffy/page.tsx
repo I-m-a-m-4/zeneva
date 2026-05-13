@@ -311,6 +311,116 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
     );
 }
 
+function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, totalBusinesses, totalUsers, launchDate }: { open: boolean, onOpenChange: (open: boolean) => void, daysActive: number, totalSales: number, totalBusinesses: number, totalUsers: number, launchDate: Date }) {
+    const elementRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
+    const [isExporting, setIsExporting] = useState(false);
+
+    const handleDownloadCertificate = async () => {
+        if (!elementRef.current) return;
+        setIsExporting(true);
+        toast({ title: "Generating Commemoration...", description: "Please wait while we render your high-fidelity milestone card." });
+        try {
+            const canvas = await html2canvas(elementRef.current, { 
+                scale: 3, 
+                backgroundColor: '#09090b',
+                logging: false,
+                useCORS: true
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `zeneva-milestone-${daysActive}days.png`;
+            link.href = dataUrl;
+            link.click();
+            toast({ variant: "success", title: "Card Downloaded", description: "Your commemorative achievement card is now saved!" });
+        } catch (e) {
+            toast({ variant: "destructive", title: "Export Failed", description: "Unable to capture image canvas." });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md p-0 overflow-visible border-none bg-transparent backdrop-blur-none flex justify-center items-center shadow-none no-capture [&>button]:text-white/50">
+                <div className="relative group max-w-sm w-full mx-auto" ref={elementRef}>
+                    {/* Dynamic gradient background wrapper */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-emerald-500 to-cyan-500 rounded-[2.5rem] blur-lg opacity-70 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+                    
+                    <div className="relative bg-zinc-950 border border-white/10 px-6 py-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center overflow-hidden ring-1 ring-white/10">
+                        {/* Elegant atmospheric lighting details */}
+                        <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-indigo-500/20 to-transparent pointer-events-none"></div>
+                        <div className="absolute -right-24 -top-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+                        <div className="absolute -left-24 -bottom-24 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
+
+                        {/* Bouncing Trophy Emblem */}
+                        <div className="relative bg-white/5 border border-white/10 p-5 rounded-3xl mt-1 mb-4 shadow-inner flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-yellow-400/10 rounded-3xl blur-sm"></div>
+                            <Trophy className="h-12 w-12 text-amber-400 relative z-10 animate-bounce" />
+                        </div>
+
+                        <span className="text-[9px] uppercase tracking-[0.3em] font-black text-indigo-400 mb-2 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 select-none">Platform Genesis Milestone</span>
+                        <h2 className="text-3xl font-black tracking-tight text-white select-none flex items-center gap-1">
+                            ZENEVA OS
+                        </h2>
+                        
+                        {/* Epic Big Number Counter Display */}
+                        <div className="my-6 px-8 py-4 rounded-3xl bg-gradient-to-b from-white/[0.07] to-transparent border border-white/10 backdrop-blur-md shadow-[inset_0px_1px_1px_rgba(255,255,255,0.1)] relative overflow-hidden group-hover:border-white/20 transition-colors">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent translate-x-[-100%] animate-[shimmer_3s_infinite] pointer-events-none"></div>
+                            <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 leading-none select-none">
+                                {daysActive}
+                            </div>
+                            <div className="text-[10px] uppercase font-black tracking-[0.25em] text-cyan-400 mt-2 select-none">Days Online</div>
+                        </div>
+
+                        <p className="text-xs text-zinc-400 font-medium mb-6 px-4 leading-relaxed select-none">
+                            Active on the grid since <span className="text-zinc-100 font-bold underline decoration-dotted decoration-indigo-400 underline-offset-2">{format(launchDate, 'PPP')}</span>. Powering borderless digital checkout operations globally.
+                        </p>
+
+                        {/* Key Platform Metrics */}
+                        <div className="w-full grid grid-cols-3 gap-2 bg-white/[0.03] border border-white/5 rounded-2xl p-3.5 mb-6 select-none">
+                            <div className="flex flex-col p-1 items-center justify-center">
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Accounts</span>
+                                <span className="text-base font-black text-white mt-1">+{totalUsers}</span>
+                                <span className="text-[8px] font-bold text-zinc-400 uppercase mt-0.5">Users</span>
+                            </div>
+                            <div className="flex flex-col border-x border-white/10 p-1 items-center justify-center">
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Coverage</span>
+                                <span className="text-base font-black text-white mt-1">+{totalBusinesses}</span>
+                                <span className="text-[8px] font-bold text-zinc-400 uppercase mt-0.5">Stores</span>
+                            </div>
+                            <div className="flex flex-col p-1 items-center justify-center">
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Volume</span>
+                                <span className="text-base font-black text-emerald-400 mt-1">+{totalSales.toLocaleString()}</span>
+                                <span className="text-[8px] font-bold text-emerald-500/80 uppercase mt-0.5">Checkouts</span>
+                            </div>
+                        </div>
+
+                        {/* Progress Stage Tracker */}
+                        <div className="w-full mb-7 flex flex-col text-left px-1 select-none">
+                            <div className="flex justify-between items-center mb-2 text-[9px] uppercase tracking-widest font-extrabold">
+                                <span className="text-zinc-500">Phase I: Genisys</span>
+                                <span className="text-emerald-400 flex items-center gap-1">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                    Active
+                                </span>
+                            </div>
+                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden relative ring-1 ring-white/5">
+                                <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 rounded-full animate-pulse" style={{ width: '82%' }}></div>
+                            </div>
+                        </div>
+
+                        {/* Save Button for download */}
+                        <Button onClick={handleDownloadCertificate} disabled={isExporting} size="sm" variant="outline" className="w-full bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20 text-white rounded-2xl font-bold no-capture flex items-center justify-center gap-2 h-11 text-xs tracking-wide shadow-lg active:scale-[0.98] transition-transform">
+                            <Download className="h-4 w-4 text-zinc-300" /> {isExporting ? "Capturing Frame..." : "Commemorate Capture"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserProfile | null, business: BusinessInstance | undefined, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
 
@@ -401,6 +511,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [isAssigningPlan, setIsAssigningPlan] = useState(false);
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
     const [userListModalState, setUserListModalState] = useState<{ open: boolean; title: string; description: string; users: UserProfile[] }>({ open: false, title: '', description: '', users: [] });
+    const [isAgeMilestoneOpen, setIsAgeMilestoneOpen] = useState(false);
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -1127,14 +1238,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 description="Businesses with transactions"
                             />
                         </button>
-                        <StatCard 
-                            title="Zeneva Age" 
-                            value={analyticsData.daysActive > 365 
-                                ? `${(analyticsData.daysActive / 365).toFixed(1)} Years` 
-                                : `${analyticsData.daysActive} Days`} 
-                            icon={Clock} 
-                            description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')}`}
-                        />
+                        <button onClick={() => setIsAgeMilestoneOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Zeneva Age" 
+                                value={analyticsData.daysActive > 365 
+                                    ? `${(analyticsData.daysActive / 365).toFixed(1)} Years` 
+                                    : `${analyticsData.daysActive} Days`} 
+                                icon={Clock} 
+                                description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')}`}
+                            />
+                        </button>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 border-t border-white/5 pt-6">
@@ -1903,6 +2016,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 description={userListModalState.description}
                 users={userListModalState.users}
                 businesses={businesses}
+            />
+
+            <ZenevaMilestoneDialog
+                open={isAgeMilestoneOpen}
+                onOpenChange={setIsAgeMilestoneOpen}
+                daysActive={analyticsData.daysActive}
+                totalSales={receipts?.length || 0}
+                totalBusinesses={platformAnalytics.totalActiveBusinesses}
+                totalUsers={analyticsData.totalUsers}
+                launchDate={analyticsData.earliestBusiness}
             />
 
             <UserDetailDialog
