@@ -130,7 +130,7 @@ function ReceiptsContent() {
         return format(date, 'p');
     };
 
-    const isLoading = isPosLoading;
+    const isLoading = isPosLoading || receipts === null;
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;

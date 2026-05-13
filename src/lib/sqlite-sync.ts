@@ -8,71 +8,82 @@ import Database from '@tauri-apps/plugin-sql';
  */
 
 let db: Database | null = null;
+let initPromise: Promise<Database | null> | null = null;
 
 export async function getOfflineDb() {
   if (db) return db;
   if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return null;
   
-  try {
-    db = await Database.load('sqlite:zeneva.db');
-    
-    // Initialize tables
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS sync_metadata (
-        id TEXT PRIMARY KEY,
-        business_id TEXT,
-        last_sync_timestamp INTEGER
-      );
-      
-      CREATE TABLE IF NOT EXISTS business (
-        id TEXT PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY,
-        business_id TEXT,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS customers (
-        id TEXT PRIMARY KEY,
-        business_id TEXT,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS receipts (
-        id TEXT PRIMARY KEY,
-        business_id TEXT,
-        data TEXT,
-        created_at INTEGER,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS stats (
-        id TEXT PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS sync_queue (
-        id TEXT PRIMARY KEY,
-        action_type TEXT,
-        payload TEXT,
-        description TEXT,
-        timestamp INTEGER,
-        status TEXT DEFAULT 'pending'
-      );
-    `);
-    
-    return db;
-  } catch (err) {
-    console.error('Failed to initialize SQLite offline DB:', err);
-    return null;
+  if (initPromise) {
+    return initPromise;
   }
+
+  initPromise = (async () => {
+    try {
+      const loadedDb = await Database.load('sqlite:zeneva.db');
+      
+      // Initialize tables
+      await loadedDb.execute(`
+        CREATE TABLE IF NOT EXISTS sync_metadata (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          last_sync_timestamp INTEGER
+        );
+        
+        CREATE TABLE IF NOT EXISTS business (
+          id TEXT PRIMARY KEY,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS customers (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS receipts (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          data TEXT,
+          created_at INTEGER,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS stats (
+          id TEXT PRIMARY KEY,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_queue (
+          id TEXT PRIMARY KEY,
+          action_type TEXT,
+          payload TEXT,
+          description TEXT,
+          timestamp INTEGER,
+          status TEXT DEFAULT 'pending'
+        );
+      `);
+      
+      db = loadedDb;
+      return db;
+    } catch (err) {
+      console.error('Failed to initialize SQLite offline DB:', err);
+      initPromise = null; // Reset so we can attempt to load again
+      return null;
+    }
+  })();
+
+  return initPromise;
 }
 
 export async function syncBusinessToOffline(business: any) {

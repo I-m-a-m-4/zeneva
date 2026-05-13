@@ -91,6 +91,24 @@ function CustomerDetailContent() {
     });
     const [isFetchingReceipts, setIsFetchingReceipts] = React.useState(true);
 
+    // Sync incoming receipts reactive to pos-context hydration
+    React.useEffect(() => {
+        if (allReceipts && customerId) {
+            const matching = allReceipts.filter(r => r.customer?.id === customerId);
+            if (matching.length > 0) {
+                setAllCustomerReceipts(prev => {
+                    const merged = [...prev];
+                    matching.forEach(m => {
+                        if (!merged.some(existing => existing.id === m.id)) {
+                            merged.push(m);
+                        }
+                    });
+                    return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+                });
+            }
+        }
+    }, [allReceipts, customerId]);
+
     React.useEffect(() => {
         if (!firestore || !customerId || !business?.id) return;
 
@@ -104,11 +122,24 @@ function CustomerDetailContent() {
                     const { getCachedCustomerReceipts } = await import('@/lib/sqlite-sync');
                     const localReceipts = await getCachedCustomerReceipts(business.id, customerId);
                     if (localReceipts.length > 0) {
-                        setAllCustomerReceipts(localReceipts);
+                        setAllCustomerReceipts(prev => {
+                            const merged = [...prev];
+                            localReceipts.forEach(lr => {
+                                if (!merged.some(m => m.id === lr.id)) merged.push(lr);
+                            });
+                            return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+                        });
                     }
                 } catch (err) {
                     console.warn("SQLite Receipt Fetch failed:", err);
                 }
+            }
+
+            // 2. If offline, do not attempt to contact Firestore which causes hang
+            const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+            if (!isOnline) {
+                setIsFetchingReceipts(false);
+                return;
             }
 
             try {

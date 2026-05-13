@@ -1151,6 +1151,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
     
+    let result = { revenue: 0, count: 0, customers: 0 };
+    let uniqueCustomerIds = new Set<string>();
+
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
     if (isOnline) {
       try {
@@ -1167,62 +1170,88 @@ export function POSProvider({ children }: { children: ReactNode }) {
           totalOrders: count()
         });
         
-        const revenue = aggregateSnap.data().totalRevenue || 0;
-        const orderCount = aggregateSnap.data().totalOrders || 0;
+        result.revenue = aggregateSnap.data().totalRevenue || 0;
+        result.count = aggregateSnap.data().totalOrders || 0;
         
-        // For unique customers, we still need to fetch IDs or documents 
-        // We cap this at 5,000 due to Firestore structured query limits
+        // For unique customers, we cap this at 5,000 due to Firestore structured query limits
         const docSnap = await getDocs(query(q, limit(5000)));
-        const customers = new Set(docSnap.docs.map(d => d.data().customer?.id).filter(Boolean)).size;
-        
-        return { revenue, count: orderCount, customers };
+        docSnap.docs.forEach(d => {
+          const cId = d.data().customer?.id;
+          if (cId) uniqueCustomerIds.add(cId);
+        });
+        result.customers = uniqueCustomerIds.size;
       } catch (err) {
         console.error("fetchDetailedAnalytics online failed:", err);
       }
     }
 
     // Fallback 1: SQLite (Tauri)
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (isTauri) {
-      try {
-        const { getCachedReceipts } = await import('@/lib/sqlite-sync');
-        const cached = await getCachedReceipts(businessId, 10000);
-        if (cached && cached.length > 0) {
-          const fromTime = from.getTime();
-          const toTime = to.getTime();
-          const filtered = cached.filter(r => {
-            const rt = safeToDate(r.createdAt).getTime();
-            return rt >= fromTime && rt <= toTime;
-          });
-          return {
-            revenue: filtered.reduce((acc, r) => acc + r.total, 0),
-            count: filtered.length,
-            customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size
-          };
+    if (result.count === 0) {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        try {
+          const { getCachedReceipts } = await import('@/lib/sqlite-sync');
+          const cached = await getCachedReceipts(businessId, 10000);
+          if (cached && cached.length > 0) {
+            const fromTime = from.getTime();
+            const toTime = to.getTime();
+            const filtered = cached.filter(r => {
+              const rt = safeToDate(r.createdAt).getTime();
+              return rt >= fromTime && rt <= toTime;
+            });
+            result.revenue = filtered.reduce((acc, r) => acc + r.total, 0);
+            result.count = filtered.length;
+            uniqueCustomerIds.clear();
+            filtered.forEach(r => { if (r.customer?.id) uniqueCustomerIds.add(r.customer.id); });
+            result.customers = uniqueCustomerIds.size;
+          }
+        } catch (err) {
+          console.error("fetchDetailedAnalytics SQLite fallback failed:", err);
         }
-      } catch (err) {
-        console.error("fetchDetailedAnalytics SQLite fallback failed:", err);
       }
     }
 
     // Fallback 2: State / SecureStorage receipts (Web/PWA)
-    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
-    if (targetReceipts && targetReceipts.length > 0) {
-      const fromTime = from.getTime();
-      const toTime = to.getTime();
-      const filtered = targetReceipts.filter(r => {
-        const rt = safeToDate(r.createdAt).getTime();
-        return rt >= fromTime && rt <= toTime;
-      });
-      return {
-        revenue: filtered.reduce((acc, r) => acc + r.total, 0),
-        count: filtered.length,
-        customers: new Set(filtered.map(r => r.customer?.id).filter(Boolean)).size
-      };
+    if (result.count === 0) {
+      const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+      if (targetReceipts && targetReceipts.length > 0) {
+        const fromTime = from.getTime();
+        const toTime = to.getTime();
+        const filtered = targetReceipts.filter(r => {
+          const rt = safeToDate(r.createdAt).getTime();
+          return rt >= fromTime && rt <= toTime;
+        });
+        result.revenue = filtered.reduce((acc, r) => acc + r.total, 0);
+        result.count = filtered.length;
+        uniqueCustomerIds.clear();
+        filtered.forEach(r => { if (r.customer?.id) uniqueCustomerIds.add(r.customer.id); });
+        result.customers = uniqueCustomerIds.size;
+      }
     }
 
-    return { revenue: 0, count: 0, customers: 0 };
-  }, [businessId, firestore, syncedReceipts, receipts, user]);
+    // 🚨 Inject ALL Pending Offline Sales into metrics to guarantee immediate 100% consistent accuracy!
+    const fromTime = from.getTime();
+    const toTime = to.getTime();
+    
+    queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending').forEach(action => {
+      const receipt = action.payload.receiptData;
+      if (receipt) {
+        const rDate = safeToDate(receipt.createdAt || new Date(action.timestamp));
+        const rTime = rDate.getTime();
+        if (rTime >= fromTime && rTime <= toTime) {
+          result.revenue += (receipt.total || 0);
+          result.count += 1;
+          if (receipt.customer?.id) {
+            uniqueCustomerIds.add(receipt.customer.id);
+          }
+        }
+      }
+    });
+    
+    result.customers = uniqueCustomerIds.size;
+
+    return result;
+  }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions]);
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
@@ -1527,6 +1556,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
     if (!businessId || !firestore) return [];
     
+    let results: Receipt[] = [];
+    
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
     if (isOnline) {
       try {
@@ -1540,51 +1571,71 @@ export function POSProvider({ children }: { children: ReactNode }) {
         );
         
         const snap = await getDocs(q);
-        const receipts = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+        results = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
         
         // Sync these to offline for future use
         if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-          import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
+          import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, results));
         }
-        
-        return receipts;
       } catch (err) {
         console.error("Fetch Receipts In Range online failed:", err);
       }
     }
 
     // Fallback 1: SQLite (Tauri)
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (isTauri) {
-      try {
-        const { getCachedReceipts } = await import('@/lib/sqlite-sync');
-        const cached = await getCachedReceipts(businessId, limitCount);
-        if (cached && cached.length > 0) {
-          const fromTime = from.getTime();
-          const toTime = to.getTime();
-          return cached.filter(r => {
-            const rt = safeToDate(r.createdAt).getTime();
-            return rt >= fromTime && rt <= toTime;
-          });
+    if (results.length === 0) {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        try {
+          const { getCachedReceipts } = await import('@/lib/sqlite-sync');
+          const cached = await getCachedReceipts(businessId, limitCount);
+          if (cached && cached.length > 0) {
+            const fromTime = from.getTime();
+            const toTime = to.getTime();
+            results = cached.filter(r => {
+              const rt = safeToDate(r.createdAt).getTime();
+              return rt >= fromTime && rt <= toTime;
+            });
+          }
+        } catch (err) {
+          console.error("Fetch Receipts In Range SQLite fallback failed:", err);
         }
-      } catch (err) {
-        console.error("Fetch Receipts In Range SQLite fallback failed:", err);
       }
     }
 
     // Fallback 2: State / SecureStorage receipts (Web/PWA)
-    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
-    if (targetReceipts && targetReceipts.length > 0) {
-      const fromTime = from.getTime();
-      const toTime = to.getTime();
-      return targetReceipts.filter(r => {
-        const rt = safeToDate(r.createdAt).getTime();
-        return rt >= fromTime && rt <= toTime;
-      });
+    if (results.length === 0) {
+      const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+      if (targetReceipts && targetReceipts.length > 0) {
+        const fromTime = from.getTime();
+        const toTime = to.getTime();
+        results = targetReceipts.filter(r => {
+          const rt = safeToDate(r.createdAt).getTime();
+          return rt >= fromTime && rt <= toTime;
+        });
+      }
     }
 
-    return [];
-  }, [businessId, firestore, syncedReceipts, receipts]);
+    // 🚨 Inject ALL Pending Offline Receipts into the results for realtime calculations!
+    const fromTime = from.getTime();
+    const toTime = to.getTime();
+    const existingIds = new Set(results.map(r => r.id));
+
+    queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending').forEach(action => {
+      const receipt = action.payload.receiptData;
+      if (receipt && !existingIds.has(receipt.id)) {
+        const rDate = safeToDate(receipt.createdAt || new Date(action.timestamp));
+        const rTime = rDate.getTime();
+        if (rTime >= fromTime && rTime <= toTime) {
+          results.push({ ...receipt, isOptimistic: true, createdAt: rDate });
+          existingIds.add(receipt.id);
+        }
+      }
+    });
+
+    // Sort final outputs descendingly by Date
+    return results.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions]);
 
   const currencyCode = business?.settings?.currency || 'NGN';
 
@@ -1595,15 +1646,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    let results: { month: string, revenue: number }[] = [];
 
     // 1. If Online, fetch precise aggregates from Firestore
     if (isOnline) {
       try {
-        const months = [];
         const now = new Date();
         const currentYear = now.getFullYear();
 
-        // We fetch for all months of the current year up to now
         const monthPromises = [];
         for (let i = 0; i <= now.getMonth(); i++) {
           const startDate = new Date(currentYear, i, 1);
@@ -1624,44 +1674,56 @@ export function POSProvider({ children }: { children: ReactNode }) {
           })));
         }
 
-        const results = await Promise.all(monthPromises);
-        
-        // Update SQLite cache in background
-        if (isTauri) {
-          // We'd normally have a specialized sync for this, but let's just return for now
-          // getMonthlyRevenue already exists but it's based on local receipts.
-        }
-
-        return results.sort((a,b) => b.month.localeCompare(a.month));
+        results = await Promise.all(monthPromises);
       } catch (err) {
         console.error("Firestore Aggregate Fetch Failed:", err);
       }
     }
 
     // 2. Fallback to SQLite (Last 12 months among synced receipts)
-    if (isTauri) {
+    if (results.length === 0 && isTauri) {
       try {
         const res = await getMonthlyRevenue(businessId, monthCount);
-        if (res && res.length > 0) return res;
+        if (res && res.length > 0) {
+          results = res;
+        }
       } catch (err) {
         console.error("SQLite Monthly Fetch Failed:", err);
       }
     }
 
     // 3. Fallback to synced receipts (volatile or cached)
-    const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
-    if (targetReceipts && targetReceipts.length > 0) {
-      const monthly: Record<string, number> = {};
-      targetReceipts.forEach(r => {
-        const date = safeToDate(r.createdAt);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthly[key] = (monthly[key] || 0) + (r.total || 0);
-      });
-      return Object.entries(monthly).map(([month, revenue]) => ({ month, revenue })).sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+    if (results.length === 0) {
+      const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
+      if (targetReceipts && targetReceipts.length > 0) {
+        const monthly: Record<string, number> = {};
+        targetReceipts.forEach(r => {
+          const date = safeToDate(r.createdAt);
+          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          monthly[key] = (monthly[key] || 0) + (r.total || 0);
+        });
+        results = Object.entries(monthly).map(([month, revenue]) => ({ month, revenue }));
+      }
     }
-    
-    return [];
-  }, [businessId, firestore, syncedReceipts, receipts]);
+
+    // 🚨 Inject ALL Pending Offline Revenue into corresponding month aggregates!
+    queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending').forEach(action => {
+      const receipt = action.payload.receiptData;
+      if (receipt) {
+        const rDate = safeToDate(receipt.createdAt || new Date(action.timestamp));
+        const key = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        const existing = results.find(m => m.month === key);
+        if (existing) {
+          existing.revenue += (receipt.total || 0);
+        } else {
+          results.push({ month: key, revenue: receipt.total || 0 });
+        }
+      }
+    });
+
+    return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions]);
 
 
   const value: POSContextType = useMemo(() => ({

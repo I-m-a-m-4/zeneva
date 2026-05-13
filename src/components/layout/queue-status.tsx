@@ -13,6 +13,21 @@ import { cn } from '@/lib/utils';
 
 export default function QueueStatus() {
     const { queuedActions, isQueueProcessing, clearFailedActions, processQueue, removeFromQueue } = usePOS();
+    const [isOnline, setIsOnline] = React.useState(true);
+
+    React.useEffect(() => {
+        if (typeof navigator !== 'undefined') {
+            setIsOnline(navigator.onLine);
+        }
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const pendingCount = queuedActions.filter(a => a.status === 'pending').length;
     const failedCount = queuedActions.filter(a => a.status === 'failed').length;
@@ -28,11 +43,11 @@ export default function QueueStatus() {
         triggerIcon = <AlertTriangle className="h-4 w-4" />;
         triggerColor = "text-destructive";
         badgeVariant = "destructive";
-    } else if (isQueueProcessing) {
+    } else if (isQueueProcessing && isOnline) { // ONLY spin if physically online!
         triggerIcon = <RefreshCw className="h-4 w-4 animate-spin" />;
         triggerColor = "text-primary";
         badgeVariant = "default";
-    } else if (pendingCount > 0) {
+    } else if (pendingCount > 0 || !isOnline) { // If offline or pending, show static Cloud
         triggerIcon = <Cloud className="h-4 w-4" />;
         triggerColor = "text-orange-500";
     }

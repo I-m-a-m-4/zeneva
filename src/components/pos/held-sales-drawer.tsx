@@ -45,12 +45,12 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
                 )}
             </SheetTrigger>
             <SheetContent className="w-full sm:max-w-[540px]">
-                <SheetHeader className="pt-8 md:pt-4">
-                    <SheetTitle className="flex items-center gap-2">
-                        <Archive className="h-5 w-5" />
+                <SheetHeader className="pt-2.5 pr-12 pb-1 select-none">
+                    <SheetTitle className="flex items-center gap-2 text-lg tracking-tight font-black">
+                        <Archive className="h-5 w-5 text-primary" />
                         Parked Sales
                     </SheetTitle>
-                    <SheetDescription>
+                    <SheetDescription className="text-[11px] mt-0.5">
                         View and resume transactions you've put on hold.
                     </SheetDescription>
                 </SheetHeader>

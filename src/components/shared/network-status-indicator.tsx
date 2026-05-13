@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -9,36 +9,53 @@ export default function NetworkStatusIndicator() {
   const [isOnline, setIsOnline] = useState(true);
   const [bannerVisible, setBannerVisible] = useState(false);
   const [bannerType, setBannerType] = useState<'offline' | 'online' | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Set initial status quietly
     if (typeof navigator !== 'undefined') {
       const initialOnline = navigator.onLine;
       setIsOnline(initialOnline);
+      
+      // IF we are booted up offline, show that once
       if (!initialOnline) {
-        // If initially offline, trigger warning banner
         setBannerType('offline');
         setBannerVisible(true);
-        const timer = setTimeout(() => setBannerVisible(false), 6000);
-        return () => clearTimeout(timer);
+        timeoutRef.current = setTimeout(() => setBannerVisible(false), 6000);
       }
     }
+    
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setBannerType('online');
+    const triggerBanner = (type: 'online' | 'offline', duration: number) => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setBannerType(type);
       setBannerVisible(true);
-      const timer = setTimeout(() => setBannerVisible(false), 5000);
-      return () => clearTimeout(timer);
+      timeoutRef.current = setTimeout(() => setBannerVisible(false), duration);
+    };
+
+    const handleOnline = () => {
+      setIsOnline((prev) => {
+        // Guard: Only trigger success banner if we TRANSITIONED from an offline state
+        if (!prev) {
+          triggerBanner('online', 5000);
+        }
+        return true;
+      });
     };
 
     const handleOffline = () => {
-      setIsOnline(false);
-      setBannerType('offline');
-      setBannerVisible(true);
-      const timer = setTimeout(() => setBannerVisible(false), 6000);
-      return () => clearTimeout(timer);
+      setIsOnline((prev) => {
+        // Guard: Only trigger offline banner if we TRANSITIONED from an online state
+        if (prev) {
+          triggerBanner('offline', 6000);
+        }
+        return false;
+      });
     };
 
     window.addEventListener('online', handleOnline);
@@ -47,6 +64,7 @@ export default function NetworkStatusIndicator() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -67,14 +85,15 @@ export default function NetworkStatusIndicator() {
             animate={{ y: 16, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="fixed top-0 inset-x-0 z-[9999] mx-auto max-w-sm px-4 no-print pointer-events-none"
+            // Tailwind updates: On PC pin to top right (right-6) and push below custom titlebar (top-16)
+            className="fixed top-0 md:top-16 inset-x-0 md:right-6 md:left-auto md:inset-x-auto z-[9999] mx-auto md:mx-0 w-full max-w-sm px-4 no-print pointer-events-none"
           >
             <div
               className={cn(
                 "pointer-events-auto flex items-center gap-3 p-3.5 rounded-2xl shadow-2xl border backdrop-blur-xl ring-1 ring-black/5 select-none",
                 bannerType === 'offline'
-                  ? "bg-zinc-950/95 border-amber-500/30 text-amber-400"
-                  : "bg-zinc-950/95 border-emerald-500/30 text-emerald-400"
+                  ? "bg-zinc-950/95 border-amber-500/30 text-amber-400 shadow-amber-950/20"
+                  : "bg-zinc-950/95 border-emerald-500/30 text-emerald-400 shadow-emerald-950/20"
               )}
             >
               <div className={cn(
