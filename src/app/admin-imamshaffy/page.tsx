@@ -271,6 +271,46 @@ function BusinessDetailDialog({ open, onOpenChange, title, description, business
     );
 }
 
+function UserListDialog({ open, onOpenChange, title, description, users, businesses }: { open: boolean, onOpenChange: (open: boolean) => void, title: string, description: string, users: UserProfile[] | null, businesses: BusinessInstance[] | null }) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>
+                        {description}
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Business</TableHead>
+                                <TableHead>Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {(users || []).map(u => {
+                                const biz = businesses?.find(b => b.id === u.businessId);
+                                return (
+                                    <TableRow key={u.id}>
+                                        <TableCell className="font-medium">{u.name}</TableCell>
+                                        <TableCell>{u.email}</TableCell>
+                                        <TableCell>{biz?.name || 'N/A'}</TableCell>
+                                        <TableCell><Badge variant={u.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">{u.status || 'active'}</Badge></TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserProfile | null, business: BusinessInstance | undefined, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
 
@@ -360,6 +400,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
     const [isAssigningPlan, setIsAssigningPlan] = useState(false);
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
+    const [userListModalState, setUserListModalState] = useState<{ open: boolean; title: string; description: string; users: UserProfile[] }>({ open: false, title: '', description: '', users: [] });
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -625,8 +666,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             }))
             .sort((a, b) => b.value - a.value);
 
-        const businessesWithProducts = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0).length;
-        const businessesWithSales = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0).length;
+        const businessesWithProductsList = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0);
+        const businessesWithSalesList = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0);
 
         return {
             totalActiveBusinesses: activeBusinesses.length,
@@ -645,7 +686,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             conversionRate,
             expiringSoonList,
             topLocations,
-
+ 
             countryData: countryData.map(c => ({
                 ...c,
                 businesses: activeBusinesses.filter(b => (b.settings?.country || 'Pending Onboarding') === c.name)
@@ -654,8 +695,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 ...i,
                 businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Pending Onboarding') === i.name)
             })),
-            businessesWithProducts,
-            businessesWithSales
+            businessesWithProducts: businessesWithProductsList.length,
+            businessesWithSales: businessesWithSalesList.length,
+            businessesWithProductsList,
+            businessesWithSalesList
         }
     }, [businesses, products, receipts, users]);
     const analyticsData = useMemo(() => {
@@ -795,16 +838,35 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     }, [users, businesses, products, receipts, purchases]);
 
 
-    const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying') => {
+    const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers') => {
         let modalData = { open: true, title: '', description: '', businesses: [] as BusinessInstance[] };
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
 
         switch (type) {
             case 'active':
-                modalData.title = 'All Active Businesses';
-                modalData.description = 'A list of all businesses on the platform that have not been deleted.';
+            case 'totalBusinesses':
+                modalData.title = 'All Registered Businesses';
+                modalData.description = 'A list of all active business accounts currently established on the platform.';
                 modalData.businesses = activeBusinesses;
                 break;
+            case 'inventoryActive':
+                modalData.title = 'Active Inventory Businesses';
+                modalData.description = 'A list of all businesses that have added at least one product or service to their stock catalog.';
+                modalData.businesses = platformAnalytics.businessesWithProductsList || [];
+                break;
+            case 'generatingSales':
+                modalData.title = 'Revenue Generating Stores';
+                modalData.description = 'A list of all stores that have recorded and processed at least one checkout sale.';
+                modalData.businesses = platformAnalytics.businessesWithSalesList || [];
+                break;
+            case 'totalUsers':
+                setUserListModalState({
+                    open: true,
+                    title: 'Total Platform Users',
+                    description: 'Complete register of all authenticated accounts active across all businesses.',
+                    users: users || []
+                });
+                return;
             case 'activated':
                 modalData.title = 'Activated Businesses';
                 modalData.description = 'Businesses with at least 10 products and at least 1 sale.';
@@ -1033,30 +1095,38 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             </CardTitle>
                         </CardHeader>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
-                        <StatCard 
-                            title="Total Users" 
-                            value={analyticsData.totalUsers} 
-                            icon={Users} 
-                            description="Total registered user accounts"
-                        />
-                        <StatCard 
-                            title="Total Businesses" 
-                            value={analyticsData.totalBusinesses} 
-                            icon={Building} 
-                            description="Total business registrations"
-                        />
-                        <StatCard 
-                            title="Inventory Active" 
-                            value={platformAnalytics.businessesWithProducts} 
-                            icon={Package} 
-                            description="Businesses with added stock"
-                        />
-                        <StatCard 
-                            title="Generating Sales" 
-                            value={platformAnalytics.businessesWithSales} 
-                            icon={Zap} 
-                            description="Businesses with transactions"
-                        />
+                        <button onClick={() => handleOpenDetailModal('totalUsers')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Total Users" 
+                                value={analyticsData.totalUsers} 
+                                icon={Users} 
+                                description="Total registered user accounts"
+                            />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('totalBusinesses')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Total Businesses" 
+                                value={analyticsData.totalBusinesses} 
+                                icon={Building} 
+                                description="Total business registrations"
+                            />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('inventoryActive')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Inventory Active" 
+                                value={platformAnalytics.businessesWithProducts} 
+                                icon={Package} 
+                                description="Businesses with added stock"
+                            />
+                        </button>
+                        <button onClick={() => handleOpenDetailModal('generatingSales')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Generating Sales" 
+                                value={platformAnalytics.businessesWithSales} 
+                                icon={Zap} 
+                                description="Businesses with transactions"
+                            />
+                        </button>
                         <StatCard 
                             title="Zeneva Age" 
                             value={analyticsData.daysActive > 365 
@@ -1824,6 +1894,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 businesses={detailModalState.businesses}
                 users={users}
                 isInfoOnly={detailModalState.isInfoOnly}
+            />
+
+            <UserListDialog
+                open={userListModalState.open}
+                onOpenChange={(open) => setUserListModalState(prev => ({ ...prev, open }))}
+                title={userListModalState.title}
+                description={userListModalState.description}
+                users={userListModalState.users}
+                businesses={businesses}
             />
 
             <UserDetailDialog
