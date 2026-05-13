@@ -139,6 +139,10 @@ export default function ReportsDashboard() {
 
         targetReceipts.forEach(r => {
             if (r.customer?.id) uniqueCustomerIds.add(r.customer.id);
+            
+            let receiptProductSum = 0;
+            let receiptServiceSum = 0;
+
             r.items?.forEach(i => {
                 uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
@@ -146,12 +150,24 @@ export default function ReportsDashboard() {
                 
                 if (product?.categoryType === 'service') {
                     totalServicesSold += i.quantity;
-                    totalServiceRevenue += itemRevenue;
+                    receiptServiceSum += itemRevenue;
                 } else {
                     totalProductsSold += i.quantity;
-                    totalProductRevenue += itemRevenue;
+                    receiptProductSum += itemRevenue;
                 }
             });
+
+            const receiptTotalRaw = receiptProductSum + receiptServiceSum;
+            const actualReceiptRevenue = Number(r.total) || 0;
+
+            if (receiptTotalRaw > 0) {
+                const pRatio = receiptProductSum / receiptTotalRaw;
+                const sRatio = receiptServiceSum / receiptTotalRaw;
+                totalProductRevenue += (pRatio * actualReceiptRevenue);
+                totalServiceRevenue += (sRatio * actualReceiptRevenue);
+            } else {
+                totalProductRevenue += actualReceiptRevenue;
+            }
         });
 
         const activeDays = new Set(targetReceipts.map(r => {

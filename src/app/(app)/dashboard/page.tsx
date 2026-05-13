@@ -158,6 +158,10 @@ export default function DashboardPage() {
 
     filteredReceipts.forEach(receipt => {
       if (!receipt || !Array.isArray(receipt.items)) return;
+      
+      let receiptProductSum = 0;
+      let receiptServiceSum = 0;
+
       receipt.items.forEach(item => {
         if (!item || !item.productId) return;
         const product = inventoryItems.find(p => p.id === item.productId);
@@ -168,20 +172,36 @@ export default function DashboardPage() {
         if (product) {
           if (product.categoryType === 'service') {
             serviceUnitsSold += (item.quantity || 0);
-            serviceRevenue += itemRev;
+            receiptServiceSum += itemRev;
           } else {
             productUnitsSold += (item.quantity || 0);
-            productRevenue += itemRev;
+            receiptProductSum += itemRev;
           }
         } else {
           productUnitsSold += (item.quantity || 0);
-          productRevenue += itemRev;
+          receiptProductSum += itemRev;
         }
       });
+
+      const receiptTotalRaw = receiptProductSum + receiptServiceSum;
+      const actualReceiptRevenue = Number(receipt.total) || 0;
+
+      if (receiptTotalRaw > 0) {
+        const pRatio = receiptProductSum / receiptTotalRaw;
+        const sRatio = receiptServiceSum / receiptTotalRaw;
+        productRevenue += (pRatio * actualReceiptRevenue);
+        serviceRevenue += (sRatio * actualReceiptRevenue);
+      } else {
+        productRevenue += actualReceiptRevenue; // Fallback to product revenue if no item info
+      }
     });
 
     filteredOnlineOrders.forEach(order => {
       if (!order || !Array.isArray(order.items)) return;
+      
+      let orderProductSum = 0;
+      let orderServiceSum = 0;
+
       order.items.forEach(item => {
         if (!item || !item.productId) return;
         const product = inventoryItems.find(p => p.id === item.productId);
@@ -192,16 +212,28 @@ export default function DashboardPage() {
         if (product) {
           if (product.categoryType === 'service') {
             serviceUnitsSold += (item.quantity || 0);
-            serviceRevenue += itemRev;
+            orderServiceSum += itemRev;
           } else {
             productUnitsSold += (item.quantity || 0);
-            productRevenue += itemRev;
+            orderProductSum += itemRev;
           }
         } else {
           productUnitsSold += (item.quantity || 0);
-          productRevenue += itemRev;
+          orderProductSum += itemRev;
         }
       });
+
+      const orderTotalRaw = orderProductSum + orderServiceSum;
+      const actualOrderRevenue = Number(order.total) || 0;
+
+      if (orderTotalRaw > 0) {
+        const pRatio = orderProductSum / orderTotalRaw;
+        const sRatio = orderServiceSum / orderTotalRaw;
+        productRevenue += (pRatio * actualOrderRevenue);
+        serviceRevenue += (sRatio * actualOrderRevenue);
+      } else {
+        productRevenue += actualOrderRevenue;
+      }
     });
 
     const topSellingItems = Object.entries(itemSalesCount)
@@ -336,12 +368,25 @@ export default function DashboardPage() {
     if (!dashboardData) return null;
     if (!rangeStats) return dashboardData;
 
+    const rawRevenueSum = (dashboardData.productRevenue || 0) + (dashboardData.serviceRevenue || 0);
+    let finalProductRevenue = dashboardData.productRevenue;
+    let finalServiceRevenue = dashboardData.serviceRevenue;
+
+    if (rawRevenueSum > 0) {
+      const pRatio = (dashboardData.productRevenue || 0) / rawRevenueSum;
+      const sRatio = (dashboardData.serviceRevenue || 0) / rawRevenueSum;
+      finalProductRevenue = pRatio * rangeStats.revenue;
+      finalServiceRevenue = sRatio * rangeStats.revenue;
+    }
+
     return {
       ...dashboardData,
       totalRevenue: rangeStats.revenue,
       totalSalesValue: rangeStats.revenue,
       totalReceipts: rangeStats.count,
-      newCustomersCount: rangeStats.customers
+      newCustomersCount: rangeStats.customers,
+      productRevenue: finalProductRevenue,
+      serviceRevenue: finalServiceRevenue
     };
   }, [dashboardData, rangeStats]);
 
