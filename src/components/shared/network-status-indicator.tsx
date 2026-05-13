@@ -4,31 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { usePOS } from '@/context/pos-context';
 
 export default function NetworkStatusIndicator() {
-  const [isOnline, setIsOnline] = useState(true);
+  const { isOnline } = usePOS();
   const [bannerVisible, setBannerVisible] = useState(false);
   const [bannerType, setBannerType] = useState<'offline' | 'online' | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    // Set initial status quietly
-    if (typeof navigator !== 'undefined') {
-      const initialOnline = navigator.onLine;
-      setIsOnline(initialOnline);
-      
-      // IF we are booted up offline, show that once
-      if (!initialOnline) {
-        setBannerType('offline');
-        setBannerVisible(true);
-        timeoutRef.current = setTimeout(() => setBannerVisible(false), 6000);
-      }
-    }
-    
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const isMounted = useRef(false);
 
   useEffect(() => {
     const triggerBanner = (type: 'online' | 'offline', duration: number) => {
@@ -38,35 +21,26 @@ export default function NetworkStatusIndicator() {
       timeoutRef.current = setTimeout(() => setBannerVisible(false), duration);
     };
 
-    const handleOnline = () => {
-      setIsOnline((prev) => {
-        // Guard: Only trigger success banner if we TRANSITIONED from an offline state
-        if (!prev) {
-          triggerBanner('online', 5000);
-        }
-        return true;
-      });
-    };
+    if (!isMounted.current) {
+      // On initial boot, only trigger visible banners if starting disconnected
+      isMounted.current = true;
+      if (!isOnline) {
+        triggerBanner('offline', 6000);
+      }
+      return;
+    }
 
-    const handleOffline = () => {
-      setIsOnline((prev) => {
-        // Guard: Only trigger offline banner if we TRANSITIONED from an online state
-        if (prev) {
-          triggerBanner('offline', 6000);
-        }
-        return false;
-      });
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    // Transition banner: Triggers exactly when WAN connectivity status flips
+    if (isOnline) {
+      triggerBanner('online', 5000);
+    } else {
+      triggerBanner('offline', 6000);
+    }
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, []);
+  }, [isOnline]);
 
   return (
     <>

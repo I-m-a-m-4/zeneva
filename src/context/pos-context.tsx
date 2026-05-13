@@ -116,6 +116,7 @@ interface POSContextType {
   voidReceipt: (receiptId: string) => Promise<void>;
   users: UserProfile[];
   auditLogs: AuditLog[];
+  isOnline: boolean;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -150,6 +151,65 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => secureStorage.getItem<BusinessStats>('pos_offline_stats'));
   const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => Date.now());
+
+  // 🌐 INTELLIGENT CONNECTIVITY ENGINE
+  // navigator.onLine can give false positives (e.g. connected to a WiFi hotspot with no cellular data)
+  // We solve this by performing a direct lightweight WAN ping in the background to guarantee REAL internet!
+  const [isRealOnline, setIsRealOnline] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined') return navigator.onLine;
+    return true;
+  });
+
+  const verifyConnectivity = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!navigator.onLine) {
+      setIsRealOnline(false);
+      return false;
+    }
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 3500);
+      // Chrome's specialized generate_204 endpoint requires no-cors and returns very fast
+      await fetch("https://clients3.google.com/generate_204", {
+        mode: "no-cors",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(id);
+      setIsRealOnline(true);
+      return true;
+    } catch (err) {
+      setIsRealOnline(false);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleOnlineEvent = () => {
+      // Wait 500ms to allow interface initialization, then execute WAN ping
+      setTimeout(verifyConnectivity, 500);
+    };
+    const handleOfflineEvent = () => {
+      setIsRealOnline(false);
+    };
+
+    window.addEventListener('online', handleOnlineEvent);
+    window.addEventListener('offline', handleOfflineEvent);
+    
+    // Periodic background check every 12 seconds to react quickly to cellular data changes
+    const interval = setInterval(verifyConnectivity, 12000);
+    
+    // Perform verification on component load
+    verifyConnectivity();
+
+    return () => {
+      window.removeEventListener('online', handleOnlineEvent);
+      window.removeEventListener('offline', handleOfflineEvent);
+      clearInterval(interval);
+    };
+  }, [verifyConnectivity]);
 
   // --- POS Local States ---
   const [cart, setCart] = useState<CartItem[]>(() => secureStorage.getItem<CartItem[]>(POS_CART_KEY) || []);
@@ -268,7 +328,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const products = useMemo(() => {
-    if (initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine) && !!businessId) return null;
+    if (initialProducts === null && syncedProducts.length === 0 && isRealOnline && !!businessId) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
@@ -289,7 +349,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
       return dateB - dateA;
     });
-  }, [initialProducts, syncedProducts, queuedActions, businessId]);
+  }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId]);
 
   const profile = useMemo(() => {
     if (currentUserProfile) return currentUserProfile;
@@ -316,7 +376,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
   const receipts = useMemo(() => {
-    if (initialReceipts === null && syncedReceipts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine) && !!businessId) return null;
+    if (initialReceipts === null && syncedReceipts.length === 0 && isRealOnline && !!businessId) return null;
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
     syncedReceipts.forEach(r => { if (!existingIds.has(r.id)) merged.push(r); });
@@ -334,7 +394,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       };
       return getMillis(b.createdAt) - getMillis(a.createdAt);
     });
-  }, [initialReceipts, syncedReceipts, queuedActions]);
+  }, [initialReceipts, syncedReceipts, queuedActions, isRealOnline, businessId]);
 
   const customers = useMemo(() => {
     let merged = [...(initialCustomers || [])];
@@ -421,7 +481,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   // --- Functions ---
   const refreshData = useCallback(async () => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isSyncing || !isOnline) return;
     
     setIsSyncing(true);
@@ -484,10 +544,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsSyncing(false);
     }
-  }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast]);
+  }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast, isRealOnline]);
 
   const fetchInitialReceipts = useCallback(async () => {
-    if (!user || !businessId || !firestore || !navigator.onLine) return;
+    if (!user || !businessId || !firestore || !isRealOnline) return;
     try {
       const q = query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(200));
       const snap = await getDocs(q);
@@ -499,18 +559,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to fetch initial receipts:", error);
     }
-  }, [businessId, firestore, user]);
+  }, [businessId, firestore, user, isRealOnline]);
 
   // Effect to pull initial historical receipts once on startup if the local array is empty.
   useEffect(() => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (user && businessId && firestore && isOnline) {
       fetchInitialReceipts();
     }
-  }, [businessId, firestore, fetchInitialReceipts, refreshKey, user]);
+  }, [businessId, firestore, fetchInitialReceipts, refreshKey, user, isRealOnline]);
 
   const fetchInitialUsers = useCallback(async () => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || !isOnline) return;
     try {
       const snap = await getDocs(query(collection(firestore, "users"), where("businessId", "==", businessId)));
@@ -520,10 +580,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
       console.error("Fetch initial users failed:", e); 
     }
-  }, [businessId, firestore, user]);
+  }, [businessId, firestore, user, isRealOnline]);
 
   const fetchInitialAuditLogs = useCallback(async () => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || !isOnline) return;
     try {
       const snap = await getDocs(query(collection(firestore, 'businessInstances', businessId, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)));
@@ -533,18 +593,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
       console.error("Fetch initial audit logs failed:", e); 
     }
-  }, [businessId, firestore, user]);
+  }, [businessId, firestore, user, isRealOnline]);
 
   useEffect(() => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (user && businessId && firestore && isOnline) {
       fetchInitialUsers();
       fetchInitialAuditLogs();
     }
-  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey, user]);
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey, user, isRealOnline]);
 
   const fetchFullCustomers = useCallback(async () => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
     
     setIsFullSyncingCustomers(true);
@@ -600,10 +660,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFullSyncingCustomers(false);
     }
-  }, [businessId, firestore, isFullSyncingCustomers, toast, user]);
+  }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
 
   const fetchFullProducts = useCallback(async () => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
     
     setIsFullSyncingProducts(true);
@@ -657,7 +717,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFullSyncingProducts(false);
     }
-  }, [businessId, firestore, isFullSyncingProducts, toast, user]);
+  }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();
@@ -676,7 +736,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const processQueue = useCallback(async () => {
     const effectiveProfile = currentUserProfile || offlineProfile;
-    if (isQueueProcessing || !navigator.onLine || !firestore || !businessId || !effectiveProfile) return;
+    if (isQueueProcessing || !isRealOnline || !firestore || !businessId || !effectiveProfile) return;
     const pending = queuedActions.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
     setIsQueueProcessing(true);
@@ -955,7 +1015,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsQueueProcessing(false);
     }
-  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, offlineProfile, products, syncedProducts, toast]);
+  }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, offlineProfile, products, syncedProducts, toast, isRealOnline]);
 
 
   const addToQueue = useCallback((action: any, description: string) => {
@@ -1011,12 +1071,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setQueuedActions(prev => [...prev, newAction]);
     
     // Proactive Sync: If online, trigger processQueue in the next tick
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (isRealOnline) {
         setTimeout(() => processQueue(), 100);
     }
     
     return id;
-  }, [businessId, business, toast, processQueue, currentUserProfile]);
+  }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // If there's an image, we handle it. Ideally in background but for now let's just queue the data.
@@ -1062,7 +1122,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchCustomers = useCallback(async (term: string) => {
     if (!term.trim()) return [];
     const lower = term.toLowerCase().trim();
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     
     let local: Customer[] = [];
     if (customers && customers.length > 0) {
@@ -1076,11 +1136,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const combined = [...local, ...nameSnap.docs.map(d => ({ ...d.data() as any, id: d.id } as Customer)), ...emailSnap.docs.map(d => ({ ...d.data() as any, id: d.id } as Customer))];
       return Array.from(new Map(combined.map(item => [item.id, item])).values()).slice(0, 20);
     } catch { return local.slice(0, 20); }
-  }, [businessId, firestore, customers, isFullSyncingCustomers, user]);
+  }, [businessId, firestore, customers, isFullSyncingCustomers, user, isRealOnline]);
 
   const searchCustomersByField = useCallback(async (field: string, value: string) => {
     if (!value) return [];
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     
     if (customers && customers.length > 0) {
       const local = customers.filter(c => (c as any)[field] === value);
@@ -1093,12 +1153,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
     } catch { return []; }
-  }, [businessId, firestore, customers]);
+  }, [businessId, firestore, customers, isRealOnline]);
 
   const searchProducts = useCallback(async (term: string) => {
     if (!term.trim()) return [];
     const lower = term.toLowerCase().trim();
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
 
     if (products && products.length > 0) {
       const local = products.filter(p => p.name.toLowerCase().includes(lower) || p.sku?.toLowerCase().includes(lower));
@@ -1111,11 +1171,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(q);
       return snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
     } catch { return []; }
-  }, [businessId, firestore, products, isSyncing]);
+  }, [businessId, firestore, products, isSyncing, isRealOnline]);
 
   const searchProductsByField = useCallback(async (field: string, value: string) => {
     if (!value) return [];
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     
     if (products && products.length > 0) {
       const local = products.filter(p => (p as any)[field] === value);
@@ -1128,11 +1188,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
     } catch { return []; }
-  }, [businessId, firestore, products]);
+  }, [businessId, firestore, products, isRealOnline]);
 
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku) return null;
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     
     if (products && products.length > 0) {
       const local = products.find(p => p.sku === sku);
@@ -1146,7 +1206,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (snap.empty) return null;
       return { ...snap.docs[0].data(), id: snap.docs[0].id } as Product;
     } catch { return null; }
-  }, [businessId, firestore, products]);
+  }, [businessId, firestore, products, isRealOnline]);
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
@@ -1154,7 +1214,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let result = { revenue: 0, count: 0, customers: 0 };
     let uniqueCustomerIds = new Set<string>();
 
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (isOnline) {
       try {
         const q = query(
@@ -1251,7 +1311,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     result.customers = uniqueCustomerIds.size;
 
     return result;
-  }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions]);
+  }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions, isRealOnline]);
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
@@ -1378,7 +1438,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       getOfflineQueue().then(queue => {
         if (queue.length > 0) {
           setQueuedActions(prev => [...prev, ...queue.filter(a => !prev.find(p => p.id === a.id))]);
-          if (navigator.onLine) processQueue();
+          if (isRealOnline) processQueue();
         }
       });
       
@@ -1389,7 +1449,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
       getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
     }
-  }, [isMounted, businessId, processQueue]);
+  }, [isMounted, businessId, processQueue, isRealOnline]);
 
 
   useEffect(() => {
@@ -1419,12 +1479,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', handleOnline);
     
     // Auto-trigger processQueue when actions are added if online
-    if (navigator.onLine && queuedActions.some(a => a.status === 'pending') && !isQueueProcessing) {
+    if (isRealOnline && queuedActions.some(a => a.status === 'pending') && !isQueueProcessing) {
       processQueue();
     }
 
     return () => window.removeEventListener('online', handleOnline);
-  }, [processQueue, queuedActions, isQueueProcessing]);
+  }, [processQueue, queuedActions, isQueueProcessing, isRealOnline]);
   
   // SQLite Continuity Sync
   useEffect(() => {
@@ -1438,9 +1498,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, products, customers, receipts, business, stats]);
 
-  // Handle Full Background Sync of Customers for Native
   useEffect(() => {
-    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !navigator.onLine) return;
+    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline) return;
 
     const checkFullSyncStatus = async () => {
       const [lastCustSync, lastProdSync] = await Promise.all([
@@ -1461,7 +1520,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     };
 
     checkFullSyncStatus();
-  }, [isMounted, businessId, firestore]);
+  }, [isMounted, businessId, firestore, isRealOnline, isFullSyncingCustomers, isFullSyncingProducts, fetchFullCustomers, fetchFullProducts]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);
@@ -1558,7 +1617,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     let results: Receipt[] = [];
     
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     if (isOnline) {
       try {
         const q = query(
@@ -1635,7 +1694,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     // Sort final outputs descendingly by Date
     return results.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
-  }, [businessId, firestore, syncedReceipts, receipts, queuedActions]);
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline]);
 
   const currencyCode = business?.settings?.currency || 'NGN';
 
@@ -1645,7 +1704,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!businessId || !firestore) return [];
     
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    const isOnline = isRealOnline;
     let results: { month: string, revenue: number }[] = [];
 
     // 1. If Online, fetch precise aggregates from Firestore
@@ -1723,7 +1782,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
 
     return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
-  }, [businessId, firestore, syncedReceipts, receipts, queuedActions]);
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline]);
 
 
   const value: POSContextType = useMemo(() => ({
@@ -1736,12 +1795,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
                  if (isTauri) {
                    return syncedProducts.length === 0;
                  }
-                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && (typeof navigator !== 'undefined' && navigator.onLine)) || 
-                        (isLoadingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) || 
-                        (isLoadingReceipts && (!receipts || receipts.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-                        (isSyncing && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-                        (isFullSyncingCustomers && (!customers || customers.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine)) ||
-                        (isFullSyncingProducts && (!products || products.length === 0) && (typeof navigator !== 'undefined' && navigator.onLine));
+                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && isRealOnline) || 
+                        (isLoadingCustomers && (!customers || customers.length === 0) && isRealOnline) || 
+                        (isLoadingReceipts && (!receipts || receipts.length === 0) && isRealOnline) ||
+                        (isSyncing && (!products || products.length === 0) && isRealOnline) ||
+                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline) ||
+                        (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline);
                })()) ||
                !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
@@ -1764,10 +1823,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     heldSales, holdCurrentSale, resumeHeldSale, deleteHeldSale, voidReceipt,
     users, auditLogs,
+    isOnline: isRealOnline,
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }
