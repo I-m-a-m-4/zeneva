@@ -1029,33 +1029,33 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <HeartPulse className="h-5 w-5 text-primary" />
-                                Tactical Platform Command
+                                Platform Overview Command
                             </CardTitle>
                         </CardHeader>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
                         <StatCard 
-                            title="Nodes Established" 
+                            title="Total Users" 
                             value={analyticsData.totalUsers} 
                             icon={Users} 
-                            description="Total authenticated identities"
+                            description="Total registered user accounts"
                         />
                         <StatCard 
-                            title="Operational Architectures" 
+                            title="Total Businesses" 
                             value={analyticsData.totalBusinesses} 
                             icon={Building} 
-                            description="Active business containers"
+                            description="Total business registrations"
                         />
                         <StatCard 
-                            title="Asset Provisioning" 
+                            title="Inventory Active" 
                             value={platformAnalytics.businessesWithProducts} 
                             icon={Package} 
-                            description="Businesses with inventory"
+                            description="Businesses with added stock"
                         />
                         <StatCard 
-                            title="Combat Ready" 
+                            title="Generating Sales" 
                             value={platformAnalytics.businessesWithSales} 
                             icon={Zap} 
-                            description="Revenue-generating nodes"
+                            description="Businesses with transactions"
                         />
                         <StatCard 
                             title="Zeneva Age" 
@@ -1069,7 +1069,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 border-t border-white/5 pt-6">
                         <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="Strategic Nodes" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Active business structures" />
+                            <StatCard title="Active Stores" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Currently active businesses" />
                         </button>
                         <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full transition-transform active:scale-95" disabled={platformAnalytics.payingBusinessesList.length === 0}>
                             <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="Monthly Recurring" />
@@ -1078,10 +1078,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
                         </button>
                         <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description="Nodes with >10 assets" />
+                            <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description="Businesses with >10 products" />
                         </button>
                         <button onClick={() => handleOpenDetailModal('atRisk')} className="text-left w-full h-full transition-transform active:scale-95" disabled={platformAnalytics.atRiskBusinesses.length === 0}>
-                            <StatCard title="At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No telemetry 14 days" />
+                            <StatCard title="At Risk" value={platformAnalytics.atRiskBusinesses.length} icon={AlertTriangle} description="No activity for 14 days" />
                         </button>
                     </div>
 
