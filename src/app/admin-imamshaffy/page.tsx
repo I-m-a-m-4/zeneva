@@ -311,7 +311,20 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
     );
 }
 
-function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, totalBusinesses, totalUsers, launchDate }: { open: boolean, onOpenChange: (open: boolean) => void, daysActive: number, totalSales: number, totalBusinesses: number, totalUsers: number, launchDate: Date }) {
+function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, totalBusinesses, totalUsers, launchDate, averageSalesPerDay, averageReceiptsPerDay, platformAOV, arr, topLocation }: { 
+    open: boolean, 
+    onOpenChange: (open: boolean) => void, 
+    daysActive: number, 
+    totalSales: number, 
+    totalBusinesses: number, 
+    totalUsers: number, 
+    launchDate: Date,
+    averageSalesPerDay: number,
+    averageReceiptsPerDay: number,
+    platformAOV: number,
+    arr: number,
+    topLocation: string
+}) {
     const elementRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [isExporting, setIsExporting] = useState(false);
@@ -402,53 +415,93 @@ function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, tot
                             </Button>
                         </div>
 
-                        {/* COLUMN 2: VISION & FUTURE ROADMAP */}
+                        {/* COLUMN 2: DYNAMIC DYNAMIC PLATFORM INTELLIGENCE */}
                         <div className="relative px-6 py-8 flex flex-col bg-white/[0.01] overflow-hidden">
-                            <div className="absolute -left-24 -bottom-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+                            <div className="absolute -left-24 -bottom-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
 
                             {/* Header */}
-                            <div className="flex items-center gap-2 mb-4 text-cyan-400 font-extrabold tracking-widest text-[9px] uppercase">
-                                <Globe className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow" /> The Vision Roadmap
+                            <div className="flex items-center gap-2 mb-4 text-emerald-400 font-extrabold tracking-widest text-[9px] uppercase">
+                                <Activity className="h-3.5 w-3.5 text-emerald-400 animate-pulse" /> Platform Intelligence Pulse
                             </div>
                             
-                            <h3 className="text-xl font-black text-white mb-2 tracking-tight select-none">Forging the Future</h3>
-                            <p className="text-[11px] text-zinc-400 leading-relaxed mb-6 select-none">
-                                We aren’t just constructing a point of sale app; we are forging the foundational operating infrastructure for digital retail commerce. Zeneva is unlocking an interconnected, borderless global ecosystem.
+                            <h3 className="text-xl font-black text-white mb-1.5 tracking-tight select-none">Real-time Velocity</h3>
+                            <p className="text-[10px] text-zinc-400 leading-relaxed mb-6 select-none">
+                                Continuous live ecosystem calculations aggregated from all active platform storefront nodes.
                             </p>
 
-                            {/* Timeline Flow */}
-                            <div className="space-y-5 border-l border-white/10 ml-2 pl-4 relative flex-grow select-none">
-                                {/* Milestone 1 */}
-                                <div className="relative">
-                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-indigo-500 ring-4 ring-indigo-500/20"></div>
-                                    <span className="text-[8px] uppercase font-black tracking-wider text-indigo-400">Phase I: Genisys (Active)</span>
-                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">The Core Foundation</p>
-                                    <p className="text-[9px] text-zinc-500 mt-0.5">Powering real-time sync, offline resilient checkout, native release flows, and advanced local inventory.</p>
+                            {/* Timeline Flow replacement: Dynamic KPI stack */}
+                            <div className="space-y-3 relative flex-grow select-none">
+                                {/* Metric 1: Frequency Pulse */}
+                                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-500/10 p-2 rounded-xl border border-indigo-500/20">
+                                            <Zap className="h-4 w-4 text-indigo-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Frequency Pulse</p>
+                                            <p className="text-[11px] font-semibold text-zinc-300">Transaction Flow Rate</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-black text-white">{(averageReceiptsPerDay || 0).toFixed(2)} <span className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold">/day</span></p>
+                                    </div>
                                 </div>
 
-                                {/* Milestone 2 */}
-                                <div className="relative">
-                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20 animate-pulse"></div>
-                                    <span className="text-[8px] uppercase font-black tracking-wider text-emerald-400 flex items-center gap-1">
-                                        Phase II: OmniPresence (In Flight)
-                                        <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping"></span>
-                                    </span>
-                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">Multi-Store Ecosystem</p>
-                                    <p className="text-[9px] text-zinc-500 mt-0.5">Scaling distribution on Google Play, Android TV, and Windows WinGet. Launching public releases worldwide.</p>
+                                {/* Metric 2: Daily Economic Volume */}
+                                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                                            <DollarSign className="h-4 w-4 text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Economic Volume</p>
+                                            <p className="text-[11px] font-semibold text-zinc-300">Avg. Daily Sales GMV</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-black text-emerald-400">₦{(averageSalesPerDay || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                                    </div>
                                 </div>
 
-                                {/* Milestone 3 */}
-                                <div className="relative">
-                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-zinc-700 ring-4 ring-white/5"></div>
-                                    <span className="text-[8px] uppercase font-black tracking-wider text-zinc-500">Phase III: HyperScale (Coming Q1)</span>
-                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">Predictive Algorithmic Mastery</p>
-                                    <p className="text-[9px] text-zinc-500 mt-0.5">Leveraging intelligent demand forecasts, localized supply-chain hubs, and fully automated store analytics.</p>
+                                {/* Metric 3: Basket size */}
+                                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-cyan-500/10 p-2 rounded-xl border border-cyan-500/20">
+                                            <ShoppingCart className="h-4 w-4 text-cyan-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Ecosystem Basket</p>
+                                            <p className="text-[11px] font-semibold text-zinc-300">Average Order Value</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-black text-white">₦{(platformAOV || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                                    </div>
+                                </div>
+
+                                {/* Metric 4: Projections */}
+                                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+                                            <TrendingUp className="h-4 w-4 text-rose-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Software Target</p>
+                                            <p className="text-[11px] font-semibold text-zinc-300">Annual Target Runrate</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-black text-white">₦{(arr || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Founder Motivation Footer Quote */}
-                            <div className="mt-6 pt-4 text-[9px] italic text-zinc-500 border-t border-white/5 font-medium leading-relaxed select-none">
-                                "Software has no boundaries. We are accelerating thousands of retail builders into the future, one checkout at a time."
+                            {/* Active Territory Footer Quote */}
+                            <div className="mt-6 pt-4 text-[9px] text-zinc-500 border-t border-white/5 font-medium flex items-center justify-between select-none">
+                                <span className="uppercase tracking-wider font-bold text-[8px]">Dominant Regional Territory:</span>
+                                <span className="flex items-center gap-1 text-zinc-300 font-extrabold uppercase tracking-wide">
+                                    <MapPin className="h-3 w-3 text-emerald-400" /> {topLocation}
+                                </span>
                             </div>
                         </div>
 
@@ -2064,6 +2117,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 totalBusinesses={platformAnalytics.totalActiveBusinesses}
                 totalUsers={analyticsData.totalUsers}
                 launchDate={analyticsData.earliestBusiness}
+                averageSalesPerDay={analyticsData.averageSalesPerDay}
+                averageReceiptsPerDay={analyticsData.averageReceiptsPerDay}
+                platformAOV={analyticsData.platformAOV}
+                arr={analyticsData.arr}
+                topLocation={platformAnalytics.topLocations?.[0]?.name || 'N/A'}
             />
 
             <UserDetailDialog
