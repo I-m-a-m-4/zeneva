@@ -11,9 +11,16 @@ export default function NetworkStatusIndicator() {
   const [bannerVisible, setBannerVisible] = useState(false);
   const [bannerType, setBannerType] = useState<'offline' | 'online' | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [mounted, setMounted] = useState(false);
   const isMounted = useRef(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const triggerBanner = (type: 'online' | 'offline', duration: number) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setBannerType(type);
@@ -40,7 +47,9 @@ export default function NetworkStatusIndicator() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [isOnline]);
+  }, [isOnline, mounted]);
+
+  if (!mounted) return null;
 
   return (
     <>
