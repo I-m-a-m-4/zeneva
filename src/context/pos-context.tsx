@@ -167,12 +167,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    // Channel 1: Micro-fetch payloadless sensor
+    // Channel 1: Micro-fetch payloadless sensor (Routed through Whitelisted CSP endpoint)
     const checkFetch = async (): Promise<boolean> => {
       try {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), 3000);
-        await fetch("https://clients3.google.com/generate_204", {
+        // Using fonts.googleapis.com which is explicitly whitelisted in connect-src CSP headers
+        await fetch("https://fonts.googleapis.com", {
           mode: "no-cors",
           cache: "no-store",
           signal: controller.signal,
