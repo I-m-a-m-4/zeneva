@@ -87,13 +87,16 @@ export default function NetworkStatusIndicator() {
               </div>
 
               <div className="flex-1 flex flex-col text-left">
-                <p className="text-[10px] font-black tracking-widest uppercase">
-                  {bannerType === 'offline' ? "Offline Engaged" : "Grid Reconnected"}
+                <p className={cn(
+                  "text-[10px] font-black tracking-widest uppercase",
+                  bannerType === 'offline' ? "text-amber-400" : "text-emerald-400"
+                )}>
+                  {bannerType === 'offline' ? "Offline Mode Active" : "Online Mode Active"}
                 </p>
                 <p className="text-[10px] text-zinc-400 font-medium mt-0.5 leading-tight">
-                  {bannerType === 'offline'
-                    ? "Sales are saved locally and will auto-sync when connection returns."
-                    : "Synchronizing offline cache nodes seamlessly."}
+                  {bannerType === 'offline' 
+                    ? "Sales are saved locally and will auto-sync when connection returns." 
+                    : "Successfully reconnected. Cloud synchronization live."}
                 </p>
               </div>
 

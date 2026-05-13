@@ -203,6 +203,10 @@ jobs:
         run: npx tauri android init --ci
         continue-on-error: true
 
+      - name: Patch Android Manifest with Camera Permissions
+        run: node scripts/patch-android-manifest.mjs
+        continue-on-error: true
+
       - name: Generate App Icons
         run: npm run tauri icon public/zeneva-app-icon.png
         continue-on-error: true
