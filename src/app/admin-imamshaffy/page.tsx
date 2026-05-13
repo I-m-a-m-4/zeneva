@@ -342,78 +342,114 @@ function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, tot
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 overflow-visible border-none bg-transparent backdrop-blur-none flex justify-center items-center shadow-none no-capture [&>button]:text-white/50">
-                <div className="relative group max-w-sm w-full mx-auto" ref={elementRef}>
+            <DialogContent className="sm:max-w-4xl p-0 overflow-visible border-none bg-transparent backdrop-blur-none flex justify-center items-center shadow-none no-capture [&>button]:text-white/50">
+                <div className="relative group max-w-3xl w-full mx-auto px-4" ref={elementRef}>
                     {/* Dynamic gradient background wrapper */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-emerald-500 to-cyan-500 rounded-[2.5rem] blur-lg opacity-70 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+                    <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-emerald-500 to-cyan-500 rounded-[2.5rem] blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
                     
-                    <div className="relative bg-zinc-950 border border-white/10 px-6 py-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center overflow-hidden ring-1 ring-white/10">
-                        {/* Elegant atmospheric lighting details */}
-                        <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-indigo-500/20 to-transparent pointer-events-none"></div>
-                        <div className="absolute -right-24 -top-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-                        <div className="absolute -left-24 -bottom-24 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
-
-                        {/* Bouncing Trophy Emblem */}
-                        <div className="relative bg-white/5 border border-white/10 p-5 rounded-3xl mt-1 mb-4 shadow-inner flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
-                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-yellow-400/10 rounded-3xl blur-sm"></div>
-                            <Trophy className="h-12 w-12 text-amber-400 relative z-10 animate-bounce" />
-                        </div>
-
-                        <span className="text-[9px] uppercase tracking-[0.3em] font-black text-indigo-400 mb-2 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 select-none">Platform Genesis Milestone</span>
-                        <h2 className="text-3xl font-black tracking-tight text-white select-none flex items-center gap-1">
-                            ZENEVA OS
-                        </h2>
+                    <div className="relative bg-zinc-950 border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden ring-1 ring-white/10 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-white/10">
                         
-                        {/* Epic Big Number Counter Display */}
-                        <div className="my-6 px-8 py-4 rounded-3xl bg-gradient-to-b from-white/[0.07] to-transparent border border-white/10 backdrop-blur-md shadow-[inset_0px_1px_1px_rgba(255,255,255,0.1)] relative overflow-hidden group-hover:border-white/20 transition-colors">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent translate-x-[-100%] animate-[shimmer_3s_infinite] pointer-events-none"></div>
-                            <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 leading-none select-none">
-                                {daysActive}
+                        {/* COLUMN 1: ACHIEVEMENT BADGE */}
+                        <div className="relative px-6 py-8 flex flex-col items-center text-center overflow-hidden">
+                            {/* Atmospheric lighting */}
+                            <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-indigo-500/20 to-transparent pointer-events-none"></div>
+                            <div className="absolute -right-24 -top-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+                            
+                            {/* Bouncing Trophy */}
+                            <div className="relative bg-white/5 border border-white/10 p-5 rounded-3xl mt-2 mb-4 shadow-inner flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-yellow-400/10 rounded-3xl blur-sm"></div>
+                                <Trophy className="h-12 w-12 text-amber-400 relative z-10 animate-bounce" />
                             </div>
-                            <div className="text-[10px] uppercase font-black tracking-[0.25em] text-cyan-400 mt-2 select-none">Days Online</div>
+
+                            <span className="text-[9px] uppercase tracking-[0.3em] font-black text-indigo-400 mb-2 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 select-none">Platform Genesis</span>
+                            <h2 className="text-3xl font-black tracking-tight text-white select-none flex items-center gap-1">
+                                ZENEVA OS
+                            </h2>
+                            
+                            {/* Massive Counter */}
+                            <div className="my-6 px-8 py-3 rounded-3xl bg-gradient-to-b from-white/[0.07] to-transparent border border-white/10 backdrop-blur-md shadow-[inset_0px_1px_1px_rgba(255,255,255,0.1)] relative overflow-hidden w-full max-w-[220px]">
+                                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 leading-none select-none">
+                                    {daysActive}
+                                </div>
+                                <div className="text-[9px] uppercase font-black tracking-[0.25em] text-cyan-400 mt-2 select-none">Days Online</div>
+                            </div>
+
+                            <p className="text-xs text-zinc-400 font-medium mb-6 leading-relaxed select-none max-w-[260px]">
+                                Active on the grid since <span className="text-zinc-100 font-bold underline decoration-dotted decoration-indigo-400 underline-offset-2">{format(launchDate, 'PPP')}</span>.
+                            </p>
+
+                            {/* Grid Stats */}
+                            <div className="w-full grid grid-cols-3 gap-2 bg-white/[0.03] border border-white/5 rounded-2xl p-3 mb-6 select-none">
+                                <div className="flex flex-col p-1 items-center justify-center">
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Accounts</span>
+                                    <span className="text-sm font-black text-white mt-0.5">+{totalUsers}</span>
+                                </div>
+                                <div className="flex flex-col border-x border-white/10 p-1 items-center justify-center">
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Coverage</span>
+                                    <span className="text-sm font-black text-white mt-0.5">+{totalBusinesses}</span>
+                                </div>
+                                <div className="flex flex-col p-1 items-center justify-center">
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Volume</span>
+                                    <span className="text-sm font-black text-emerald-400 mt-0.5">+{totalSales.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            {/* Download Button */}
+                            <Button onClick={handleDownloadCertificate} disabled={isExporting} size="sm" variant="outline" className="w-full bg-white/5 hover:bg-white/10 border-white/10 text-white rounded-2xl font-bold no-capture flex items-center justify-center gap-2 h-10 text-xs shadow-lg active:scale-[0.98] transition-transform mt-auto">
+                                <Download className="h-3.5 w-3.5 text-zinc-300" /> {isExporting ? "Capturing..." : "Commemorate Badge"}
+                            </Button>
                         </div>
 
-                        <p className="text-xs text-zinc-400 font-medium mb-6 px-4 leading-relaxed select-none">
-                            Active on the grid since <span className="text-zinc-100 font-bold underline decoration-dotted decoration-indigo-400 underline-offset-2">{format(launchDate, 'PPP')}</span>. Powering borderless digital checkout operations globally.
-                        </p>
+                        {/* COLUMN 2: VISION & FUTURE ROADMAP */}
+                        <div className="relative px-6 py-8 flex flex-col bg-white/[0.01] overflow-hidden">
+                            <div className="absolute -left-24 -bottom-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
 
-                        {/* Key Platform Metrics */}
-                        <div className="w-full grid grid-cols-3 gap-2 bg-white/[0.03] border border-white/5 rounded-2xl p-3.5 mb-6 select-none">
-                            <div className="flex flex-col p-1 items-center justify-center">
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Accounts</span>
-                                <span className="text-base font-black text-white mt-1">+{totalUsers}</span>
-                                <span className="text-[8px] font-bold text-zinc-400 uppercase mt-0.5">Users</span>
+                            {/* Header */}
+                            <div className="flex items-center gap-2 mb-4 text-cyan-400 font-extrabold tracking-widest text-[9px] uppercase">
+                                <Globe className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow" /> The Vision Roadmap
                             </div>
-                            <div className="flex flex-col border-x border-white/10 p-1 items-center justify-center">
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Coverage</span>
-                                <span className="text-base font-black text-white mt-1">+{totalBusinesses}</span>
-                                <span className="text-[8px] font-bold text-zinc-400 uppercase mt-0.5">Stores</span>
+                            
+                            <h3 className="text-xl font-black text-white mb-2 tracking-tight select-none">Forging the Future</h3>
+                            <p className="text-[11px] text-zinc-400 leading-relaxed mb-6 select-none">
+                                We aren’t just constructing a point of sale app; we are forging the foundational operating infrastructure for digital retail commerce. Zeneva is unlocking an interconnected, borderless global ecosystem.
+                            </p>
+
+                            {/* Timeline Flow */}
+                            <div className="space-y-5 border-l border-white/10 ml-2 pl-4 relative flex-grow select-none">
+                                {/* Milestone 1 */}
+                                <div className="relative">
+                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-indigo-500 ring-4 ring-indigo-500/20"></div>
+                                    <span className="text-[8px] uppercase font-black tracking-wider text-indigo-400">Phase I: Genisys (Active)</span>
+                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">The Core Foundation</p>
+                                    <p className="text-[9px] text-zinc-500 mt-0.5">Powering real-time sync, offline resilient checkout, native release flows, and advanced local inventory.</p>
+                                </div>
+
+                                {/* Milestone 2 */}
+                                <div className="relative">
+                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20 animate-pulse"></div>
+                                    <span className="text-[8px] uppercase font-black tracking-wider text-emerald-400 flex items-center gap-1">
+                                        Phase II: OmniPresence (In Flight)
+                                        <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping"></span>
+                                    </span>
+                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">Multi-Store Ecosystem</p>
+                                    <p className="text-[9px] text-zinc-500 mt-0.5">Scaling distribution on Google Play, Android TV, and Windows WinGet. Launching public releases worldwide.</p>
+                                </div>
+
+                                {/* Milestone 3 */}
+                                <div className="relative">
+                                    <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-zinc-700 ring-4 ring-white/5"></div>
+                                    <span className="text-[8px] uppercase font-black tracking-wider text-zinc-500">Phase III: HyperScale (Coming Q1)</span>
+                                    <p className="text-[11px] text-zinc-200 font-bold mt-0.5">Predictive Algorithmic Mastery</p>
+                                    <p className="text-[9px] text-zinc-500 mt-0.5">Leveraging intelligent demand forecasts, localized supply-chain hubs, and fully automated store analytics.</p>
+                                </div>
                             </div>
-                            <div className="flex flex-col p-1 items-center justify-center">
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Volume</span>
-                                <span className="text-base font-black text-emerald-400 mt-1">+{totalSales.toLocaleString()}</span>
-                                <span className="text-[8px] font-bold text-emerald-500/80 uppercase mt-0.5">Checkouts</span>
+
+                            {/* Founder Motivation Footer Quote */}
+                            <div className="mt-6 pt-4 text-[9px] italic text-zinc-500 border-t border-white/5 font-medium leading-relaxed select-none">
+                                "Software has no boundaries. We are accelerating thousands of retail builders into the future, one checkout at a time."
                             </div>
                         </div>
 
-                        {/* Progress Stage Tracker */}
-                        <div className="w-full mb-7 flex flex-col text-left px-1 select-none">
-                            <div className="flex justify-between items-center mb-2 text-[9px] uppercase tracking-widest font-extrabold">
-                                <span className="text-zinc-500">Phase I: Genisys</span>
-                                <span className="text-emerald-400 flex items-center gap-1">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                                    Active
-                                </span>
-                            </div>
-                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden relative ring-1 ring-white/5">
-                                <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 rounded-full animate-pulse" style={{ width: '82%' }}></div>
-                            </div>
-                        </div>
-
-                        {/* Save Button for download */}
-                        <Button onClick={handleDownloadCertificate} disabled={isExporting} size="sm" variant="outline" className="w-full bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20 text-white rounded-2xl font-bold no-capture flex items-center justify-center gap-2 h-11 text-xs tracking-wide shadow-lg active:scale-[0.98] transition-transform">
-                            <Download className="h-4 w-4 text-zinc-300" /> {isExporting ? "Capturing Frame..." : "Commemorate Capture"}
-                        </Button>
                     </div>
                 </div>
             </DialogContent>
