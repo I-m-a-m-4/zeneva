@@ -343,6 +343,8 @@ function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, tot
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-4xl p-0 overflow-visible border-none bg-transparent backdrop-blur-none flex justify-center items-center shadow-none no-capture [&>button]:text-white/50">
+                <DialogTitle className="sr-only">Zeneva OS Platform Genesis Milestone</DialogTitle>
+                <DialogDescription className="sr-only">Commemorative dashboard visualizing operational growth and visionary trajectory.</DialogDescription>
                 <div className="relative group max-w-3xl w-full mx-auto px-4" ref={elementRef}>
                     {/* Dynamic gradient background wrapper */}
                     <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-emerald-500 to-cyan-500 rounded-[2.5rem] blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
