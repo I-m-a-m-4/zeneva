@@ -153,6 +153,8 @@ export default function DashboardPage() {
     const itemSalesCount: Record<string, number> = {};
     let serviceUnitsSold = 0;
     let productUnitsSold = 0;
+    let serviceRevenue = 0;
+    let productRevenue = 0;
 
     filteredReceipts.forEach(receipt => {
       if (!receipt || !Array.isArray(receipt.items)) return;
@@ -161,12 +163,19 @@ export default function DashboardPage() {
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
         itemSalesCount[name] = (itemSalesCount[name] || 0) + (item.quantity || 0);
+        
+        const itemRev = (Number(item.price) || 0) * (Number(item.quantity) || 0);
         if (product) {
           if (product.categoryType === 'service') {
             serviceUnitsSold += (item.quantity || 0);
+            serviceRevenue += itemRev;
           } else {
             productUnitsSold += (item.quantity || 0);
+            productRevenue += itemRev;
           }
+        } else {
+          productUnitsSold += (item.quantity || 0);
+          productRevenue += itemRev;
         }
       });
     });
@@ -178,12 +187,19 @@ export default function DashboardPage() {
         const product = inventoryItems.find(p => p.id === item.productId);
         const name = product?.name || item.name || 'Unknown Item';
         itemSalesCount[name] = (itemSalesCount[name] || 0) + (item.quantity || 0);
+        
+        const itemRev = (Number(item.price) || 0) * (Number(item.quantity) || 0);
         if (product) {
           if (product.categoryType === 'service') {
             serviceUnitsSold += (item.quantity || 0);
+            serviceRevenue += itemRev;
           } else {
             productUnitsSold += (item.quantity || 0);
+            productRevenue += itemRev;
           }
+        } else {
+          productUnitsSold += (item.quantity || 0);
+          productRevenue += itemRev;
         }
       });
     });
@@ -242,7 +258,9 @@ export default function DashboardPage() {
       debtItemsCount: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).length,
       totalDebtUnits: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).reduce((acc, p) => acc + Math.abs(p.stock || 0), 0),
       serviceUnitsSold,
-      productUnitsSold
+      productUnitsSold,
+      serviceRevenue,
+      productRevenue
     };
   }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts]);
 
@@ -354,7 +372,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold } = finalDashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue } = finalDashboardData;
 
   const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
   const isRestricted = !hasReportPermission;
@@ -377,6 +395,24 @@ export default function DashboardPage() {
             value={`${currencySymbol}${(totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={currencySymbol}
             description={`${(totalReceipts || 0) + (totalOnlineOrdersCount || 0)} total transactions`}
+            href="/reports"
+          />
+        )}
+        {!isRestricted && (
+          <SummaryCard
+            title="Product Revenue"
+            value={`${currencySymbol}${(productRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={Package}
+            description={`${(productUnitsSold || 0).toLocaleString()} products sold`}
+            href="/reports"
+          />
+        )}
+        {!isRestricted && (
+          <SummaryCard
+            title="Service Revenue"
+            value={`${currencySymbol}${(serviceRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={Activity}
+            description={`${(serviceUnitsSold || 0).toLocaleString()} services rendered`}
             href="/reports"
           />
         )}

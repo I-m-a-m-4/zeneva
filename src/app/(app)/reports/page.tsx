@@ -123,7 +123,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (isLoading || !targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0 };
+        if (isLoading || !targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -132,6 +132,8 @@ export default function ReportsDashboard() {
 
         let totalProductsSold = 0;
         let totalServicesSold = 0;
+        let totalProductRevenue = 0;
+        let totalServiceRevenue = 0;
         const uniqueProductIds = new Set<string>();
         const uniqueCustomerIds = new Set<string>();
 
@@ -140,10 +142,14 @@ export default function ReportsDashboard() {
             r.items?.forEach(i => {
                 uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
+                const itemRevenue = (Number(i.price) || 0) * (Number(i.quantity) || 0);
+                
                 if (product?.categoryType === 'service') {
                     totalServicesSold += i.quantity;
+                    totalServiceRevenue += itemRevenue;
                 } else {
                     totalProductsSold += i.quantity;
+                    totalProductRevenue += itemRevenue;
                 }
             });
         });
@@ -162,6 +168,8 @@ export default function ReportsDashboard() {
             totalProductsSold,
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold,
+            totalProductRevenue,
+            totalServiceRevenue,
             uniqueProductsSold: uniqueProductIds.size,
             catalogSize: Math.max(stats?.totalProducts || 0, products.length),
             dailyAverageSales: totalSales / activeDays,
@@ -302,6 +310,18 @@ export default function ReportsDashboard() {
                                 value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                 icon={DollarSign}
                                 description="Total earnings"
+                            />
+                            <ReportStatCard
+                                title="Product Revenue"
+                                value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                icon={Package}
+                                description="Revenue from physical goods"
+                            />
+                            <ReportStatCard
+                                title="Service Revenue"
+                                value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                icon={TrendingUp}
+                                description="Revenue from services"
                             />
                             <ReportStatCard
                                 title="Sales"
