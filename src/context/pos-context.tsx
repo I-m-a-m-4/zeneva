@@ -166,22 +166,79 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsRealOnline(false);
       return false;
     }
-    try {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 3500);
-      // Chrome's specialized generate_204 endpoint requires no-cors and returns very fast
-      await fetch("https://clients3.google.com/generate_204", {
-        mode: "no-cors",
-        cache: "no-store",
-        signal: controller.signal,
+
+    // Channel 1: Micro-fetch payloadless sensor
+    const checkFetch = async (): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 3000);
+        await fetch("https://clients3.google.com/generate_204", {
+          mode: "no-cors",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(id);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Channel 2 & 3: Browser-native Image Beaconing (bypasses ALL CORS/CORB/CSP limitations)
+    const checkImage = (url: string): Promise<boolean> => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const timer = setTimeout(() => {
+          img.onload = null;
+          img.onerror = null;
+          img.src = "";
+          resolve(false);
+        }, 3000);
+        
+        img.onload = () => {
+          clearTimeout(timer);
+          resolve(true);
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve(false);
+        };
+        // Force bypass local cache with timestamp query
+        img.src = `${url}?cacheBust=${Date.now()}`;
       });
-      clearTimeout(id);
-      setIsRealOnline(true);
-      return true;
-    } catch (err) {
-      setIsRealOnline(false);
-      return false;
-    }
+    };
+
+    // Define multiple disparate endpoints to bypass any regional or provider blocks
+    const tasks = [
+      checkFetch(),
+      checkImage("https://www.google.com/favicon.ico"),
+      checkImage("https://www.cloudflare.com/favicon.ico")
+    ];
+
+    // Custom Race: Resolve to TRUE immediately on the FIRST successful probe.
+    // Only resolve to FALSE if ALL parallel attempts fail or time out.
+    let finishedCount = 0;
+    const hasConnection = await new Promise<boolean>((resolve) => {
+      let resolved = false;
+      tasks.forEach(task => {
+        task.then(isSuccessful => {
+          if (resolved) return;
+          if (isSuccessful) {
+            resolved = true;
+            resolve(true);
+          } else {
+            finishedCount++;
+            if (finishedCount === tasks.length) {
+              resolved = true;
+              resolve(false);
+            }
+          }
+        });
+      });
+    });
+
+    setIsRealOnline(hasConnection);
+    return hasConnection;
   }, []);
 
   useEffect(() => {
