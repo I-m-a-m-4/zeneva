@@ -410,7 +410,7 @@ function InventoryPageContent() {
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
   return (
     <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
-      <div className="flex items-center pt-1 pb-4 gap-4">
+      <div className="flex items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3.5 gap-4 z-10 border-b mb-4">
         <div className="flex flex-col flex-1">
           <div className="relative flex items-center gap-2">
             <div className="relative flex-1 group">
@@ -431,11 +431,12 @@ function InventoryPageContent() {
             </div>
             <Button 
                variant="secondary" 
-               className="h-10 px-3 shrink-0 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+               size="icon"
+               className="h-10 w-10 shrink-0 border shadow-sm hover:shadow-md transition-all active:scale-95"
                onClick={() => performSearch(searchTerm)}
+               aria-label="Search"
             >
               <Search className="h-4 w-4" />
-              <span className="text-xs font-semibold">Search</span>
             </Button>
           </div>
           {isSyncing && (

@@ -345,12 +345,12 @@ export default function SelectProductsPage() {
                         </div>
                         <Button 
                             variant="secondary" 
-                            className="h-11 px-3 sm:px-4 gap-2 border shadow-sm hover:shadow-md transition-all active:scale-95"
+                            size="icon"
+                            className="h-11 w-11 shrink-0 border shadow-sm hover:shadow-md transition-all active:scale-95"
                             onClick={performManualSearch}
+                            aria-label="Search"
                         >
-
                             <Search className="h-4 w-4" />
-                            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Search</span>
                         </Button>
                         <Button
                             variant="outline"
