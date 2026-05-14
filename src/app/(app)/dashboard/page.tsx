@@ -338,17 +338,23 @@ export default function DashboardPage() {
   }, [fetchMonthlyAnalytics]);
 
 
+  const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
+  const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
+
   React.useEffect(() => {
-    if (date?.from && date?.to) {
+    if (dateFromTime && dateToTime) {
       const fetchRange = async () => {
         setIsFetchingBatch(true);
         try {
+          const parsedFrom = new Date(dateFromTime);
+          const parsedTo = new Date(dateToTime);
+          
           // Fetch high-fidelity range stats
-          const res = await fetchDetailedAnalytics(startOfDay(date.from!), endOfDay(date.to!));
+          const res = await fetchDetailedAnalytics(startOfDay(parsedFrom), endOfDay(parsedTo));
           setRangeStats(res);
           
           // Also fetch the actual receipts for Top Selling Items calculation
-          const BatchRes = await fetchReceiptsInRange(startOfDay(date.from!), endOfDay(date.to!), 500);
+          const BatchRes = await fetchReceiptsInRange(startOfDay(parsedFrom), endOfDay(parsedTo), 500);
           setDashboardBatchReceipts(BatchRes);
         } catch (err) {
           console.error("Dashboard range fetch failed:", err);
@@ -361,7 +367,7 @@ export default function DashboardPage() {
       setRangeStats(null);
       setDashboardBatchReceipts([]);
     }
-  }, [date, fetchDetailedAnalytics, fetchReceiptsInRange]);
+  }, [dateFromTime, dateToTime, fetchDetailedAnalytics, fetchReceiptsInRange]);
 
   // Merge range stats into dashboard calculations
   const finalDashboardData = React.useMemo(() => {

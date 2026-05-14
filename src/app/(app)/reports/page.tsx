@@ -87,12 +87,19 @@ export default function ReportsDashboard() {
     });
 
     // Auto-adjust to Business Lifetime once loaded
+    const businessCreatedAtTime = business?.createdAt ? safeToDate(business.createdAt).getTime() : 0;
     React.useEffect(() => {
-        if (business?.createdAt) {
-            const inception = safeToDate(business.createdAt);
-            setDate({ from: inception, to: new Date() });
+        if (businessCreatedAtTime) {
+            const inception = new Date(businessCreatedAtTime);
+            setDate(prev => {
+                // Prevent infinite state updates if they already match
+                if (prev?.from && prev.from.getTime() === inception.getTime()) {
+                    return prev;
+                }
+                return { from: inception, to: new Date() };
+            });
         }
-    }, [business?.createdAt]);
+    }, [businessCreatedAtTime]);
 
     const hasLifetimeAccess = business?.accessLevel === 'lifetime';
 
@@ -199,20 +206,23 @@ export default function ReportsDashboard() {
     const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
     const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
 
+    const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
+    const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
+
     React.useEffect(() => {
-        if (date?.from && date?.to) {
+        if (dateFromTime && dateToTime) {
             const fetchRange = async () => {
-                const res = await fetchDetailedAnalytics(date.from!, date.to!);
+                const res = await fetchDetailedAnalytics(new Date(dateFromTime), new Date(dateToTime));
                 setRangeStats(res);
             };
             fetchRange();
         } else {
             setRangeStats(null);
         }
-    }, [date, fetchDetailedAnalytics]);
+    }, [dateFromTime, dateToTime, fetchDetailedAnalytics]);
 
     React.useEffect(() => {
-        if (date?.from && date?.to) {
+        if (dateFromTime && dateToTime) {
             const fetchBatch = async () => {
                 setIsFetchingBatch(true);
                 const timeout = setTimeout(() => {
@@ -226,7 +236,7 @@ export default function ReportsDashboard() {
                 }, 4000);
                 
                 try {
-                    const res = await fetchReceiptsInRange(date.from!, date.to!);
+                    const res = await fetchReceiptsInRange(new Date(dateFromTime), new Date(dateToTime));
                     setReportBatchReceipts(res);
                 } finally {
                     clearTimeout(timeout);
@@ -235,7 +245,7 @@ export default function ReportsDashboard() {
             };
             fetchBatch();
         }
-    }, [date, fetchReceiptsInRange]);
+    }, [dateFromTime, dateToTime, fetchReceiptsInRange]);
 
     React.useEffect(() => {
         const fetchHistory = async () => {
