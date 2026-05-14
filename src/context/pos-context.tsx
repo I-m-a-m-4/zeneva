@@ -138,6 +138,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
   const [isConfettiActive, setIsConfettiActive] = useState(false);
   const hasShownSyncToast = useRef(false);
+  const hasHydratedRef = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
@@ -443,14 +444,27 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
   const receipts = useMemo(() => {
-    if (initialReceipts === null && syncedReceipts.length === 0 && isRealOnline && !!businessId) return null;
+    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
+    if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && isRealOnline && !!businessId) return null;
+    
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
-    syncedReceipts.forEach(r => { if (!existingIds.has(r.id)) merged.push(r); });
-    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
+    syncedReceipts.forEach(r => { 
+      if (!existingIds.has(r.id)) {
+        merged.push(r); 
+        existingIds.add(r.id);
+      }
+    });
     queuedSales.forEach(action => {
       const receipt = action.payload.receiptData;
-      if (receipt && !existingIds.has(receipt.id)) merged.push({ ...receipt, isOptimistic: true, createdAt: receipt.createdAt || new Date(action.timestamp) });
+      if (receipt && !existingIds.has(receipt.id)) {
+        merged.push({ 
+          ...receipt, 
+          isOptimistic: true, 
+          createdAt: receipt.createdAt || new Date(action.timestamp) 
+        });
+        existingIds.add(receipt.id);
+      }
     });
     
     // Filter out voided receipts currently in the sync queue
@@ -1576,8 +1590,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialStats]);
   
   useEffect(() => {
+    if (!isMounted || !businessId || hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
+
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (isTauri && isMounted && businessId) {
+    if (isTauri) {
       // 1. Load Queue
       getOfflineQueue().then(queue => {
         if (queue.length > 0) {
@@ -1592,7 +1609,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       getCachedReceipts(businessId, 500).then(r => { if (r.length > 0) setSyncedReceipts(r); });
       getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
       getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
-    } else if (!isTauri && isMounted && businessId) {
+    } else {
       // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
       idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); });
       idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); });
