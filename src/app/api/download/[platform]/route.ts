@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AppConfig } from '@/lib/config';
+import { adminFirestore } from '@/firebase/admin';
+import crypto from 'crypto';
 
 export async function GET(
   request: NextRequest,
@@ -28,6 +30,50 @@ export async function GET(
   }
 
   let downloadUrl = '';
+  let responseCookieId = '';
+
+  // Track download event with a unique, non-auth visitor cookie
+  if (adminFirestore) {
+    try {
+      const visitorCookie = request.cookies.get('zeneva_visitor_id');
+      let visitorId = visitorCookie ? visitorCookie.value : null;
+
+      if (!visitorId) {
+        visitorId = crypto.randomUUID();
+        responseCookieId = visitorId;
+      }
+
+      const clickData = {
+        lastClick: new Date(),
+        userAgent: request.headers.get('user-agent') || 'unknown',
+      };
+
+      const docRef = adminFirestore.collection('download_clicks').doc(visitorId);
+      const docSnap = await docRef.get();
+
+      if (!docSnap.exists) {
+        await docRef.set({
+          ...clickData,
+          firstClick: new Date(),
+          platforms: [platform],
+          clicks: 1,
+        });
+      } else {
+        const existingPlatforms = docSnap.data()?.platforms || [];
+        const updatedPlatforms = existingPlatforms.includes(platform) 
+          ? existingPlatforms 
+          : [...existingPlatforms, platform];
+        
+        await docRef.update({
+          ...clickData,
+          platforms: updatedPlatforms,
+          clicks: (docSnap.data()?.clicks || 0) + 1,
+        });
+      }
+    } catch (err) {
+      console.error('Error logging download telemetry to Firestore:', err);
+    }
+  }
 
   // Helper to find asset by pattern
   const findAssetUrl = (endsWithStr: string, containsStr?: string) => {
@@ -80,5 +126,17 @@ export async function GET(
     }
   }
 
-  return NextResponse.redirect(downloadUrl);
+  const response = NextResponse.redirect(downloadUrl);
+  if (responseCookieId) {
+    response.cookies.set({
+      name: 'zeneva_visitor_id',
+      value: responseCookieId,
+      maxAge: 60 * 60 * 24 * 365 * 2, // 2 years
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  return response;
 }

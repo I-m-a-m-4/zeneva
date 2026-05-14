@@ -586,7 +586,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 }
 
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null }) {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -1029,15 +1029,29 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         // LTV = Total Subscription Revenue / Total Customers
         const ltv = totalBusinesses > 0 ? totalSubscriptionRevenue / totalBusinesses : 0;
 
+        // --- DOWNLOAD TELEMETRY INTELLIGENCE ---
+        const downloadStats = (downloadClicks || []).reduce((acc, d) => {
+            const pList = d.platforms || [];
+            pList.forEach((p: string) => {
+                if (p.includes('windows')) acc.windows += 1;
+                else if (p.includes('macos')) acc.macos += 1;
+                else if (p.includes('android')) acc.android += 1;
+            });
+            acc.totalClicks += (d.clicks || 0);
+            return acc;
+        }, { windows: 0, macos: 0, android: 0, totalClicks: 0 });
+
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, 
             totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
             richestBusiness, topPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
-            earliestBusiness, daysActive
+            earliestBusiness, daysActive,
+            uniqueDownloaders: downloadClicks?.length || 0,
+            downloadStats
         };
-    }, [users, businesses, products, receipts, purchases]);
+    }, [users, businesses, products, receipts, purchases, downloadClicks]);
 
 
     const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers') => {
@@ -1337,6 +1351,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     : `${analyticsData.daysActive} Days`} 
                                 icon={Clock} 
                                 description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')}`}
+                            />
+                        </button>
+                        <button 
+                            onClick={() => toast({ title: "Download Traffic Intelligence", description: `Total engagement: ${analyticsData.downloadStats.totalClicks} total clicks. Breakdown: ${analyticsData.downloadStats.windows} Windows, ${analyticsData.downloadStats.macos} macOS, ${analyticsData.downloadStats.android} Android.` })} 
+                            className="text-left w-full h-full transition-transform active:scale-95"
+                        >
+                            <StatCard 
+                                title="Unique Downloaders" 
+                                value={analyticsData.uniqueDownloaders} 
+                                icon={Download} 
+                                description={`${analyticsData.downloadStats.windows} Win / ${analyticsData.downloadStats.macos} Mac / ${analyticsData.downloadStats.android} Android`}
                             />
                         </button>
                     </div>
@@ -2184,6 +2209,7 @@ export default function AdminDashboardPage() {
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
+    const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
 
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
@@ -2191,8 +2217,9 @@ export default function AdminDashboardPage() {
     const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
     const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
     const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
+    const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || receiptsLoading || purchasesLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
 
     if (isLoading) {
         return (
@@ -2203,5 +2230,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} />
+    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} />
 }
