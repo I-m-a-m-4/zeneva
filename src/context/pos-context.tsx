@@ -100,6 +100,8 @@ interface POSContextType {
   mutateBusiness: (data?: any) => Promise<any> | void;
   isSyncing: boolean;
   isFullSyncingCustomers: boolean;
+  isFullSyncingProducts: boolean;
+  isFullSyncingReceipts: boolean;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
   optimisticProducts: Product[];
@@ -142,6 +144,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
+  const [isFullSyncingReceipts, setIsFullSyncingReceipts] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
@@ -697,8 +700,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         });
         
         return merged
-          .sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime())
-          .slice(0, 500); // Maintain healthy local cache constraints
+          .sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
       });
       
       // 3. Sync changes and propagate deletions down to offline SQLite storage if in Tauri desktop environment
@@ -891,6 +893,76 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingProducts(false);
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
+
+  const fetchFullReceipts = useCallback(async () => {
+    const isOnline = isRealOnline;
+    if (!user || !businessId || !firestore || isFullSyncingReceipts || !isOnline) return;
+    
+    setIsFullSyncingReceipts(true);
+    let allFetched: Receipt[] = [];
+    let lastDoc: any = null;
+    let hasMore = true;
+    const BATCH_SIZE = 2500; 
+
+    try {
+      while (hasMore) {
+        let q = query(
+          collection(firestore, "receipts"),
+          where("businessId", "==", businessId),
+          orderBy("createdAt", "desc"),
+          limit(BATCH_SIZE)
+        );
+        
+        if (lastDoc) q = query(q, startAfter(lastDoc));
+        
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          hasMore = false;
+        } else {
+          const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+          allFetched = [...allFetched, ...batch];
+          
+          setSyncedReceipts(prev => {
+            const merged = [...prev];
+            batch.forEach(nr => {
+              const idx = merged.findIndex(r => r.id === nr.id);
+              if (idx !== -1) merged[idx] = nr;
+              else merged.push(nr);
+            });
+            return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+          });
+
+          if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+             await syncReceiptsToOffline(businessId, batch);
+          } else {
+             const cumulative = await idb.get<Receipt[]>('pos_synced_receipts') || [];
+             const mergedIndexed = [...cumulative];
+             batch.forEach(nr => {
+                const idx = mergedIndexed.findIndex(r => r.id === nr.id);
+                if (idx !== -1) mergedIndexed[idx] = nr;
+                else mergedIndexed.push(nr);
+             });
+             await idb.set('pos_synced_receipts', mergedIndexed);
+          }
+
+          lastDoc = snap.docs[snap.docs.length - 1];
+          if (snap.docs.length < BATCH_SIZE) hasMore = false;
+        }
+      }
+      
+      setLastSyncMetadata(businessId, 'full_receipts_sync', Date.now());
+      
+      const lastToast = Number(localStorage.getItem('last_receipt_sync_toast_time') || 0);
+      if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
+        toast({ title: "Sales History Synced", description: `Synchronized ${allFetched.length} receipts for full offline access.` });
+        localStorage.setItem('last_receipt_sync_toast_time', Date.now().toString());
+      }
+    } catch (error) {
+      console.error("Full Receipt Sync Failed:", error);
+    } finally {
+      setIsFullSyncingReceipts(false);
+    }
+  }, [businessId, firestore, isFullSyncingReceipts, toast, user, isRealOnline]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();
@@ -1659,7 +1731,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
        // 2. Hydrate POS from SQLite for instant start
       getCachedProducts(businessId).then(p => { if (p.length > 0) setSyncedProducts(p); });
       getCachedCustomers(businessId).then(c => { if (c.length > 0) setSyncedCustomers(c); });
-      getCachedReceipts(businessId, 500).then(r => { if (r.length > 0) setSyncedReceipts(r); });
+      getCachedReceipts(businessId, 10000).then(r => { if (r.length > 0) setSyncedReceipts(r); });
       getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
       getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
     } else {
@@ -1721,9 +1793,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline) return;
 
     const checkFullSyncStatus = async () => {
-      const [lastCustSync, lastProdSync] = await Promise.all([
+      const [lastCustSync, lastProdSync, lastReceiptSync] = await Promise.all([
         getLastSyncMetadata(businessId, 'full_customers_sync'),
-        getLastSyncMetadata(businessId, 'full_products_sync')
+        getLastSyncMetadata(businessId, 'full_products_sync'),
+        getLastSyncMetadata(businessId, 'full_receipts_sync')
       ]);
       
       const now = Date.now();
@@ -1736,10 +1809,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
         fetchFullProducts();
       }
+
+      if (now - lastReceiptSync > dayInterval && !isFullSyncingReceipts) {
+        fetchFullReceipts();
+      }
     };
 
     checkFullSyncStatus();
-  }, [isMounted, businessId, firestore, isRealOnline, isFullSyncingCustomers, isFullSyncingProducts, fetchFullCustomers, fetchFullProducts]);
+  }, [isMounted, businessId, firestore, isRealOnline, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, fetchFullCustomers, fetchFullProducts, fetchFullReceipts]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);
@@ -2037,7 +2114,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     paymentMethod, setPaymentMethod, autoPrint, setAutoPrint, resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
-    mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, optimisticProducts: [],
+    mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, optimisticProducts: [],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField, searchReceipts: async () => [],
@@ -2052,7 +2129,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }
