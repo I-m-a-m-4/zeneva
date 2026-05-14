@@ -453,6 +453,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (receipt && !existingIds.has(receipt.id)) merged.push({ ...receipt, isOptimistic: true, createdAt: receipt.createdAt || new Date(action.timestamp) });
     });
     
+    // Filter out voided receipts currently in the sync queue
+    const voidedIds = new Set(queuedActions.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
+    if (voidedIds.size > 0) {
+      merged = merged.filter(r => !voidedIds.has(r.id));
+    }
+    
     // Client-side sort by createdAt desc
     return merged.sort((a, b) => {
       const getMillis = (dateVal: any) => {
@@ -1082,6 +1088,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
                 break;
               }
+              case 'delete-receipt': {
+                batch.delete(doc(firestore, 'receipts', action.payload.receiptId));
+                break;
+              }
             }
 
             await batch.commit();
@@ -1698,6 +1708,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [heldSales]);
 
   const voidReceipt = useCallback(async (receiptId: string) => {
+    // 1. Optimistic local state updates
     setSyncedReceipts(prev => prev.filter(r => r.id !== receiptId));
     try {
       const currentSynced = secureStorage.getItem<any[]>('pos_synced_receipts') || [];
@@ -1707,12 +1718,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Failed to update secureStorage for voided receipt:", err);
     }
 
+    // 2. Local SQLite removal
     try {
       await deleteReceiptFromOffline(receiptId);
     } catch (err) {
       console.error("Failed to delete receipt from SQLite:", err);
     }
-  }, []);
+
+    // 3. Dispatch global delete command to Firestore sync engine
+    addToQueue({
+      type: 'delete-receipt',
+      payload: { receiptId }
+    }, `Voided receipt ${receiptId}`);
+
+    toast({
+      title: "Receipt Voided",
+      description: "The sale has been voided and will be removed globally.",
+    });
+  }, [addToQueue, toast]);
 
 
 
