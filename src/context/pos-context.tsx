@@ -1023,9 +1023,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
               });
             }
 
-          } catch (execError) {
+          } catch (execError: any) {
             console.error("❌ POS Queue Engine :: Batch write execution failed.", execError);
-            break; // Stop further processing on this tick to preserve logical ordering for safe retry later
+            
+            // Detect non-retryable permanent errors (e.g. Permission Denied, Resource Exhausted, Failed Precondition)
+            const errCode = execError?.code || '';
+            const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
+            
+            if (isPermanentError) {
+              console.warn("⚠️ Permanent Firestore rejection on aggregate batch. Discarding chunk to unblock queue.");
+              chunk.forEach(action => successfullyCommitIds.push(action.id)); // Discard to unblock queue
+              
+              toast({
+                title: "Sync Rejection",
+                description: `The server rejected a batch of actions: ${execError.message || 'Permission Denied'}.`,
+                variant: "destructive"
+              });
+              continue; // Skip breaking, continue processing remainder
+            }
+            
+            break; // Stop further processing on this tick for temporary network/server blips to preserve safe retry
           }
         }
         
@@ -1097,9 +1114,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
             await batch.commit();
             successfullyCommitIds.push(action.id);
 
-          } catch (singularErr) {
+          } catch (singularErr: any) {
             console.error(`❌ Standalone sync step failed [${action.type}]:`, singularErr);
-            break; // Maintain strict synchronous chain safety
+            
+            // Detect non-retryable permanent errors (e.g. Permission Denied, Not Found, Failed Precondition)
+            const errCode = singularErr?.code || '';
+            const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
+            
+            if (isPermanentError) {
+              console.warn(`⚠️ Permanent Firestore rejection for ${action.type} [ID: ${action.id}]. Discarding to unblock queue.`);
+              successfullyCommitIds.push(action.id); // Remove from state queue to unblock remaining actions
+              
+              toast({
+                title: "Operation Denied",
+                description: `Server rejected: "${action.description || action.type}". Reason: ${singularErr.message || 'Permission Denied'}.`,
+                variant: "destructive"
+              });
+              continue; // Resume execution of the remaining queue
+            }
+            
+            break; // Preserve synchronous safety for temporary network errors
           }
         }
       }
