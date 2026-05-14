@@ -58,27 +58,25 @@ export async function GET(
     }
   }
 
-  // Fallback to hardcoded naming pattern or latest releases page if GitHub API failed or assets were empty
+  // Always fall back to the direct constructed download URL pattern instead of redirecting to the releases index
   if (!downloadUrl) {
-    if (version === AppConfig.version) {
-      downloadUrl = 'https://github.com/I-m-a-m-4/zeneva-releases/releases/latest';
-    } else {
-      switch (platform) {
-        case 'windows':
-          downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64_en-US.msi`;
-          break;
-        case 'macos-silicon':
-          downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
-          break;
-        case 'macos-intel':
-          downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64.dmg`;
-          break;
-        case 'android':
-          downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
-          break;
-        default:
-          return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
-      }
+    switch (platform) {
+      case 'windows':
+        // Point to the executable installer seen in the user screenshot
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64-setup.exe`;
+        break;
+      case 'macos-silicon':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
+        break;
+      case 'macos-intel':
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64.dmg`;
+        break;
+      case 'android':
+        // Match the signed APK pattern perfectly
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
     }
   }
 
