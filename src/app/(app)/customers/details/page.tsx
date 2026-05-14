@@ -24,6 +24,7 @@ import {
     Receipt, FileText
 } from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
+import { getCachedCustomerReceipts, syncCustomersToOffline } from '@/lib/sqlite-sync';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -119,7 +120,6 @@ function CustomerDetailContent() {
             // 1. Initial hit from SQLite for instant UI in Native
             if (isTauri) {
                 try {
-                    const { getCachedCustomerReceipts } = await import('@/lib/sqlite-sync');
                     const localReceipts = await getCachedCustomerReceipts(business.id, customerId);
                     if (localReceipts.length > 0) {
                         setAllCustomerReceipts(prev => {
@@ -270,7 +270,6 @@ function CustomerDetailContent() {
             
             if (isTauri) {
                 try {
-                    const { syncCustomersToOffline } = await import('@/lib/sqlite-sync');
                     await syncCustomersToOffline(currentUserProfile.businessId, [{ ...displayCustomer, aiInsights: insightsWithTimestamp }]);
                     console.log("Insights saved to local SQLite.");
                 } catch (e) {

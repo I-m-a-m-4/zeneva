@@ -16,7 +16,11 @@ export const secureStorage = {
     } catch (error) {
       console.error('Encryption failed:', error);
       // Fallback to plain text if encryption fails for some weird reason
-      localStorage.setItem(key, JSON.stringify(value));
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (innerErr) {
+        console.error('SecureStorage fallback also failed:', innerErr);
+      }
     }
   },
 

@@ -9,8 +9,8 @@ import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, delet
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
-import { 
-  syncProductsToOffline, 
+import { idb } from '@/lib/idb';
+import {   syncProductsToOffline, 
   syncProductToOffline,
   deleteMultipleProductsFromOffline,
   getCachedProducts, 
@@ -19,6 +19,7 @@ import {
   syncReceiptsToOffline,
   getCachedReceipts,
   getCachedBusiness,
+  syncBusinessToOffline,
   syncStatsToOffline,
   getCachedStats,
   getLastSyncMetadata, 
@@ -26,7 +27,9 @@ import {
   saveActionToOfflineQueue,
   getOfflineQueue,
   removeActionFromOfflineQueue,
-  getMonthlyRevenue
+  getMonthlyRevenue,
+  clearAllTables,
+  deleteReceiptFromOffline
 } from '@/lib/sqlite-sync';
 
 import { 
@@ -303,14 +306,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     secureStorage.setItem('pos_synced_products', syncedProducts);
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri) idb.set('pos_synced_products', syncedProducts);
   }, [syncedProducts]);
 
   useEffect(() => {
     secureStorage.setItem('pos_synced_customers', syncedCustomers);
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri) idb.set('pos_synced_customers', syncedCustomers);
   }, [syncedCustomers]);
 
   useEffect(() => {
     secureStorage.setItem('pos_synced_receipts', syncedReceipts);
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri) idb.set('pos_synced_receipts', syncedReceipts);
   }, [syncedReceipts]);
  
   useEffect(() => {
@@ -612,7 +621,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const fetchedRecs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
       setSyncedReceipts(fetchedRecs);
       if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-        import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, fetchedRecs));
+        syncReceiptsToOffline(businessId, fetchedRecs);
       }
     } catch (error) {
       console.error("Failed to fetch initial receipts:", error);
@@ -1174,7 +1183,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const nuclearReset = useCallback(async () => {
     await resetPOS(); setQueuedActions([]); setSyncedProducts([]); setSyncedCustomers([]); setSyncedReceipts([]);
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) import('@/lib/sqlite-sync').then(m => m.clearAllTables());
+    idb.clear();
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) clearAllTables();
   }, [resetPOS]);
 
   const searchCustomers = useCallback(async (term: string) => {
@@ -1308,7 +1318,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (isTauri) {
         try {
-          const { getCachedReceipts } = await import('@/lib/sqlite-sync');
           const cached = await getCachedReceipts(businessId, 10000);
           if (cached && cached.length > 0) {
             const fromTime = from.getTime();
@@ -1503,9 +1512,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
        // 2. Hydrate POS from SQLite for instant start
       getCachedProducts(businessId).then(p => { if (p.length > 0) setSyncedProducts(p); });
       getCachedCustomers(businessId).then(c => { if (c.length > 0) setSyncedCustomers(c); });
-      getCachedReceipts(businessId).then(r => { if (r.length > 0) setSyncedReceipts(r); });
+      getCachedReceipts(businessId, 500).then(r => { if (r.length > 0) setSyncedReceipts(r); });
       getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
       getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
+    } else if (!isTauri && isMounted && businessId) {
+      // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
+      idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); });
+      idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); });
+      idb.get<Receipt[]>('pos_synced_receipts').then(r => { if (r && r.length > 0) setSyncedReceipts(r); });
     }
   }, [isMounted, businessId, processQueue, isRealOnline]);
 
@@ -1548,11 +1562,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     if (isTauri && businessId) {
-      if (products && products.length > 0) import('@/lib/sqlite-sync').then(m => m.syncProductsToOffline(businessId, products));
-      if (customers && customers.length > 0) import('@/lib/sqlite-sync').then(m => m.syncCustomersToOffline(businessId, customers));
-      if (receipts && receipts.length > 0) import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, receipts));
-      if (business) import('@/lib/sqlite-sync').then(m => m.syncBusinessToOffline(business));
-      if (stats) import('@/lib/sqlite-sync').then(m => m.syncStatsToOffline(businessId, stats));
+      if (products && products.length > 0) syncProductsToOffline(businessId, products);
+      if (customers && customers.length > 0) syncCustomersToOffline(businessId, customers);
+      if (receipts && receipts.length > 0) syncReceiptsToOffline(businessId, receipts);
+      if (business) syncBusinessToOffline(business);
+      if (stats) syncStatsToOffline(businessId, stats);
     }
   }, [businessId, products, customers, receipts, business, stats]);
 
@@ -1661,7 +1675,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { deleteReceiptFromOffline } = await import('@/lib/sqlite-sync');
       await deleteReceiptFromOffline(receiptId);
     } catch (err) {
       console.error("Failed to delete receipt from SQLite:", err);
@@ -1692,7 +1705,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         
         // Sync these to offline for future use
         if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-          import('@/lib/sqlite-sync').then(m => m.syncReceiptsToOffline(businessId, results));
+          syncReceiptsToOffline(businessId, results);
         }
       } catch (err) {
         console.error("Fetch Receipts In Range online failed:", err);
@@ -1704,7 +1717,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (isTauri) {
         try {
-          const { getCachedReceipts } = await import('@/lib/sqlite-sync');
           const cached = await getCachedReceipts(businessId, limitCount);
           if (cached && cached.length > 0) {
             const fromTime = from.getTime();

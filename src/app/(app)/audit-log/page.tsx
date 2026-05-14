@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { safeToDate } from '@/lib/utils';
 
 type SuspiciousActivity = {
     title: string;
@@ -73,10 +74,10 @@ function analyzeLogsLocally(logs: AuditLog[]): { summary: string; suspiciousActi
             const createLog = sales.find(l =>
                 l.action === 'sale.create' &&
                 l.entityId === voidLog.entityId &&
-                l.createdAt.toDate() < voidLog.createdAt.toDate()
+                safeToDate(l.createdAt) < safeToDate(voidLog.createdAt)
             );
             if (createLog) {
-                const timeDiff = voidLog.createdAt.toDate().getTime() - createLog.createdAt.toDate().getTime();
+                const timeDiff = safeToDate(voidLog.createdAt).getTime() - safeToDate(createLog.createdAt).getTime();
                 if (timeDiff < TEN_MINUTES) {
                     suspiciousVoidLogIds.add(voidLog.id);
                     suspiciousVoidLogIds.add(createLog.id);
@@ -213,7 +214,7 @@ function AuditLogPageContent() {
         );
 
         const unsubscribe = onSnapshot(baseQuery, (snap) => {
-            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) } as AuditLog));
             setAuditLogs(logs);
             if (snap.docs.length < 50) setHasMore(false);
         });
@@ -233,7 +234,7 @@ function AuditLogPageContent() {
                 limit(50)
             );
             const snap = await getDocs(nextQuery);
-            const more = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+            const more = snap.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) } as AuditLog));
             if (more.length > 0) {
                 setAuditLogs(prev => [...prev, ...more]);
             }
@@ -400,7 +401,7 @@ function AuditLogPageContent() {
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="text-right text-muted-foreground text-xs whitespace-nowrap">
-                                                            {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : ''}
+                                                            {log.createdAt ? formatDistanceToNow(safeToDate(log.createdAt), { addSuffix: true }) : ''}
                                                         </TableCell>
                                                     </TableRow>
                                                 )
@@ -452,7 +453,7 @@ function AuditLogPageContent() {
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Date</p>
-                                <p className="font-medium">{selectedLog.createdAt ? format(selectedLog.createdAt.toDate(), 'PPP p') : 'N/A'}</p>
+                                <p className="font-medium">{selectedLog.createdAt ? format(safeToDate(selectedLog.createdAt), 'PPP p') : 'N/A'}</p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Target</p>

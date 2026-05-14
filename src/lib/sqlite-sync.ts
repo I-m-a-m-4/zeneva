@@ -104,15 +104,16 @@ export async function syncProductsToOffline(businessId: string, products: any[])
   const db = await getOfflineDb();
   if (!db || products.length === 0) return;
   
-  try {
-    for (const product of products) {
+  for (const product of products) {
+    if (!product || !product.id) continue;
+    try {
       await db.execute(
         'INSERT OR REPLACE INTO products (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
         [product.id, businessId, JSON.stringify(product)]
       );
+    } catch (err) {
+      console.error(`SQLite Sync Error (Product ${product.id}):`, err);
     }
-  } catch (err) {
-    console.error('SQLite Sync Error (Products):', err);
   }
 }
 
@@ -250,15 +251,16 @@ export async function syncCustomersToOffline(businessId: string, customers: any[
   const db = await getOfflineDb();
   if (!db || customers.length === 0) return;
   
-  try {
-    for (const customer of customers) {
+  for (const customer of customers) {
+    if (!customer || !customer.id) continue;
+    try {
       await db.execute(
         'INSERT OR REPLACE INTO customers (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
         [customer.id, businessId, JSON.stringify(customer)]
       );
+    } catch (err) {
+      console.error(`SQLite Sync Error (Customer ${customer.id}):`, err);
     }
-  } catch (err) {
-    console.error('SQLite Sync Error (Customers):', err);
   }
 }
 
@@ -266,16 +268,17 @@ export async function syncReceiptsToOffline(businessId: string, receipts: any[])
   const db = await getOfflineDb();
   if (!db || receipts.length === 0) return;
   
-  try {
-    for (const receipt of receipts) {
+  for (const receipt of receipts) {
+    if (!receipt || !receipt.id) continue;
+    try {
       const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
       await db.execute(
         'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
         [receipt.id, businessId, JSON.stringify(receipt), createdAt]
       );
+    } catch (err) {
+      console.error(`SQLite Sync Error (Receipt ${receipt.id}):`, err);
     }
-  } catch (err) {
-    console.error('SQLite Sync Error (Receipts):', err);
   }
 }
 
@@ -317,6 +320,7 @@ export async function getCachedReceipts(businessId: string, limit: number = 50) 
     );
     return result.map(r => JSON.parse(r.data));
   } catch (err) {
+    console.error('SQLite Retrieval Error (Receipts):', err);
     return [];
   }
 }
