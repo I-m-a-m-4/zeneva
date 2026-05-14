@@ -1816,7 +1816,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     };
 
     checkFullSyncStatus();
-  }, [isMounted, businessId, firestore, isRealOnline, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, fetchFullCustomers, fetchFullProducts, fetchFullReceipts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, businessId, firestore, isRealOnline]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);

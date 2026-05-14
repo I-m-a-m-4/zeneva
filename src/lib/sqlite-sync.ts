@@ -169,6 +169,13 @@ export async function getCachedProducts(businessId: string) {
 }
 
 export async function setLastSyncMetadata(businessId: string, type: string, timestamp: number) {
+  const key = `zeneva_sync_metadata_${businessId}_${type}`;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(key, timestamp.toString());
+    } catch (e) {}
+  }
+
   const db = await getOfflineDb();
   if (!db) return;
   const id = `${businessId}_${type}`;
@@ -183,15 +190,29 @@ export async function setLastSyncMetadata(businessId: string, type: string, time
 }
 
 export async function getLastSyncMetadata(businessId: string, type: string): Promise<number> {
+  const key = `zeneva_sync_metadata_${businessId}_${type}`;
+  
+  // 1. Attempt SQLite retrieval first if available
   const db = await getOfflineDb();
-  if (!db) return 0;
-  const id = `${businessId}_${type}`;
-  try {
-    const result: any[] = await db.select('SELECT last_sync_timestamp FROM sync_metadata WHERE id = $1', [id]);
-    return result.length > 0 ? result[0].last_sync_timestamp : 0;
-  } catch (err) {
-    return 0;
+  if (db) {
+    const id = `${businessId}_${type}`;
+    try {
+      const result: any[] = await db.select('SELECT last_sync_timestamp FROM sync_metadata WHERE id = $1', [id]);
+      if (result.length > 0 && result[0].last_sync_timestamp) {
+        return Number(result[0].last_sync_timestamp);
+      }
+    } catch (err) {}
   }
+
+  // 2. Perfect fallback to localStorage if on Web or SQLite metadata is missing
+  if (typeof window !== 'undefined') {
+    try {
+      const localVal = localStorage.getItem(key);
+      if (localVal) return Number(localVal);
+    } catch (e) {}
+  }
+
+  return 0;
 }
 
 export async function getCachedCustomers(businessId: string) {
