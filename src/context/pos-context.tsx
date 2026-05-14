@@ -651,12 +651,42 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(q);
       const fetchedRecs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
       
-      // Anti-Ghosting Guard: Prevent re-injecting receipts that are actively queued for deletion
+      // 1. Anti-Ghosting Guard: Prevent re-injecting receipts that this CLIENT has queued for deletion
       const voidedReceiptIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
       const filteredRecs = fetchedRecs.filter(r => !voidedReceiptIds.has(r.id));
       
+      // 2. Server Deletion Reconciliation: Detect and purge items deleted from Firestore by OTHER clients
+      const serverIds = new Set(fetchedRecs.map(r => r.id));
+      const purgedLocalIds: string[] = [];
+
       setSyncedReceipts(prev => {
-        const merged = [...prev];
+        if (fetchedRecs.length === 0) return prev;
+        
+        // Extract the timestamp of the oldest server document in our top 200 retrieval window
+        const oldestFetchedDate = safeToDate(fetchedRecs[fetchedRecs.length - 1].createdAt).getTime();
+        
+        const prunedPrev = prev.filter(localR => {
+          // If it exists in the fetched payload, keep it (it will be updated below)
+          if (serverIds.has(localR.id)) return true;
+          
+          // If the local client is actively pending a write/complete-sale for this receipt, DO NOT delete it
+          const pendingSale = queuedActionsRef.current.some(a => a.type === 'complete-sale' && (a.payload.receiptData?.id === localR.id || a.payload.id === localR.id));
+          if (pendingSale) return true;
+          
+          const localTime = safeToDate(localR.createdAt).getTime();
+          
+          // If the receipt timestamp is newer than the oldest retrieved document BUT the document is MISSING
+          // from the server payload, it must have been deleted from Firestore by another client!
+          if (localTime >= oldestFetchedDate) {
+            purgedLocalIds.push(localR.id);
+            return false; // Prune it from the array!
+          }
+          
+          // Keep older historical records that are beyond the 200-item retrieval window limit
+          return true;
+        });
+
+        const merged = [...prunedPrev];
         filteredRecs.forEach(nr => {
           const idx = merged.findIndex(r => r.id === nr.id);
           if (idx !== -1) {
@@ -665,12 +695,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
             merged.push(nr);
           }
         });
+        
         return merged
           .sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime())
-          .slice(0, 500); // Keep memory constraints healthy while maintaining recent history
+          .slice(0, 500); // Maintain healthy local cache constraints
       });
+      
+      // 3. Sync changes and propagate deletions down to offline SQLite storage if in Tauri desktop environment
       if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-        syncReceiptsToOffline(businessId, fetchedRecs);
+        await syncReceiptsToOffline(businessId, fetchedRecs);
+        
+        for (const idToPurge of purgedLocalIds) {
+          await deleteReceiptFromOffline(idToPurge);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch initial receipts:", error);
