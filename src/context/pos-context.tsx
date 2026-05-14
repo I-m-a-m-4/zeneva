@@ -954,7 +954,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       
       const lastToast = Number(localStorage.getItem('last_receipt_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
-        toast({ title: "Sales History Synced", description: `Synchronized ${allFetched.length} receipts for full offline access.` });
+        toast({ title: "Sales History Synced", description: `Synchronized ${allFetched.length} receipts and invoices for full offline access.` });
         localStorage.setItem('last_receipt_sync_toast_time', Date.now().toString());
       }
     } catch (error) {

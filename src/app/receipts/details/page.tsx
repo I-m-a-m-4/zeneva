@@ -18,7 +18,7 @@ function ReceiptContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const receiptId = searchParams.get('id');
-  const { queuedActions, business: posBusiness, user } = usePOS();
+  const { queuedActions, business: posBusiness, user, receipts } = usePOS();
 
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
@@ -27,10 +27,12 @@ function ReceiptContent() {
   const receipt = React.useMemo(() => {
       if (firestoreReceipt) return firestoreReceipt;
       if (!receiptId) return null;
+      const cached = receipts?.find(r => r.id === receiptId);
+      if (cached) return cached;
       const action = queuedActions?.find(a => a.type === 'complete-sale' && a.payload.receiptData.id === receiptId);
       if (action) return action.payload.receiptData;
       return null;
-  }, [firestoreReceipt, receiptId, queuedActions]);
+  }, [firestoreReceipt, receiptId, queuedActions, receipts]);
 
   // Fetch business info directly from Firestore if not provided by global POS context (e.g. public link)
   const businessRef = useMemoFirebase(() => (firestore && receipt?.businessId ? doc(firestore, 'businessInstances', receipt.businessId) : null), [firestore, receipt?.businessId]);

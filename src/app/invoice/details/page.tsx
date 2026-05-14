@@ -19,11 +19,17 @@ function InvoiceContent() {
     const searchParams = useSearchParams();
     const invoiceId = searchParams.get('id');
     const router = useRouter();
-    const { business: posBusiness, user } = usePOS();
+    const { business: posBusiness, user, receipts } = usePOS();
 
     const firestore = useFirestore();
     const invoiceRef = useMemoFirebase(() => (firestore && invoiceId ? doc(firestore, 'receipts', invoiceId) : null), [firestore, invoiceId]);
-    const { data: invoice, isLoading: isInvoiceLoading } = useDoc<Receipt>(invoiceRef);
+    const { data: firestoreInvoice, isLoading: isInvoiceLoading } = useDoc<Receipt>(invoiceRef);
+
+    const invoice = React.useMemo(() => {
+        if (firestoreInvoice) return firestoreInvoice;
+        if (!invoiceId) return null;
+        return receipts?.find(r => r.id === invoiceId) || null;
+    }, [firestoreInvoice, invoiceId, receipts]);
 
     // Fetch business info directly from Firestore if not provided by global POS context (e.g. public link)
     const businessRef = useMemoFirebase(() => (firestore && invoice?.businessId ? doc(firestore, 'businessInstances', invoice.businessId) : null), [firestore, invoice?.businessId]);
@@ -41,7 +47,7 @@ function InvoiceContent() {
 
     const isLoading = isInvoiceLoading || (invoice && !business && isBusinessLoading);
 
-    if (!mounted || isLoading || !firestore) {
+    if (!mounted || (isLoading && !invoice) || !firestore) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Invoice...</span></div>;
     }
 
