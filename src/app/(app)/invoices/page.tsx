@@ -76,9 +76,13 @@ export default function InvoicesPage() {
             .filter(r => r.paymentMethod === 'Invoice')
             .filter(r => {
                 const searchLower = searchTerm.toLowerCase();
-                const receiptNum = (r.receiptNumber || r.id.substring(0, 8)).toLowerCase();
+                const receiptId = r.id || '';
+                const rNumber = r.receiptNumber || `rec-${receiptId.substring(0, 8)}`;
                 const customerName = (r.customer?.name || 'walk-in').toLowerCase();
-                return receiptNum.includes(searchLower) || customerName.includes(searchLower);
+                
+                return rNumber.toLowerCase().includes(searchLower) || 
+                    receiptId.toLowerCase().includes(searchLower) || 
+                    customerName.includes(searchLower);
             })
             .sort((a, b) => {
                 const dateA = safeToDate(a.createdAt);

@@ -99,12 +99,16 @@ function ReceiptsContent() {
       filtered = filtered.filter(r => r.customer?.id === customerId);
     } else if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter(r => 
-        (r.id || '').toLowerCase().includes(lower) || 
-        (r.customer?.name || '').toLowerCase().includes(lower) ||
-        (r.paymentMethod || '').toLowerCase().includes(lower) ||
-        (r.total || 0).toString().includes(lower)
-      );
+      filtered = filtered.filter(r => {
+        const receiptId = r.id || '';
+        const rNumber = r.receiptNumber || `rec-${receiptId.substring(0, 8)}`;
+        
+        return rNumber.toLowerCase().includes(lower) || 
+          receiptId.toLowerCase().includes(lower) || 
+          (r.customer?.name || '').toLowerCase().includes(lower) ||
+          (r.paymentMethod || '').toLowerCase().includes(lower) ||
+          (r.total || 0).toString().includes(lower);
+      });
     }
     return filtered;
   }, [receipts, searchTerm, customerId]);
@@ -272,7 +276,9 @@ function ReceiptsContent() {
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => router.push(`/receipts/details?id=${receipt.id}`)}
                     >
-                      <TableCell className="font-medium">{(receipt.id || '').substring(0, 8)}...</TableCell>
+                      <TableCell className="font-medium font-mono text-xs whitespace-nowrap">
+                        {receipt.receiptNumber || `rec-${(receipt.id || '').substring(0, 8)}`}
+                      </TableCell>
                       <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
                       <TableCell className="whitespace-nowrap">{safeFormatDate(receipt.createdAt)}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{safeFormatTime(receipt.createdAt)}</TableCell>
@@ -344,7 +350,7 @@ function ReceiptsContent() {
           <DialogHeader>
             <DialogTitle>Are you sure you want to void this sale?</DialogTitle>
             <DialogDescription>
-              This will permanently delete receipt <strong>{receiptToDelete?.id.substring(0, 8)}</strong>.
+              This will permanently delete receipt <strong>{receiptToDelete?.receiptNumber || `rec-${receiptToDelete?.id.substring(0, 8)}`}</strong>.
               Stock for all items will be restored and any loyalty points earned will be removed.
               This action cannot be undone.
             </DialogDescription>
