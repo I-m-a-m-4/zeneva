@@ -60,58 +60,6 @@ export default function NetworkStatusIndicator() {
         </div>
       )}
 
-      {/* 2. Responsive Floating Intelligent Alert Banner */}
-      <AnimatePresence>
-        {bannerVisible && (
-          <motion.div
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 16, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            // Tailwind updates: On PC pin to top right (right-6) and push below custom titlebar (top-16)
-            className="fixed top-0 md:top-16 inset-x-0 md:right-6 md:left-auto md:inset-x-auto z-[9999] mx-auto md:mx-0 w-full max-w-sm px-4 no-print pointer-events-none"
-          >
-            <div
-              className={cn(
-                "pointer-events-auto flex items-center gap-3 p-3.5 rounded-2xl shadow-2xl border backdrop-blur-xl ring-1 ring-black/5 select-none",
-                bannerType === 'offline'
-                  ? "bg-zinc-950/95 border-amber-500/30 text-amber-400 shadow-amber-950/20"
-                  : "bg-zinc-950/95 border-emerald-500/30 text-emerald-400 shadow-emerald-950/20"
-              )}
-            >
-              <div className={cn(
-                "p-2 rounded-xl border",
-                bannerType === 'offline'
-                  ? "bg-amber-500/10 border-amber-500/20 animate-pulse"
-                  : "bg-emerald-500/10 border-emerald-500/20"
-              )}>
-                {bannerType === 'offline' ? <WifiOff className="h-4 w-4" /> : <Wifi className="h-4 w-4" />}
-              </div>
-
-              <div className="flex-1 flex flex-col text-left">
-                <p className={cn(
-                  "text-[10px] font-black tracking-widest uppercase",
-                  bannerType === 'offline' ? "text-amber-400" : "text-emerald-400"
-                )}>
-                  {bannerType === 'offline' ? "Offline Mode Active" : "Online Mode Active"}
-                </p>
-                <p className="text-[10px] text-zinc-400 font-medium mt-0.5 leading-tight">
-                  {bannerType === 'offline' 
-                    ? "Sales are saved locally and will auto-sync when connection returns." 
-                    : "Successfully reconnected. Cloud synchronization live."}
-                </p>
-              </div>
-
-              <button
-                onClick={() => setBannerVisible(false)}
-                className="text-zinc-500 hover:text-zinc-200 transition-colors p-1 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }

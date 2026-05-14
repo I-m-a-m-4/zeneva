@@ -1694,12 +1694,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const updatedHeldSales = heldSales.filter(s => s.id !== heldSaleId);
     setHeldSales(updatedHeldSales);
     secureStorage.setItem(POS_HELD_SALES_KEY, updatedHeldSales);
-    
-    toast({
-      title: "Sale Resumed",
-      description: "The parked items have been added back to your cart.",
-    });
-  }, [heldSales, toast]);
+  }, [heldSales]);
 
   const deleteHeldSale = useCallback((heldSaleId: string) => {
     const updated = heldSales.filter(s => s.id !== heldSaleId);
