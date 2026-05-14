@@ -124,13 +124,16 @@ export default function ReportsDashboard() {
     }, [allReceipts, date]);
 
     const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    const isLoading = isNative 
-        ? ((isPosLoading && (!allReceipts || allReceipts.length === 0)) || isFetchingBatch)
-        : (isPosLoading || isFetchingBatch);
+    const isBaseLoading = isNative 
+        ? (isPosLoading && (!allReceipts || allReceipts.length === 0))
+        : isPosLoading;
+    
+    const hasDataToDisplay = (reportBatchReceipts && reportBatchReceipts.length > 0) || (receipts && receipts.length > 0);
+    const showBlankScreenSpinner = (isBaseLoading || isFetchingBatch) && !hasDataToDisplay;
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (isLoading || !targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -199,7 +202,7 @@ export default function ReportsDashboard() {
             dailyAverageRevenue: totalRevenue / activeDays
         }
 
-    }, [reportBatchReceipts, receipts, products, customers, isLoading, stats]);
+    }, [reportBatchReceipts, receipts, products, customers, stats]);
 
     // Surgical Analytics
     const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
@@ -219,7 +222,8 @@ export default function ReportsDashboard() {
         } else {
             setRangeStats(null);
         }
-    }, [dateFromTime, dateToTime, fetchDetailedAnalytics]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateFromTime, dateToTime]);
 
     React.useEffect(() => {
         if (dateFromTime && dateToTime) {
@@ -245,7 +249,8 @@ export default function ReportsDashboard() {
             };
             fetchBatch();
         }
-    }, [dateFromTime, dateToTime, fetchReceiptsInRange]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateFromTime, dateToTime]);
 
     React.useEffect(() => {
         const fetchHistory = async () => {
@@ -319,14 +324,25 @@ export default function ReportsDashboard() {
                 placeholderContent={<ReportsPlaceholder />}
                 isLoading={isPosLoading}
             >
-                <div className="flex flex-wrap items-center justify-between gap-2 no-capture mb-6">
-                    <DateRangePicker date={date} onDateChange={setDate} />
+                <div className="flex flex-wrap items-center justify-between gap-4 no-capture mb-6">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <DateRangePicker date={date} onDateChange={setDate} />
+                        {isFetchingBatch && (
+                            <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                <span>Updating metrics...</span>
+                            </div>
+                        )}
+                    </div>
                     <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4" />Download</Button>
                 </div>
 
-                {isLoading ? (
-                    <div className="flex h-64 items-center justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                {showBlankScreenSpinner ? (
+                    <div className="flex h-64 items-center justify-center animate-pulse">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                            <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
+                        </div>
                     </div>
                 ) : (
                     <div className="space-y-6">

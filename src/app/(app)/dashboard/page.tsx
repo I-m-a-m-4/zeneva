@@ -367,7 +367,8 @@ export default function DashboardPage() {
       setRangeStats(null);
       setDashboardBatchReceipts([]);
     }
-  }, [dateFromTime, dateToTime, fetchDetailedAnalytics, fetchReceiptsInRange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFromTime, dateToTime]);
 
   // Merge range stats into dashboard calculations
   const finalDashboardData = React.useMemo(() => {
