@@ -187,17 +187,19 @@ function ReceiptsContent() {
       });
 
       toast({ title: 'Sale Voided', description: `Receipt ${receiptToDelete.id.substring(0, 8)} has been voided and stock levels restored.`, variant: 'success' });
-      triggerRefresh();
       await voidReceipt(receiptToDelete.id);
     } catch (e: any) {
       console.error("Failed to void sale:", e);
-      toast({ title: 'Error', description: e.message || 'Could not void the sale.', variant: 'destructive' });
       
-      // If the receipt was not found or already deleted on Firestore, make sure we still clear it locally!
-      if (e.message?.includes("Receipt not found") || e.message?.includes("already been deleted")) {
-        await voidReceipt(receiptToDelete.id);
-        triggerRefresh();
-      }
+      // Fallback: Even if the direct online transaction failed (e.g. network error, already deleted, or sync mismatch),
+      // we MUST call voidReceipt to clear it from local cache and enqueue the operation for safety.
+      await voidReceipt(receiptToDelete.id);
+      
+      toast({ 
+        title: 'Offline Void Handled', 
+        description: 'The sale was voided locally and the update queued for synchronization.',
+        variant: 'default' 
+      });
     } finally {
       setReceiptToDelete(null);
       setIsDeleting(false);

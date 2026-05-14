@@ -191,11 +191,11 @@ service cloud.firestore {
                         hasPermission('manage_inventory') ||
                         (hasPermission('record_sales') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'updatedAt']))
                       ));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
                       isRequestingUserManager() && 
                       hasPermission('manage_inventory') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+                      isSubscriptionActive(resource.data.get('businessId', null)))));
     }
 
     match /receipts/{receiptId} {
@@ -206,11 +206,16 @@ service cloud.firestore {
                         isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
                         hasPermission('record_sales') &&
                         isSubscriptionActive(request.resource.data.get('businessId', null)));
-        allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && 
+        allow update: if isSuperAdmin() || (isUserAuthenticated() && 
                                 isRequestingUserManager() && 
                                 hasPermission('record_sales') &&
                                 isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                                 isSubscriptionActive(resource.data.get('businessId', null)));
+        allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
+                                isRequestingUserManager() && 
+                                hasPermission('record_sales') &&
+                                isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
+                                isSubscriptionActive(resource.data.get('businessId', null)))));
     }
     
     match /customers/{customerId} {
@@ -226,11 +231,11 @@ service cloud.firestore {
                         hasPermission('view_customers') ||
                         (hasPermission('record_sales') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalSpent', 'loyaltyPoints', 'updatedAt']))
                       ));
-      allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
                       isRequestingUserManager() && 
                       hasPermission('view_customers') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+                      isSubscriptionActive(resource.data.get('businessId', null)))));
     }
 
     match /admin_analytics/{docId} {

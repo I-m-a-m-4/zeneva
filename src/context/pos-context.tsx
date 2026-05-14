@@ -145,6 +145,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
+  const queuedActionsRef = useRef<QueuedAction[]>(queuedActions);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
   const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => secureStorage.getItem<Product[]>('pos_synced_products') || []);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => secureStorage.getItem<Customer[]>('pos_synced_customers') || []);
@@ -303,6 +304,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     secureStorage.setItem('pos_queued_actions', queuedActions);
+    queuedActionsRef.current = queuedActions;
   }, [queuedActions]);
 
   useEffect(() => {
@@ -587,10 +589,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const newCustomers = cSnap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
       const newReceipts = rSnap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
 
-      if (newProducts.length > 0) {
+      // Anti-Ghosting Guard: Prevent network delta-sync from re-injecting items currently pending deletion
+      const deletedProductIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
+      const deletedCustomerIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
+      const voidedReceiptIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
+
+      const filteredProducts = newProducts.filter(p => !deletedProductIds.has(p.id));
+      const filteredCustomers = newCustomers.filter(c => !deletedCustomerIds.has(c.id));
+      const filteredReceipts = newReceipts.filter(r => !voidedReceiptIds.has(r.id));
+
+      if (filteredProducts.length > 0) {
         setSyncedProducts(prev => {
           const merged = [...prev];
-          newProducts.forEach(np => {
+          filteredProducts.forEach(np => {
             const idx = merged.findIndex(p => p.id === np.id);
             if (idx !== -1) merged[idx] = np;
             else merged.push(np);
@@ -599,10 +610,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      if (newCustomers.length > 0) {
+      if (filteredCustomers.length > 0) {
         setSyncedCustomers(prev => {
           const merged = [...prev];
-          newCustomers.forEach(nc => {
+          filteredCustomers.forEach(nc => {
             const idx = merged.findIndex(c => c.id === nc.id);
             if (idx !== -1) merged[idx] = nc;
             else merged.push(nc);
@@ -610,10 +621,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           return merged;
         });
       }
-      if (newReceipts.length > 0) {
+      if (filteredReceipts.length > 0) {
         setSyncedReceipts(prev => {
           const merged = [...prev];
-          newReceipts.forEach(nr => {
+          filteredReceipts.forEach(nr => {
             const idx = merged.findIndex(r => r.id === nr.id);
             if (idx !== -1) merged[idx] = nr;
             else merged.push(nr);
@@ -639,9 +650,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const q = query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(200));
       const snap = await getDocs(q);
       const fetchedRecs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+      
+      // Anti-Ghosting Guard: Prevent re-injecting receipts that are actively queued for deletion
+      const voidedReceiptIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
+      const filteredRecs = fetchedRecs.filter(r => !voidedReceiptIds.has(r.id));
+      
       setSyncedReceipts(prev => {
         const merged = [...prev];
-        fetchedRecs.forEach(nr => {
+        filteredRecs.forEach(nr => {
           const idx = merged.findIndex(r => r.id === nr.id);
           if (idx !== -1) {
             merged[idx] = nr;
