@@ -9,7 +9,7 @@ import { useRef, Suspense } from "react";
 // Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
-import type { Receipt } from "@/types";
+import type { Receipt, BusinessInstance } from "@/types";
 import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import Link from 'next/link';
@@ -18,33 +18,40 @@ function ReceiptContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const receiptId = searchParams.get('id');
-  const { queuedActions, business } = usePOS();
+  const { queuedActions, business: posBusiness, user } = usePOS();
 
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
-  const { data: firestoreReceipt, isLoading } = useDoc<Receipt>(receiptRef);
+  const { data: firestoreReceipt, isLoading: isReceiptLoading } = useDoc<Receipt>(receiptRef);
 
+  const receipt = React.useMemo(() => {
+      if (firestoreReceipt) return firestoreReceipt;
+      if (!receiptId) return null;
+      const action = queuedActions?.find(a => a.type === 'complete-sale' && a.payload.receiptData.id === receiptId);
+      if (action) return action.payload.receiptData;
+      return null;
+  }, [firestoreReceipt, receiptId, queuedActions]);
+
+  // Fetch business info directly from Firestore if not provided by global POS context (e.g. public link)
+  const businessRef = useMemoFirebase(() => (firestore && receipt?.businessId ? doc(firestore, 'businessInstances', receipt.businessId) : null), [firestore, receipt?.businessId]);
+  const { data: dbBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessRef);
+
+  const business = posBusiness || dbBusiness;
   const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
   const router = useRouter();
-    const receiptContentRef = useRef<HTMLDivElement>(null);
-    const [mounted, setMounted] = React.useState(false);
+  const receiptContentRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = React.useState(false);
 
-    React.useEffect(() => {
-        setMounted(true);
-    }, []);
+  React.useEffect(() => {
+      setMounted(true);
+  }, []);
 
-    const receipt = React.useMemo(() => {
-        if (firestoreReceipt) return firestoreReceipt;
-        if (!receiptId) return null;
-        const action = queuedActions.find(a => a.type === 'complete-sale' && a.payload.receiptData.id === receiptId);
-        if (action) return action.payload.receiptData;
-        return null;
-    }, [firestoreReceipt, receiptId, queuedActions]);
+  const isLoading = isReceiptLoading || (receipt && !business && isBusinessLoading);
 
-    if (!mounted || (isLoading && !receipt) || !firestore) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
-    }
+  if (!mounted || (isLoading && !receipt) || !firestore) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading document...</span></div>;
+  }
 
   if (!receiptId || !receipt) {
     notFound();
@@ -132,22 +139,26 @@ function ReceiptContent() {
 
   return (
     <div className="flex flex-col items-center gap-6 py-4">
-      <div className="w-full max-w-2xl flex justify-start no-print">
-        <Button variant="ghost" asChild size="sm">
-          <Link href="/receipts">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
-          </Link>
-        </Button>
-      </div>
+      {user && (
+        <div className="w-full max-w-2xl flex justify-start no-print">
+          <Button variant="ghost" asChild size="sm">
+            <Link href="/receipts">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
+            </Link>
+          </Button>
+        </div>
+      )}
 
       <div ref={receiptContentRef} className="border rounded-lg bg-card overflow-hidden">
         <ReceiptDetails receipt={receipt} business={business} currencySymbol={currencySymbol} isInvoice={isInvoice} />
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 no-print">
-        <Button asChild variant="outline">
-          <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
-        </Button>
+        {user && (
+          <Button asChild variant="outline">
+            <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
+          </Button>
+        )}
         <Button onClick={handlePrint} variant="outline">
           <Printer className="mr-2 h-4 w-4" /> Print
         </Button>

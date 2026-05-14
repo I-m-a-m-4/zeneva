@@ -9,8 +9,8 @@ import { useRef, Suspense } from "react";
 // Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import type { Receipt } from "@/types";
-import { useBusiness } from "@/context/pos-context";
+import type { Receipt, BusinessInstance } from "@/types";
+import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import Link from 'next/link';
 
@@ -19,12 +19,17 @@ function InvoiceContent() {
     const searchParams = useSearchParams();
     const invoiceId = searchParams.get('id');
     const router = useRouter();
+    const { business: posBusiness, user } = usePOS();
 
     const firestore = useFirestore();
     const invoiceRef = useMemoFirebase(() => (firestore && invoiceId ? doc(firestore, 'receipts', invoiceId) : null), [firestore, invoiceId]);
-    const { data: invoice, isLoading } = useDoc<Receipt>(invoiceRef);
+    const { data: invoice, isLoading: isInvoiceLoading } = useDoc<Receipt>(invoiceRef);
 
-    const business = useBusiness();
+    // Fetch business info directly from Firestore if not provided by global POS context (e.g. public link)
+    const businessRef = useMemoFirebase(() => (firestore && invoice?.businessId ? doc(firestore, 'businessInstances', invoice.businessId) : null), [firestore, invoice?.businessId]);
+    const { data: dbBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessRef);
+
+    const business = posBusiness || dbBusiness;
     const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
     const receiptContentRef = useRef<HTMLDivElement>(null);
@@ -33,6 +38,8 @@ function InvoiceContent() {
     React.useEffect(() => {
         setMounted(true);
     }, []);
+
+    const isLoading = isInvoiceLoading || (invoice && !business && isBusinessLoading);
 
     if (!mounted || isLoading || !firestore) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Invoice...</span></div>;
@@ -111,27 +118,31 @@ function InvoiceContent() {
 
     return (
         <div className="flex flex-col items-center gap-6 py-4">
-            <div className="w-full max-w-2xl flex justify-start no-print">
-                <Button variant="ghost" asChild size="sm">
-                    <Link href="/invoices">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
-                    </Link>
-                </Button>
-            </div>
+            {user && (
+                <div className="w-full max-w-2xl flex justify-start no-print">
+                    <Button variant="ghost" asChild size="sm">
+                        <Link href="/invoices">
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices
+                        </Link>
+                    </Button>
+                </div>
+            )}
 
             <div ref={receiptContentRef} className="border rounded-lg bg-card overflow-hidden">
                 <ReceiptDetails receipt={invoice} business={business} currencySymbol={currencySymbol} isInvoice={true} />
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 no-print">
-                {invoice.status && invoice.status !== 'paid' && (
+                {user && invoice.status && invoice.status !== 'paid' && (
                     <Button onClick={handleMarkPaid} variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
                     </Button>
                 )}
-                <Button asChild variant="outline">
-                    <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
-                </Button>
+                {user && (
+                    <Button asChild variant="outline">
+                        <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
+                    </Button>
+                )}
                 <Button onClick={handlePrint} variant="outline">
                     <Printer className="mr-2 h-4 w-4" /> Print
                 </Button>

@@ -99,11 +99,7 @@ service cloud.firestore {
     // =================================================================
 
     match /businessInstances/{businessId} {
-      allow get: if isSuperAdmin() ||
-                    (isUserAuthenticated() && isRequestingUserMemberOf(businessId)) ||
-                    (isUserAuthenticated() && resource != null && resource.data.get('ownerId', null) == request.auth.uid) ||
-                    (resource != null && resource.data.get(['settings', 'publicStore', 'enabled'], false) == true) ||
-                    (resource == null);
+      allow get: if true;
       
       allow list: if (isUserAuthenticated() && request.query.limit <= 1) || isSuperAdmin();
       
@@ -199,7 +195,7 @@ service cloud.firestore {
     }
 
     match /receipts/{receiptId} {
-        allow get: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
+        allow get: if true;
         allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
         
         allow create: if isSuperAdmin() || (isUserAuthenticated() && 
