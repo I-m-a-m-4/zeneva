@@ -185,9 +185,12 @@ service cloud.firestore {
                       isSubscriptionActive(request.resource.data.get('businessId', null)));
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
-                      hasPermission('manage_inventory') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+                      isSubscriptionActive(resource.data.get('businessId', null)) &&
+                      (
+                        hasPermission('manage_inventory') ||
+                        (hasPermission('record_sales') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'updatedAt']))
+                      ));
       allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserManager() && 
                       hasPermission('manage_inventory') &&
@@ -217,9 +220,12 @@ service cloud.firestore {
       allow create: if isUserAuthenticated() && hasPermission('view_customers'); 
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
-                      hasPermission('view_customers') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+                      isSubscriptionActive(resource.data.get('businessId', null)) &&
+                      (
+                        hasPermission('view_customers') ||
+                        (hasPermission('record_sales') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalSpent', 'loyaltyPoints', 'updatedAt']))
+                      ));
       allow delete: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserManager() && 
                       hasPermission('view_customers') &&
