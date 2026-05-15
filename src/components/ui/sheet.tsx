@@ -36,12 +36,12 @@ const sheetVariants = cva(
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top pt-[calc(1.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
+        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top pt-[calc(2.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
         bottom:
           "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm pt-[calc(1.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm pt-[calc(2.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
         right:
-          "inset-y-0 right-0 h-full w-3/4  border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm pt-[calc(1.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
+          "inset-y-0 right-0 h-full w-3/4  border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm pt-[calc(2.5rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]",
       },
     },
     defaultVariants: {
@@ -68,7 +68,7 @@ const SheetContent = React.forwardRef<
       {children}
       <SheetPrimitive.Close className={cn(
         "absolute right-4 rounded-md p-1 opacity-70 transition-all hover:opacity-100 hover:bg-muted hover:rotate-90 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-secondary",
-        side === "bottom" ? "top-4" : "top-[calc(1rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]"
+        side === "bottom" ? "top-4" : "top-[calc(2rem+var(--tauri-title-height,0px)+env(safe-area-inset-top,0px))]"
       )}>
         <X className="h-6 w-6" />
         <span className="sr-only">Close</span>
