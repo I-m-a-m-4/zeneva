@@ -175,7 +175,7 @@ export async function setLastSyncMetadata(businessId: string, type: string, time
       localStorage.setItem(key, timestamp.toString());
     } catch (e) {}
   }
-
+ 
   const db = await getOfflineDb();
   if (!db) return;
   const id = `${businessId}_${type}`;

@@ -168,19 +168,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return true;
   });
 
+  const consecutiveFailuresRef = useRef<number>(0);
+
   const verifyConnectivity = useCallback(async () => {
     if (typeof window === 'undefined') return;
+    
+    // 1. Native Disconnect is absolute and immediate
     if (!navigator.onLine) {
+      consecutiveFailuresRef.current = 2; // Force threshold ceiling
       setIsRealOnline(false);
       return false;
     }
 
-    // Channel 1: Micro-fetch payloadless sensor (Routed through Whitelisted CSP endpoint)
+    // Channel 1: Micro-fetch sensor (Routed through whitelisted CSP endpoint)
     const checkFetch = async (): Promise<boolean> => {
       try {
         const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 3000);
-        // Using fonts.googleapis.com which is explicitly whitelisted in connect-src CSP headers
+        // INCREASE TIMEOUT WINDOW TO 8.5 SECONDS TO ACCOMMODATE WEAK/SLUGGISH CELLULAR LINKS
+        const id = setTimeout(() => controller.abort(), 8500);
         await fetch("https://fonts.googleapis.com", {
           mode: "no-cors",
           cache: "no-store",
@@ -202,7 +207,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           img.onerror = null;
           img.src = "";
           resolve(false);
-        }, 3000);
+        }, 8500); // Expanded timeout to 8.5s
         
         img.onload = () => {
           clearTimeout(timer);
@@ -225,7 +230,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     ];
 
     // Custom Race: Resolve to TRUE immediately on the FIRST successful probe.
-    // Only resolve to FALSE if ALL parallel attempts fail or time out.
     let finishedCount = 0;
     const hasConnection = await new Promise<boolean>((resolve) => {
       let resolved = false;
@@ -246,7 +250,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    setIsRealOnline(hasConnection);
+    if (hasConnection) {
+      // SUCCESS: Instantly restore connection and reset fails!
+      consecutiveFailuresRef.current = 0;
+      setIsRealOnline(true);
+    } else {
+      // PROBE FAILURE: Log it, but BUFFER the decision!
+      consecutiveFailuresRef.current += 1;
+      
+      // Only declare offline in UI if BOTH probes in CONSECUTIVE runs fail entirely!
+      // This flawlessly prevents flickering on high-latency or weak connections.
+      if (consecutiveFailuresRef.current >= 2) {
+        setIsRealOnline(false);
+      }
+    }
+    
     return hasConnection;
   }, []);
 
@@ -264,8 +282,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', handleOnlineEvent);
     window.addEventListener('offline', handleOfflineEvent);
     
-    // Periodic background check every 12 seconds to react quickly to cellular data changes
-    const interval = setInterval(verifyConnectivity, 12000);
+    // Periodic background check every 16 seconds to balance cellular data usage and responsiveness
+    const interval = setInterval(verifyConnectivity, 16000);
     
     // Perform verification on component load
     verifyConnectivity();
