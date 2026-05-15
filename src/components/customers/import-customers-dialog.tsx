@@ -171,6 +171,8 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           batch.set(newCustomerRef, {
             name: customerData.name,
             email: customerData.email,
+            lowercaseName: customerData.name?.toLowerCase() || '',
+            lowercaseEmail: customerData.email?.toLowerCase() || '',
             phone: customerData.phone || '',
             code: customerData.code || '',
             businessId,

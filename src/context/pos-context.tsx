@@ -811,7 +811,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
         let q = query(
           collection(firestore, "customers"),
           where("businessId", "==", businessId),
-          orderBy("totalSpent", "desc"),
           limit(BATCH_SIZE)
         );
         

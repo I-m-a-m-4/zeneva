@@ -22,6 +22,8 @@ import type { Customer, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
+
 
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: (customer: Customer) => void }) {
     const firestore = useFirestore();
@@ -69,7 +71,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
         isSavingRef.current = true;
         setIsSaving(true);
         try {
-            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+            const id = uuidv4();
             const newCustomerData = {
                 name,
                 email,
@@ -78,29 +80,23 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
                 businessId,
                 loyaltyPoints: 0,
                 totalSpent: 0,
+                id,
+                createdAt: new Date(),
+                lowercaseName: name.toLowerCase(),
+                lowercaseEmail: email ? email.toLowerCase() : '',
             };
 
-            if (isTauri) {
-                const tempId = `temp-${Date.now()}`;
-                const completeCustomer = { ...newCustomerData, id: tempId, createdAt: new Date() };
-                addToQueue({
-                    type: 'add-customer',
-                    payload: completeCustomer,
-                }, `Adding customer: ${name}`);
+            // Use unified offline-first queue for BOTH PWA/Web and Desktop.
+            // This ensures optimistic UI rendering, offline robustness,
+            // proper lowercase indexing, and reliable cross-environment syncing.
+            addToQueue({
+                type: 'add-customer',
+                payload: newCustomerData,
+            }, `Adding customer: ${name}`);
 
-                toast({ title: 'Success', description: `${name} has been added and will be synced.`, variant: 'success' });
-                triggerRefresh();
-                onCustomerAdded(completeCustomer as Customer);
-            } else {
-                const docRef = await addDoc(collection(firestore, 'customers'), {
-                    ...newCustomerData,
-                    createdAt: serverTimestamp(),
-                });
-                const completeCustomer = { ...newCustomerData, id: docRef.id, createdAt: new Date() };
-                toast({ title: 'Customer Added', description: `${name} has been added.`, variant: 'success' });
-                triggerRefresh();
-                onCustomerAdded(completeCustomer as Customer);
-            }
+            toast({ title: 'Customer Saved', description: `${name} has been added to the system.`, variant: 'success' });
+            triggerRefresh();
+            onCustomerAdded(newCustomerData as Customer);
 
         } catch (error) {
             toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
