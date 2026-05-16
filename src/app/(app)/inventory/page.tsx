@@ -664,16 +664,14 @@ function InventoryPageContent() {
             </DropdownMenu>
           </div>
       </div>
-      <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Products
-            {isSyncing && (
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-normal uppercase tracking-widest animate-in fade-in duration-300">
-                <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                <span>Global Catalog Syncing...</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              Products
+              {isSyncing && (
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Syncing catalog..." />
+              )}
+            </div>
           </CardTitle>
           <CardDescription>
             Manage your products and view their sales performance.

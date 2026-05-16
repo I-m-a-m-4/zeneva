@@ -392,9 +392,9 @@ export default function SelectProductsPage() {
                         </Select>
                     </div>
                     {isSyncing && (
-                        <div className="flex items-center gap-2 ml-1">
+                        <div className="flex items-center gap-2 ml-1 px-1.5 py-0.5 rounded-full bg-primary/5 w-fit border border-primary/10">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest leading-none">Global Catalog Syncing...</span>
+                            <span className="text-[8px] text-primary/70 font-black uppercase tracking-[0.2em] leading-none">Sync</span>
                         </div>
                     )}
                 </div>
