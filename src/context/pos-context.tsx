@@ -594,11 +594,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [initialStats, offlineStats, queuedActions]);
 
   // --- Functions ---
-  const refreshData = useCallback(async () => {
+  const refreshData = useCallback(async (silent = false) => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isSyncing || !isOnline) return;
     
-    setIsSyncing(true);
+    if (!silent) setIsSyncing(true);
     try {
       // Delta Sync: Only fetch documents updated since our last check
       // This turns 10,000 reads into 1-10 reads.
@@ -661,14 +661,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setLastSyncedTimestamp(now);
       secureStorage.setItem('pos_last_synced_timestamp', now);
 
-      if ((newProducts.length > 0 || newCustomers.length > 0 || newReceipts.length > 0) && !hasShownSyncToast.current) {
+      if ((newProducts.length > 0 || newCustomers.length > 0 || newReceipts.length > 0) && !hasShownSyncToast.current && !silent) {
         toast({ title: "Operational Sync Complete", description: `Successfully synchronized inventory, customer, and recent sales data.` });
         hasShownSyncToast.current = true;
       }
     } catch (error) {
-      console.error("Delta Sync Failed:", error);
+      if (!silent) console.error("Delta Sync Failed:", error);
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
   }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast, isRealOnline]);
 
@@ -1843,24 +1843,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted, businessId, firestore, isRealOnline]);
   
-  // Periodic Delta Sync (Background Refresh)
+  // Initial Delta Sync (Silent Catch-up on mount)
   useEffect(() => {
     if (!businessId || !isRealOnline || !firestore) return;
 
-    // Run delta sync every 60 seconds to keep stock and prices fresh
-    const interval = setInterval(() => {
-      refreshData();
-    }, 60000);
-
-    // Also run once on mount (with a small delay to not compete with initial load)
     const timeout = setTimeout(() => {
-      refreshData();
+      refreshData(true); // Run silently to avoid flickering or showing messages
     }, 2000);
 
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
+    return () => clearTimeout(timeout);
   }, [businessId, isRealOnline, firestore, refreshData]);
 
 
@@ -2145,7 +2136,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
                  return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && isRealOnline) || 
                         (isLoadingCustomers && (!customers || customers.length === 0) && isRealOnline) || 
                         (isLoadingReceipts && (!receipts || receipts.length === 0) && isRealOnline) ||
-                        (isSyncing && (!products || products.length === 0) && isRealOnline) ||
                         (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline) ||
                         (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline);
                })()) ||
