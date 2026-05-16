@@ -158,7 +158,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
   const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
   const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => secureStorage.getItem<BusinessStats>('pos_offline_stats'));
-  const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => Date.now());
+  const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => {
+    const stored = secureStorage.getItem<number>('pos_last_synced_timestamp');
+    // If no previous sync, default to 24 hours ago to catch recent changes on first load
+    return stored || (Date.now() - 24 * 60 * 60 * 1000);
+  });
 
   // 🌐 INTELLIGENT CONNECTIVITY ENGINE
   // navigator.onLine can give false positives (e.g. connected to a WiFi hotspot with no cellular data)
@@ -653,7 +657,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           return merged;
         });
       }
-      setLastSyncedTimestamp(Date.now());
+      const now = Date.now();
+      setLastSyncedTimestamp(now);
+      secureStorage.setItem('pos_last_synced_timestamp', now);
+
       if ((newProducts.length > 0 || newCustomers.length > 0 || newReceipts.length > 0) && !hasShownSyncToast.current) {
         toast({ title: "Operational Sync Complete", description: `Successfully synchronized inventory, customer, and recent sales data.` });
         hasShownSyncToast.current = true;
@@ -1835,6 +1842,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted, businessId, firestore, isRealOnline]);
+  
+  // Periodic Delta Sync (Background Refresh)
+  useEffect(() => {
+    if (!businessId || !isRealOnline || !firestore) return;
+
+    // Run delta sync every 60 seconds to keep stock and prices fresh
+    const interval = setInterval(() => {
+      refreshData();
+    }, 60000);
+
+    // Also run once on mount (with a small delay to not compete with initial load)
+    const timeout = setTimeout(() => {
+      refreshData();
+    }, 2000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [businessId, isRealOnline, firestore, refreshData]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);
