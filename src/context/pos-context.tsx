@@ -954,27 +954,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
 
-  useEffect(() => {
-    const isOnline = isRealOnline;
-    if (user && businessId && firestore && isOnline) {
-      fetchInitialUsers();
-      fetchInitialAuditLogs();
-      fetchInitialProducts();
-      fetchInitialCustomers();
-    }
-  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
-
-  // Background Full Sync Trigger: Starts after a delay to ensure initial load is smooth
-  useEffect(() => {
-    if (user && businessId && firestore && isRealOnline) {
-      const timer = setTimeout(() => {
-        fetchFullProducts();
-        fetchFullCustomers();
-        fetchFullReceipts();
-      }, 5000); // 5 second delay
-      return () => clearTimeout(timer);
-    }
-  }, [businessId, firestore, fetchFullProducts, fetchFullCustomers, fetchFullReceipts, user, isRealOnline]);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -1045,6 +1024,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingReceipts(false);
     }
   }, [businessId, firestore, isFullSyncingReceipts, toast, user, isRealOnline]);
+
+  useEffect(() => {
+    const isOnline = isRealOnline;
+    if (user && businessId && firestore && isOnline) {
+      fetchInitialUsers();
+      fetchInitialAuditLogs();
+      fetchInitialProducts();
+      fetchInitialCustomers();
+    }
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
+
+  // Background Full Sync Trigger: Starts after a delay to ensure initial load is smooth
+  useEffect(() => {
+    if (user && businessId && firestore && isRealOnline) {
+      const timer = setTimeout(() => {
+        fetchFullProducts();
+        fetchFullCustomers();
+        fetchFullReceipts();
+      }, 5000); // 5 second delay
+      return () => clearTimeout(timer);
+    }
+  }, [businessId, firestore, fetchFullProducts, fetchFullCustomers, fetchFullReceipts, user, isRealOnline]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();
