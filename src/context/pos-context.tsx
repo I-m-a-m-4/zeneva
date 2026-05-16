@@ -788,15 +788,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, user, isRealOnline]);
 
-  useEffect(() => {
-    const isOnline = isRealOnline;
-    if (user && businessId && firestore && isOnline) {
-      fetchInitialUsers();
-      fetchInitialAuditLogs();
-      fetchInitialProducts();
-      fetchInitialCustomers();
-    }
-  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
 
   const fetchInitialCustomers = useCallback(async () => {
     if (!user || !businessId || !firestore || !isRealOnline) return;
@@ -962,6 +953,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingProducts(false);
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
+
+  useEffect(() => {
+    const isOnline = isRealOnline;
+    if (user && businessId && firestore && isOnline) {
+      fetchInitialUsers();
+      fetchInitialAuditLogs();
+      fetchInitialProducts();
+      fetchInitialCustomers();
+    }
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
