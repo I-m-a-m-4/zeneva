@@ -257,14 +257,22 @@ export default function DashboardPage() {
       }
     });
 
-    const sortedCustomers = [...allCustomers].sort((a, b) => {
-      if (isLoyaltyEnabled) {
-        return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
-      }
-      return (customerSpendInRange[b.id] || 0) - (customerSpendInRange[a.id] || 0);
-    });
+    // OPTIMIZATION: Only sort customers who have activity or points to avoid sorting massive arrays
+    const activeCustomerIds = new Set([
+        ...Object.keys(customerSpendInRange),
+        ...allCustomers.filter(c => (c.loyaltyPoints || 0) > 0).map(c => c.id)
+    ]);
 
-    const topLoyaltyCustomers = sortedCustomers.slice(0, 3).map(c => ({
+    const sortedCustomers = allCustomers
+      .filter(c => activeCustomerIds.has(c.id))
+      .sort((a, b) => {
+        if (isLoyaltyEnabled) {
+          return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
+        }
+        return (customerSpendInRange[b.id] || 0) - (customerSpendInRange[a.id] || 0);
+      });
+
+    const topLoyaltyCustomers = sortedCustomers.slice(0, 5).map(c => ({
         ...c,
         spendInRange: customerSpendInRange[c.id] || 0
     }));
