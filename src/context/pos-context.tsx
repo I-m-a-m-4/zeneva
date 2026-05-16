@@ -788,32 +788,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, user, isRealOnline]);
 
-
-  const fetchInitialCustomers = useCallback(async () => {
-    if (!user || !businessId || !firestore || !isRealOnline) return;
-    try {
-      const q = query(
-        collection(firestore, "customers"),
-        where("businessId", "==", businessId),
-        orderBy("totalSpent", "desc"),
-        limit(200)
-      );
-      const snap = await getDocs(q);
-      const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
-      
-      setSyncedCustomers(prev => {
-        const merged = [...prev];
-        fetched.forEach(nc => {
-          const idx = merged.findIndex(c => c.id === nc.id);
-          if (idx !== -1) merged[idx] = nc;
-          else merged.push(nc);
-        });
-        return merged.sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
-      });
-    } catch (error) {
-      console.error("Initial Customer Fetch Failed:", error);
+  useEffect(() => {
+    const isOnline = isRealOnline;
+    if (user && businessId && firestore && isOnline) {
+      fetchInitialUsers();
+      fetchInitialAuditLogs();
     }
-  }, [businessId, firestore, user, isRealOnline]);
+  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, refreshKey, user, isRealOnline]);
 
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -823,7 +804,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Customer[] = [];
     let lastDoc: any = null;
     let hasMore = true;
-    const BATCH_SIZE = 1000; // Reduced from 5000 for better stability on low-end devices
+    const BATCH_SIZE = 5000;
 
     try {
       while (hasMore) {
@@ -859,6 +840,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       
       setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
       
+      // Only show the toast if it's been more than 24 hours since the last success
+      // to avoid annoying the user on every app start.
       const lastToast = Number(localStorage.getItem('last_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Full Sync Successful", description: `Synchronized ${allFetched.length} customers for offline access.` });
@@ -871,32 +854,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
 
-  const fetchInitialProducts = useCallback(async () => {
-    if (!user || !businessId || !firestore || !isRealOnline) return;
-    try {
-      const q = query(
-        collection(firestore, "products"),
-        where("businessId", "==", businessId),
-        orderBy("name", "asc"),
-        limit(200)
-      );
-      const snap = await getDocs(q);
-      const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
-      
-      setSyncedProducts(prev => {
-        const merged = [...prev];
-        fetched.forEach(np => {
-          const idx = merged.findIndex(p => p.id === np.id);
-          if (idx !== -1) merged[idx] = np;
-          else merged.push(np);
-        });
-        return merged.sort((a, b) => a.name.localeCompare(b.name));
-      });
-    } catch (error) {
-      console.error("Initial Product Fetch Failed:", error);
-    }
-  }, [businessId, firestore, user, isRealOnline]);
-
   const fetchFullProducts = useCallback(async () => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
@@ -905,7 +862,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Product[] = [];
     let lastDoc: any = null;
     let hasMore = true;
-    const BATCH_SIZE = 500; // Reduced from 2000 for better stability
+    const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
 
     try {
       while (hasMore) {
@@ -953,7 +910,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingProducts(false);
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
-
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -1024,28 +980,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingReceipts(false);
     }
   }, [businessId, firestore, isFullSyncingReceipts, toast, user, isRealOnline]);
-
-  useEffect(() => {
-    const isOnline = isRealOnline;
-    if (user && businessId && firestore && isOnline) {
-      fetchInitialUsers();
-      fetchInitialAuditLogs();
-      fetchInitialProducts();
-      fetchInitialCustomers();
-    }
-  }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
-
-  // Background Full Sync Trigger: Starts after a delay to ensure initial load is smooth
-  useEffect(() => {
-    if (user && businessId && firestore && isRealOnline) {
-      const timer = setTimeout(() => {
-        fetchFullProducts();
-        fetchFullCustomers();
-        fetchFullReceipts();
-      }, 5000); // 5 second delay
-      return () => clearTimeout(timer);
-    }
-  }, [businessId, firestore, fetchFullProducts, fetchFullCustomers, fetchFullReceipts, user, isRealOnline]);
 
   const triggerRefresh = useCallback(() => {
     refreshData();

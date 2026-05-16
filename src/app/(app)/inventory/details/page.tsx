@@ -16,10 +16,8 @@ import {
     Trash2,
     Layers,
     QrCode,
-    AlertCircle,
-    PackagePlus
+    AlertCircle
 } from "lucide-react";
-import { Label } from "@/components/ui/label";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -399,10 +397,9 @@ function EditProductContent() {
     };
 
     const isLoading = !isMounted || isProductLoading || !firestore;
-    const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
-    const canManageProduct = isSuperAdmin || (currentUserProfile?.permissions?.manage_inventory ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager'));
+    const canManageProduct = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
 
-    if (isLoading || !currentUserProfile) {
+    if (isLoading) {
         return <EditProductSkeleton />;
     }
 
@@ -859,100 +856,6 @@ function EditProductContent() {
 
                     </div>
                 </div>
-
-                {categoryType === 'product' && canManageProduct && (
-                    <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
-                        <CardHeader className="bg-primary/5 pb-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <PackagePlus className="h-4 w-4 text-primary" />
-                                        Adjust Stock
-                                    </CardTitle>
-                                    <CardDescription className="text-xs">
-                                        Quickly increase or decrease the current stock levels.
-                                    </CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="flex flex-col md:flex-row items-end gap-4">
-                                <div className="grid gap-2 flex-1">
-                                    <Label htmlFor="adjustment-type">Adjustment Type</Label>
-                                    <Select 
-                                        defaultValue="add" 
-                                        onValueChange={(v) => {
-                                            const input = document.getElementById('adjustment-amount') as HTMLInputElement;
-                                            if (input) input.dataset.type = v;
-                                        }}
-                                    >
-                                        <SelectTrigger id="adjustment-type">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="add">Add to Stock (+)</SelectItem>
-                                            <SelectItem value="subtract">Remove from Stock (-)</SelectItem>
-                                            <SelectItem value="set">Set Absolute Value (=)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2 flex-1">
-                                    <Label htmlFor="adjustment-amount">Amount / New Value</Label>
-                                    <Input 
-                                        id="adjustment-amount" 
-                                        type="number" 
-                                        placeholder="0" 
-                                        min="0"
-                                    />
-                                </div>
-                                <div className="grid gap-2 flex-[2]">
-                                    <Label htmlFor="adjustment-reason">Reason (Optional)</Label>
-                                    <Input 
-                                        id="adjustment-reason" 
-                                        placeholder="e.g. Restock, Damage, Correction" 
-                                    />
-                                </div>
-                                <Button 
-                                    type="button" 
-                                    className="w-full md:w-auto"
-                                    onClick={() => {
-                                        const amountInput = document.getElementById('adjustment-amount') as HTMLInputElement;
-                                        const reasonInput = document.getElementById('adjustment-reason') as HTMLInputElement;
-                                        const type = amountInput.dataset.type || 'add';
-                                        const amount = parseFloat(amountInput.value);
-                                        const reason = reasonInput.value || 'Manual Adjustment';
-
-                                        if (isNaN(amount)) {
-                                            toast({ title: "Invalid Amount", description: "Please enter a valid number.", variant: "destructive" });
-                                            return;
-                                        }
-
-                                        const currentStock = form.getValues('stock') || 0;
-                                        let newStock = currentStock;
-
-                                        if (type === 'add') newStock = currentStock + amount;
-                                        else if (type === 'subtract') newStock = currentStock - amount;
-                                        else if (type === 'set') newStock = amount;
-
-                                        form.setValue('stock', newStock);
-                                        
-                                        // Auto-save logic could go here, or just let user click the main save button
-                                        // Let's just update the form and show a notification
-                                        toast({
-                                            title: "Stock Adjusted",
-                                            description: `Local stock updated to ${newStock}. Don't forget to save changes!`,
-                                        });
-
-                                        amountInput.value = '';
-                                        reasonInput.value = '';
-                                    }}
-                                >
-                                    Apply
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
 
                 {categoryType === 'product' && (
                     <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
