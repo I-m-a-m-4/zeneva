@@ -64,7 +64,7 @@ import { cn } from "@/lib/utils";
 
 
 export default function DownloadPage() {
-  const [version, setVersion] = useState(AppConfig.version || "2.0.9");
+  const [version, setVersion] = useState(AppConfig.version || "2.4.8");
 
   useEffect(() => {
     fetch('https://api.github.com/repos/I-m-a-m-4/zeneva-releases/releases/latest')
