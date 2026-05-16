@@ -823,7 +823,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Customer[] = [];
     let lastDoc: any = null;
     let hasMore = true;
-    const BATCH_SIZE = 5000;
+    const BATCH_SIZE = 1000; // Reduced from 5000 for better stability on low-end devices
 
     try {
       while (hasMore) {
@@ -905,7 +905,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Product[] = [];
     let lastDoc: any = null;
     let hasMore = true;
-    const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
+    const BATCH_SIZE = 500; // Reduced from 2000 for better stability
 
     try {
       while (hasMore) {
@@ -963,6 +963,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       fetchInitialCustomers();
     }
   }, [businessId, firestore, fetchInitialUsers, fetchInitialAuditLogs, fetchInitialProducts, fetchInitialCustomers, refreshKey, user, isRealOnline]);
+
+  // Background Full Sync Trigger: Starts after a delay to ensure initial load is smooth
+  useEffect(() => {
+    if (user && businessId && firestore && isRealOnline) {
+      const timer = setTimeout(() => {
+        fetchFullProducts();
+        fetchFullCustomers();
+        fetchFullReceipts();
+      }, 5000); // 5 second delay
+      return () => clearTimeout(timer);
+    }
+  }, [businessId, firestore, fetchFullProducts, fetchFullCustomers, fetchFullReceipts, user, isRealOnline]);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
