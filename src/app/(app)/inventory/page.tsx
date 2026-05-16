@@ -439,12 +439,6 @@ function InventoryPageContent() {
               <Search className="h-4 w-4" />
             </Button>
           </div>
-          {isSyncing && (
-            <div className="flex items-center gap-1.5 mt-2 ml-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Global Catalog Syncing...</span>
-            </div>
-          )}
         </div>
         <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && canManageStock && (
@@ -672,7 +666,15 @@ function InventoryPageContent() {
       </div>
       <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
-          <CardTitle>Products</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Products
+            {isSyncing && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-normal uppercase tracking-widest animate-in fade-in duration-300">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span>Global Catalog Syncing...</span>
+              </div>
+            )}
+          </CardTitle>
           <CardDescription>
             Manage your products and view their sales performance.
           </CardDescription>
