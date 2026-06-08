@@ -67,7 +67,7 @@ export default function DownloadPage() {
   const [version, setVersion] = useState(AppConfig.version || "2.5.0");
 
   useEffect(() => {
-    fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest')
+    fetch('https://api.github.com/repos/I-m-a-m-4/zeneva-releases/releases/latest')
       .then(res => res.json())
       .then(data => {
         if (data.tag_name) {

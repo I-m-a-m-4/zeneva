@@ -12,7 +12,7 @@ export async function GET(
   let assets: Array<{ name: string; browser_download_url: string }> = [];
 
   try {
-    const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva/releases/latest?t=' + Date.now(), {
+    const res = await fetch('https://api.github.com/repos/I-m-a-m-4/zeneva-releases/releases/latest?t=' + Date.now(), {
       headers: { 'User-Agent': 'zeneva' },
       cache: 'no-store'
     });
@@ -109,17 +109,17 @@ export async function GET(
     switch (platform) {
       case 'windows':
         // Point to the executable installer seen in the user screenshot
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64-setup.exe`;
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64-setup.exe`;
         break;
       case 'macos-silicon':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_aarch64.dmg`;
         break;
       case 'macos-intel':
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva_${version}_x64.dmg`;
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva_${version}_x64.dmg`;
         break;
       case 'android':
         // Match the signed APK pattern perfectly
-        downloadUrl = `https://github.com/I-m-a-m-4/zeneva/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
+        downloadUrl = `https://github.com/I-m-a-m-4/zeneva-releases/releases/download/v${version}/zeneva-v${version}-SIGNED.apk`;
         break;
       default:
         return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
