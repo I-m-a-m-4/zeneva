@@ -19,7 +19,7 @@ export function DashboardCarousel() {
     return (
         <section className="relative w-full max-w-7xl mx-auto px-6 pb-24 mt-12 z-20">
             <div className="flex flex-col items-center">
-                <div className="relative w-full rounded-xl overflow-hidden shadow-md">
+                <div className="relative w-full rounded-xl overflow-hidden">
                     <div className="relative aspect-[16/10] w-full bg-slate-50">
                         {slides.map((slide, index) => {
                             const isActive = index === activeSlide;
