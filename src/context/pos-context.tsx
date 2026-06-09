@@ -145,6 +145,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
   const [isFullSyncingReceipts, setIsFullSyncingReceipts] = useState(false);
+  const [hasFullSyncedProducts, setHasFullSyncedProducts] = useState(false);
+  const [hasFullSyncedReceipts, setHasFullSyncedReceipts] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
@@ -423,7 +425,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const products = useMemo(() => {
-    if (initialProducts === null && syncedProducts.length === 0 && isRealOnline && !!businessId) return null;
+    if (initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline && !!businessId) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
@@ -472,7 +474,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const receipts = useMemo(() => {
     const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
-    if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && isRealOnline && !!businessId) return null;
+    if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && !hasFullSyncedReceipts && isRealOnline && !!businessId) return null;
     
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
@@ -665,7 +667,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         toast({ title: "Operational Sync Complete", description: `Successfully synchronized inventory, customer, and recent sales data.` });
         hasShownSyncToast.current = true;
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       if (!silent) console.error("Delta Sync Failed:", error);
     } finally {
       if (!silent) setIsSyncing(false);
@@ -736,7 +739,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
           await deleteReceiptFromOffline(idToPurge);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       console.error("Failed to fetch initial receipts:", error);
     }
   }, [businessId, firestore, user, isRealOnline]);
@@ -854,7 +858,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         toast({ title: "Full Sync Successful", description: `Synchronized ${allFetched.length} customers for offline access.` });
         localStorage.setItem('last_sync_toast_time', Date.now().toString());
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       console.error("Full Customer Sync Failed:", error);
     } finally {
       setIsFullSyncingCustomers(false);
@@ -905,13 +910,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
       
       setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
+      setHasFullSyncedProducts(true);
       
       const lastToast = Number(localStorage.getItem('last_product_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Product Catalog Synced", description: `Synchronized ${allFetched.length} products for offline access.` });
         localStorage.setItem('last_product_sync_toast_time', Date.now().toString());
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       console.error("Full Product Sync Failed:", error);
     } finally {
       setIsFullSyncingProducts(false);
@@ -975,13 +982,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
       
       setLastSyncMetadata(businessId, 'full_receipts_sync', Date.now());
+      setHasFullSyncedReceipts(true);
       
       const lastToast = Number(localStorage.getItem('last_receipt_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Sales History Synced", description: `Synchronized ${allFetched.length} receipts and invoices for full offline access.` });
         localStorage.setItem('last_receipt_sync_toast_time', Date.now().toString());
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       console.error("Full Receipt Sync Failed:", error);
     } finally {
       setIsFullSyncingReceipts(false);
@@ -1822,6 +1831,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
         getLastSyncMetadata(businessId, 'full_products_sync'),
         getLastSyncMetadata(businessId, 'full_receipts_sync')
       ]);
+
+      if (lastProdSync > 0) setHasFullSyncedProducts(true);
+      if (lastReceiptSync > 0) setHasFullSyncedReceipts(true);
       
       const now = Date.now();
       const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
@@ -1832,9 +1844,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
       if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
         fetchFullProducts();
+      } else if (lastProdSync <= 0) {
+        fetchFullProducts();
       }
 
       if (now - lastReceiptSync > dayInterval && !isFullSyncingReceipts) {
+        fetchFullReceipts();
+      } else if (lastReceiptSync <= 0) {
         fetchFullReceipts();
       }
     };
@@ -2133,7 +2149,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                  if (isTauri) {
                    return syncedProducts.length === 0;
                  }
-                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && isRealOnline) || 
+                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
                         (isLoadingCustomers && (!customers || customers.length === 0) && isRealOnline) || 
                         (isLoadingReceipts && (!receipts || receipts.length === 0) && isRealOnline) ||
                         (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline) ||
