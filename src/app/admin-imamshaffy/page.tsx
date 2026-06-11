@@ -1693,6 +1693,45 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Database className="h-5 w-5 text-blue-500" />
+                                Operational Cost & Usage Tracking
+                            </CardTitle>
+                            <CardDescription>Track Zeneva's live Firebase infrastructure costs and reads.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                            <a href="https://console.cloud.google.com/billing/01459A-506211-CE0671?project=studio-3699136485-6747d" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors cursor-pointer group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-200 transition-colors">
+                                        <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold">GCP Billing Console</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">Track total amount paid & cost savings</p>
+                                    </div>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            </a>
+                            
+                            <a href="https://console.cloud.google.com/firestore/databases/-default-/usage?authuser=0&hl=en-US&project=studio-3699136485-6747d" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors cursor-pointer group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full group-hover:bg-purple-200 transition-colors">
+                                        <Activity className="h-4 w-4 text-purple-600 dark:text-purple-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold">Firestore Usage Metrics</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">Track daily reads, writes, and database load</p>
+                                    </div>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            </a>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
                         <PlatformRevenueChart receipts={receipts || []} />
                         <UserGrowthChart users={users || []} />
