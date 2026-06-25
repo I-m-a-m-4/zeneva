@@ -126,31 +126,78 @@ export default function FollowUpCenter({
       const auth = getAuth();
       const token = await auth.currentUser?.getIdToken();
 
-      // Dispatch Strike: Use absolute URL for the cloud-hosted API
-      const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          to: selectedRecipient.email,
-          name: selectedRecipient.name,
-          subject,
-          html: emailBody,
-          businessId: selectedRecipient.businessId,
-          type: 'retention'
-        })
-      });
+      if (selectedRecipient.isBulk) {
+        const targets = selectedRecipient.recipients;
+        let successCount = 0;
+        let failCount = 0;
 
-      const result = await response.json();
-
-      if (result.success) {
-        toast({ variant: 'success', title: 'Success', description: 'Follow-up email dispatched.' });
+        for (const target of targets) {
+          try {
+            let customizedBody = emailBody;
+            if (emailBody.includes(selectedRecipient.name)) {
+              customizedBody = emailBody.replace(new RegExp(selectedRecipient.name, 'g'), target.name);
+            } else {
+              customizedBody = emailBody.replace(/Hi\s+[^,]+/i, `Hi ${target.name}`);
+            }
+            const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                to: target.email,
+                name: target.name,
+                subject,
+                html: customizedBody,
+                businessId: target.businessId,
+                type: 'retention'
+              })
+            });
+            const result = await response.json();
+            if (result.success) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch (e) {
+            failCount++;
+          }
+        }
+        
+        toast({ 
+          variant: failCount === 0 ? 'success' : 'destructive', 
+          title: 'Bulk Email Complete', 
+          description: `Dispatched to ${successCount} recipients. Failed: ${failCount}.` 
+        });
         setIsModalOpen(false);
         fetchLogs();
       } else {
-        throw new Error(result.message);
+        const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            to: selectedRecipient.email,
+            name: selectedRecipient.name,
+            subject,
+            html: emailBody,
+            businessId: selectedRecipient.businessId,
+            type: 'retention'
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          toast({ variant: 'success', title: 'Success', description: 'Follow-up email dispatched.' });
+          setIsModalOpen(false);
+          fetchLogs();
+        } else {
+          throw new Error(result.message);
+        }
       }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -236,12 +283,36 @@ export default function FollowUpCenter({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Col: At Risk Businesses */}
         <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              At-Risk Businesses
-            </CardTitle>
-            <CardDescription>No activity in the last 14 days.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                At-Risk Businesses
+              </CardTitle>
+              <CardDescription>No activity in the last 14 days.</CardDescription>
+            </div>
+            {atRiskBusinesses.length > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-[10px] font-bold h-8 border-destructive/20 text-destructive hover:bg-destructive/10 shrink-0"
+                onClick={() => {
+                  const allRecipients = atRiskBusinesses
+                    .map(bus => users.find(u => u.businessId === bus.id))
+                    .filter(u => !!u);
+                  
+                  setSelectedRecipient({
+                    name: 'All At-Risk Owners',
+                    email: `${allRecipients.length} recipients`,
+                    isBulk: true,
+                    recipients: allRecipients
+                  });
+                  setIsModalOpen(true);
+                }}
+              >
+                <Mail className="h-3 w-3 mr-1" /> Bulk Email All
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[400px]">
