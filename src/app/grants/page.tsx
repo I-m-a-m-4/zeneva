@@ -221,14 +221,14 @@ export default function GrantsPage() {
                 Leaving Zeneva
               </DialogTitle>
               <DialogDescription className="text-white/70 text-xs font-medium font-dm-sans mt-1">
-                You are about to visit the official application portal for **{selectedGrant?.title}**.
+                You are about to visit the official application portal for <strong className="font-bold text-white">{selectedGrant?.title}</strong>.
               </DialogDescription>
             </DialogHeader>
           </div>
           
           <div className="p-6 space-y-4 bg-white font-dm-sans">
             <p className="text-sm text-slate-600 leading-relaxed">
-              Zeneva has verified this link as the official page of **{selectedGrant?.funder}**.
+              Zeneva has verified this link as the official page of <strong className="font-bold text-slate-900">{selectedGrant?.funder}</strong>.
             </p>
             
             <div className="p-4 rounded-lg bg-red-50 border border-red-100 text-xs text-red-800 space-y-1">
