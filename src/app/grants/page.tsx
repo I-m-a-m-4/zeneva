@@ -132,17 +132,6 @@ export default function GrantsPage() {
               Zeneva aggregates and reviews legitimate business grant opportunities for Nigerian entrepreneurs. Zero scam links, zero fees.
             </p>
 
-            {/* Anti-Scam Advisory */}
-            <div className="max-w-xl mx-auto p-4 rounded-xl border border-red-200 bg-red-50/50 flex items-start gap-3 text-left">
-              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-red-950 font-dm-sans">Scam Warning Advisory</h4>
-                <p className="text-xs text-red-700 font-medium font-dm-sans mt-0.5 leading-relaxed">
-                  Zeneva and official government grant agencies will **never** ask you for a processing fee, account upgrade fee, or activation money to apply for a grant. If you receive an email asking for money to secure a grant, it is a scam.
-                </p>
-              </div>
-            </div>
-
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
               <Button asChild size="lg" className="bg-[#1e293b] hover:bg-[#0f172a] text-white rounded-md px-8 py-4 h-auto text-base font-medium tracking-tight shadow-sm">
                 <Link href="#opportunities" className="font-dm-sans">View Opportunities</Link>
