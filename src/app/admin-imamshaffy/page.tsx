@@ -606,6 +606,35 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadReport = async () => {
+        const element = cardRef.current;
+        if (!element) return;
+        setIsDownloading(true);
+        toast({ title: "Generating Report...", description: "Please wait while we capture the admin metrics." });
+        try {
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                backgroundColor: '#09090b',
+                logging: false,
+                useCORS: true,
+                ignoreElements: (el) => el.classList.contains('no-capture')
+            });
+            const data = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = data;
+            link.download = `zeneva-admin-report-${new Date().toISOString().split('T')[0]}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({ variant: 'success', title: 'Report Downloaded', description: 'Your admin report has been saved.' });
+        } catch (err) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the admin report.' });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
@@ -1278,16 +1307,23 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     };
 
     return (
-        <div className="p-4 md:p-6 lg:p-8 space-y-6 high-fidelity-shell">
-            <div className="mb-2">
-                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                <p className="text-muted-foreground">
-                    Platform-wide overview, analytics, and admin tools.
-                </p>
+        <div ref={cardRef} className="p-4 md:p-6 lg:p-8 space-y-6 high-fidelity-shell">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+                <div>
+                    <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+                    <p className="text-muted-foreground">
+                        Platform-wide overview, analytics, and admin tools.
+                    </p>
+                </div>
+                <div className="no-capture flex items-center gap-2">
+                    <Button onClick={handleDownloadReport} disabled={isDownloading} variant="outline">
+                        <Download className="mr-2 h-4 w-4" /> {isDownloading ? "Downloading..." : "Download Report"}
+                    </Button>
+                </div>
             </div>
 
             <Tabs defaultValue="overview" className="space-y-4">
-                <TabsList>
+                <TabsList className="no-capture">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
