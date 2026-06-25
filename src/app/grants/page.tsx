@@ -245,7 +245,11 @@ export default function GrantsPage() {
                   href={selectedGrant?.applicationUrl} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  onClick={() => setSelectedGrant(null)}
+                  onClick={() => {
+                    setTimeout(() => {
+                      setSelectedGrant(null);
+                    }, 150);
+                  }}
                 >
                   Proceed to Apply
                   <ArrowRight className="ml-2 h-4 w-4" />
