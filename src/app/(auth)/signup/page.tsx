@@ -22,7 +22,21 @@ import { doc, getDoc } from 'firebase/firestore';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  email: z.string().email({ message: 'Invalid email address.' }),
+  email: z.string()
+    .email({ message: 'Invalid email address.' })
+    .refine((email) => {
+      const localPart = email.split('@')[0];
+      return !localPart.includes('+');
+    }, { message: 'Email aliases (plus addressing like name+alias@gmail.com) are not allowed.' })
+    .refine((email) => {
+      const domain = email.split('@')[1]?.toLowerCase();
+      const disposableDomains = [
+        'wshu.net', 'tempmail.com', 'mailinator.com', 'yopmail.com', 
+        'guerrillamail.com', 'dispostable.com', '10minutemail.com', 
+        'burnermail.io', 'trashmail.com', 'getairmail.com'
+      ];
+      return !disposableDomains.includes(domain);
+    }, { message: 'Temporary/disposable email addresses are not allowed.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   phone: z.string().optional(),
 });
