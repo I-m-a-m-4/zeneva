@@ -83,11 +83,13 @@ Our AI doesn't just manage stock; it now acts as a **Digital Sentinel**. Our new
 
 ---
 
-## Strategic Conclusion
+## Strategic Conclusion: Global Expansion & Capital Growth
 
 As we continue to build Zeneva into the operating system for modern retail, security and global reach remain our twin pillars. By removing the friction of international payments and hardening our digital vault, we are ensuring that Zeneva isn't just a POS—it's a fortress for your business growth.
 
-**Start selling globally today.** Update your payment settings now and join the new era of borderless retail.
+To fuel this borderless expansion, access to capital is essential. That's why Zeneva now provides a curated [Business Grants Directory](/grants) directly on our platform. Entrepreneurs can browse legitimate government and foundation funding opportunities (like the Tony Elumelu Foundation or BOI MSME schemes) to secure equity-free grants to scale their operations.
+
+**Start selling globally today.** Check out our [Getting Started Guide](/blog/getting-started-with-zeneva), configure your payments, or look at our affordable [Pricing Plans](/pricing) to select the perfect package for your shop.
 `
   },
   {
@@ -159,6 +161,12 @@ Your online store and physical store share the **exact same stock**. If you sell
 
 Once you're live, keep an eye on your **Business Health Score** in the Analytics tab. It's an AI-calculated metric from 0 to 100. If your score is below 70, click the "Zen Suggestions" button to see exactly which products are draining your capital and how to fix it.
 
+### Step 5: Securing Funding and Grants
+
+Beyond managing operations, scaling requires capital. Zeneva hosts a regularly updated [Business Grants Portal](/grants) where we list verified, active grants for Nigerian SMEs. Whether you need equity-free funding or low-interest matching grants, you can apply directly through our verified links.
+
+For more strategic details on optimization, read our breakdown of the [Zen AI Copilot](/blog/zen-ai-copilot-business-insights) or check our [Pricing Plans](/pricing) to pick the perfect plan.
+
 **Ready to start?** Log in to your dashboard and complete your first item upload now.
 `
   },
@@ -228,6 +236,12 @@ The AI is only as good as the data you give it. To get the most out of Zen AI:
 *   **Record Every Sale:** Don't skip the POS for "small" cash sales.
 *   **Input Cost Prices:** Without cost data, the AI cannot calculate your profit margins.
 *   **Use the Audit Log:** Regularly review the "AI Security Summaries."
+
+### AI-Driven Financial Strategy & Grants
+
+Optimizing your shop layout and stock velocity is only half the battle. If Zen AI flags that your business is running highly efficiently (with a Business Health Score over 80), you are in a prime position to apply for external funding. Check out Zeneva's verified [Business Grants Hub](/grants) to see matching government and institutional grants that you can apply for to scale your retail warehouse.
+
+To prepare your storefront for massive growth, view our [Online Store Setup Guide](/blog/guide-to-public-storefront) or view [Pricing Plans](/pricing).
 
 **The future of retail is data-driven.** With Zen AI, you aren't just a shop owner; you're a retail strategist with an intelligent assistant in your pocket.
 `
