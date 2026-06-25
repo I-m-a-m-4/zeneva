@@ -73,6 +73,7 @@ import {
     Settings,
     Database,
     RefreshCcw,
+    PlusCircle,
     Trash2,
     PartyPopper,
     Store,
@@ -586,7 +587,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 }
 
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grantApplications }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grantApplications: any[] | null }) {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grants }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grants: any[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -639,6 +640,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
     const [velocityFilter, setVelocityFilter] = useState<'7' | '14' | '30' | '90'>('14');
+    const [isCreateGrantOpen, setIsCreateGrantOpen] = useState(false);
+    const [isPublishingGrant, setIsPublishingGrant] = useState(false);
     const [totalSubscribers, setTotalSubscribers] = useState(0);
     
     // --- PERSISTENT CACHE FOR OUTREACH ---
@@ -727,14 +730,37 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         }
     };
 
-    const handleDeleteGrantApplication = async (appId: string) => {
-        if (!confirm('Are you sure you want to delete this grant application?')) return;
+    const handleDeleteGrant = async (grantId: string) => {
+        if (!confirm('Are you sure you want to remove this grant from the directory?')) return;
         try {
-            await deleteDoc(doc(firestore, 'grant_applications', appId));
-            toast({ title: "Action Successful", description: "The grant application has been removed." });
+            await deleteDoc(doc(firestore, 'grants', grantId));
+            toast({ title: "Action Successful", description: "The grant opportunity has been deleted." });
         } catch (error) {
-            console.error("Error deleting grant application:", error);
-            toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the application." });
+            console.error("Error deleting grant:", error);
+            toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the grant." });
+        }
+    };
+
+    const handleCreateGrant = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsPublishingGrant(true);
+        const formData = new FormData(e.currentTarget);
+        try {
+            await addDoc(collection(firestore, 'grants'), {
+                title: formData.get('title'),
+                funder: formData.get('funder'),
+                amount: formData.get('amount'),
+                eligibility: formData.get('eligibility'),
+                description: formData.get('description'),
+                applicationUrl: formData.get('applicationUrl'),
+                createdAt: serverTimestamp()
+            });
+            toast({ variant: 'success', title: 'Grant Published!', description: 'The new grant has been added to the directory.' });
+            setIsCreateGrantOpen(false);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Action Failed', description: error.message || 'Failed to publish grant.' });
+        } finally {
+            setIsPublishingGrant(false);
         }
     };
 
@@ -2124,69 +2150,64 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </TabsContent>
                 <TabsContent value="grants" className="space-y-6">
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Trophy className="h-5 w-5 text-primary" />
-                                Business Grant Applications ({grantApplications?.length || 0})
-                            </CardTitle>
-                            <CardDescription>
-                                Review and manage funding grant support applications submitted by business owners.
-                            </CardDescription>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Trophy className="h-5 w-5 text-primary" />
+                                    Verified Business Grants ({grants?.length || 0})
+                                </CardTitle>
+                                <CardDescription>
+                                    Publish and manage verified grant opportunities shown to business owners on the platform.
+                                </CardDescription>
+                            </div>
+                            <Button onClick={() => setIsCreateGrantOpen(true)} className="gap-2 h-10 px-4">
+                                <PlusCircle className="h-4 w-4" />
+                                Publish Grant
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <div className="rounded-md border">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Applicant</TableHead>
-                                            <TableHead>Business & Sector</TableHead>
-                                            <TableHead>Requested</TableHead>
-                                            <TableHead>Applied Date</TableHead>
-                                            <TableHead>Pitch</TableHead>
-                                            <TableHead>Plan Link</TableHead>
+                                            <TableHead>Grant Title</TableHead>
+                                            <TableHead>Funder</TableHead>
+                                            <TableHead>Funding Amount</TableHead>
+                                            <TableHead>Eligibility</TableHead>
+                                            <TableHead>Date Added</TableHead>
+                                            <TableHead>Application Link</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {grantApplications && grantApplications.length > 0 ? (
-                                            grantApplications.map((app) => (
-                                                <TableRow key={app.id}>
-                                                    <TableCell className="font-medium">
-                                                        <div>{app.name}</div>
-                                                        <div className="text-xs text-muted-foreground">{app.email}</div>
-                                                        <div className="text-xs text-muted-foreground">{app.phone}</div>
-                                                    </TableCell>
+                                        {grants && grants.length > 0 ? (
+                                            grants.map((grant) => (
+                                                <TableRow key={grant.id}>
+                                                    <TableCell className="font-semibold">{grant.title}</TableCell>
                                                     <TableCell>
-                                                        <div className="font-semibold">{app.businessName}</div>
-                                                        <Badge variant="outline" className="mt-1">{app.businessSector}</Badge>
+                                                        <Badge variant="outline">{grant.funder}</Badge>
                                                     </TableCell>
                                                     <TableCell className="font-semibold text-emerald-600">
-                                                        ₦{app.amountRequested}
+                                                        {grant.amount}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm max-w-xs truncate" title={grant.eligibility}>
+                                                        {grant.eligibility}
                                                     </TableCell>
                                                     <TableCell className="text-sm">
-                                                        {app.createdAt?.toDate ? format(app.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                                                        {grant.createdAt?.toDate ? format(grant.createdAt.toDate(), 'MMM d, yyyy') : 'Pre-populated'}
                                                     </TableCell>
-                                                    <TableCell className="max-w-xs truncate text-sm" title={app.pitch}>
-                                                        {app.pitch}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {app.businessPlanLink ? (
-                                                            <Button variant="link" size="sm" asChild className="h-auto p-0">
-                                                                <a href={app.businessPlanLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-                                                                    View Plan <Globe className="h-3 w-3" />
-                                                                </a>
-                                                            </Button>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">None</span>
-                                                        )}
+                                                    <TableCell className="text-sm max-w-xs truncate" title={grant.applicationUrl}>
+                                                        <a href={grant.applicationUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                                                            {grant.applicationUrl}
+                                                        </a>
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <Button 
                                                             variant="ghost" 
                                                             size="sm" 
-                                                            onClick={() => handleDeleteGrantApplication(app.id)}
+                                                            onClick={() => handleDeleteGrant(grant.id)}
                                                             className="hover:bg-destructive/10 hover:text-destructive group"
-                                                            title="Delete Application"
+                                                            title="Delete Grant"
                                                         >
                                                             <Trash2 className="h-4 w-4 text-muted-foreground group-hover:text-destructive transition-colors" />
                                                         </Button>
@@ -2196,7 +2217,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                         ) : (
                                             <TableRow>
                                                 <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                                                    No grant applications received yet.
+                                                    No custom grants published yet. Displaying fallback verified grants on public portal.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -2300,6 +2321,54 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </DialogContent>
             </Dialog>
 
+
+            <Dialog open={isCreateGrantOpen} onOpenChange={setIsCreateGrantOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Trophy className="h-5 w-5 text-primary" />
+                            Publish Verified Business Grant
+                        </DialogTitle>
+                        <DialogDescription>
+                            Enter details to add a new verified grant to the public business directory.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateGrant} className="space-y-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="title">Grant Title</Label>
+                            <Input id="title" name="title" required placeholder="e.g. Tony Elumelu Foundation Grant Scheme" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="funder">Funder Name</Label>
+                            <Input id="funder" name="funder" required placeholder="e.g. Tony Elumelu Foundation" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="amount">Funding Amount (₦)</Label>
+                            <Input id="amount" name="amount" required placeholder="e.g. ₦2,500,000" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="eligibility">Target Eligibility</Label>
+                            <Input id="eligibility" name="eligibility" required placeholder="e.g. African startups under 5 years old" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="applicationUrl">Application URL</Label>
+                            <Input id="applicationUrl" name="applicationUrl" type="url" required placeholder="https://www.tefconnect.net/" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="description">Short Description</Label>
+                            <Textarea id="description" name="description" required placeholder="Outline program details, deadlines, and key benefits..." className="min-h-[100px] resize-none" />
+                        </div>
+                        <div className="flex gap-3 justify-end pt-4">
+                            <Button type="button" variant="outline" onClick={() => setIsCreateGrantOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPublishingGrant}>
+                                {isPublishingGrant ? "Publishing..." : "Publish Opportunity"}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <BusinessDetailDialog
                 open={detailModalState.open}
@@ -2418,7 +2487,7 @@ export default function AdminDashboardPage() {
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
-    const grantApplicationsQuery = useMemoFirebase(() => query(collection(firestore, 'grant_applications'), orderBy('createdAt', 'desc')), [firestore]);
+    const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc')), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
     const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
@@ -2427,12 +2496,12 @@ export default function AdminDashboardPage() {
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
     const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
     const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
-    const { data: grantApplications, isLoading: grantApplicationsLoading } = useCollection<any>(grantApplicationsQuery);
+    const { data: grants, isLoading: grantsLoading } = useCollection<any>(grantsQuery);
     const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
     const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
     const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantApplicationsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
 
     if (isLoading) {
         return (
@@ -2443,5 +2512,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grantApplications={grantApplications} />
+    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} />
 }
