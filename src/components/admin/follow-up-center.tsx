@@ -161,6 +161,11 @@ export default function FollowUpCenter({
 
   const templates = [
     {
+      name: 'Download App',
+      subject: 'Download the official Zeneva Desktop & Mobile App',
+      body: (name: string) => `Hi ${name || 'there'},<br><br>To get the best experience out of Zeneva, we highly recommend downloading our official app for PC, Mac, and mobile devices.<br><br>The native Zeneva app runs much faster, operates fully offline, and connects seamlessly to barcode scanners and receipt printers.<br><br>You can download the app for all your devices here: <a href="https://zeneva.space/download" target="_blank" style="color: #ea580c; font-weight: bold; text-decoration: underline;">https://zeneva.space/download</a><br><br>If you need help setting up the application on your computer or phone, please reply to this email and we'll walk you through it.<br><br>Best,<br>Zeneva Team`
+    },
+    {
       name: 'Usage Follow-up',
       subject: 'Are you still using Zeneva?',
       body: (name: string) => `Hi ${name || 'there'},<br><br>I noticed you haven't logged into Zeneva in a while. I'm reaching out to see if you are still using our software for your business, or if you ran into any issues that stopped you from moving forward.<br><br>We're constantly improving Zeneva based on feedback. If it wasn't a good fit, or if there's a feature you felt was missing, I'd love to hear your thoughts so we can make it better.<br><br>If you need help getting back on track, just reply to this email and I'll personally assist you.<br><br>Best,<br>Zeneva Team`
