@@ -152,6 +152,12 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
     const [targetStats, setTargetStats] = useState<{ products: number; customers: number; sizeKB: number } | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
 
+    // Sales Wipe State
+    const [isWipeSalesModalOpen, setIsWipeSalesModalOpen] = useState(false);
+    const [wipeSalesId, setWipeSalesId] = useState('');
+    const [wipeSalesName, setWipeSalesName] = useState('');
+    const [hasConfirmedWipe, setHasConfirmedWipe] = useState(false);
+
     const fetchTargetStats = async (businessId: string) => {
         if (!firestore) return;
         setIsLoadingStats(true);
@@ -342,16 +348,20 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
     };
 
     const [isWipingSales, setIsWipingSales] = useState<string | null>(null);
-    const handleWipeSales = async (businessId: string, businessName: string) => {
-        if (!firestore) return;
-        if (!window.confirm(`Are you sure you want to PERMANENTLY wipe all sales/receipts for "${businessName}"? This action cannot be undone.`)) return;
+    const handleWipeSales = async () => {
+        if (!firestore || !wipeSalesId) return;
+        if (!hasConfirmedWipe) {
+            toast({ variant: 'destructive', title: "Confirmation Required", description: "Please acknowledge the destructive nature of this action." });
+            return;
+        }
         
-        setIsWipingSales(businessId);
-        toast({ title: "Wipe Started", description: `Purging sales documents for ${businessName}...` });
+        setIsWipingSales(wipeSalesId);
+        setIsWipeSalesModalOpen(false);
+        toast({ title: "Wipe Started", description: `Purging sales documents for ${wipeSalesName}...` });
         
         try {
             const receiptsRef = collection(firestore, 'receipts');
-            const q = query(receiptsRef, where("businessId", "==", businessId));
+            const q = query(receiptsRef, where("businessId", "==", wipeSalesId));
             const snap = await getDocs(q);
 
             if (!snap.empty) {
@@ -366,11 +376,11 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                 }
                 toast({ 
                     title: "Wipe Complete", 
-                    description: `Successfully deleted ${snap.docs.length} receipts for "${businessName}".`,
+                    description: `Successfully deleted ${snap.docs.length} receipts for "${wipeSalesName}".`,
                     className: "bg-black text-emerald-500 border-emerald-500/50 font-mono"
                 });
             } else {
-                toast({ title: "Wipe Complete", description: `No receipts found for "${businessName}".` });
+                toast({ title: "Wipe Complete", description: `No receipts found for "${wipeSalesName}".` });
             }
         } catch (error: any) {
             console.error("Sales wipe failed:", error);
@@ -381,6 +391,9 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
             });
         } finally {
             setIsWipingSales(null);
+            setHasConfirmedWipe(false);
+            setWipeSalesId('');
+            setWipeSalesName('');
         }
     };
 
@@ -801,7 +814,12 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                                                     variant="ghost" 
                                                     size="sm" 
                                                     className="h-8 text-[9px] font-bold text-amber-600 hover:text-white hover:bg-amber-600 border border-amber-600/20 hover:border-amber-600 transition-all rounded-md"
-                                                    onClick={() => handleWipeSales(business.id, business.name)}
+                                                    onClick={() => {
+                                                        setWipeSalesId(business.id);
+                                                        setWipeSalesName(business.name || "Unnamed Entity");
+                                                        setHasConfirmedWipe(false);
+                                                        setIsWipeSalesModalOpen(true);
+                                                    }}
                                                     disabled={isWipingSales === business.id}
                                                 >
                                                     {isWipingSales === business.id ? (
@@ -1020,6 +1038,68 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                                 Execute Termination
                             </Button>
                         )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sales Wipe Confirmation Dialog */}
+            <Dialog open={isWipeSalesModalOpen} onOpenChange={(open) => !isWipingSales && setIsWipeSalesModalOpen(open)}>
+                <DialogContent className="sm:max-w-[500px] border-amber-500/50 bg-background shadow-2xl shadow-amber-500/10">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-amber-600 text-xl font-bold tracking-tighter">
+                            <ShieldAlert className="h-6 w-6 animate-pulse" />
+                            Confirm Sales Wipe
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-bold text-muted-foreground mt-2 border-b pb-4">
+                            You are about to permanently delete all sales and receipt records for <span className="text-amber-600 font-bold">"{wipeSalesName}"</span>.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg flex gap-3 items-start">
+                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                            <div className="space-y-1">
+                                <p className="text-xs font-bold text-amber-700 tracking-tight">Warning: Irreversible Action</p>
+                                <p className="text-[11px] text-amber-600 leading-relaxed font-medium">
+                                    This will delete all receipts/sales documents from the database for this business. This will reset their Gross GMV to ₦0. Other business data (products, customers, settings) will not be modified.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center space-x-2 pt-2">
+                                <input 
+                                    type="checkbox" 
+                                    id="confirmWipe" 
+                                    checked={hasConfirmedWipe}
+                                    onChange={(e) => setHasConfirmedWipe(e.target.checked)}
+                                    className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                                />
+                                <label htmlFor="confirmWipe" className="text-[11px] font-bold text-muted-foreground leading-none">
+                                    I confirm that I want to permanently delete all sales history for "{wipeSalesName}".
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="border-t pt-4">
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setIsWipeSalesModalOpen(false)}
+                            className="font-bold text-[10px]"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            disabled={!hasConfirmedWipe} 
+                            onClick={handleWipeSales}
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] px-8 shadow-lg shadow-amber-500/20"
+                        >
+                            Wipe All Sales
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
