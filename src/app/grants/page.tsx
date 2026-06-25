@@ -41,7 +41,7 @@ const fallbackOpportunities = [
     amount: "₦2,500,000 ($5,000 Equity-free)",
     description: "Annual entrepreneurship programme providing mentoring, business training, and non-refundable seed capital to African startups.",
     eligibility: "African startups less than 5 years old",
-    applicationUrl: "https://www.tefconnect.net/"
+    applicationUrl: "https://tefconnect.com/"
   },
   {
     id: "boi-msme-2026",
