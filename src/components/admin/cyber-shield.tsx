@@ -341,6 +341,49 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
         }
     };
 
+    const [isWipingSales, setIsWipingSales] = useState<string | null>(null);
+    const handleWipeSales = async (businessId: string, businessName: string) => {
+        if (!firestore) return;
+        if (!window.confirm(`Are you sure you want to PERMANENTLY wipe all sales/receipts for "${businessName}"? This action cannot be undone.`)) return;
+        
+        setIsWipingSales(businessId);
+        toast({ title: "Wipe Started", description: `Purging sales documents for ${businessName}...` });
+        
+        try {
+            const receiptsRef = collection(firestore, 'receipts');
+            const q = query(receiptsRef, where("businessId", "==", businessId));
+            const snap = await getDocs(q);
+
+            if (!snap.empty) {
+                const chunks = [];
+                for (let i = 0; i < snap.docs.length; i += 450) {
+                    chunks.push(snap.docs.slice(i, i + 450));
+                }
+                for (const chunk of chunks) {
+                    const batch = writeBatch(firestore);
+                    chunk.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+                toast({ 
+                    title: "Wipe Complete", 
+                    description: `Successfully deleted ${snap.docs.length} receipts for "${businessName}".`,
+                    className: "bg-black text-emerald-500 border-emerald-500/50 font-mono"
+                });
+            } else {
+                toast({ title: "Wipe Complete", description: `No receipts found for "${businessName}".` });
+            }
+        } catch (error: any) {
+            console.error("Sales wipe failed:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: "Wipe Aborted", 
+                description: error.message || "Unknown error during sales wipe." 
+            });
+        } finally {
+            setIsWipingSales(null);
+        }
+    };
+
     const handleEntityTermination = async () => {
         if (!firestore || !authUser) return;
         
@@ -753,7 +796,21 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                                             <TableCell className="font-mono text-[9px] text-muted-foreground/40">
                                                 {business.id}
                                             </TableCell>
-                                            <TableCell className="text-right px-6">
+                                            <TableCell className="text-right px-6 flex items-center justify-end gap-2">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="h-8 text-[9px] font-bold text-amber-600 hover:text-white hover:bg-amber-600 border border-amber-600/20 hover:border-amber-600 transition-all rounded-md"
+                                                    onClick={() => handleWipeSales(business.id, business.name)}
+                                                    disabled={isWipingSales === business.id}
+                                                >
+                                                    {isWipingSales === business.id ? (
+                                                        <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                                                    ) : (
+                                                        <Database className="h-3 w-3 mr-2" />
+                                                    )}
+                                                    Wipe Sales
+                                                </Button>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
