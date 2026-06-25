@@ -102,7 +102,7 @@ import {
     getDoc,
     deleteDoc,
 } from 'firebase/firestore';
-import { format, formatDistanceToNow, subDays, differenceInDays } from 'date-fns';
+import { format, formatDistanceToNow, subDays, differenceInDays, startOfDay, endOfDay } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { logAuditEvent } from '@/lib/audit';
 import { 
@@ -638,6 +638,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
     const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
+    const [velocityFilter, setVelocityFilter] = useState<'7' | '14' | '30' | '90'>('14');
     const [totalSubscribers, setTotalSubscribers] = useState(0);
     
     // --- PERSISTENT CACHE FOR OUTREACH ---
@@ -1043,17 +1044,28 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const averageSalesPerDay = platformGmv / daysActive;
         const averageReceiptsPerDay = totalReceipts / daysActive;
 
-        const dailyGmv: Record<string, number> = {};
-        const dailyReceipts: Record<string, number> = {};
-        
-        receipts?.forEach(r => {
-            const date = format(r.createdAt.toDate(), 'MMM d');
-            dailyGmv[date] = (dailyGmv[date] || 0) + r.total;
-            dailyReceipts[date] = (dailyReceipts[date] || 0) + 1;
-        });
-
-        const dailyGmvData = Object.entries(dailyGmv).map(([date, amount]) => ({ date, 'Revenue': amount })).slice(-14);
-        const dailyReceiptsData = Object.entries(dailyReceipts).map(([date, count]) => ({ date, 'Sales': count })).slice(-14);
+        const daysToFetch = parseInt(velocityFilter);
+        const dailyGmvData = [];
+        const dailyReceiptsData = [];
+        for (let i = daysToFetch - 1; i >= 0; i--) {
+            const d = subDays(new Date(), i);
+            const dateStr = format(d, 'MMM d');
+            const dayStart = startOfDay(d);
+            const dayEnd = endOfDay(d);
+            const dayReceipts = receipts?.filter(r => {
+                const rDate = r.createdAt.toDate();
+                return rDate >= dayStart && rDate <= dayEnd;
+            }) || [];
+            const dayTotal = dayReceipts.reduce((sum, r) => sum + r.total, 0);
+            dailyGmvData.push({
+                date: dateStr,
+                'Revenue': dayTotal
+            });
+            dailyReceiptsData.push({
+                date: dateStr,
+                'Sales': dayReceipts.length
+            });
+        }
 
         // LTV = Total Subscription Revenue / Total Customers
         const ltv = totalBusinesses > 0 ? totalSubscriptionRevenue / totalBusinesses : 0;
@@ -1080,7 +1092,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             uniqueDownloaders: downloadClicks?.length || 0,
             downloadStats
         };
-    }, [users, businesses, products, receipts, purchases, downloadClicks]);
+    }, [users, businesses, products, receipts, purchases, downloadClicks, velocityFilter]);
 
 
     const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers') => {
@@ -2231,12 +2243,28 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 onOpenChange={setIsUserDetailOpen}
             />
 
-            <Dialog open={isSalesVelocityOpen} onOpenChange={setIsSalesVelocityOpen}>
+            <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
                 <DialogContent className="max-w-4xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-primary" />
-                            Platform Sales Velocity
+                        <DialogTitle className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-2">
+                                <Activity className="h-5 w-5 text-primary" />
+                                Platform Sales Velocity
+                            </span>
+                            <div className="flex items-center gap-2 select-none mr-6 no-capture">
+                                <span className="text-xs text-muted-foreground font-normal">Period:</span>
+                                <Select value={velocityFilter} onValueChange={(v: any) => setVelocityFilter(v)}>
+                                    <SelectTrigger className="w-[120px] h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="7">Last 7 Days</SelectItem>
+                                        <SelectItem value="14">Last 14 Days</SelectItem>
+                                        <SelectItem value="30">Last 30 Days</SelectItem>
+                                        <SelectItem value="90">Last 90 Days</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </DialogTitle>
                         <DialogDescription>
                             Historical sales performance across and transaction frequency.
@@ -2252,7 +2280,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-sm font-medium">Daily Revenue (Last 14 Days)</CardTitle>
+                                <CardTitle className="text-sm font-medium">Daily Revenue (Last {velocityFilter} Days)</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="h-[300px]">
@@ -2260,7 +2288,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                         <ReLineChart data={analyticsData.dailyGmvData}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                             <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-                                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `₦${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                            <YAxis 
+                                                fontSize={12} 
+                                                tickLine={false} 
+                                                axisLine={false} 
+                                                tickFormatter={(v) => {
+                                                    if (v >= 1000000) return `₦${(v / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
+                                                    if (v >= 1000) return `₦${(v / 1000).toFixed(0)}k`;
+                                                    return `₦${v}`;
+                                                }} 
+                                            />
                                             <ReTooltip content={<CustomTooltip />} />
                                             <Line type="monotone" dataKey="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                                         </ReLineChart>
