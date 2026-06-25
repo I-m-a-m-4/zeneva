@@ -150,6 +150,7 @@ export default function MarketingFooter() {
               <ul className="mt-3 space-y-2 text-sm">
                 <li><Link href="/about/our-mission" className="transition text-neutral-300 hover:text-white">Our Mission</Link></li>
                 <li><Link href="/careers" className="transition text-neutral-300 hover:text-white">Careers</Link></li>
+                <li><Link href="/grants" className="transition text-neutral-300 hover:text-white">Business Grants</Link></li>
                 <li><Link href="/contact" className="transition text-neutral-300 hover:text-white">Contact</Link></li>
                 <li><Link href="/legal/privacy-policy" className="transition text-neutral-300 hover:text-white">Privacy Policy</Link></li>
                 <li><Link href="/legal/terms-of-service" className="transition text-neutral-300 hover:text-white">Terms of Service</Link></li>

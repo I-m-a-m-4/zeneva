@@ -586,7 +586,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 }
 
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null }) {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grantApplications }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grantApplications: any[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -724,6 +724,17 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         } catch (error) {
             console.error("Error deleting application:", error);
             toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the application. Data integrity maintained." });
+        }
+    };
+
+    const handleDeleteGrantApplication = async (appId: string) => {
+        if (!confirm('Are you sure you want to delete this grant application?')) return;
+        try {
+            await deleteDoc(doc(firestore, 'grant_applications', appId));
+            toast({ title: "Action Successful", description: "The grant application has been removed." });
+        } catch (error) {
+            console.error("Error deleting grant application:", error);
+            toast({ variant: "destructive", title: "Action Failed", description: "Failed to remove the application." });
         }
     };
 
@@ -1343,6 +1354,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="recruitment" className="gap-2">
                         <Briefcase className="h-4 w-4" />
                         Recruitment
+                    </TabsTrigger>
+                    <TabsTrigger value="grants" className="gap-2">
+                        <Trophy className="h-4 w-4" />
+                        Business Grants
                     </TabsTrigger>
                     <TabsTrigger value="security" className="gap-2">
                         <ShieldCheck className="h-4 w-4" />
@@ -2107,6 +2122,90 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         </CardContent>
                     </Card>
                 </TabsContent>
+                <TabsContent value="grants" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Trophy className="h-5 w-5 text-primary" />
+                                Business Grant Applications ({grantApplications?.length || 0})
+                            </CardTitle>
+                            <CardDescription>
+                                Review and manage funding grant support applications submitted by business owners.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Applicant</TableHead>
+                                            <TableHead>Business & Sector</TableHead>
+                                            <TableHead>Requested</TableHead>
+                                            <TableHead>Applied Date</TableHead>
+                                            <TableHead>Pitch</TableHead>
+                                            <TableHead>Plan Link</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {grantApplications && grantApplications.length > 0 ? (
+                                            grantApplications.map((app) => (
+                                                <TableRow key={app.id}>
+                                                    <TableCell className="font-medium">
+                                                        <div>{app.name}</div>
+                                                        <div className="text-xs text-muted-foreground">{app.email}</div>
+                                                        <div className="text-xs text-muted-foreground">{app.phone}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-semibold">{app.businessName}</div>
+                                                        <Badge variant="outline" className="mt-1">{app.businessSector}</Badge>
+                                                    </TableCell>
+                                                    <TableCell className="font-semibold text-emerald-600">
+                                                        ₦{app.amountRequested}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">
+                                                        {app.createdAt?.toDate ? format(app.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                                                    </TableCell>
+                                                    <TableCell className="max-w-xs truncate text-sm" title={app.pitch}>
+                                                        {app.pitch}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {app.businessPlanLink ? (
+                                                            <Button variant="link" size="sm" asChild className="h-auto p-0">
+                                                                <a href={app.businessPlanLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                                    View Plan <Globe className="h-3 w-3" />
+                                                                </a>
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">None</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleDeleteGrantApplication(app.id)}
+                                                            className="hover:bg-destructive/10 hover:text-destructive group"
+                                                            title="Delete Application"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                                                    No grant applications received yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
                 <TabsContent value="security">
                     <CyberShield 
                         allBusinesses={businesses} 
@@ -2319,6 +2418,7 @@ export default function AdminDashboardPage() {
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
+    const grantApplicationsQuery = useMemoFirebase(() => query(collection(firestore, 'grant_applications'), orderBy('createdAt', 'desc')), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
     const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
@@ -2327,11 +2427,12 @@ export default function AdminDashboardPage() {
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
     const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
     const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
+    const { data: grantApplications, isLoading: grantApplicationsLoading } = useCollection<any>(grantApplicationsQuery);
     const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
     const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
     const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantApplicationsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
 
     if (isLoading) {
         return (
@@ -2342,5 +2443,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} />
+    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grantApplications={grantApplications} />
 }
