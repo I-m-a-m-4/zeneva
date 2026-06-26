@@ -509,10 +509,10 @@ export default function FollowUpCenter({
                         )}
                       </TableCell>
                       <TableCell className="text-[10px] font-mono whitespace-nowrap">
-                        <div>Sent: {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}</div>
+                        <div>Sent: {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, h:mm a') : 'N/A'}</div>
                         {log.openedAt?.seconds && (
                           <div className="text-emerald-600 font-bold mt-0.5">
-                            Opened: {format(new Date(log.openedAt.seconds * 1000), 'MMM d, HH:mm')}
+                            Opened: {format(new Date(log.openedAt.seconds * 1000), 'MMM d, h:mm a')}
                           </div>
                         )}
                         <div className="text-[9px] text-muted-foreground mt-0.5">via ZENEVA Outreach</div>
