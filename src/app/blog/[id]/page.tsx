@@ -18,6 +18,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title: `${staticPost.title} | Zeneva Blog`,
       description: staticPost.excerpt,
+      alternates: {
+        canonical: `/blog/${id}`
+      },
       openGraph: {
         title: staticPost.title,
         description: staticPost.excerpt,
@@ -37,6 +40,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: 'Blog Post | Zeneva',
     description: 'Read the latest from Zeneva on retail operations, AI, and business growth.',
+    alternates: {
+      canonical: `/blog/${id}`
+    }
   };
 }
 

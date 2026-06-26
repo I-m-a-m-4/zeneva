@@ -1,4 +1,13 @@
 
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service | Zeneva Retail OS',
+  alternates: {
+    canonical: '/legal/terms-of-service'
+  }
+};
+
 export default function TermsOfServicePage() {
   return (
     <>

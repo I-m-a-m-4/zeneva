@@ -1428,7 +1428,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             <StatCard 
                                 title="Generating Sales" 
                                 value={platformAnalytics.businessesWithSales} 
-                                icon={Zap} 
+                                icon={DollarSign} 
                                 description="Businesses with transactions"
                             />
                         </button>

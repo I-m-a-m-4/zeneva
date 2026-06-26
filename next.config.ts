@@ -7,6 +7,15 @@ const nextConfig: NextConfig = {
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
   serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],
+  redirects: isTauri ? undefined : async () => {
+    return [
+      {
+        source: '/industries/:path*',
+        destination: '/use-cases',
+        permanent: true,
+      },
+    ];
+  },
   experimental: {
     serverMinification: false,
   },

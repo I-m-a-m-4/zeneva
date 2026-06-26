@@ -1,4 +1,13 @@
 
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy | Zeneva Retail OS',
+  alternates: {
+    canonical: '/legal/privacy-policy'
+  }
+};
+
 export default function PrivacyPolicyPage() {
   return (
     <>

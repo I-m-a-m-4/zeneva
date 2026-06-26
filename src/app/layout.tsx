@@ -85,9 +85,6 @@ export const metadata: Metadata = {
     description: 'Transform your retail operations with Zeneva. Inventory, analytics, and global payments in one unified platform.',
     images: [`${siteUrl}/zeneva-og-image.png?v=5`],
     creator: '@zeneva_retail',
-  },
-  alternates: {
-    canonical: siteUrl,
   }
 };
 

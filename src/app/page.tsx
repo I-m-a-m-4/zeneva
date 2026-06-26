@@ -1,4 +1,12 @@
+import { Metadata } from 'next';
 import { InteractiveGrid } from '@/components/interactive-grid';
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: '/'
+  }
+};
+
 import {
     ShoppingCart,
     ArrowRight,
