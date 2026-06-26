@@ -2,6 +2,7 @@
 
 'use client';
 import FollowUpCenter from '@/components/admin/follow-up-center';
+import ContentStrategyCenter from '@/components/admin/content-strategy';
 import PlatformRevenueChart from '@/components/admin/charts/PlatformRevenueChart';
 import UserGrowthChart from '@/components/admin/charts/UserGrowthChart';
 import TransactionVolumeChart from '@/components/admin/charts/TransactionVolumeChart';
@@ -1377,6 +1378,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="users">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
                     <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
+                    <TabsTrigger value="content" className="gap-2">
+                        <Newspaper className="h-4 w-4" />
+                        Content Strategy
+                    </TabsTrigger>
                     <TabsTrigger value="recruitment" className="gap-2">
                         <Briefcase className="h-4 w-4" />
                         Recruitment
@@ -2064,6 +2069,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         onRefresh={() => fetchOutreachData(true)}
                         onMount={fetchOutreachData}
                     />
+                </TabsContent>
+                <TabsContent value="content" className="space-y-6">
+                    <ContentStrategyCenter />
                 </TabsContent>
                 <TabsContent value="recruitment" className="space-y-6">
                     <Card>
