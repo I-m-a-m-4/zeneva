@@ -63,6 +63,8 @@ export default function FollowUpCenter({
   const [logs, setLogs] = React.useState<FollowUpLog[]>(cachedLogs);
   const [sentCount, setSentCount] = React.useState(cachedSentCount);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [filterStatus, setFilterStatus] = React.useState<'all' | 'opened' | 'sent' | 'failed' | 'newly_opened'>('all');
+  const [searchQuery, setSearchQuery] = React.useState('');
   
   // Sync with parent cache
   React.useEffect(() => {
@@ -361,6 +363,43 @@ export default function FollowUpCenter({
             </Button>
           </CardHeader>
           <CardContent>
+            {/* Search and Filters Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+              <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'newly_opened', label: 'Newly Opened' },
+                  { id: 'opened', label: 'Opened' },
+                  { id: 'sent', label: 'Not Opened' },
+                  { id: 'failed', label: 'Failed' }
+                ].map((btn) => (
+                  <Button
+                    key={btn.id}
+                    variant="ghost"
+                    size="sm"
+                    className={`text-[11px] h-7 px-3 font-semibold rounded-md transition-all ${
+                      filterStatus === btn.id 
+                        ? 'bg-white text-slate-900 shadow-sm' 
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    onClick={() => setFilterStatus(btn.id as any)}
+                  >
+                    {btn.label}
+                  </Button>
+                ))}
+              </div>
+              
+              <div className="relative max-w-xs w-full">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search recipient or subject..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 text-xs h-8.5 rounded-lg border-slate-200"
+                />
+              </div>
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -373,88 +412,149 @@ export default function FollowUpCenter({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No outreach logs found. Start by sending a follow-up.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (() => {
-                    const groupedLogs: Record<string, any> = {};
-                    logs.forEach(log => {
-                      const key = `${log.sentTo}-${log.type || 'follow-up'}`;
-                      if (!groupedLogs[key]) {
-                        groupedLogs[key] = { ...log, count: log.status === 'failed' ? 0 : 1 };
-                      } else {
-                        if (log.status !== 'failed') groupedLogs[key].count++;
-                        groupedLogs[key].openCount = Math.max(groupedLogs[key].openCount, log.openCount);
-                        if (log.status === 'opened') groupedLogs[key].status = 'opened';
-                        else if (log.status === 'failed' && groupedLogs[key].status !== 'opened') groupedLogs[key].status = 'failed';
+                {(() => {
+                  // 1. Group logs to merge duplicates and track aggregates/latest status
+                  const groupedLogs: Record<string, any> = {};
+                  logs.forEach(log => {
+                    const key = `${log.sentTo}-${log.type || 'follow-up'}`;
+                    if (!groupedLogs[key]) {
+                      groupedLogs[key] = { ...log, count: log.status === 'failed' ? 0 : 1 };
+                    } else {
+                      if (log.status !== 'failed') groupedLogs[key].count++;
+                      groupedLogs[key].openCount = Math.max(groupedLogs[key].openCount, log.openCount);
+                      if (log.status === 'opened') groupedLogs[key].status = 'opened';
+                      else if (log.status === 'failed' && groupedLogs[key].status !== 'opened') groupedLogs[key].status = 'failed';
+                      
+                      // Retain latest openedAt
+                      if (log.openedAt?.seconds) {
+                        if (!groupedLogs[key].openedAt?.seconds || log.openedAt.seconds > groupedLogs[key].openedAt.seconds) {
+                          groupedLogs[key].openedAt = log.openedAt;
+                        }
                       }
-                    });
+                      // Retain latest sentAt
+                      if (log.sentAt?.seconds) {
+                        if (!groupedLogs[key].sentAt?.seconds || log.sentAt.seconds > groupedLogs[key].sentAt.seconds) {
+                          groupedLogs[key].sentAt = log.sentAt;
+                        }
+                      }
+                    }
+                  });
 
-                    return Object.values(groupedLogs).map((log: any) => (
-                      <TableRow key={log.id}>
-                        <TableCell>
-                          <div className="font-bold text-xs flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                            {log.recipientName}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground ml-3">{log.sentTo}</div>
-                        </TableCell>
-                        <TableCell className="max-w-[180px]">
-                          <div className="text-xs font-medium truncate">{log.subject}</div>
-                          {log.behaviorContext && (
-                            <div className="flex items-center gap-1 mt-1">
-                                <Bot className="h-3 w-3 text-orange-400" />
-                                <span className="text-[9px] text-orange-400/80 font-black uppercase tracking-tighter">Intel: {log.behaviorContext}</span>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-[10px] font-mono whitespace-nowrap">
-                          {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}
-                          <div className="text-[9px] text-muted-foreground">via ZENEVA Outreach</div>
-                        </TableCell>
-                        <TableCell>
-                          {log.status === 'opened' || (log.openCount > 0 && log.status === 'sent') ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] font-black uppercase">
-                               <CheckCircle2 className="h-3 w-3 mr-1" /> Opened
-                               {log.count > 1 && <span className="ml-1 opacity-70">[{log.count}]</span>}
-                            </Badge>
-                          ) : log.status === 'failed' ? (
-                            <Badge variant="destructive" className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px] font-black uppercase">
-                              <AlertCircle className="h-3 w-3 mr-1" /> FAILED
-                              {log.count > 1 && <span className="ml-1">({log.count}x)</span>}
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] font-black uppercase">
-                              <Clock className="h-3 w-3 mr-1" /> Dispatch
-                              {log.count > 1 && <span className="ml-1">({log.count})</span>}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {log.converted ? (
-                             <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30 text-[10px] font-black">
-                                <TrendingUp className="h-3 w-3 mr-1" /> CONVERTED
-                             </Badge>
-                          ) : (
-                            <div className="flex items-center justify-end gap-2 text-xs">
-                              <Eye className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-bold">{log.openCount || 0}</span>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-orange-500/10" onClick={() => setViewLog(log)}>
-                            <Search className="h-4 w-4 text-orange-400" />
-                          </Button>
+                  let processedList = Object.values(groupedLogs);
+
+                  // 2. Search Query Filtering
+                  if (searchQuery.trim()) {
+                    const queryStr = searchQuery.toLowerCase();
+                    processedList = processedList.filter(log => 
+                      log.recipientName?.toLowerCase().includes(queryStr) ||
+                      log.sentTo?.toLowerCase().includes(queryStr) ||
+                      log.subject?.toLowerCase().includes(queryStr)
+                    );
+                  }
+
+                  // 3. Status Filtering
+                  if (filterStatus === 'opened') {
+                    processedList = processedList.filter(log => log.status === 'opened' || log.openCount > 0);
+                  } else if (filterStatus === 'sent') {
+                    processedList = processedList.filter(log => log.status === 'sent' && !(log.openCount > 0));
+                  } else if (filterStatus === 'failed') {
+                    processedList = processedList.filter(log => log.status === 'failed');
+                  } else if (filterStatus === 'newly_opened') {
+                    processedList = processedList.filter(log => log.openedAt?.seconds);
+                  }
+
+                  // 4. Sorting
+                  if (filterStatus === 'newly_opened') {
+                    // Sort by openedAt descending
+                    processedList.sort((a, b) => {
+                      const timeA = a.openedAt?.seconds || 0;
+                      const timeB = b.openedAt?.seconds || 0;
+                      return timeB - timeA;
+                    });
+                  } else {
+                    // Default sort by sentAt descending
+                    processedList.sort((a, b) => {
+                      const timeA = a.sentAt?.seconds || 0;
+                      const timeB = b.sentAt?.seconds || 0;
+                      return timeB - timeA;
+                    });
+                  }
+
+                  if (processedList.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No matching outreach logs found.
                         </TableCell>
                       </TableRow>
-                    ));
-                  })()
-                )}
+                    );
+                  }
+
+                  return processedList.map((log: any) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <div className="font-bold text-xs flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                          {log.recipientName}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground ml-3">{log.sentTo}</div>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <div className="text-xs font-medium truncate">{log.subject}</div>
+                        {log.behaviorContext && (
+                          <div className="flex items-center gap-1 mt-1">
+                              <Bot className="h-3 w-3 text-orange-400" />
+                              <span className="text-[9px] text-orange-400/80 font-black uppercase tracking-tighter">Intel: {log.behaviorContext}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-[10px] font-mono whitespace-nowrap">
+                        <div>Sent: {log.sentAt?.seconds ? format(new Date(log.sentAt.seconds * 1000), 'MMM d, HH:mm') : 'N/A'}</div>
+                        {log.openedAt?.seconds && (
+                          <div className="text-emerald-600 font-bold mt-0.5">
+                            Opened: {format(new Date(log.openedAt.seconds * 1000), 'MMM d, HH:mm')}
+                          </div>
+                        )}
+                        <div className="text-[9px] text-muted-foreground mt-0.5">via ZENEVA Outreach</div>
+                      </TableCell>
+                      <TableCell>
+                        {log.status === 'opened' || (log.openCount > 0 && log.status === 'sent') ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] font-black uppercase">
+                             <CheckCircle2 className="h-3 w-3 mr-1" /> Opened
+                             {log.count > 1 && <span className="ml-1 opacity-70">[{log.count}]</span>}
+                          </Badge>
+                        ) : log.status === 'failed' ? (
+                          <Badge variant="destructive" className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px] font-black uppercase">
+                            <AlertCircle className="h-3 w-3 mr-1" /> FAILED
+                            {log.count > 1 && <span className="ml-1">({log.count}x)</span>}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] font-black uppercase">
+                            <Clock className="h-3 w-3 mr-1" /> Dispatch
+                            {log.count > 1 && <span className="ml-1">({log.count})</span>}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {log.converted ? (
+                           <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30 text-[10px] font-black">
+                              <TrendingUp className="h-3 w-3 mr-1" /> CONVERTED
+                           </Badge>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2 text-xs">
+                            <Eye className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-bold">{log.openCount || 0}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-orange-500/10" onClick={() => setViewLog(log)}>
+                          <Search className="h-4 w-4 text-orange-400" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })()}
               </TableBody>
             </Table>
           </CardContent>
