@@ -2147,7 +2147,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                ((() => {
                  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
                  if (isTauri) {
-                   return syncedProducts.length === 0;
+                   return syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline;
                  }
                  return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
                         (isLoadingCustomers && (!customers || customers.length === 0) && isRealOnline) || 
