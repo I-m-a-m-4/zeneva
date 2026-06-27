@@ -216,12 +216,18 @@ export default function AchievementsPage() {
         const currentYear = new Date().getFullYear();
 
         if (receipts) {
-            const sortedReceipts = [...receipts].sort((a, b) => a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime());
+            const sortedReceipts = [...receipts]
+                .filter(r => r && r.createdAt)
+                .sort((a, b) => {
+                    const timeA = typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : (a.createdAt.seconds ? a.createdAt.seconds * 1000 : 0);
+                    const timeB = typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : (b.createdAt.seconds ? b.createdAt.seconds * 1000 : 0);
+                    return timeA - timeB;
+                });
 
             let yearTotal = 0;
             for (const receipt of sortedReceipts) {
-                const receiptDate = receipt.createdAt.toDate();
-                if (receiptDate.getFullYear() === currentYear) {
+                const receiptDate = typeof receipt.createdAt.toDate === 'function' ? receipt.createdAt.toDate() : (receipt.createdAt.seconds ? new Date(receipt.createdAt.seconds * 1000) : null);
+                if (receiptDate && receiptDate.getFullYear() === currentYear) {
                     yearTotal += receipt.total;
                     for (const milestone of SALES_MILESTONES) {
                         if (yearTotal >= milestone.value && !achieved.some(a => a.label.includes(milestone.label))) {
