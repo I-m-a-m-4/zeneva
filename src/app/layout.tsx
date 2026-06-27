@@ -26,11 +26,19 @@ const siteUrl = 'https://zeneva.space';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: siteUrl,
+    languages: {
+      'en-US': siteUrl,
+      'en-NG': siteUrl,
+      'x-default': siteUrl,
+    },
+  },
   title: {
     default: 'Zeneva - Advanced Inventory Management & Global POS Operating System',
     template: '%s | Zeneva'
   },
-  description: 'Zeneva is a borderless retail operating system that unifies inventory management, multi-store POS, analytics, and USD/NGN payments into one powerful platform. Built for modern retailers scaling globally.',
+  description: 'Zeneva is a borderless retail operating system unifying inventory, POS, analytics, and USD/NGN payments into a powerful platform for modern retailers.',
   keywords: [
     'inventory management software', 
     'retail pos system', 
@@ -91,6 +99,17 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${siteUrl}/#website`,
+      'url': siteUrl,
+      'name': 'Zeneva',
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': `${siteUrl}/help-center?q={search_term_string}`,
+        'query-input': 'required name=search_term_string'
+      }
+    },
     {
       '@type': 'Organization',
       '@id': `${siteUrl}/#organization`,
@@ -184,6 +203,9 @@ export default function RootLayout({
         <meta name="google-site-verification" content="QGYrHkSlC71065ymk6dZc6DFesm14JeSPw-myjzZVso" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+        <link rel="dns-prefetch" href="https://code.iconify.design" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <Script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js" strategy="afterInteractive" />
         

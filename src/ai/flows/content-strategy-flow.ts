@@ -3,11 +3,24 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
+const PlatformStatsSchema = z.object({
+  totalUsers: z.number().optional(),
+  totalBusinesses: z.number().optional(),
+  totalProducts: z.number().optional(),
+  totalReceipts: z.number().optional(),
+  platformGmv: z.number().optional(),
+  averageSalesPerDay: z.number().optional(),
+  platformAOV: z.number().optional(),
+  topLocation: z.string().optional(),
+  topIndustries: z.array(z.string()).optional(),
+}).optional();
+
 const ContentStrategyInputSchema = z.object({
   theme: z.string().describe('The core theme of the content (e.g., Offline POS, Employee theft, USD payouts).'),
   platform: z.string().describe('Target marketing platform: Medium, Substack, LinkedIn, Twitter.'),
   persona: z.string().describe('Target reader persona (e.g., Pharmacy owners, Boutique retailers).'),
   seedKnowledge: z.string().optional().describe('Optional custom context or stories to inject.'),
+  platformStats: PlatformStatsSchema,
 });
 
 const SectionOutlineSchema = z.object({
@@ -44,13 +57,24 @@ const prompt = ai.definePrompt({
   output: { schema: ContentStrategyOutputSchema },
   prompt: `You are Zen AI, a world-class growth marketing director and B2B SaaS strategist for Zeneva. Zeneva is an offline-first, borderless retail operating system for modern merchants (mini-marts, supermarkets, boutiques, pharmacies) in Nigeria and globally.
 
-Your task is to take the provided theme, platform, persona, and custom seed knowledge, and generate a high-impact B2B marketing content blueprint.
+Your task is to take the provided theme, platform, persona, custom seed knowledge, and real-time live platform metrics from the Zeneva admin dashboard, and generate a high-impact B2B marketing content blueprint.
 
 **CONTEXT ABOUT ZENEVA:**
 - **Core Value Proposition**: Unifies inventory management, multi-store POS, analytics, and local/global payments (USD and NGN) into one platform.
-- **Killer Feature**: Hyper-Sync Offline POS. Works fully offline on desktop/mobile during blackouts, syncing automatically once internet returns.
+- **Killer Feature**: Hyper-Sync Offline POS. Works fully offline on desktop/mobile during blackouts, syncing automatically once internet returns. Saves retailers from massive losses (e.g. "Why Nigerian Retailers Lose ₦200,000+ to Internet blackouts (and How to Fix It)").
 - **Target Audience**: Retailers, boutique owners, pharmacy managers, and supermarket owners in emerging markets (primarily Nigeria/Lekki/Ikeja/Lagos) looking to prevent inventory theft, track expiry dates, manage multi-currency billing, and accept global payments.
 - **Grants Feature**: A Business Grants Directory is built directly into Zeneva to help retailers discover equity-free funding opportunities.
+
+**LIVE PLATFORM METRICS & DASHBOARD INSIGHTS (Weave these statistics and milestones into the generated article copy, hook, and outlines to build extreme trust and authority):**
+- Total Platform Users: {{platformStats.totalUsers}}
+- Total Businesses Supported: {{platformStats.totalBusinesses}}
+- Total Products Managed: {{platformStats.totalProducts}}
+- Total Sales Receipts Processed: {{platformStats.totalReceipts}}
+- Total Platform GMV: ₦{{platformStats.platformGmv}}
+- Average Sales Velocity per Day: ₦{{platformStats.averageSalesPerDay}}
+- Platform Average Order Value (AOV): ₦{{platformStats.platformAOV}}
+- Dominant Territory/Location: {{platformStats.topLocation}}
+- Top Active Industries: {{platformStats.topIndustries}}
 
 **INPUTS:**
 - **Core Theme**: {{theme}}
@@ -59,7 +83,10 @@ Your task is to take the provided theme, platform, persona, and custom seed know
 - **Additional Seed Context**: {{seedKnowledge}}
 
 **OUTPUT INSTRUCTIONS:**
-Generate a JSON response matching the output schema. Ensure the content plan is detailed, deeply practical, and tailored to the target platform (e.g., shorter and hook-heavy for LinkedIn; longer and keyword-rich for Medium/Substack). All CTA recommendations must guide the reader back to zeneva.space.`,
+- Generate a JSON response matching the output schema.
+- **CRITICAL**: The title, hook, and outline MUST directly quote or reference the provided live metrics where appropriate (e.g., "how we helped process over ₦[GMV] across [totalBusinesses] stores", or referencing the top location/industry, or offline-sales-saved figures).
+- Write highly engaging titles like "Why Nigerian Retailers Lose ₦200,000+ to Internet blackouts (and How to Fix It)" or based on the live statistics.
+- Make the content blueprint detailed, deeply practical, and tailored to the target platform (e.g., shorter and hook-heavy for LinkedIn; longer and keyword-rich for Medium/Substack). All CTA recommendations must guide the reader back to zeneva.space.`,
 });
 
 const contentStrategyFlow = ai.defineFlow(

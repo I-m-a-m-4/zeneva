@@ -2,9 +2,9 @@ import { Metadata } from 'next';
 import { InteractiveGrid } from '@/components/interactive-grid';
 
 export const metadata: Metadata = {
-  alternates: {
-    canonical: '/'
-  }
+    alternates: {
+        canonical: '/'
+    }
 };
 
 import {
@@ -181,7 +181,7 @@ export default function Home() {
                                 </p>
 
                                 <HeroInputForm />
-                                
+
                                 <div className="mt-8 flex items-center justify-center lg:justify-start gap-4">
                                     <Link href="/download" className="group flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
                                         <Monitor className="h-4 w-4" />
@@ -193,13 +193,13 @@ export default function Home() {
 
                             {/* Right Column: UI Mockups */}
                             <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
-                                <Image 
-                                    src="/computer-P.png" 
-                                    alt="Product UI" 
-                                    width={1600} 
-                                    height={1200} 
-                                    className="w-full h-auto block" 
-                                    priority 
+                                <Image
+                                    src="/computer-P.png"
+                                    alt="Product UI"
+                                    width={1600}
+                                    height={1200}
+                                    className="w-full h-auto block"
+                                    priority
                                     sizes="(max-width: 768px) 100vw, 50vw"
                                 />
                             </div>
@@ -771,7 +771,7 @@ export default function Home() {
                                     backgroundSize: '32px 32px'
                                 }}></div>
                                 <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-                                
+
                                 <div className="relative z-10 max-w-xl text-left">
                                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 font-bricolage leading-tight">
                                         Global Access. <br />Seamless <span className="text-primary">USD</span> Subscriptions.
@@ -784,22 +784,22 @@ export default function Home() {
                                         <ArrowRight className="w-4 h-4 transition-transform group-hover/link:translate-x-1" />
                                     </Link>
                                 </div>
-                                
+
                                 <div className="relative z-10 w-full md:w-1/2 flex justify-center md:justify-end">
                                     <div className="relative transition-all duration-700 group-hover:translate-x-2 group-hover:-translate-y-2">
                                         {/* Soft glow behind the image */}
                                         <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full -z-10 scale-125"></div>
-                                        <Image 
-                                            src="/global-payment.png" 
-                                            alt="Multi-currency Payment Integration" 
-                                            width={600} 
-                                            height={400} 
+                                        <Image
+                                            src="/global-payment.png"
+                                            alt="Multi-currency Payment Integration"
+                                            width={600}
+                                            height={400}
                                             className="w-full max-w-sm h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-xl"
                                         />
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Architectural Connection Lines */}
                             <div className="flex justify-between px-12 md:px-32 h-28 pointer-events-none">
                                 <div className="flex gap-24">

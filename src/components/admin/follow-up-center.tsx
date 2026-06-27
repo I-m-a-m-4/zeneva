@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Dialog,
     DialogContent,
@@ -79,6 +80,70 @@ export default function FollowUpCenter({
       onMount();
     }
   }, []);
+
+  const campaignStats = React.useMemo(() => {
+    const validLogs = logs.filter(l => l.status !== 'failed');
+    const totalSent = validLogs.length;
+    const openedLogs = validLogs.filter(l => l.status === 'opened' || (l.openCount && l.openCount > 0));
+    const totalOpened = openedLogs.length;
+    
+    // 1. Open Rate
+    const openRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0;
+    
+    // 2. Outreach Conversion Rate (converted field is boolean)
+    const convertedLogs = validLogs.filter(l => l.converted);
+    const outreachConversionRate = totalSent > 0 ? (convertedLogs.length / totalSent) * 100 : 0;
+
+    // 3. Best Performing Template (by open rate)
+    const templateStats: Record<string, { sent: number; opened: number }> = {};
+    validLogs.forEach(l => {
+      const subject = l.subject || 'Standard Follow-Up';
+      if (!templateStats[subject]) {
+        templateStats[subject] = { sent: 0, opened: 0 };
+      }
+      templateStats[subject].sent++;
+      if (l.status === 'opened' || (l.openCount && l.openCount > 0)) {
+        templateStats[subject].opened++;
+      }
+    });
+
+    let bestCampaign = 'None';
+    let bestRate = 0;
+    Object.entries(templateStats).forEach(([subject, stats]) => {
+      const rate = stats.sent > 0 ? (stats.opened / stats.sent) * 100 : 0;
+      if (rate > bestRate && stats.sent >= 2) {
+        bestRate = rate;
+        bestCampaign = subject;
+      }
+    });
+    // Fallback if not enough campaign data
+    if (bestCampaign === 'None' && Object.keys(templateStats).length > 0) {
+      const sorted = Object.entries(templateStats).sort((a,b) => b[1].opened - a[1].opened);
+      bestCampaign = sorted[0][0];
+      bestRate = (sorted[0][1].opened / sorted[0][1].sent) * 100;
+    }
+
+    // Shorten subject for display
+    const cleanBestCampaign = bestCampaign.length > 25 ? bestCampaign.substring(0, 25) + '...' : bestCampaign;
+
+    // 4. Outreach Coverage of At-Risk Businesses
+    const atRiskEmails = new Set(atRiskBusinesses.map(bus => {
+      const owner = users.find(u => u.businessId === bus.id);
+      return owner?.email;
+    }).filter(Boolean));
+
+    const emailedAtRisk = logs.filter(l => atRiskEmails.has(l.sentTo)).length;
+    const coverage = atRiskEmails.size > 0 ? (emailedAtRisk / atRiskEmails.size) * 100 : 0;
+
+    return {
+      openRate,
+      outreachConversionRate,
+      bestCampaign: cleanBestCampaign,
+      bestRate,
+      coverage
+    };
+  }, [logs, atRiskBusinesses, users]);
+
   const [isSending, setIsSending] = React.useState(false);
   const { toast } = useToast();
   const [selectedRecipient, setSelectedRecipient] = React.useState<any>(null);
@@ -282,6 +347,54 @@ export default function FollowUpCenter({
         </Card>
       </div>
 
+      {/* Campaign outreach analytics row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 border-t border-slate-100 pt-4">
+        <Card className="bg-slate-50/50">
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-slate-500">Outreach Open Rate</CardTitle>
+            <Eye className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-slate-900">{campaignStats.openRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Opened emails out of dispatches</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-50/50">
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-slate-500">Response Conversion</CardTitle>
+            <TrendingUp className="h-4 w-4 text-indigo-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-slate-900">{campaignStats.outreachConversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Dispatches converting users</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-50/50">
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-slate-500">At-Risk Contacted</CardTitle>
+            <Bot className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-slate-900">{campaignStats.coverage.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Emailed at-risk merchants</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-50/50">
+          <CardHeader className="p-4 flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-slate-500">Best Campaign</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-[13px] font-bold text-slate-900 truncate" title={campaignStats.bestCampaign}>
+              {campaignStats.bestCampaign}
+            </div>
+            <p className="text-xs text-muted-foreground font-semibold text-emerald-600 mt-1">
+              ({campaignStats.bestRate.toFixed(0)}% open rate)
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Col: At Risk Businesses */}
         <Card className="lg:col-span-1">
@@ -400,26 +513,29 @@ export default function FollowUpCenter({
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Mission Context</TableHead>
-                  <TableHead>Telemetry</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Engagement</TableHead>
-                  <TableHead className="text-right">Audit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <ScrollArea className="h-[400px] pr-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Mission Context</TableHead>
+                    <TableHead>Telemetry</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Engagement</TableHead>
+                    <TableHead className="text-right">Audit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {(() => {
                   // 1. Group logs to merge duplicates and track aggregates/latest status
+                  // Group by recipient AND subject to explicitly show different email campaigns separate
                   const groupedLogs: Record<string, any> = {};
                   logs.forEach(log => {
-                    const key = `${log.sentTo}-${log.type || 'follow-up'}`;
+                    const key = `${log.sentTo}-${log.subject}`;
                     if (!groupedLogs[key]) {
-                      groupedLogs[key] = { ...log, count: log.status === 'failed' ? 0 : 1 };
+                      groupedLogs[key] = { ...log, count: log.status === 'failed' ? 0 : 1, history: [log] };
                     } else {
+                      groupedLogs[key].history.push(log);
                       if (log.status !== 'failed') groupedLogs[key].count++;
                       groupedLogs[key].openCount = Math.max(groupedLogs[key].openCount, log.openCount);
                       if (log.status === 'opened') groupedLogs[key].status = 'opened';
@@ -541,10 +657,24 @@ export default function FollowUpCenter({
                               <TrendingUp className="h-3 w-3 mr-1" /> CONVERTED
                            </Badge>
                         ) : (
-                          <div className="flex items-center justify-end gap-2 text-xs">
-                            <Eye className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-bold">{log.openCount || 0}</span>
-                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center justify-end gap-2 text-xs cursor-help select-none">
+                                  <Eye className="h-3 w-3 text-muted-foreground" />
+                                  <span className="font-bold">{log.openCount || 0}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="bg-slate-900 border-slate-800 text-white text-xs max-w-xs p-3 space-y-1.5 shadow-lg">
+                                <p className="font-bold text-orange-400">Campaign Outreach Metrics</p>
+                                <p>This specific email campaign was opened <span className="font-bold text-emerald-400">{log.openCount || 0} times</span>.</p>
+                                <p className="text-[10px] text-slate-300">
+                                  Total system dispatches: {log.count}<br />
+                                  Last open: {log.openedAt?.seconds ? format(new Date(log.openedAt.seconds * 1000), 'MMM d, h:mm a') : 'Never'}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -557,7 +687,8 @@ export default function FollowUpCenter({
                 })()}
               </TableBody>
             </Table>
-          </CardContent>
+          </ScrollArea>
+        </CardContent>
         </Card>
       </div>
 

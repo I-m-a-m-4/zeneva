@@ -13,7 +13,21 @@ import { useToast } from '@/hooks/use-toast';
 import { generateContentPlan, type ContentStrategyOutput } from '@/ai/flows/content-strategy-flow';
 import { Newspaper, Loader2, Sparkles, Send, Copy, ArrowRight, Share2, Bot, Bookmark, BookOpen, AlertCircle } from 'lucide-react';
 
-export default function ContentStrategyCenter() {
+interface ContentStrategyCenterProps {
+  platformStats?: {
+    totalUsers: number;
+    totalBusinesses: number;
+    totalProducts: number;
+    totalReceipts: number;
+    platformGmv: number;
+    averageSalesPerDay: number;
+    platformAOV: number;
+    topLocation: string;
+    topIndustries: string[];
+  };
+}
+
+export default function ContentStrategyCenter({ platformStats }: ContentStrategyCenterProps) {
   const [theme, setTheme] = React.useState('Offline POS & Power Outages');
   const [platform, setPlatform] = React.useState('Medium Article');
   const [persona, setPersona] = React.useState('General Retailers');
@@ -54,7 +68,8 @@ export default function ContentStrategyCenter() {
         theme,
         platform,
         persona,
-        seedKnowledge
+        seedKnowledge,
+        platformStats
       });
       setResult(plan);
       toast({
@@ -87,10 +102,17 @@ export default function ContentStrategyCenter() {
       {/* Left Column: Form Configuration */}
       <Card className="lg:col-span-2 border-slate-200">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2 font-display">
-            <Bot className="h-5 w-5 text-orange-600 animate-pulse" />
-            AI Content Strategist
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-lg flex items-center gap-2 font-display">
+              <Bot className="h-5 w-5 text-orange-600 animate-pulse" />
+              AI Content Strategist
+            </CardTitle>
+            {platformStats && (
+              <Badge className="bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
+                ● Live Stats
+              </Badge>
+            )}
+          </div>
           <CardDescription>
             Strategize and outline high-quality marketing articles designed to drive backlink growth and convert retail merchants to Zeneva.
           </CardDescription>

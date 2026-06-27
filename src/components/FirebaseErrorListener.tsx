@@ -31,7 +31,13 @@ export function FirebaseErrorListener({ user }: { user: User | null }) {
         return;
       }
       
-      setError(error);
+      // Only throw/crash the app for critical database permission errors
+      const isCritical = error.path?.includes('businessInstances') || error.path?.includes('onlineOrders');
+      if (isCritical) {
+        setError(error);
+      } else {
+        console.warn(`[Firebase] Swallowed non-critical permission error for ${error.path}.`);
+      }
     };
 
     errorEmitter.on('permission-error', handleError);

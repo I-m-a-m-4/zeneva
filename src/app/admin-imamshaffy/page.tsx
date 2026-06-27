@@ -666,7 +666,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 orderBy('sentAt', 'desc')
             );
             const snapshot = await getDocs(logsQuery);
-            const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
             
             setOutreachLogs(logs);
             setOutreachSentCount(logs.filter(log => log.status !== 'failed').length);
@@ -2071,7 +2071,19 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     />
                 </TabsContent>
                 <TabsContent value="content" className="space-y-6">
-                    <ContentStrategyCenter />
+                    <ContentStrategyCenter 
+                        platformStats={{
+                            totalUsers: analyticsData.totalUsers,
+                            totalBusinesses: platformAnalytics.totalActiveBusinesses,
+                            totalProducts: analyticsData.totalProducts,
+                            totalReceipts: analyticsData.totalReceipts,
+                            platformGmv: analyticsData.platformGmv,
+                            averageSalesPerDay: analyticsData.averageSalesPerDay,
+                            platformAOV: analyticsData.platformAOV,
+                            topLocation: platformAnalytics.topLocations?.[0]?.name || 'Nigeria',
+                            topIndustries: platformAnalytics.industryData.slice(0, 3).map(i => i.name)
+                        }}
+                    />
                 </TabsContent>
                 <TabsContent value="recruitment" className="space-y-6">
                     <Card>
