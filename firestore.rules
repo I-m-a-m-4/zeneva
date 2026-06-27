@@ -84,13 +84,13 @@ service cloud.firestore {
     }
 
     match /supportThreads/{threadId} {
-        allow read: if isSuperAdmin() || (isUserAuthenticated() && resource.data.userId == request.auth.uid);
-        allow create: if isUserAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow read: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || resource.data.userId == request.auth.uid));
+        allow create: if isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || request.resource.data.userId == request.auth.uid);
         allow update: if isSuperAdmin();
 
         match /messages/{messageId} {
-            allow create: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
-            allow read: if isSuperAdmin() || (isUserAuthenticated() && get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid);
+            allow create: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid));
+            allow read: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid));
         }
     }
 

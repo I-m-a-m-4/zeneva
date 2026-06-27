@@ -466,7 +466,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     setIsSending(false);
                     return;
                 }
-                const newThreadRef = doc(collection(firestore, 'supportThreads'));
+                const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_${Math.random().toString(36).substring(2, 15)}`);
                 const newThreadData: Omit<SupportThread, 'id'> = {
                     userId: userProfile.id,
                     userName: userProfile.name,
