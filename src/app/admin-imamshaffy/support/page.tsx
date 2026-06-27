@@ -104,7 +104,11 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                              {msg.senderId !== 'admin' && <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">{msg.senderName.charAt(0)}</div>}
                              <div className={cn("max-w-[70%] rounded-lg p-3 text-sm whitespace-pre-wrap", msg.senderId === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
                                 {msg.text}
-                                <div className="text-xs opacity-70 mt-1 text-right">{msg.createdAt ? formatDistanceToNowStrict(msg.createdAt.toDate(), {addSuffix: true}) : ''}</div>
+                                <div className="text-xs opacity-70 mt-1 text-right">
+                                    {msg.createdAt && typeof msg.createdAt.toDate === 'function' 
+                                        ? formatDistanceToNowStrict(msg.createdAt.toDate(), {addSuffix: true}) 
+                                        : ''}
+                                </div>
                              </div>
                         </div>
                     ))}
@@ -157,10 +161,14 @@ export default function AdminSupportPage() {
                                     </div>
                                     {!thread.isReadByAdmin && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 ml-2 flex-shrink-0"></div>}
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 truncate">{thread.lastMessageSnippet}</p>
+                                 <p className="text-xs text-muted-foreground mt-1 truncate">{thread.lastMessageSnippet}</p>
                                 <div className="flex justify-between items-center mt-2">
                                      <Badge variant={thread.status === 'open' ? 'default' : 'secondary'}>{thread.status}</Badge>
-                                     <p className="text-xs text-muted-foreground">{formatDistanceToNowStrict(thread.lastMessageAt.toDate(), {addSuffix: true})}</p>
+                                     <p className="text-xs text-muted-foreground">
+                                         {thread.lastMessageAt && typeof thread.lastMessageAt.toDate === 'function' 
+                                             ? formatDistanceToNowStrict(thread.lastMessageAt.toDate(), {addSuffix: true}) 
+                                             : 'Just now'}
+                                     </p>
                                 </div>
                             </button>
                         ))
