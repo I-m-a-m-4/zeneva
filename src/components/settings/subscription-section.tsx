@@ -319,6 +319,24 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
     const [selectedCycles, setSelectedCycles] = useState({ pro: '1m', business: '1m' });
     const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
 
+    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isMobileApp = isTauri && isMobile;
+
+    const handleOpenWebDashboard = async () => {
+        if (isTauri) {
+            try {
+                const { open } = await import('@tauri-apps/plugin-shell');
+                await open('https://zeneva.space/billing');
+            } catch (e) {
+                console.error("Failed to open via Tauri shell:", e);
+                window.open('https://zeneva.space/billing', '_blank');
+            }
+        } else {
+            window.open('https://zeneva.space/billing', '_blank');
+        }
+    };
+
     const handleCycleChange = (planId: string, cycleId: string) => {
         setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
     };
@@ -457,7 +475,17 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                {currency === 'NGN' ? (
+                                {isMobileApp ? (
+                                    <div className="w-full flex flex-col items-center">
+                                        <Button onClick={handleOpenWebDashboard} className="w-full">
+                                            <ArrowRight className="mr-2 h-4 w-4" />
+                                            Upgrade on Web Dashboard
+                                        </Button>
+                                        <p className="text-[10px] text-muted-foreground text-center mt-2">
+                                            To comply with Google Play guidelines, subscription upgrades are completed securely via your web browser.
+                                        </p>
+                                    </div>
+                                ) : currency === 'NGN' ? (
                                     <PaystackSubscriptionButton
                                         plan={plan}
                                         cycle={selectedCycle}
