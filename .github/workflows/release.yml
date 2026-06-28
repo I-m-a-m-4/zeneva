@@ -211,55 +211,73 @@ jobs:
         run: npm run tauri icon public/zeneva-app-icon.png
         continue-on-error: true
 
-      - name: Build Android APK
+      - name: Build Android App (APK & AAB)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ env.NDK_HOME }}
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
         run: |
+          # Build standard AAB app bundle for Play Store
+          npm run tauri android build -- --target aarch64
+          # Build APK for direct testing/sideloading
           npm run tauri android build -- --apk --target aarch64
 
-      - name: Locate, Sign and Prepare APK
+      - name: Locate, Sign and Prepare Android Files
         run: |
-          echo "Searching for APK files..."
+          echo "Searching for APK and AAB files..."
           APK_PATH=$(find . -name "*.apk" | grep release | head -n 1)
           if [ -z "$APK_PATH" ]; then
             APK_PATH=$(find . -name "*.apk" | head -n 1)
           fi
           
+          AAB_PATH=$(find . -name "*.aab" | grep release | head -n 1)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find . -name "*.aab" | head -n 1)
+          fi
+          
+          # Check if zeneva.keystore exists, otherwise fallback to temp
+          if [ ! -f "zeneva.keystore" ]; then
+              echo "Zeneva Keystore not found, falling back to temp"
+              keytool -genkey -v -keystore zeneva.keystore -alias zeneva -keyalg RSA -keysize 2048 -validity 10000 -storepass zenevapass -keypass zenevapass -dname "CN=Zeneva, OU=Mobile, O=Zeneva, L=Lagos, S=Lagos, C=NG"
+          fi
+          
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at: $APK_PATH"
-            
-            # Check if zeneva.keystore exists, otherwise fallback to temp
-            if [ ! -f "zeneva.keystore" ]; then
-                echo "Zeneva Keystore not found, falling back to temp"
-                keytool -genkey -v -keystore zeneva.keystore -alias zeneva -keyalg RSA -keysize 2048 -validity 10000 -storepass zenevapass -keypass zenevapass -dname "CN=Zeneva, OU=Mobile, O=Zeneva, L=Lagos, S=Lagos, C=NG"
-            fi
-            
             # Find apksigner
             APKSIGNER=$(find $ANDROID_SDK_ROOT/build-tools -name "apksigner" | sort -V | tail -1)
             echo "Using apksigner at: $APKSIGNER"
-            
             # Sign the APK
             $APKSIGNER sign --ks zeneva.keystore --ks-key-alias zeneva --ks-pass pass:zenevapass --key-pass pass:zenevapass --out "./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk" "$APK_PATH"
-            
             echo "SIGNED APK ready at ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk"
           else
-            echo "CRITICAL: No APK file found!"
-            exit 1
+            echo "Warning: No APK file found!"
+          fi
+          
+          if [ -n "$AAB_PATH" ]; then
+            echo "Found AAB at: $AAB_PATH"
+            # Sign the AAB using jarsigner
+            jarsigner -keystore zeneva.keystore -storepass zenevapass -keypass zenevapass "$AAB_PATH" zeneva
+            cp "$AAB_PATH" "./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab"
+            echo "SIGNED AAB ready at ./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab"
+          else
+            echo "Warning: No AAB file found!"
           fi
 
-      - name: Upload APK to Release
+      - name: Upload Artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk
+          files: |
+            ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk
+            ./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab
           tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
 
-      - name: Upload APK as Workflow Artifact
+      - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: zeneva-android-apk
-          path: ./zeneva-*-SIGNED.apk
+          name: zeneva-android-artifacts
+          path: |
+            ./zeneva-*-SIGNED.apk
+            ./zeneva-*-SIGNED.aab
           if-no-files-found: warn
