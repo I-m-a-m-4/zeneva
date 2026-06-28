@@ -147,6 +147,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isFullSyncingReceipts, setIsFullSyncingReceipts] = useState(false);
   const [hasFullSyncedProducts, setHasFullSyncedProducts] = useState(false);
   const [hasFullSyncedReceipts, setHasFullSyncedReceipts] = useState(false);
+  const [hasFullSyncedCustomers, setHasFullSyncedCustomers] = useState(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
@@ -834,6 +835,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
       
       setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
+      setHasFullSyncedCustomers(true);
       
       // Only show the toast if it's been more than 24 hours since the last success
       // to avoid annoying the user on every app start.
@@ -1839,6 +1841,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
       if (lastProdSync > 0) setHasFullSyncedProducts(true);
       if (lastReceiptSync > 0) setHasFullSyncedReceipts(true);
+      if (lastCustSync > 0) setHasFullSyncedCustomers(true);
       
       const now = Date.now();
       const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
@@ -2154,11 +2157,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
                  if (isTauri) {
                    return syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline;
                  }
-                 return ((isLoadingProducts || !canFetchSubData) && !!businessId && initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
-                        (isLoadingCustomers && (!customers || customers.length === 0) && isRealOnline) || 
-                        (isLoadingReceipts && (!receipts || receipts.length === 0) && isRealOnline) ||
-                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline) ||
-                        (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline);
+                 return (!!businessId && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
+                        ((!customers || customers.length === 0) && !hasFullSyncedCustomers && isRealOnline) || 
+                        ((!receipts || receipts.length === 0) && !hasFullSyncedReceipts && isRealOnline) ||
+                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline && !hasFullSyncedCustomers) ||
+                        (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline && !hasFullSyncedProducts);
                })()) ||
                !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
