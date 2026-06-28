@@ -172,7 +172,7 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.get('businessId', null))));
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid));
       
       allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                       isRequestingUserStaff() && 
@@ -196,7 +196,7 @@ service cloud.firestore {
 
     match /receipts/{receiptId} {
         allow get: if true;
-        allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
+        allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid));
         
         allow create: if isSuperAdmin() || (isUserAuthenticated() && 
                         isRequestingUserMemberOf(request.resource.data.get('businessId', null)) && 
@@ -216,7 +216,7 @@ service cloud.firestore {
     
     match /customers/{customerId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.get('businessId', null)) || resource.data.get('createdBy', null) == request.auth.uid));
-      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.get('businessId', 'none') == getCurrentUserBusinessId() || resource.data.get('createdBy', null) == request.auth.uid));
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid));
       
       allow create: if isUserAuthenticated() && hasPermission('view_customers'); 
       allow update: if isSuperAdmin() || (isUserAuthenticated() && 

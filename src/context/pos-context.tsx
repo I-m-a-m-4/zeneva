@@ -845,7 +845,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('last_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+        setHasFullSyncedCustomers(true);
+        return;
+      }
       console.error("Full Customer Sync Failed:", error);
     } finally {
       setIsFullSyncingCustomers(false);
@@ -904,7 +907,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('last_product_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+        setHasFullSyncedProducts(true);
+        return;
+      }
       console.error("Full Product Sync Failed:", error);
     } finally {
       setIsFullSyncingProducts(false);
@@ -976,7 +982,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('last_receipt_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+        setHasFullSyncedReceipts(true);
+        return;
+      }
       console.error("Full Receipt Sync Failed:", error);
     } finally {
       setIsFullSyncingReceipts(false);
