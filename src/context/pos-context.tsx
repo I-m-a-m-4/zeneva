@@ -760,15 +760,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(query(collection(firestore, "users"), where("businessId", "==", businessId)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
       if (fetched.length > 0) {
-        setSyncedUsers(prev => {
-          const merged = [...prev];
-          fetched.forEach(nu => {
-            const idx = merged.findIndex(u => u.id === nu.id);
-            if (idx !== -1) merged[idx] = nu;
-            else merged.push(nu);
-          });
-          return merged;
-        });
+        setSyncedUsers(fetched);
       }
     } catch (e: any) { 
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
@@ -783,15 +775,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(query(collection(firestore, 'businessInstances', businessId, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)));
       const fetched = snap.docs.map(d => ({ ...d.data(), id: d.id } as AuditLog));
       if (fetched.length > 0) {
-        setSyncedAuditLogs(prev => {
-          const merged = [...prev];
-          fetched.forEach(na => {
-            const idx = merged.findIndex(a => a.id === na.id);
-            if (idx !== -1) merged[idx] = na;
-            else merged.push(na);
-          });
-          return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime()).slice(0, 200);
-        });
+        setSyncedAuditLogs(fetched.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime()));
       }
     } catch (e: any) { 
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
@@ -1431,8 +1415,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const nuclearReset = useCallback(async () => {
-    await resetPOS(); setQueuedActions([]); setSyncedProducts([]); setSyncedCustomers([]); setSyncedReceipts([]);
+    await resetPOS(); 
+    setQueuedActions([]); 
+    setSyncedProducts([]); 
+    setSyncedCustomers([]); 
+    setSyncedReceipts([]);
+    setSyncedUsers([]);
+    setSyncedAuditLogs([]);
+    setOfflineProfile(null);
+    setOfflineBusiness(null);
+    setOfflineStats(null);
     idb.clear();
+    
+    // Clear all secure storage keys to avoid bleeding data between logins
+    secureStorage.removeItem('pos_synced_products');
+    secureStorage.removeItem('pos_synced_customers');
+    secureStorage.removeItem('pos_synced_receipts');
+    secureStorage.removeItem('pos_synced_users');
+    secureStorage.removeItem('pos_synced_audit_logs');
+    secureStorage.removeItem(USER_PROFILE_KEY);
+    secureStorage.removeItem(BUSINESS_INSTANCE_KEY);
+    secureStorage.removeItem('pos_offline_stats');
+    secureStorage.removeItem('pos_last_synced_timestamp');
+    
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) clearAllTables();
   }, [resetPOS]);
 
