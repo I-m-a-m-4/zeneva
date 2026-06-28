@@ -46,8 +46,8 @@ function InvoiceRowSkeleton() {
 }
 
 export default function InvoicesPage() {
-    const { receipts, isLoading: isPosLoading, currencySymbol, triggerRefresh } = usePOS();
-    const isLoading = isPosLoading || receipts === null;
+    const { receipts, currencySymbol, triggerRefresh } = usePOS();
+    const isLoading = receipts === null;
     const [searchTerm, setSearchTerm] = React.useState('');
     const [updatingId, setUpdatingId] = React.useState<string | null>(null);
     const firestore = useFirestore();
