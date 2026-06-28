@@ -1843,7 +1843,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, products, customers, receipts, business, stats]);
 
   useEffect(() => {
-    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline) return;
+    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
 
     const checkFullSyncStatus = async () => {
       const [lastCustSync, lastProdSync, lastReceiptSync] = await Promise.all([
@@ -1878,7 +1878,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, businessId, firestore, isRealOnline]);
+  }, [isMounted, businessId, firestore, isRealOnline, user]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
   useEffect(() => {
