@@ -217,11 +217,9 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
         run: |
           # Build standard AAB app bundle for Play Store
-          npm run tauri android build -- --target aarch64
-          # Compile the APK directly via Gradle using the already compiled assets/Rust libs
-          cd src-tauri/gen/android
-          chmod +x gradlew
-          ./gradlew assembleRelease
+          npm run tauri android build -- --aab --target aarch64
+          # Build APK package for testing
+          npm run tauri android build -- --apk --target aarch64
 
       - name: Locate, Sign and Prepare Android Files
         run: |
