@@ -853,6 +853,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Full Customer Sync Failed:", error);
     } finally {
       setIsFullSyncingCustomers(false);
+      setHasFullSyncedCustomers(true);
     }
   }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
 
@@ -915,6 +916,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Full Product Sync Failed:", error);
     } finally {
       setIsFullSyncingProducts(false);
+      setHasFullSyncedProducts(true);
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
 
@@ -990,6 +992,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Full Receipt Sync Failed:", error);
     } finally {
       setIsFullSyncingReceipts(false);
+      setHasFullSyncedReceipts(true);
     }
   }, [businessId, firestore, isFullSyncingReceipts, toast, user, isRealOnline]);
 
