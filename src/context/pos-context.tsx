@@ -193,11 +193,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const controller = new AbortController();
         // INCREASE TIMEOUT WINDOW TO 8.5 SECONDS TO ACCOMMODATE WEAK/SLUGGISH CELLULAR LINKS
         const id = setTimeout(() => controller.abort(), 8500);
-        await fetch("https://fonts.googleapis.com", {
+        await fetch("https://fonts.googleapis.com/css2?family=Inter", {
           mode: "no-cors",
           cache: "no-store",
           signal: controller.signal,
         });
+
         clearTimeout(id);
         return true;
       } catch {
@@ -1542,7 +1543,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, firestore, products, isRealOnline]);
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
-    if (!user || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
+    if (!getAuth().currentUser || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
     
     let result = { revenue: 0, count: 0, customers: 0 };
     let uniqueCustomerIds = new Set<string>();
@@ -1985,7 +1986,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
-    if (!businessId || !firestore) return [];
+    if (!getAuth().currentUser || !businessId || !firestore) return [];
     
     let results: Receipt[] = [];
     
@@ -2072,7 +2073,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || '₦';
 
   const fetchMonthlyAnalytics = useCallback(async (monthCount: number = 12) => {
-    if (!businessId || !firestore) return [];
+    if (!getAuth().currentUser || !businessId || !firestore) return [];
     
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     const isOnline = isRealOnline;
