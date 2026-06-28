@@ -47,6 +47,11 @@ export default function PrivacyPolicyPage() {
       <p>
         Information our servers automatically collect when you access the Service, such as your IP address, your browser type, your operating system, your access times, and the pages you have viewed directly before and after accessing the Service.
       </p>
+
+      <h3>D. Device Permissions (Camera)</h3>
+      <p>
+        We may request access or permission to certain features from your mobile device, including your device's camera. The camera is used solely to scan barcodes and product QR codes during checkout and inventory actions. Image frames processed by the camera are analyzed locally on your device in real-time and are never uploaded, stored, or shared on our servers.
+      </p>
       
       <h2>2. How We Use Your Information</h2>
       <p>
@@ -82,13 +87,14 @@ export default function PrivacyPolicyPage() {
         <li><strong>Multi-Tenant Isolation:</strong> We use strict logical boundaries to ensure your data is accessible only by you and your authorized staff.</li>
       </ul>
       
-      <h2>5. Your Rights</h2>
+      <h2>5. Your Rights & Data Deletion</h2>
       <p>
         You have the right to:
       </p>
       <ul>
         <li>Review or change the information in your account by logging into your account settings and updating your account.</li>
         <li>Terminate your account, which will result in the deletion of your Personal Data and the archiving or deletion of your Business Data according to our data retention policies.</li>
+        <li><strong>Request Data Deletion:</strong> You can request the complete deletion of your account and all associated personal and business data at any time by emailing us at <strong>zenevapos@gmail.com</strong>. Upon receiving your request, we will verify your identity and delete all your hosted data from our active databases within 30 days.</li>
       </ul>
       
       <h2>6. Changes to This Privacy Policy</h2>
