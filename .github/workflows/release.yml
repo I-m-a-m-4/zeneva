@@ -76,7 +76,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Zeneva v__VERSION__'
           releaseBody: 'Zeneva Multi-Platform Release (Windows/macOS). For the best experience, use the auto-updater within the application settings.'
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
 
       - name: Verify Artifacts (Windows)
@@ -255,6 +255,7 @@ jobs:
           files: ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk
           tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
