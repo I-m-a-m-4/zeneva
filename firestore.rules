@@ -86,7 +86,7 @@ service cloud.firestore {
     match /supportThreads/{threadId} {
         allow read: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || resource.data.userId == request.auth.uid));
         allow create: if isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || request.resource.data.userId == request.auth.uid);
-        allow update: if isSuperAdmin();
+        allow update: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || resource.data.userId == request.auth.uid));
 
         match /messages/{messageId} {
             allow create: if isSuperAdmin() || (isUserAuthenticated() && (threadId.startsWith(request.auth.uid + '_') || get(/databases/$(database)/documents/supportThreads/$(threadId)).data.userId == request.auth.uid));
