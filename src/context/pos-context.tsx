@@ -448,7 +448,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
       return dateB - dateA;
     });
-  }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId]);
+  }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId, hasFullSyncedProducts]);
 
   const profile = useMemo(() => {
     if (currentUserProfile) return currentUserProfile;
@@ -512,7 +512,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       };
       return getMillis(b.createdAt) - getMillis(a.createdAt);
     });
-  }, [initialReceipts, syncedReceipts, queuedActions, isRealOnline, businessId]);
+  }, [initialReceipts, syncedReceipts, queuedActions, isRealOnline, businessId, hasFullSyncedReceipts]);
 
   const customers = useMemo(() => {
     let merged = [...(initialCustomers || [])];
