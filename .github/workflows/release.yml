@@ -198,7 +198,6 @@ jobs:
         run: |
           node scripts/prepare-tauri.mjs
           npm run build
-
       - name: Initialize Android (if not exists)
         run: npx tauri android init --ci
         continue-on-error: true
@@ -219,8 +218,10 @@ jobs:
         run: |
           # Build standard AAB app bundle for Play Store
           npm run tauri android build -- --target aarch64
-          # Build APK for direct testing/sideloading
-          npm run tauri android build -- --apk --target aarch64
+          # Compile the APK directly via Gradle using the already compiled assets/Rust libs
+          cd src-tauri/gen/android
+          chmod +x gradlew
+          ./gradlew assembleRelease
 
       - name: Locate, Sign and Prepare Android Files
         run: |
