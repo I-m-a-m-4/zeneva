@@ -323,9 +323,9 @@ export default function ReportsDashboard() {
                 featureName="Advanced Reports"
                 featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
                 className="flex-grow flex flex-col"
-                placeholderContent={<ReportsPlaceholder />}
                 isLoading={isPosLoading}
-                          <Tabs defaultValue="analytics" className="w-full flex flex-col flex-grow">
+            >
+                <Tabs defaultValue="analytics" className="w-full flex flex-col flex-grow">
                   <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
                       <TabsList className="grid grid-cols-2 w-[350px]">
                           <TabsTrigger value="analytics" className="text-sm font-semibold">Analytics Dashboard</TabsTrigger>
@@ -480,7 +480,6 @@ export default function ReportsDashboard() {
                       </>
                   )}
                 </Tabs>
-                )}
             </FeatureGate>
         </div>
     );

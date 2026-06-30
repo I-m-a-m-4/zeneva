@@ -56,9 +56,9 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           quantity: item.quantity,
           price: item.price,
           total: item.price * item.quantity,
-          receiptNumber: r.receiptNumber,
+          receiptNumber: r.receiptNumber || 'N/A',
           createdAt: date,
-          paymentMethod: r.paymentMethod,
+          paymentMethod: r.paymentMethod || 'Walk-in',
           imageUrl: product?.imageUrl || undefined,
           categoryType: product?.categoryType || 'product',
           category: product?.category || undefined
