@@ -23,7 +23,7 @@ import { logAuditEvent } from '@/lib/audit';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
@@ -209,6 +209,38 @@ function ReviewPageContent() {
                 customerUpdate
             }
         }, `Recording Sale: ${receiptData.receiptNumber}`);
+
+        // Queue audit logs for stock adjustment due to sales
+        const activeProfile = currentUserProfile || offlineProfile;
+        cart.forEach(cartItem => {
+            const masterProduct = products.find(p => p.id === cartItem.product.id);
+            const isService = masterProduct?.categoryType === 'service';
+            if (isService) return; // Skip audit logging stock for services as they have no inventory
+            
+            const multiplier = cartItem.multiplier || 1;
+            const quantitySold = cartItem.quantity * multiplier;
+            
+            addToQueue({
+                type: 'add-audit-log',
+                payload: {
+                    businessId: business.id,
+                    userId: activeProfile?.id || user.uid,
+                    userName: activeProfile?.name || 'Staff',
+                    userEmail: activeProfile?.email || user.email || '',
+                    userRole: activeProfile?.role || 'staff',
+                    action: 'product.sale',
+                    entityType: 'Product',
+                    entityId: cartItem.product.id,
+                    details: {
+                        entityName: cartItem.product.name,
+                        oldStock: masterProduct?.stock || 0,
+                        newStock: (masterProduct?.stock || 0) - quantitySold,
+                        adjustment: -quantitySold,
+                        reason: `Sold in Sale ${displayReceipt.receiptNumber}`
+                    }
+                }
+            }, `Logging sale deduction for ${cartItem.product.name}`);
+        });
 
         // 4. Handle Email Receipt (Try sending immediately if online)
         if (navigator.onLine && shouldSendEmail && selectedCustomer?.email) {

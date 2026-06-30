@@ -180,7 +180,7 @@ function EditProductContent() {
         const stockQuery = query(
             collection(firestore, 'businessInstances', business.id, 'auditLogs'),
             where('entityId', '==', product.id),
-            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update', 'product.bulk_update']),
+            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update', 'product.bulk_update', 'product.sale']),
             orderBy('createdAt', 'desc'),
             limit(50)
         );
@@ -195,7 +195,7 @@ function EditProductContent() {
             const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
             // Filter to ensure we only show logs that actually affected stock or are explicit adjustments
             const filtered = logs.filter(log => {
-                if (log.action === 'product.stock_adjustment' || log.action === 'product.create') return true;
+                if (log.action === 'product.stock_adjustment' || log.action === 'product.create' || log.action === 'product.sale') return true;
                 if (log.action === 'product.update' || log.action === 'product.bulk_update') {
                     // Show if it explicitly mentions stock or adjustment
                     return log.details?.adjustment !== undefined || 
