@@ -1440,6 +1440,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setOfflineProfile(null);
     setOfflineBusiness(null);
     setOfflineStats(null);
+    setHasFullSyncedProducts(false);
+    setHasFullSyncedReceipts(false);
+    setHasFullSyncedCustomers(false);
+    setLastSyncedTimestamp(Date.now() - 24 * 60 * 60 * 1000);
     idb.clear();
     
     // Clear all secure storage keys to avoid bleeding data between logins
