@@ -20,6 +20,8 @@ import Link from 'next/link';
 import ProfitLossChart from '@/components/reports/profit-loss-chart';
 import OverviewChart from '@/components/dashboard/overview-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
+import DailySalesItemsTable from '@/components/reports/daily-sales-items-table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
@@ -323,152 +325,161 @@ export default function ReportsDashboard() {
                 className="flex-grow flex flex-col"
                 placeholderContent={<ReportsPlaceholder />}
                 isLoading={isPosLoading}
-            >
-                <div className="flex flex-wrap items-center justify-between gap-4 no-capture mb-6">
-                    <div className="flex flex-wrap items-center gap-4">
-                        <DateRangePicker date={date} onDateChange={setDate} />
-                        {isFetchingBatch && (
-                            <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                <span>Updating metrics...</span>
+                          <Tabs defaultValue="analytics" className="w-full flex flex-col flex-grow">
+                  <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
+                      <TabsList className="grid grid-cols-2 w-[350px]">
+                          <TabsTrigger value="analytics" className="text-sm font-semibold">Analytics Dashboard</TabsTrigger>
+                          <TabsTrigger value="daily-sales" className="text-sm font-semibold">Daily Sales Items</TabsTrigger>
+                      </TabsList>
+                      <div className="flex flex-wrap items-center gap-4">
+                          <DateRangePicker date={date} onDateChange={setDate} />
+                          {isFetchingBatch && (
+                              <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                  <span>Updating metrics...</span>
+                              </div>
+                          )}
+                          <Button onClick={handleDownloadImage} variant="outline" size="sm" className="h-9"><Download className="mr-2 h-4 w-4" />Export Image</Button>
+                      </div>
+                  </div>
+
+                  {showBlankScreenSpinner ? (
+                      <div className="flex h-64 items-center justify-center animate-pulse">
+                          <div className="flex flex-col items-center gap-3">
+                              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                              <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
+                          </div>
+                      </div>
+                  ) : (
+                      <>
+                        <TabsContent value="analytics" className="space-y-6 mt-0">
+                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                                <ReportStatCard
+                                    title="Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={DollarSign}
+                                    description="Total earnings"
+                                />
+                                <ReportStatCard
+                                    title="Product Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={Package}
+                                    description="Revenue from physical goods"
+                                />
+                                <ReportStatCard
+                                    title="Service Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={TrendingUp}
+                                    description="Revenue from services"
+                                />
+                                <ReportStatCard
+                                    title="Sales"
+                                    value={finalReportData?.totalSales.toLocaleString() || '0'}
+                                    icon={ShoppingCart}
+                                    description="Total transactions"
+                                />
+                                <ReportStatCard
+                                    title="Unique Products"
+                                    value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
+                                    icon={Package}
+                                    description="Different products sold"
+                                />
+                                <ReportStatCard
+                                    title="Units Sold"
+                                    value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
+                                    icon={Layers}
+                                    description="Total pieces moved"
+                                />
+                                 <ReportStatCard
+                                    title="Daily Velocity"
+                                    value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
+                                    icon={TrendingUp}
+                                    description="Sales per day"
+                                />
+                                <ReportStatCard
+                                    title="Catalog Size"
+                                    value={finalReportData?.catalogSize?.toLocaleString() || '0'}
+                                    icon={Package}
+                                    description="Total unique products in inventory"
+                                />
+                                <ReportStatCard
+                                    title="Avg Order"
+                                    value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={FileText}
+                                    description="Revenue per sale"
+                                />
+                                <ReportStatCard
+                                    title="Customers"
+                                    value={finalReportData?.totalCustomers.toLocaleString() || '0'}
+                                    icon={Users}
+                                    description="Total unique buyers"
+                                />
                             </div>
-                        )}
-                    </div>
-                    <Button onClick={handleDownloadImage}><Download className="mr-2 h-4 w-4" />Download</Button>
-                </div>
 
-                {showBlankScreenSpinner ? (
-                    <div className="flex h-64 items-center justify-center animate-pulse">
-                        <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                            <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-                            <ReportStatCard
-                                title="Revenue"
-                                value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                icon={DollarSign}
-                                description="Total earnings"
-                            />
-                            <ReportStatCard
-                                title="Product Revenue"
-                                value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                icon={Package}
-                                description="Revenue from physical goods"
-                            />
-                            <ReportStatCard
-                                title="Service Revenue"
-                                value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                icon={TrendingUp}
-                                description="Revenue from services"
-                            />
-                            <ReportStatCard
-                                title="Sales"
-                                value={finalReportData?.totalSales.toLocaleString() || '0'}
-                                icon={ShoppingCart}
-                                description="Total transactions"
-                            />
-                            <ReportStatCard
-                                title="Unique Products"
-                                value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
-                                icon={Package}
-                                description="Different products sold"
-                            />
-                            <ReportStatCard
-                                title="Units Sold"
-                                value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
-                                icon={Layers}
-                                description="Total pieces moved"
-                            />
-                             <ReportStatCard
-                                title="Daily Velocity"
-                                value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
-                                icon={TrendingUp}
-                                description="Sales per day"
-                            />
-                            <ReportStatCard
-                                title="Catalog Size"
-                                value={finalReportData?.catalogSize?.toLocaleString() || '0'}
-                                icon={Package}
-                                description="Total unique products in inventory"
-                            />
-                            <ReportStatCard
-                                title="Avg Order"
-                                value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                icon={FileText}
-                                description="Revenue per sale"
-                            />
-                            <ReportStatCard
-                                title="Customers"
-                                value={finalReportData?.totalCustomers.toLocaleString() || '0'}
-                                icon={Users}
-                                description="Total unique buyers"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                            <div className="lg:col-span-3">
-                                <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                                <div className="lg:col-span-3">
+                                    <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                </div>
+                                <div className="lg:col-span-2">
+                                    <TopProductsChart receipts={deepReceipts} />
+                                </div>
                             </div>
-                            <div className="lg:col-span-2">
-                                <TopProductsChart receipts={deepReceipts} />
+
+                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                                <div className="lg:col-span-3">
+                                    <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                </div>
+                                <div className="lg:col-span-2">
+                                    <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                            <div className="lg:col-span-3">
-                                <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                                <div className="lg:col-span-3">
+                                    <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                </div>
+                                <div className="lg:col-span-2">
+                                    <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                </div>
                             </div>
-                            <div className="lg:col-span-2">
-                                <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+
+                            <div className="grid grid-cols-1 gap-6">
+                                <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
+                                <HourlySalesHeatmap receipts={deepReceipts} />
+                                <BasketAnalysis receipts={deepReceipts} />
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                            <div className="lg:col-span-3">
-                                <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
-                            </div>
-                            <div className="lg:col-span-2">
-                                <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
-                            </div>
-                        </div>
+                            <FeatureGate
+                                requiredPlan="business"
+                                currentPlan={business?.plan}
+                                hasLifetimeAccess={hasLifetimeAccess}
+                                featureName="Customer Intelligence"
+                                featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
+                            >
+                                <CustomerAnalytics 
+                                    customers={customers || []} 
+                                    receipts={deepReceipts} 
+                                    currencySymbol={currencySymbol} 
+                                    totalBusinessCustomers={stats?.totalCustomers} 
+                                />
+                            </FeatureGate>
 
-                        <div className="grid grid-cols-1 gap-6">
-                            <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
-                            <HourlySalesHeatmap receipts={deepReceipts} />
-                            <BasketAnalysis receipts={deepReceipts} />
-                        </div>
-
-
-
-                        <FeatureGate
-                            requiredPlan="business"
-                            currentPlan={business?.plan}
-                            hasLifetimeAccess={hasLifetimeAccess}
-                            featureName="Customer Intelligence"
-                            featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
-                        >
-                            <CustomerAnalytics 
-                                customers={customers || []} 
-                                receipts={deepReceipts} 
-                                currencySymbol={currencySymbol} 
-                                totalBusinessCustomers={stats?.totalCustomers} 
-                            />
-                        </FeatureGate>
-
-                        <FeatureGate
-                            requiredPlan="business"
-                            currentPlan={business?.plan}
-                            hasLifetimeAccess={hasLifetimeAccess}
-                            featureName="Inventory Velocity"
-                            featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
-                        >
-                            <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
-                        </FeatureGate>
-                    </div>
+                            <FeatureGate
+                                requiredPlan="business"
+                                currentPlan={business?.plan}
+                                hasLifetimeAccess={hasLifetimeAccess}
+                                featureName="Inventory Velocity"
+                                featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
+                            >
+                                <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                            </FeatureGate>
+                        </TabsContent>
+                        <TabsContent value="daily-sales" className="mt-0">
+                            <DailySalesItemsTable receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                        </TabsContent>
+                      </>
+                  )}
+                </Tabs>
                 )}
             </FeatureGate>
         </div>
