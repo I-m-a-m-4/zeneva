@@ -425,6 +425,29 @@ function SettingsPageContent() {
         }
 
         try {
+            const performOptimisticUpdate = () => {
+                if (mutateBusiness) {
+                    mutateBusiness((prev: any) => {
+                        if (!prev) return null;
+                        const updated = { ...prev };
+                        Object.keys(finalData).forEach(key => {
+                            if (key.includes('.')) {
+                                const parts = key.split('.');
+                                let curr: any = updated;
+                                for (let i = 0; i < parts.length - 1; i++) {
+                                    curr[parts[i]] = { ...curr[parts[i]] };
+                                    curr = curr[parts[i]];
+                                }
+                                curr[parts[parts.length - 1]] = finalData[key];
+                            } else {
+                                (updated as any)[key] = finalData[key];
+                            }
+                        });
+                        return updated;
+                    });
+                }
+            };
+
             if (isTauri) {
                 // Use offline queue for desktop
                 addToQueue({
@@ -438,21 +461,18 @@ function SettingsPageContent() {
                   description: `Settings will be synced when online.` 
                 });
                 
-                // Optimistically update business state in context (if mutateBusiness supports it)
-                if (mutateBusiness) {
-                    // This will be handled by the context's effect on queuedActions
-                    // but we can also call mutateBusiness with the new data for immediate UI update
-                }
+                performOptimisticUpdate();
             } else {
                 // Web behavior
                 const businessDocRef = doc(firestore, 'businessInstances', business.id);
                 await updateDoc(businessDocRef, finalData);
                 toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
+                
+                performOptimisticUpdate();
+                
+                // Force a re-fetch of business data to update all industry-specific UI components
+                triggerRefresh();
             }
-            
-            // Force a re-fetch of business data to update all industry-specific UI components
-            triggerRefresh();
-            if (mutateBusiness) mutateBusiness();
         } catch (error) {
             toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
         } finally {
@@ -1061,7 +1081,13 @@ function SettingsPageContent() {
 
 export default function SettingsPage() {
     const { isLoading: isPosLoading, business } = usePOS();
-    if (isPosLoading && !business) {
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted || (isPosLoading && !business)) {
         return <SettingsPageSkeleton />;
     }
     return <SettingsPageContent />;

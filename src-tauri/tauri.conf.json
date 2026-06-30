@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co; connect-src 'self' https: wss: blob:; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
+      "csp": "default-src 'self' tauri: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://cdn.jsdelivr.net; connect-src 'self' https: wss: blob:; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com https://www.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
     }
   },
   "bundle": {

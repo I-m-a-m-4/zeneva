@@ -51,6 +51,16 @@ function ReceiptRowSkeleton() {
 }
 
 export default function ReceiptsPage() {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <Skeleton className="h-96 w-full" />;
+  }
+
   return (
     <Suspense fallback={<Skeleton className="h-96 w-full" />}>
       <ReceiptsContent />

@@ -280,3 +280,69 @@ jobs:
             ./zeneva-*-SIGNED.apk
             ./zeneva-*-SIGNED.aab
           if-no-files-found: warn
+
+  release-ios:
+    name: Build & Release (iOS)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Extract App Version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build frontend
+        env:
+          IS_TAURI: true
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
+          NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
+          NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
+          NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
+          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
+          NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID }}
+          NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID }}
+          NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY }}
+        run: |
+          node scripts/prepare-tauri.mjs
+          npm run build
+
+      - name: Initialize iOS (if not exists)
+        run: npx tauri ios init --ci
+        continue-on-error: true
+
+      - name: Build iOS App
+        run: |
+          # Build iOS app without signing certificates (to prevent errors in CI)
+          npm run tauri ios build -- --no-signing
+        continue-on-error: true
+
+      - name: Upload iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeneva-ios-artifacts
+          path: src-tauri/gen/apple/build/arm64/*.app
+          if-no-files-found: warn

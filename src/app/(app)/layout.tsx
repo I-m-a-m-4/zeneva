@@ -1033,47 +1033,76 @@ export default function AuthenticatedLayout({
                   )}
                 </div>
                 {showSubscriptionBlock && (
-                   <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] animate-in fade-in duration-500">
-                    <Card className="w-full max-w-lg border-2 border-dashed border-orange-500/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-8 duration-700">
-                      <CardHeader className="pt-10 pb-6 text-center">
-                        <div className="mx-auto mb-8 relative">
-                           <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
-                           <img 
-                             src="/trial-expired.png" 
-                             alt="Trial Expired" 
-                             className="h-32 w-auto relative z-10 drop-shadow-2xl animate-float"
-                           />
-                        </div>
-                        <CardTitle className="text-4xl font-extrabold tracking-tight text-foreground">
-                          Trial Expired
-                        </CardTitle>
-                        <CardDescription className="text-lg mt-3 px-4">
-                          Your trial period or subscription has ended. To continue using <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span>, please subscribe to a plan.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="px-8 pb-10">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                          <div className="p-5 rounded-2xl bg-muted/30 border border-border/50 shadow-sm">
-                            <h4 className="text-xs font-bold text-primary mb-4 uppercase tracking-wider">Restricted Features</h4>
-                            <ul className="text-sm space-y-3 text-muted-foreground font-medium">
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> POS & Sales</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Storefront</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Zen AI</li>
-                              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Customers</li>
-                            </ul>
+                   <div className="absolute inset-0 z-[30] overflow-y-auto p-4 bg-background/5 backdrop-blur-[2px] animate-in fade-in duration-500">
+                     <div className="min-h-full w-full flex items-center justify-center pb-20 sm:pb-4">
+                       <Card className="w-full max-w-lg border-2 border-dashed border-orange-500/20 shadow-md bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-8 duration-700">
+                        <CardHeader className="pt-10 pb-6 text-center">
+                          <div className="mx-auto mb-8 relative">
+                             <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-28 w-28 text-orange-500 relative z-10 animate-float"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <style>{`
+                                  @keyframes sandFlow {
+                                    to {
+                                      stroke-dashoffset: -6;
+                                    }
+                                  }
+                                  .sand-stream {
+                                    stroke-dasharray: 3 3;
+                                    animation: sandFlow 0.5s linear infinite;
+                                  }
+                                `}</style>
+                                <line x1="4" y1="2" x2="20" y2="2" strokeWidth="2" />
+                                <line x1="4" y1="22" x2="20" y2="22" strokeWidth="2" />
+                                <path d="M5 2 C5 2 5 9 10 12 C5 15 5 22 5 22" />
+                                <path d="M19 2 C19 2 19 9 14 12 C19 15 19 22 19 22" />
+                                <path d="M6 5 H18 L15 10 H9 Z" fill="currentColor" fillOpacity="0.8" stroke="none" />
+                                <line x1="12" y1="10" x2="12" y2="21" className="sand-stream" stroke="currentColor" strokeWidth="1" />
+                                <path d="M8 21 H16 L14 18 H10 Z" fill="currentColor" fillOpacity="0.9" stroke="none" />
+                              </svg>
                           </div>
-                          <div className="p-5 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex flex-col justify-center text-center">
-                            <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Unlock all features instantly with our business-ready plans.</p>
-                            <Button asChild className="w-full h-12 shadow-lg shadow-orange-500/20 hover:scale-[1.05] active:scale-95 transition-all duration-300 bg-orange-500 hover:bg-orange-600 font-bold">
-                              <Link href="/billing">
-                                <ArrowRight className="mr-2 h-4 w-4" />
-                                Review Plans
-                              </Link>
-                            </Button>
+                          <CardTitle className="text-4xl font-extrabold tracking-tight text-foreground">
+                            Trial Expired
+                          </CardTitle>
+                          <CardDescription className="text-lg mt-3 px-4">
+                            Your trial period or subscription has ended. To continue using <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span>, please subscribe to a plan.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-8 pb-10">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="p-5 rounded-2xl bg-muted/30 border border-border/50 shadow-sm">
+                              <h4 className="text-xs font-bold text-primary mb-4 uppercase tracking-wider">Restricted Features</h4>
+                              <ul className="text-sm space-y-3 text-muted-foreground font-medium">
+                                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> POS & Sales</li>
+                                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Storefront</li>
+                                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Zen AI</li>
+                                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-orange-500" /> Customers</li>
+                              </ul>
+                            </div>
+                             <div className="p-5 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex flex-col justify-center text-center">
+                               <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Unlock all features instantly with our business-ready plans.</p>
+                               <Button asChild className="w-full h-12 shadow-md hover:scale-[1.05] active:scale-95 transition-all duration-300 bg-orange-500 hover:bg-orange-600 font-bold">
+                                 <Link href="/billing">
+                                   <ArrowRight className="mr-2 h-4 w-4" />
+                                   Review Plans
+                                 </Link>
+                               </Button>
+                               <Button variant="ghost" onClick={handleLogout} className="mt-3 text-xs text-muted-foreground hover:text-foreground font-semibold hover:bg-muted/50 h-9 transition-colors">
+                                 Log Out
+                               </Button>
+                             </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                     </div>
                   </div>
                 )}
               </main>

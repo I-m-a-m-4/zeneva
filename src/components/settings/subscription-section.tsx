@@ -330,10 +330,10 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                 await open('https://zeneva.space/billing');
             } catch (e) {
                 console.error("Failed to open via Tauri shell:", e);
-                window.open('https://zeneva.space/billing', '_blank');
+                window.location.href = 'https://zeneva.space/billing';
             }
         } else {
-            window.open('https://zeneva.space/billing', '_blank');
+            window.location.href = 'https://zeneva.space/billing';
         }
     };
 
