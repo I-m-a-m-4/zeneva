@@ -10,11 +10,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
 import { idb } from '@/lib/idb';
-import {
-  syncProductsToOffline,
+import {   syncProductsToOffline, 
   syncProductToOffline,
   deleteMultipleProductsFromOffline,
-  getCachedProducts,
+  getCachedProducts, 
   getCachedCustomers,
   syncCustomersToOffline,
   syncReceiptsToOffline,
@@ -23,7 +22,7 @@ import {
   syncBusinessToOffline,
   syncStatsToOffline,
   getCachedStats,
-  getLastSyncMetadata,
+  getLastSyncMetadata, 
   setLastSyncMetadata,
   saveActionToOfflineQueue,
   getOfflineQueue,
@@ -33,13 +32,13 @@ import {
   deleteReceiptFromOffline
 } from '@/lib/sqlite-sync';
 
-import {
-  POS_CART_KEY,
-  POS_CUSTOMER_KEY,
-  POS_TAX_RATE_KEY,
-  POS_DISCOUNT_KEY,
-  POS_PAYMENT_METHOD_KEY,
-  POS_AUTO_PRINT_KEY,
+import { 
+  POS_CART_KEY, 
+  POS_CUSTOMER_KEY, 
+  POS_TAX_RATE_KEY, 
+  POS_DISCOUNT_KEY, 
+  POS_PAYMENT_METHOD_KEY, 
+  POS_AUTO_PRINT_KEY, 
   CURRENCY_SYMBOLS,
   USER_PROFILE_KEY,
   BUSINESS_INSTANCE_KEY,
@@ -180,7 +179,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const verifyConnectivity = useCallback(async () => {
     if (typeof window === 'undefined') return;
-
+    
     // 1. Native Disconnect is absolute and immediate
     if (!navigator.onLine) {
       consecutiveFailuresRef.current = 2; // Force threshold ceiling
@@ -217,7 +216,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           img.src = "";
           resolve(false);
         }, 8500); // Expanded timeout to 8.5s
-
+        
         img.onload = () => {
           clearTimeout(timer);
           resolve(true);
@@ -266,20 +265,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } else {
       // PROBE FAILURE: Log it, but BUFFER the decision!
       consecutiveFailuresRef.current += 1;
-
+      
       // Only declare offline in UI if BOTH probes in CONSECUTIVE runs fail entirely!
       // This flawlessly prevents flickering on high-latency or weak connections.
       if (consecutiveFailuresRef.current >= 2) {
         setIsRealOnline(false);
       }
     }
-
+    
     return hasConnection;
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
+    
     const handleOnlineEvent = () => {
       // Wait 500ms to allow interface initialization, then execute WAN ping
       setTimeout(verifyConnectivity, 500);
@@ -290,10 +289,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('online', handleOnlineEvent);
     window.addEventListener('offline', handleOfflineEvent);
-
+    
     // Periodic background check every 16 seconds to balance cellular data usage and responsiveness
     const interval = setInterval(verifyConnectivity, 16000);
-
+    
     // Perform verification on component load
     verifyConnectivity();
 
@@ -354,7 +353,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     if (!isTauri) idb.set('pos_synced_receipts', syncedReceipts);
   }, [syncedReceipts]);
-
+ 
   useEffect(() => {
     secureStorage.setItem('pos_synced_users', syncedUsers);
   }, [syncedUsers]);
@@ -384,7 +383,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // Background Stats Reconciliation
   useEffect(() => {
     if (!canFetchSubData || !firestore || !businessId || !initialStats) return;
-
+    
     const reconcileStats = async () => {
       try {
         if (!getAuth().currentUser) return;
@@ -392,14 +391,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
         if (!getAuth().currentUser) return;
         const productsCount = await getAggregateFromServer(query(collection(firestore, "products"), where("businessId", "==", businessId)), { total: count() });
         if (!getAuth().currentUser) return;
-
+        
         const realTotalCustomers = customersCount.data().total;
         const realTotalProducts = productsCount.data().total;
 
         if (realTotalCustomers !== initialStats.totalCustomers || realTotalProducts !== initialStats.totalProducts) {
-          await setDoc(statsDocRef!, {
+          await setDoc(statsDocRef!, { 
             totalCustomers: realTotalCustomers,
-            totalProducts: realTotalProducts
+            totalProducts: realTotalProducts 
           }, { merge: true });
         }
       } catch (e) {
@@ -438,7 +437,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (action.type === 'update-product') { const idx = merged.findIndex(p => p.id === action.payload.productId); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }
       else if (action.type === 'bulk-update-products') { action.payload.productIds.forEach((id: string) => { const idx = merged.findIndex(p => p.id === id); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }); }
       else if (action.type === 'add-product') { if (!merged.find(p => p.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); }
-      else if (action.type === 'complete-sale') {
+      else if (action.type === 'complete-sale') { 
         const items = action.payload.receiptData?.items || action.payload.items;
         if (Array.isArray(items)) items.forEach((item: any) => { const idx = merged.findIndex(p => p.id === item.productId); if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity }; });
       }
@@ -478,33 +477,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const receipts = useMemo(() => {
     const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
     if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && !hasFullSyncedReceipts && isRealOnline && !!businessId) return null;
-
+    
     let merged = [...(initialReceipts || [])];
     const existingIds = new Set(merged.map(r => r.id));
-    syncedReceipts.forEach(r => {
+    syncedReceipts.forEach(r => { 
       if (!existingIds.has(r.id)) {
-        merged.push(r);
+        merged.push(r); 
         existingIds.add(r.id);
       }
     });
     queuedSales.forEach(action => {
       const receipt = action.payload.receiptData;
       if (receipt && !existingIds.has(receipt.id)) {
-        merged.push({
-          ...receipt,
-          isOptimistic: true,
-          createdAt: receipt.createdAt || new Date(action.timestamp)
+        merged.push({ 
+          ...receipt, 
+          isOptimistic: true, 
+          createdAt: receipt.createdAt || new Date(action.timestamp) 
         });
         existingIds.add(receipt.id);
       }
     });
-
+    
     // Filter out voided receipts currently in the sync queue
     const voidedIds = new Set(queuedActions.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
     if (voidedIds.size > 0) {
       merged = merged.filter(r => !voidedIds.has(r.id));
     }
-
+    
     // Client-side sort by createdAt desc
     return merged.sort((a, b) => {
       const getMillis = (dateVal: any) => {
@@ -518,12 +517,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const customers = useMemo(() => {
     let merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
-    syncedCustomers.forEach(c => {
+    syncedCustomers.forEach(c => { 
       if (!existingIds.has(c.id)) {
-        merged.push(c);
-      } else {
+        merged.push(c); 
+      } else { 
         // Only overwrite if the local data is actually newer (using updatedAt)
-        const idx = merged.findIndex(m => m.id === c.id);
+        const idx = merged.findIndex(m => m.id === c.id); 
         if (idx !== -1) {
           const serverDate = safeToDate(merged[idx].updatedAt).getTime();
           const localDate = safeToDate(c.updatedAt).getTime();
@@ -531,17 +530,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
             merged[idx] = { ...merged[idx], ...c };
           }
         }
-      }
+      } 
     });
     const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-customer').map(a => a.payload.id));
     merged = merged.filter(c => !deletedIds.has(c.id));
     queuedActions.forEach(action => {
-      if (action.type === 'update-customer') {
-        const idx = merged.findIndex(c => c.id === action.payload.id);
-        if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values };
+      if (action.type === 'update-customer') { 
+        const idx = merged.findIndex(c => c.id === action.payload.id); 
+        if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; 
       }
-      else if (action.type === 'add-customer') {
-        if (!merged.find(c => c.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true });
+      else if (action.type === 'add-customer') { 
+        if (!merged.find(c => c.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); 
       }
       else if (action.type === 'complete-sale') {
         const { selectedCustomer, secureTotal } = action.payload;
@@ -582,7 +581,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // Optimistically apply pending offline sales to display metrics
     let pendingRevenue = 0;
     let pendingUnits = 0;
-
+    
     queuedSales.forEach(sale => {
       const data = sale.payload.receiptData || sale.payload;
       pendingRevenue += Number(data.total) || 0;
@@ -602,19 +601,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const refreshData = useCallback(async (silent = false) => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isSyncing || !isOnline) return;
-
+    
     if (!silent) setIsSyncing(true);
     try {
       // Delta Sync: Only fetch documents updated since our last check
       // This turns 10,000 reads into 1-10 reads.
       const lastCheck = new Date(lastSyncedTimestamp);
-
+      
       const pQuery = query(collection(firestore, "products"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const rQuery = query(collection(firestore, "receipts"), where("businessId", "==", businessId), where("createdAt", ">", lastCheck), limit(100));
-
+      
       const [pSnap, cSnap, rSnap] = await Promise.all([getDocs(pQuery), getDocs(cQuery), getDocs(rQuery)]);
-
+      
       const newProducts = pSnap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
       const newCustomers = cSnap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
       const newReceipts = rSnap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
@@ -684,38 +683,38 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const q = query(collection(firestore, "receipts"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(200));
       const snap = await getDocs(q);
       const fetchedRecs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
-
+      
       // 1. Anti-Ghosting Guard: Prevent re-injecting receipts that this CLIENT has queued for deletion
       const voidedReceiptIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
       const filteredRecs = fetchedRecs.filter(r => !voidedReceiptIds.has(r.id));
-
+      
       // 2. Server Deletion Reconciliation: Detect and purge items deleted from Firestore by OTHER clients
       const serverIds = new Set(fetchedRecs.map(r => r.id));
       const purgedLocalIds: string[] = [];
 
       setSyncedReceipts(prev => {
         if (fetchedRecs.length === 0) return prev;
-
+        
         // Extract the timestamp of the oldest server document in our top 200 retrieval window
         const oldestFetchedDate = safeToDate(fetchedRecs[fetchedRecs.length - 1].createdAt).getTime();
-
+        
         const prunedPrev = prev.filter(localR => {
           // If it exists in the fetched payload, keep it (it will be updated below)
           if (serverIds.has(localR.id)) return true;
-
+          
           // If the local client is actively pending a write/complete-sale for this receipt, DO NOT delete it
           const pendingSale = queuedActionsRef.current.some(a => a.type === 'complete-sale' && (a.payload.receiptData?.id === localR.id || a.payload.id === localR.id));
           if (pendingSale) return true;
-
+          
           const localTime = safeToDate(localR.createdAt).getTime();
-
+          
           // If the receipt timestamp is newer than the oldest retrieved document BUT the document is MISSING
           // from the server payload, it must have been deleted from Firestore by another client!
           if (localTime >= oldestFetchedDate) {
             purgedLocalIds.push(localR.id);
             return false; // Prune it from the array!
           }
-
+          
           // Keep older historical records that are beyond the 200-item retrieval window limit
           return true;
         });
@@ -729,15 +728,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
             merged.push(nr);
           }
         });
-
+        
         return merged
           .sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
       });
-
+      
       // 3. Sync changes and propagate deletions down to offline SQLite storage if in Tauri desktop environment
       if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
         await syncReceiptsToOffline(businessId, fetchedRecs);
-
+        
         for (const idToPurge of purgedLocalIds) {
           await deleteReceiptFromOffline(idToPurge);
         }
@@ -765,9 +764,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (fetched.length > 0) {
         setSyncedUsers(fetched);
       }
-    } catch (e: any) {
+    } catch (e: any) { 
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
-      console.error("Fetch initial users failed:", e);
+      console.error("Fetch initial users failed:", e); 
     }
   }, [businessId, firestore, user, isRealOnline]);
 
@@ -780,9 +779,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (fetched.length > 0) {
         setSyncedAuditLogs(fetched.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime()));
       }
-    } catch (e: any) {
+    } catch (e: any) { 
       if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
-      console.error("Fetch initial audit logs failed:", e);
+      console.error("Fetch initial audit logs failed:", e); 
     }
   }, [businessId, firestore, user, isRealOnline]);
 
@@ -797,7 +796,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchFullCustomers = useCallback(async () => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingCustomers || !isOnline) return;
-
+    
     setIsFullSyncingCustomers(true);
     let allFetched: Customer[] = [];
     let lastDoc: any = null;
@@ -811,16 +810,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
           where("businessId", "==", businessId),
           limit(BATCH_SIZE)
         );
-
+        
         if (lastDoc) q = query(q, startAfter(lastDoc));
-
+        
         const snap = await getDocs(q);
         if (snap.empty) {
           hasMore = false;
         } else {
           const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
           allFetched = [...allFetched, ...batch];
-
+          
           setSyncedCustomers(prev => {
             const merged = [...prev];
             batch.forEach(nc => {
@@ -835,10 +834,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
         }
       }
-
+      
       setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
       setHasFullSyncedCustomers(true);
-
+      
       // Only show the toast if it's been more than 24 hours since the last success
       // to avoid annoying the user on every app start.
       const lastToast = Number(localStorage.getItem('last_sync_toast_time') || 0);
@@ -861,7 +860,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchFullProducts = useCallback(async () => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
-
+    
     setIsFullSyncingProducts(true);
     let allFetched: Product[] = [];
     let lastDoc: any = null;
@@ -876,16 +875,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
           orderBy("name", "asc"),
           limit(BATCH_SIZE)
         );
-
+        
         if (lastDoc) q = query(q, startAfter(lastDoc));
-
+        
         const snap = await getDocs(q);
         if (snap.empty) {
           hasMore = false;
         } else {
           const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
           allFetched = [...allFetched, ...batch];
-
+          
           setSyncedProducts(prev => {
             const merged = [...prev];
             batch.forEach(np => {
@@ -900,10 +899,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
         }
       }
-
+      
       setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
       setHasFullSyncedProducts(true);
-
+      
       const lastToast = Number(localStorage.getItem('last_product_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Product Catalog Synced", description: `Synchronized ${allFetched.length} products for offline access.` });
@@ -924,12 +923,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingReceipts || !isOnline) return;
-
+    
     setIsFullSyncingReceipts(true);
     let allFetched: Receipt[] = [];
     let lastDoc: any = null;
     let hasMore = true;
-    const BATCH_SIZE = 2500;
+    const BATCH_SIZE = 2500; 
 
     try {
       while (hasMore) {
@@ -939,16 +938,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
           orderBy("createdAt", "desc"),
           limit(BATCH_SIZE)
         );
-
+        
         if (lastDoc) q = query(q, startAfter(lastDoc));
-
+        
         const snap = await getDocs(q);
         if (snap.empty) {
           hasMore = false;
         } else {
           const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
           allFetched = [...allFetched, ...batch];
-
+          
           setSyncedReceipts(prev => {
             const merged = [...prev];
             batch.forEach(nr => {
@@ -960,26 +959,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
           });
 
           if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-            await syncReceiptsToOffline(businessId, batch);
+             await syncReceiptsToOffline(businessId, batch);
           } else {
-            const cumulative = await idb.get<Receipt[]>('pos_synced_receipts') || [];
-            const mergedIndexed = [...cumulative];
-            batch.forEach(nr => {
-              const idx = mergedIndexed.findIndex(r => r.id === nr.id);
-              if (idx !== -1) mergedIndexed[idx] = nr;
-              else mergedIndexed.push(nr);
-            });
-            await idb.set('pos_synced_receipts', mergedIndexed);
+             const cumulative = await idb.get<Receipt[]>('pos_synced_receipts') || [];
+             const mergedIndexed = [...cumulative];
+             batch.forEach(nr => {
+                const idx = mergedIndexed.findIndex(r => r.id === nr.id);
+                if (idx !== -1) mergedIndexed[idx] = nr;
+                else mergedIndexed.push(nr);
+             });
+             await idb.set('pos_synced_receipts', mergedIndexed);
           }
 
           lastDoc = snap.docs[snap.docs.length - 1];
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
         }
       }
-
+      
       setLastSyncMetadata(businessId, 'full_receipts_sync', Date.now());
       setHasFullSyncedReceipts(true);
-
+      
       const lastToast = Number(localStorage.getItem('last_receipt_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Sales History Synced", description: `Synchronized ${allFetched.length} receipts and invoices for full offline access.` });
@@ -1018,7 +1017,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const pending = queuedActions.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
     setIsQueueProcessing(true);
-
+    
     try {
       // PERFORMANCE & COST OPTIMIZATION:
       // Efficiently gather sequential 'complete-sale' triggers into unified Firestore batches.
@@ -1054,7 +1053,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         // MODE A: The Sale Aggregation Pipeline
         // ----------------------------------------------------------------
         if (chunk.length > 1 || (chunk.length === 1 && chunk[0].type === 'complete-sale')) {
-
+          
           const combinedStocks = new Map<string, number>();
           const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number }>();
           let aggregateSales = 0;
@@ -1150,8 +1149,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
             const finalizedReceipts = chunk.map(c => {
               const rd = c.payload.receiptData;
               return {
-                ...rd,
-                createdAt: safeToDate(rd.createdAt) || new Date() // Formally coerce timestamps into healthy JS Dates
+                 ...rd,
+                 createdAt: safeToDate(rd.createdAt) || new Date() // Formally coerce timestamps into healthy JS Dates
               };
             });
 
@@ -1168,44 +1167,44 @@ export function POSProvider({ children }: { children: ReactNode }) {
             // 2. Fast-track locally synchronized stock reductions to avoid edge-desync
             if (combinedStocks.size > 0) {
               setSyncedProducts(prev => {
-                const fresh = [...prev];
-                combinedStocks.forEach((stockVal, productId) => {
-                  const idx = fresh.findIndex(p => p.id === productId);
-                  if (idx !== -1) fresh[idx] = { ...fresh[idx], stock: stockVal };
-                });
-                return fresh;
+                 const fresh = [...prev];
+                 combinedStocks.forEach((stockVal, productId) => {
+                   const idx = fresh.findIndex(p => p.id === productId);
+                   if (idx !== -1) fresh[idx] = { ...fresh[idx], stock: stockVal };
+                 });
+                 return fresh;
               });
             }
 
             // 3. Cascade customer total-spend velocity changes directly to local state
             if (consolidatedCust.size > 0) {
               setSyncedCustomers(prev => {
-                const fresh = [...prev];
-                consolidatedCust.forEach((cData, cId) => {
-                  const idx = fresh.findIndex(c => c.id === cId);
-                  if (idx !== -1) {
-                    fresh[idx] = {
-                      ...fresh[idx],
-                      totalSpent: (Number(fresh[idx].totalSpent) || 0) + cData.totalSpent,
-                      loyaltyPoints: cData.loyaltyPoints !== undefined ? cData.loyaltyPoints : fresh[idx].loyaltyPoints
-                    };
-                  }
-                });
-                return fresh;
+                 const fresh = [...prev];
+                 consolidatedCust.forEach((cData, cId) => {
+                   const idx = fresh.findIndex(c => c.id === cId);
+                   if (idx !== -1) {
+                     fresh[idx] = {
+                       ...fresh[idx],
+                       totalSpent: (Number(fresh[idx].totalSpent) || 0) + cData.totalSpent,
+                       loyaltyPoints: cData.loyaltyPoints !== undefined ? cData.loyaltyPoints : fresh[idx].loyaltyPoints
+                     };
+                   }
+                 });
+                 return fresh;
               });
             }
 
           } catch (execError: any) {
             console.error("❌ POS Queue Engine :: Batch write execution failed.", execError);
-
+            
             // Detect non-retryable permanent errors (e.g. Permission Denied, Resource Exhausted, Failed Precondition)
             const errCode = execError?.code || '';
             const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
-
+            
             if (isPermanentError) {
               console.warn("⚠️ Permanent Firestore rejection on aggregate batch. Discarding chunk to unblock queue.");
               chunk.forEach(action => successfullyCommitIds.push(action.id)); // Discard to unblock queue
-
+              
               toast({
                 title: "Sync Rejection",
                 description: `The server rejected a batch of actions: ${execError.message || 'Permission Denied'}.`,
@@ -1213,11 +1212,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
               });
               continue; // Skip breaking, continue processing remainder
             }
-
+            
             break; // Stop further processing on this tick for temporary network/server blips to preserve safe retry
           }
         }
-
+        
         // ----------------------------------------------------------------
         // MODE B: Single Secure Command (Inherits 100% of original logic)
         // ----------------------------------------------------------------
@@ -1235,12 +1234,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 const updateVals = { ...action.payload.values, updatedAt: serverTimestamp() };
                 if (updateVals.name) updateVals.lowercaseName = updateVals.name.toLowerCase();
                 if ('email' in updateVals) updateVals.lowercaseEmail = updateVals.email?.toLowerCase() || '';
-                batch.update(doc(firestore, 'customers', action.payload.id), updateVals);
+                batch.update(doc(firestore, 'customers', action.payload.id), updateVals); 
                 break;
               }
-              case 'delete-customer':
-                batch.delete(doc(firestore, 'customers', action.payload.id));
-                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true });
+              case 'delete-customer': 
+                batch.delete(doc(firestore, 'customers', action.payload.id)); 
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); 
                 break;
               case 'add-product':
                 batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
@@ -1288,15 +1287,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
           } catch (singularErr: any) {
             console.error(`❌ Standalone sync step failed [${action.type}]:`, singularErr);
-
+            
             // Detect non-retryable permanent errors (e.g. Permission Denied, Not Found, Failed Precondition)
             const errCode = singularErr?.code || '';
             const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
-
+            
             if (isPermanentError) {
               console.warn(`⚠️ Permanent Firestore rejection for ${action.type} [ID: ${action.id}]. Discarding to unblock queue.`);
               successfullyCommitIds.push(action.id); // Remove from state queue to unblock remaining actions
-
+              
               toast({
                 title: "Operation Denied",
                 description: `Server rejected: "${action.description || action.type}". Reason: ${singularErr.message || 'Permission Denied'}.`,
@@ -1304,7 +1303,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               });
               continue; // Resume execution of the remaining queue
             }
-
+            
             break; // Preserve synchronous safety for temporary network errors
           }
         }
@@ -1316,8 +1315,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const failCount = pending.length - successfullyCommitIds.length;
 
         if (failCount > 0) {
-          // We simply notify internal log and naturally leave unresolved items in React state queue to auto-trigger retry 
-          console.warn(`Queue resolved with ${failCount} items remaining due to retry conditions.`);
+           // We simply notify internal log and naturally leave unresolved items in React state queue to auto-trigger retry 
+           console.warn(`Queue resolved with ${failCount} items remaining due to retry conditions.`);
         }
 
         if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
@@ -1337,13 +1336,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addToQueue = useCallback((action: any, description: string) => {
     const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true;
     if (!isSubscriptionActive) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'Your subscription has expired.' }); return null; }
-
+    
     // --- RBAC Permission Check ---
     const effectiveProfile = currentUserProfile || offlineProfile;
     const permissions = effectiveProfile?.permissions || {};
     const userRole = effectiveProfile?.role;
     const isSuperAdmin = effectiveProfile?.email === 'belloimam431@gmail.com';
-
+    
     // Debug Log to catch the culprit
     if (action.type === 'complete-sale' || action.type === 'add-product' || action.type === 'update-product' || action.type === 'delete-product') {
       console.log(`[POS RBAC] Checking action: ${action.type}`, {
@@ -1361,7 +1360,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to record sales.' });
         return null;
       }
-
+      
       // 2. Manage Inventory check
       const inventoryActions = ['add-product', 'update-product', 'delete-product', 'bulk-update-products'];
       if (inventoryActions.includes(action.type) && permissions.manage_inventory === false) {
@@ -1383,14 +1382,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const id = uuidv4();
     const newAction: QueuedAction = { ...action, description, id, timestamp: Date.now(), status: 'pending' };
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
-
+    
     setQueuedActions(prev => [...prev, newAction]);
-
+    
     // Proactive Sync: If online, trigger processQueue in the next tick
     if (isRealOnline) {
-      setTimeout(() => processQueue(), 100);
+        setTimeout(() => processQueue(), 100);
     }
-
+    
     return id;
   }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline]);
 
@@ -1398,20 +1397,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // If there's an image, we handle it. Ideally in background but for now let's just queue the data.
     // In a real scenario, we might want to upload to Firebase Storage first if online,
     // or store locally in Tauri if offline.
-
+    
     // For now, let's keep it simple: Add to queue.
     const description = `Added product: ${productData.name}`;
-
+    
     // If we have an image, we'd normally want to process it. 
     // But since the user wants it to be fast and offline-first, 
     // we'll just queue the data and handle image upload in the processQueue if possible, 
     // or just save the product data.
-
+    
     // TODO: Handle image persistence for offline
-
+    
     addToQueue({
       type: 'add-product',
-      payload: {
+      payload: { 
         ...productData,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -1426,15 +1425,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const resetPOS = useCallback(async () => {
     setCart([]); setSelectedCustomer(null); setDiscount(0); setTaxRate(0); setPaymentMethod('Cash');
-    secureStorage.removeItem(POS_CART_KEY);
+    secureStorage.removeItem(POS_CART_KEY); 
     secureStorage.removeItem(POS_CUSTOMER_KEY);
   }, []);
 
   const nuclearReset = useCallback(async () => {
-    await resetPOS();
-    setQueuedActions([]);
-    setSyncedProducts([]);
-    setSyncedCustomers([]);
+    await resetPOS(); 
+    setQueuedActions([]); 
+    setSyncedProducts([]); 
+    setSyncedCustomers([]); 
     setSyncedReceipts([]);
     setSyncedUsers([]);
     setSyncedAuditLogs([]);
@@ -1442,7 +1441,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setOfflineBusiness(null);
     setOfflineStats(null);
     idb.clear();
-
+    
     // Clear all secure storage keys to avoid bleeding data between logins
     secureStorage.removeItem('pos_synced_products');
     secureStorage.removeItem('pos_synced_customers');
@@ -1453,7 +1452,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     secureStorage.removeItem(BUSINESS_INSTANCE_KEY);
     secureStorage.removeItem('pos_offline_stats');
     secureStorage.removeItem('pos_last_synced_timestamp');
-
+    
+    // Clear all sync metadata from localStorage to trigger a fresh full sync on next login
+    if (typeof window !== 'undefined') {
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('zeneva_sync_metadata_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (e) {
+        console.error("Failed to clear sync metadata from localStorage:", e);
+      }
+    }
+    
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) clearAllTables();
   }, [resetPOS]);
 
@@ -1461,12 +1473,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!term.trim()) return [];
     const lower = term.toLowerCase().trim();
     const isOnline = isRealOnline;
-
+    
     let local: Customer[] = [];
     if (customers && customers.length > 0) {
       local = customers.filter(c => c.name?.toLowerCase().includes(lower) || c.email?.toLowerCase().includes(lower) || c.phone?.includes(term) || c.code?.toLowerCase().includes(lower));
     }
-
+    
     if (!user || !businessId || !firestore || !isOnline) return local.slice(0, 20);
     try {
       const q = (field: string) => query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '>=', lower), where(field, '<=', lower + '\uf8ff'), limit(20));
@@ -1479,12 +1491,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchCustomersByField = useCallback(async (field: string, value: string) => {
     if (!value) return [];
     const isOnline = isRealOnline;
-
+    
     if (customers && customers.length > 0) {
       const local = customers.filter(c => (c as any)[field] === value);
       if (local.length > 0 || !isOnline) return local;
     }
-
+    
     if (!user || !businessId || !firestore || !isOnline) return [];
     try {
       const q = query(collection(firestore, 'customers'), where('businessId', '==', businessId), where(field, '==', value), limit(50));
@@ -1502,7 +1514,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const local = products.filter(p => p.name.toLowerCase().includes(lower) || p.sku?.toLowerCase().includes(lower));
       if (local.length >= 10 || !isOnline) return local.slice(0, 30);
     }
-
+    
     if (!user || !businessId || !firestore || !isOnline) return [];
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where('lowercaseName', '>=', lower), where('lowercaseName', '<=', lower + '\uf8ff'), limit(30));
@@ -1514,12 +1526,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const searchProductsByField = useCallback(async (field: string, value: string) => {
     if (!value) return [];
     const isOnline = isRealOnline;
-
+    
     if (products && products.length > 0) {
       const local = products.filter(p => (p as any)[field] === value);
       if (local.length > 0 || !isOnline) return local;
     }
-
+    
     if (!user || !businessId || !firestore || !isOnline) return [];
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where(field, '==', value), limit(100));
@@ -1531,12 +1543,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const findProductBySku = useCallback(async (sku: string) => {
     if (!sku) return null;
     const isOnline = isRealOnline;
-
+    
     if (products && products.length > 0) {
       const local = products.find(p => p.sku === sku);
       if (local) return local;
     }
-
+    
     if (!user || !businessId || !firestore || !isOnline) return null;
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', businessId), where('sku', '==', sku), limit(1));
@@ -1548,7 +1560,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const fetchDetailedAnalytics = useCallback(async (from: Date, to: Date) => {
     if (!getAuth().currentUser || !businessId || !firestore) return { revenue: 0, count: 0, customers: 0 };
-
+    
     let result = { revenue: 0, count: 0, customers: 0 };
     let uniqueCustomerIds = new Set<string>();
 
@@ -1561,16 +1573,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
           where("createdAt", ">=", safeToDate(from)),
           where("createdAt", "<=", safeToDate(to))
         );
-
+        
         // 100% Accurate Aggregation for Big Numbers
         const aggregateSnap = await getAggregateFromServer(q, {
           totalRevenue: sum('total'),
           totalOrders: count()
         });
-
+        
         result.revenue = aggregateSnap.data().totalRevenue || 0;
         result.count = aggregateSnap.data().totalOrders || 0;
-
+        
         // For unique customers, we cap this at 5,000 due to Firestore structured query limits
         const docSnap = await getDocs(query(q, limit(5000)));
         docSnap.docs.forEach(d => {
@@ -1629,7 +1641,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // 🚨 Inject ALL Pending Offline Sales into metrics to guarantee immediate 100% consistent accuracy!
     const fromTime = from.getTime();
     const toTime = to.getTime();
-
+    
     queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending').forEach(action => {
       const receipt = action.payload.receiptData;
       if (receipt) {
@@ -1644,7 +1656,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-
+    
     result.customers = uniqueCustomerIds.size;
 
     return result;
@@ -1658,17 +1670,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const totalQuantityInBaseUnit = newQuantity * (multiplier || 1);
 
     if (!isService && totalQuantityInBaseUnit > (product.stock || 0)) {
-      toast({ title: existingItem ? 'Backorder recorded' : 'Backorder started', description: `${product.name} is out of stock. Recording as debt.`, variant: 'backorder' as any });
+        toast({ title: existingItem ? 'Backorder recorded' : 'Backorder started', description: `${product.name} is out of stock. Recording as debt.`, variant: 'backorder' as any });
     }
 
     setCart(prev => {
       const exists = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
       if (exists) return prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
       const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
-      return [...prev, {
-        product: finalProduct,
-        quantity: 1,
-        unit: unitName,
+      return [...prev, { 
+        product: finalProduct, 
+        quantity: 1, 
+        unit: unitName, 
         multiplier,
         isPriceOverride: !!priceOverride,
         originalPrice: product.price
@@ -1680,18 +1692,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const updateQuantity = useCallback((cartItemId: string, quantity: number) => {
     if (quantity <= 0) { removeFromCart(cartItemId); return; }
-
+    
     // Stock Check for Backorder Notification
     const item = cart.find(i => (i.unit ? `${i.product.id}-${i.unit}` : i.product.id) === cartItemId);
     if (item && item.product.categoryType !== 'service') {
-      const multiplier = item.multiplier || 1;
-      if (quantity * multiplier > (item.product.stock || 0)) {
-        toast({
-          title: 'Entering Backorder',
-          description: `You are requesting more than the ${item.product.stock || 0} units available. This will be recorded as debt.`,
-          variant: 'backorder' as any
-        });
-      }
+        const multiplier = item.multiplier || 1;
+        if (quantity * multiplier > (item.product.stock || 0)) {
+            toast({
+                title: 'Entering Backorder',
+                description: `You are requesting more than the ${item.product.stock || 0} units available. This will be recorded as debt.`,
+                variant: 'backorder' as any
+            });
+        }
     }
 
     setCart(prev => prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity } : item));
@@ -1767,7 +1779,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       secureStorage.setItem('pos_offline_stats', initialStats);
     }
   }, [initialStats]);
-
+  
   useEffect(() => {
     if (!isMounted || !businessId || hasHydratedRef.current) return;
     hasHydratedRef.current = true;
@@ -1781,8 +1793,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
           if (isRealOnline) processQueue();
         }
       });
-
-      // 2. Hydrate POS from SQLite for instant start
+      
+       // 2. Hydrate POS from SQLite for instant start
       getCachedProducts(businessId).then(p => { if (p.length > 0) setSyncedProducts(p); });
       getCachedCustomers(businessId).then(c => { if (c.length > 0) setSyncedCustomers(c); });
       getCachedReceipts(businessId, 10000).then(r => { if (r.length > 0) setSyncedReceipts(r); });
@@ -1799,18 +1811,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isUserLoading) return;
-    if (!user) {
-      if (lastUserId) nuclearReset();
-      setLastUserId(null);
+    if (!user) { 
+      if (lastUserId) nuclearReset(); 
+      setLastUserId(null); 
       setImpersonatedUserId(null);
       if (typeof window !== 'undefined') sessionStorage.removeItem('zeneva_impersonated_user_id');
-      return;
+      return; 
     }
-    if (effectiveUserId !== lastUserId) {
-      if (lastUserId) resetPOS();
-      setLastUserId(effectiveUserId);
+    if (effectiveUserId !== lastUserId) { 
+      if (lastUserId) resetPOS(); 
+      setLastUserId(effectiveUserId); 
     }
-
+    
     // Safety check: only allow impersonation if current user is super admin
     const isSuperAdmin = user?.email === 'belloimam431@gmail.com';
     if (impersonatedUserId && !isSuperAdmin) {
@@ -1822,7 +1834,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleOnline = () => processQueue();
     window.addEventListener('online', handleOnline);
-
+    
     // Auto-trigger processQueue when actions are added if online
     if (isRealOnline && queuedActions.some(a => a.status === 'pending') && !isQueueProcessing) {
       processQueue();
@@ -1830,7 +1842,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     return () => window.removeEventListener('online', handleOnline);
   }, [processQueue, queuedActions, isQueueProcessing, isRealOnline]);
-
+  
   // SQLite Continuity Sync
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -1856,10 +1868,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (lastProdSync > 0) setHasFullSyncedProducts(true);
       if (lastReceiptSync > 0) setHasFullSyncedReceipts(true);
       if (lastCustSync > 0) setHasFullSyncedCustomers(true);
-
+      
       const now = Date.now();
       const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
-
+      
       if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
         fetchFullCustomers();
       }
@@ -1880,7 +1892,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted, businessId, firestore, isRealOnline, user]);
-
+  
   // Initial Delta Sync (Silent Catch-up on mount)
   useEffect(() => {
     if (!businessId || !isRealOnline || !firestore) return;
@@ -1914,7 +1926,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const holdCurrentSale = useCallback((notes?: string) => {
     if (cart.length === 0) return;
-
+    
     const newHeldSale: HeldSale = {
       id: uuidv4(),
       items: [...cart],
@@ -1923,13 +1935,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       total: total,
       notes
     };
-
+    
     setHeldSales(prev => {
       const updated = [newHeldSale, ...prev];
       secureStorage.setItem(POS_HELD_SALES_KEY, updated);
       return updated;
     });
-
+    
     resetPOS();
     toast({
       title: "Sale Parked",
@@ -1940,11 +1952,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const resumeHeldSale = useCallback((heldSaleId: string) => {
     const saleToResume = heldSales.find(s => s.id === heldSaleId);
     if (!saleToResume) return;
-
+    
     // Clear current POS state then set to resumed sale
     setCart(saleToResume.items);
     setSelectedCustomer(saleToResume.customer || null);
-
+    
     // Remove from held sales
     const updatedHeldSales = heldSales.filter(s => s.id !== heldSaleId);
     setHeldSales(updatedHeldSales);
@@ -1991,9 +2003,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const fetchReceiptsInRange = useCallback(async (from: Date, to: Date, limitCount: number = 5000) => {
     if (!getAuth().currentUser || !businessId || !firestore) return [];
-
+    
     let results: Receipt[] = [];
-
+    
     const isOnline = isRealOnline;
     if (isOnline) {
       try {
@@ -2005,10 +2017,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           orderBy('createdAt', 'desc'),
           limit(limitCount)
         );
-
+        
         const snap = await getDocs(q);
         results = snap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
-
+        
         // Sync these to offline for future use
         if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
           syncReceiptsToOffline(businessId, results);
@@ -2078,7 +2090,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const fetchMonthlyAnalytics = useCallback(async (monthCount: number = 12) => {
     if (!getAuth().currentUser || !businessId || !firestore) return [];
-
+    
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     const isOnline = isRealOnline;
     let results: { month: string, revenue: number }[] = [];
@@ -2093,14 +2105,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
         for (let i = 0; i <= now.getMonth(); i++) {
           const startDate = new Date(currentYear, i, 1);
           const endDate = new Date(currentYear, i + 1, 0, 23, 59, 59, 999);
-
+          
           const q = query(
             collection(firestore, "receipts"),
             where("businessId", "==", businessId),
             where("createdAt", ">=", startDate),
             where("createdAt", "<=", endDate)
           );
-
+          
           monthPromises.push(getAggregateFromServer(q, {
             revenue: sum('total')
           }).then(snap => ({
@@ -2147,7 +2159,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (receipt) {
         const rDate = safeToDate(receipt.createdAt || new Date(action.timestamp));
         const key = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, '0')}`;
-
+        
         const existing = results.find(m => m.month === key);
         if (existing) {
           existing.revenue += (receipt.total || 0);
@@ -2157,28 +2169,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return results.sort((a, b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+    return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
   }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline]);
 
 
   const value: POSContextType = useMemo(() => ({
-    business, products, receipts, customers, onlineOrders, currentUserProfile: profile,
+    business, products, receipts, customers, onlineOrders, currentUserProfile: profile, 
     isLoading: (isUserLoading && !offlineProfile) ||
-      (!!user && !businessId) ||
-      (isLoadingBusiness && !business) ||
-      ((() => {
-        const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-        if (isTauri) {
-          return syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline;
-        }
-        return (!!businessId && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) ||
-          ((!customers || customers.length === 0) && !hasFullSyncedCustomers && isRealOnline) ||
-          ((!receipts || receipts.length === 0) && !hasFullSyncedReceipts && isRealOnline) ||
-          (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline && !hasFullSyncedCustomers) ||
-          (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline && !hasFullSyncedProducts);
-      })()) ||
-      !isMounted,
-    isUserLoading: isUserLoading || (!!user && !profile),
+               (!!user && !businessId) ||
+               (isLoadingBusiness && !business) || 
+               ((() => {
+                 const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+                 if (isTauri) {
+                   return syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline;
+                 }
+                 return (!!businessId && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
+                        ((!customers || customers.length === 0) && !hasFullSyncedCustomers && isRealOnline) || 
+                        ((!receipts || receipts.length === 0) && !hasFullSyncedReceipts && isRealOnline) ||
+                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline && !hasFullSyncedCustomers) ||
+                        (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline && !hasFullSyncedProducts);
+               })()) ||
+               !isMounted, 
+    isUserLoading: isUserLoading || (!!user && !profile), 
     user, firestore,
     isProfileReady,
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
@@ -2186,13 +2198,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
     paymentMethod, setPaymentMethod, autoPrint, setAutoPrint, resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
-    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => { }, updateQueuedAction: () => { }, addProductWithImage, removeFromQueue: () => { },
+    queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
     mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, optimisticProducts: [],
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField, searchReceipts: async () => [],
     fetchReceiptsInRange, searchProducts, searchProductsByField, findProductBySku,
-    fetchDetailedAnalytics,
+    fetchDetailedAnalytics, 
     fetchMonthlyAnalytics,
     fetchMoreReceipts: async () => 0, fetchMoreCustomers: async () => 0, fetchMoreProducts: async () => 0,
 
@@ -2200,7 +2212,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     users, auditLogs,
     isOnline: isRealOnline,
 
-    stats,
+    stats, 
     isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
   }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
