@@ -340,6 +340,32 @@ jobs:
           npm run tauri ios build -- --no-signing
         continue-on-error: true
 
+      - name: Compress iOS App
+        run: |
+          echo "Locating built iOS app..."
+          APP_PATH=$(find src-tauri/gen/apple/build -name "*.app" | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            echo "Found iOS app at: $APP_PATH"
+            APP_DIR=$(dirname "$APP_PATH")
+            APP_NAME=$(basename "$APP_PATH")
+            cd "$APP_DIR"
+            zip -r "../../../../zeneva-v${{ env.APP_VERSION }}-ios.zip" "$APP_NAME"
+            echo "iOS App zipped successfully to zeneva-v${{ env.APP_VERSION }}-ios.zip"
+          else
+            echo "Warning: No .app file found to compress!"
+          fi
+        continue-on-error: true
+
+      - name: Upload iOS App to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./zeneva-v${{ env.APP_VERSION }}-ios.zip
+          tag_name: v${{ env.APP_VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
+        continue-on-error: true
+
       - name: Upload iOS Artifacts
         uses: actions/upload-artifact@v4
         with:
