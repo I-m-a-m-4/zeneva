@@ -161,6 +161,12 @@ jobs:
           echo "CC_aarch64_linux_android=$CLANG_PATH" >> $GITHUB_ENV
           echo "Zeneva: Linker set to $CLANG_PATH"
 
+          # Support armv7 (32-bit devices)
+          CLANG_ARMV7_PATH=$(find $TOOLCHAIN -name "armv7a-linux-androideabi*-clang" | head -n 1)
+          echo "CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER=$CLANG_ARMV7_PATH" >> $GITHUB_ENV
+          echo "CC_armv7_linux_androideabi=$CLANG_ARMV7_PATH" >> $GITHUB_ENV
+          echo "Zeneva: armv7 Linker set to $CLANG_ARMV7_PATH"
+
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
         with:
@@ -217,9 +223,9 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
         run: |
           # Build standard AAB app bundle for Play Store
-          npm run tauri android build -- --aab --target aarch64 --ignore-version-mismatches
+          npm run tauri android build -- --aab --target aarch64,armv7 --ignore-version-mismatches
           # Build APK package for testing
-          npm run tauri android build -- --apk --target aarch64 --ignore-version-mismatches
+          npm run tauri android build -- --apk --target aarch64,armv7 --ignore-version-mismatches
 
       - name: Locate, Sign and Prepare Android Files
         run: |
