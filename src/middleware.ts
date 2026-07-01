@@ -3,6 +3,33 @@ import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
     const url = req.nextUrl;
+    const pathname = url.pathname;
+
+    // Handle CORS for all API routes (to support Tauri desktop apps)
+    if (pathname.startsWith("/api/")) {
+        const origin = req.headers.get("origin") || "*";
+        
+        // Handle preflight OPTIONS request
+        if (req.method === "OPTIONS") {
+            return new NextResponse(null, {
+                status: 204,
+                headers: {
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+                    "Access-Control-Allow-Credentials": "true",
+                },
+            });
+        }
+
+        // Proceed to the API route, and append CORS headers to the response
+        const res = NextResponse.next();
+        res.headers.set("Access-Control-Allow-Origin", origin);
+        res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+        res.headers.set("Access-Control-Allow-Credentials", "true");
+        return res;
+    }
 
     // Get hostname (e.g. zeneva.space, shop.zeneva.space, localhost:3000)
     const hostname = req.headers.get("host") || "";
@@ -36,11 +63,10 @@ export const config = {
     matcher: [
         /*
          * Match all paths except for:
-         * 1. /api routes
-         * 2. /_next (Next.js internals)
-         * 3. /_static (inside /public)
-         * 4. all root files inside /public (e.g. /favicon.ico)
+         * 1. /_next (Next.js internals)
+         * 2. /_static (inside /public)
+         * 3. all root files inside /public (e.g. /favicon.ico)
          */
-        "/((?!api/|_next/|_vercel/|_static/|[\\w-]+\\.\\w+).*)",
+        "/((?!_next/|_vercel/|_static/|[\\w-]+\\.\\w+).*)",
     ],
 };
