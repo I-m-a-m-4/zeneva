@@ -152,7 +152,8 @@ export default function AuthenticatedLayout({
   children: React.ReactNode;
 }>) {
   const router = useRouter();
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname ? (rawPathname.endsWith('/') && rawPathname !== '/' ? rawPathname.slice(0, -1) : rawPathname) : '';
   const { toast } = useToast();
   const firestore = useFirestore();
 
