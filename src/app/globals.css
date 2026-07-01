@@ -573,3 +573,12 @@ body {
     animation-play-state: paused;
   }
 }
+
+/* Prevent Radix UI scroll-lock from shifting the viewport layout */
+body[style*="margin-right"],
+html[style*="margin-right"],
+body[style*="padding-right"],
+html[style*="padding-right"] {
+  margin-right: 0px !important;
+  padding-right: 0px !important;
+}
