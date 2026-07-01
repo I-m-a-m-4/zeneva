@@ -212,7 +212,11 @@ function CustomerDetailContent() {
                 
                 if (!summaryMap[productId]) {
                     // Fallback to item data if product record is missing
-                    const productInfo = allProducts?.find(p => p.id === productId);
+                    const cleanItemName = (item.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+                    const productInfo = allProducts?.find(p => 
+                        p.id === productId || 
+                        p.name.toLowerCase() === cleanItemName
+                    );
                     summaryMap[productId] = {
                         product: productInfo || {
                             id: productId,

@@ -62,7 +62,11 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       // Filter by the selected day
       if (rTime >= targetDateStart && rTime <= targetDateEnd) {
         r.items?.forEach((item, index) => {
-          const product = products?.find(p => p.id === item.productId);
+          const cleanItemName = item.name.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+          const product = products?.find(p => 
+            p.id === item.productId || 
+            p.name.toLowerCase() === cleanItemName
+          );
           list.push({
             id: `${r.id}-${item.productId}-${index}`,
             productId: item.productId,
@@ -276,6 +280,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                           alt={item.name}
                           className="aspect-square rounded-md object-cover w-full h-full border border-border"
                           src={item.imageUrl}
+                          fallback={<Package className="h-5 w-5" />}
                         />
                       </div>
                     ) : (
