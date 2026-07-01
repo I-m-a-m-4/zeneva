@@ -323,44 +323,6 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
     const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isMobileApp = isTauri && isMobile;
 
-    const handleOpenWebDashboard = async () => {
-        let checkoutLink = 'https://zeneva.space/billing';
-        
-        try {
-            // Generate auto-login link to prevent user from having to log in again in their mobile browser
-            const currentUser = auth?.currentUser;
-            if (currentUser) {
-                const idToken = await currentUser.getIdToken(true);
-                const response = await fetch('https://zeneva.space/api/auth/create-login-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idToken })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.customToken) {
-                        checkoutLink = `https://zeneva.space/auth/login-session?token=${data.customToken}&redirect=/billing`;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error("Failed to generate magic login token:", err);
-        }
-
-        if (isTauri) {
-            try {
-                const { open } = await import('@tauri-apps/plugin-shell');
-                await open(checkoutLink);
-            } catch (e) {
-                console.error("Failed to open via Tauri shell:", e);
-                window.location.href = checkoutLink;
-            }
-        } else {
-            window.location.href = checkoutLink;
-        }
-    };
-
     const handleCycleChange = (planId: string, cycleId: string) => {
         setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
     };
@@ -384,6 +346,46 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                         <div className="flex items-center gap-1.5"><Check className="h-4 w-4" /> AI Insights</div>
                     </div>
                 </CardContent>
+            </Card>
+        );
+    }
+
+    if (isMobileApp) {
+        return (
+            <Card className="mt-6 border-muted bg-muted/20">
+                <CardHeader>
+                    <CardTitle className="text-lg">Subscription Details</CardTitle>
+                    <CardDescription>
+                        Manage your account details and subscription status.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex justify-between py-2 border-b">
+                        <span className="text-sm font-medium">Current Plan</span>
+                        <Badge variant="secondary" className="capitalize font-semibold">
+                            {businessInstance.plan || 'Free / Trial'}
+                        </Badge>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                        <span className="text-sm font-medium">Status</span>
+                        <span className="text-sm text-muted-foreground font-medium">
+                            {safeToDate(businessInstance.trialExpiresAt) > new Date() ? 'Active' : 'Expired'}
+                        </span>
+                    </div>
+                    {businessInstance.trialExpiresAt && (
+                        <div className="flex justify-between py-2">
+                            <span className="text-sm font-medium">Expires On</span>
+                            <span className="text-sm text-muted-foreground font-medium">
+                                {format(safeToDate(businessInstance.trialExpiresAt), 'PPP')}
+                            </span>
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter className="flex-col items-center">
+                    <p className="text-xs text-muted-foreground text-center max-w-sm leading-relaxed">
+                        To upgrade your plan, manage subscriptions, or change billing cycles, please visit your account dashboard on the web at zeneva.space using a desktop or mobile browser. Premium features will unlock automatically in this app once updated.
+                    </p>
+                </CardFooter>
             </Card>
         );
     }
@@ -499,17 +501,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                {isMobileApp ? (
-                                    <div className="w-full flex flex-col items-center">
-                                        <Button onClick={handleOpenWebDashboard} className="w-full">
-                                            <ArrowRight className="mr-2 h-4 w-4" />
-                                            Upgrade on Web Dashboard
-                                        </Button>
-                                        <p className="text-[10px] text-muted-foreground text-center mt-2">
-                                            To comply with Google Play guidelines, subscription upgrades are completed securely via your web browser.
-                                        </p>
-                                    </div>
-                                ) : currency === 'NGN' ? (
+                                {currency === 'NGN' ? (
                                     <PaystackSubscriptionButton
                                         plan={plan}
                                         cycle={selectedCycle}

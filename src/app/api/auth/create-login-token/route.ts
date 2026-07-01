@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
 
     if (!adminAuth) {
       console.error('Firebase Admin Auth is not initialized');
+      
       return NextResponse.json({ error: 'Authentication service not configured' }, { status: 500 });
     }
 

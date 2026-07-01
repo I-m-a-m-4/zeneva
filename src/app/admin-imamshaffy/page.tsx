@@ -592,6 +592,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    const systemBroadcastsQuery = useMemoFirebase(() => query(collection(firestore, 'system_broadcasts'), orderBy('createdAt', 'desc')), [firestore]);
+    const { data: systemBroadcasts } = useCollection<any>(systemBroadcastsQuery);
+
     const [grantEmail, setGrantEmail] = useState('');
     const [grantDate, setGrantDate] = useState<Date>();
     const [isGranting, setIsGranting] = useState(false);
@@ -1349,6 +1352,30 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             toast({ variant: 'destructive', title: 'Broadcast Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
             setIsSendingBroadcast(false);
+        }
+    };
+
+    const handleToggleBroadcastActive = async (broadcastId: string, currentActive: boolean) => {
+        try {
+            const broadcastDocRef = doc(firestore, 'system_broadcasts', broadcastId);
+            await updateDoc(broadcastDocRef, {
+                isActive: !currentActive,
+                active: !currentActive
+            });
+            toast({ variant: 'success', title: `Broadcast ${!currentActive ? 'Activated' : 'Deactivated'}`, description: `The announcement was successfully updated.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Failed to Update Broadcast', description: error.message || 'An unexpected error occurred.' });
+        }
+    };
+
+    const handleDeleteBroadcast = async (broadcastId: string) => {
+        if (!confirm('Are you sure you want to delete this broadcast? This cannot be undone.')) return;
+        try {
+            const broadcastDocRef = doc(firestore, 'system_broadcasts', broadcastId);
+            await deleteDoc(broadcastDocRef);
+            toast({ variant: 'success', title: 'Broadcast Deleted', description: 'The announcement has been deleted successfully.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Failed to Delete Broadcast', description: error.message || 'An unexpected error occurred.' });
         }
     };
 
@@ -2112,6 +2139,98 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 Send Broadcast
                             </Button>
                         </CardFooter>
+                    </Card>
+
+                    <Card className="mt-6">
+                        <CardHeader>
+                            <CardTitle>Active & Past Broadcasts</CardTitle>
+                            <CardDescription>Manage existing system-wide announcements.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-[400px]">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Announcement</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Created</TableHead>
+                                            <TableHead>Expires</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {systemBroadcasts && systemBroadcasts.length > 0 ? (
+                                            systemBroadcasts.map((b: any) => {
+                                                const isExpired = b.expiresAt?.toDate ? b.expiresAt.toDate() < new Date() : false;
+                                                const isActive = b.isActive && !isExpired;
+                                                
+                                                return (
+                                                    <TableRow key={b.id}>
+                                                        <TableCell className="max-w-md">
+                                                            <div className="font-semibold text-sm">{b.title}</div>
+                                                            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{b.message}</div>
+                                                            {b.link && (
+                                                                <div className="text-[10px] text-primary underline mt-1">{b.link}</div>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={b.type === 'alert' ? 'destructive' : b.type === 'warning' ? 'default' : 'secondary'} className="capitalize">
+                                                                {b.type || 'info'}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {b.createdAt?.toDate ? format(b.createdAt.toDate(), 'MMM d, h:mm a') : 'Recently'}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {b.expiresAt?.toDate ? format(b.expiresAt.toDate(), 'MMM d, h:mm a') : 'N/A'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {isExpired ? (
+                                                                <Badge variant="outline" className="text-zinc-500 border-zinc-500">Expired</Badge>
+                                                            ) : b.isActive ? (
+                                                                <Badge variant="outline" className="text-green-500 border-green-500 bg-green-500/5">Active</Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-red-500 border-red-500 bg-red-500/5">Canceled</Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end items-center gap-2">
+                                                                {!isExpired && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="h-8 text-xs font-semibold"
+                                                                        onClick={() => handleToggleBroadcastActive(b.id, b.isActive)}
+                                                                    >
+                                                                        {b.isActive ? 'Cancel/Disable' : 'Enable'}
+                                                                    </Button>
+                                                                )}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                                                    onClick={() => handleDeleteBroadcast(b.id)}
+                                                                    title="Delete Permanently"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center py-8 text-zinc-500 text-sm">
+                                                    No broadcasts sent yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
                     </Card>
                 </TabsContent>
 
