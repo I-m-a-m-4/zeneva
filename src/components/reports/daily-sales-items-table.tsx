@@ -16,6 +16,7 @@ import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import Link from 'next/link';
 
 interface DailySalesItemsTableProps {
   receipts: Receipt[];
@@ -39,6 +40,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     const list: {
       id: string;
       productId: string;
+      receiptId: string;
       name: string;
       quantity: number;
       price: number;
@@ -70,6 +72,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           list.push({
             id: `${r.id}-${item.productId}-${index}`,
             productId: item.productId,
+            receiptId: r.id,
             name: item.name,
             quantity: item.quantity,
             price: item.price,
@@ -274,24 +277,49 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               paginatedItems.map((item) => (
                 <TableRow key={item.id} className="hover:bg-muted/10">
                   <TableCell className="py-2">
-                    {item.imageUrl ? (
-                      <div className="relative h-10 w-10">
-                        <CachedImage
-                          alt={item.name}
-                          className="aspect-square rounded-md object-cover w-full h-full border border-border"
-                          src={item.imageUrl}
-                          fallback={<Package className="h-5 w-5" />}
-                        />
-                      </div>
+                    {item.productId && item.productId !== 'custom' ? (
+                      <Link href={`/inventory/details?id=${item.productId}`} className="hover:opacity-80 transition-opacity block w-max">
+                        {item.imageUrl ? (
+                          <div className="relative h-10 w-10">
+                            <CachedImage
+                              alt={item.name}
+                              className="aspect-square rounded-md object-cover w-full h-full border border-border"
+                              src={item.imageUrl}
+                              fallback={<Package className="h-5 w-5" />}
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center text-muted-foreground border border-border">
+                            <Package className="h-5 w-5" />
+                          </div>
+                        )}
+                      </Link>
                     ) : (
-                      <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center text-muted-foreground border border-border">
-                        <Package className="h-5 w-5" />
-                      </div>
+                      item.imageUrl ? (
+                        <div className="relative h-10 w-10">
+                          <CachedImage
+                            alt={item.name}
+                            className="aspect-square rounded-md object-cover w-full h-full border border-border"
+                            src={item.imageUrl}
+                            fallback={<Package className="h-5 w-5" />}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center text-muted-foreground border border-border">
+                          <Package className="h-5 w-5" />
+                        </div>
+                      )
                     )}
                   </TableCell>
                   <TableCell className="font-medium py-2">
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold">{item.name}</span>
+                      {item.productId && item.productId !== 'custom' ? (
+                        <Link href={`/inventory/details?id=${item.productId}`} className="text-sm font-semibold hover:underline text-foreground hover:text-primary transition-colors">
+                          {item.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-semibold">{item.name}</span>
+                      )}
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <Badge
                           variant="outline"
@@ -315,13 +343,13 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                     {currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="py-2">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-mono bg-muted py-0.5 px-1.5 rounded w-max text-foreground font-medium flex items-center gap-1 border border-border">
-                        <FileText className="h-3 w-3 text-muted-foreground" />
+                    <Link href={`/receipts/details?id=${item.receiptId}`} className="group flex flex-col w-max">
+                      <span className="text-xs font-mono bg-muted group-hover:bg-primary/10 group-hover:text-primary py-0.5 px-1.5 rounded w-max text-foreground font-medium flex items-center gap-1 border border-border transition-colors">
+                        <FileText className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                         {item.receiptNumber}
                       </span>
-                      <span className="text-[10px] text-muted-foreground mt-0.5">{item.paymentMethod}</span>
-                    </div>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors">{item.paymentMethod}</span>
+                    </Link>
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground py-2 pr-6 w-[180px] min-w-[180px] whitespace-nowrap">
                     <div className="flex flex-col items-end">
