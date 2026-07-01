@@ -7,26 +7,60 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { CachedImage } from '../shared/cached-image';
-import { Package, Search, ChevronLeft, ChevronRight, FileText, Download } from 'lucide-react';
+import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
-import { format, formatDistanceToNow } from 'date-fns';
-import { safeToDate } from '@/lib/utils';
+import { format, formatDistanceToNow, startOfDay, endOfDay, isSameDay, subDays } from 'date-fns';
+import { safeToDate, cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
+import { usePOS } from '@/context/pos-context';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 interface DailySalesItemsTableProps {
-  receipts: Receipt[];
+  receipts: Receipt[]; // kept for signature compatibility
   products: Product[];
   currencySymbol: string;
 }
 
-export default function DailySalesItemsTable({ receipts, products, currencySymbol }: DailySalesItemsTableProps) {
+export default function DailySalesItemsTable({ products, currencySymbol }: DailySalesItemsTableProps) {
   const { toast } = useToast();
+  const { fetchReceiptsInRange } = usePOS();
+
+  const [selectedDate, setSelectedDate] = React.useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [localReceipts, setLocalReceipts] = React.useState<Receipt[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+
   const [searchTerm, setSearchTerm] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('all');
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
+
+  // Fetch receipts for the selected day
+  React.useEffect(() => {
+    const loadReceipts = async () => {
+      setIsLoading(true);
+      try {
+        const from = startOfDay(selectedDate);
+        const to = endOfDay(selectedDate);
+        const res = await fetchReceiptsInRange(from, to);
+        setLocalReceipts(res || []);
+      } catch (err) {
+        console.error('Error fetching daily sales items:', err);
+        toast({
+          variant: 'destructive',
+          title: 'Fetch Error',
+          description: 'Failed to load sales items for the selected day.'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadReceipts();
+  }, [selectedDate, fetchReceiptsInRange, toast]);
 
   // Flatten receipts into individual product/service sales items
   const salesItems = React.useMemo(() => {
@@ -45,7 +79,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       category?: string;
     }[] = [];
 
-    receipts.forEach(r => {
+    localReceipts.forEach(r => {
       const date = safeToDate(r.createdAt);
       r.items?.forEach((item, index) => {
         const product = products?.find(p => p.id === item.productId);
@@ -68,7 +102,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
 
     // Sort by date descending (newest sold items first)
     return list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [receipts, products]);
+  }, [localReceipts, products]);
 
   // Apply filters and search term
   const filteredItems = React.useMemo(() => {
@@ -93,7 +127,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, typeFilter]);
+  }, [searchTerm, typeFilter, selectedDate]);
 
   // Pagination calculations
   const totalItems = filteredItems.length;
@@ -128,7 +162,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     const reader = new FileReader();
     reader.onloadend = () => {
       link.setAttribute('href', reader.result as string);
-      link.setAttribute('download', `zeneva-daily-sales-items-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `zeneva-daily-sales-items-${format(selectedDate, 'yyyy-MM-dd')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -144,7 +178,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           <div>
             <CardTitle>Daily Sales Items Log</CardTitle>
             <CardDescription>
-              Detailed logs of individual product and service items sold during the filtered period.
+              Detailed logs of individual product and service items sold on the selected day.
             </CardDescription>
           </div>
           <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 gap-1 self-start sm:self-auto">
@@ -156,6 +190,49 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       
       {/* Filtering Bar */}
       <div className="px-6 pb-4 border-b flex flex-wrap items-center gap-4 bg-muted/20">
+        
+        {/* Single Date Picker */}
+        <div className="flex items-center gap-2">
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 justify-start text-left font-normal w-[240px] border border-border bg-background hover:bg-muted/50",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                {selectedDate ? (
+                  isSameDay(selectedDate, new Date()) ? (
+                    `Today (${format(selectedDate, 'PP')})`
+                  ) : isSameDay(selectedDate, subDays(new Date(), 1)) ? (
+                    `Yesterday (${format(selectedDate, 'PP')})`
+                  ) : (
+                    format(selectedDate, 'PP')
+                  )
+                ) : (
+                  <span>Pick a day</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setSelectedDate(date);
+                    setIsCalendarOpen(false);
+                  }
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
         <div className="relative flex-1 min-w-[240px] group">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
@@ -189,8 +266,9 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           </SelectContent>
         </Select>
         
-        <div className="text-xs text-muted-foreground ml-auto font-medium">
-          Showing {filteredItems.length} item sales
+        <div className="text-xs text-muted-foreground ml-auto font-medium flex items-center gap-2">
+          {isLoading && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+          <span>Showing {filteredItems.length} item sales</span>
         </div>
       </div>
 
@@ -208,7 +286,16 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedItems.length > 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                    <p className="font-semibold text-sm">Loading sales log...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : paginatedItems.length > 0 ? (
               paginatedItems.map((item) => (
                 <TableRow key={item.id} className="hover:bg-muted/10">
                   <TableCell className="py-2">
@@ -274,7 +361,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                   <div className="flex flex-col items-center justify-center p-8">
                     <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
                     <p className="font-semibold text-sm">No sales items logged</p>
-                    <p className="text-xs text-muted-foreground mt-1">There are no records matching your active filters or date range.</p>
+                    <p className="text-xs text-muted-foreground mt-1">There are no records matching your active filters on this day.</p>
                   </div>
                 </TableCell>
               </TableRow>
