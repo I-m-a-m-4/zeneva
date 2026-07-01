@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "zeneva",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "identifier": "com.zeneva.app",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:9007",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build && node scripts/post-build-cleanup.mjs"
   },
   "app": {
     "windows": [
