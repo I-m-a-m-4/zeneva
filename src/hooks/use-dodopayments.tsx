@@ -25,6 +25,65 @@ export default function useDodoPayments() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const handleMessage = (event: MessageEvent) => {
+      // Check if message is from dodopayments
+      if (typeof event.origin === 'string' && event.origin.includes('dodopayments.com')) {
+        let data = event.data;
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data);
+          } catch (e) {}
+        }
+        
+        // Handle checkout closed or cancelled
+        if (data && (data.event_type === 'checkout.closed' || data.event === 'checkout.closed' || data.event_type === 'checkout.close')) {
+          console.log("Dodo Checkout Closed message received. Forcing close.");
+          
+          // 1. Call SDK close if available
+          try {
+            if (window.DodoPaymentsCheckout) {
+              const dodo = window.DodoPaymentsCheckout.DodoPayments;
+              if (dodo && (dodo as any).Checkout && typeof (dodo as any).Checkout.close === 'function') {
+                (dodo as any).Checkout.close();
+              }
+            }
+          } catch (err) {
+            console.error("Error calling DodoPayments close method:", err);
+          }
+
+          // 2. Manually clean up overlay elements from DOM
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            if (iframe.src && iframe.src.includes('dodopayments.com')) {
+              let parent = iframe.parentElement;
+              iframe.remove();
+              if (parent && (parent.id.includes('dodo') || parent.className.includes('dodo') || parent.style.position === 'fixed' || parent.style.zIndex === '99999' || parent.style.zIndex === '100000')) {
+                parent.remove();
+              }
+            }
+          });
+
+          // Also remove any elements with classes/IDs containing dodo
+          const dodoElements = document.querySelectorAll('[id*="dodo"], [class*="dodo"]');
+          dodoElements.forEach(el => {
+            // Keep the script itself
+            if (el.tagName !== 'SCRIPT') {
+              el.remove();
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (window.DodoPaymentsCheckout) {
       setIsScriptLoaded(true);
       return;
@@ -41,7 +100,22 @@ export default function useDodoPayments() {
       if (window.DodoPaymentsCheckout) {
         window.DodoPaymentsCheckout.DodoPayments.Initialize({
           mode: process.env.NEXT_PUBLIC_DODO_MODE === 'live' ? 'live' : 'test',
-          displayType: 'overlay'
+          displayType: 'overlay',
+          onEvent: (event) => {
+            if (event && event.event_type === 'checkout.closed') {
+              console.log("SDK Event: Checkout closed.");
+              const iframes = document.querySelectorAll('iframe');
+              iframes.forEach(iframe => {
+                if (iframe.src && iframe.src.includes('dodopayments.com')) {
+                  let parent = iframe.parentElement;
+                  iframe.remove();
+                  if (parent && (parent.id.includes('dodo') || parent.className.includes('dodo') || parent.style.position === 'fixed')) {
+                    parent.remove();
+                  }
+                }
+              });
+            }
+          }
         });
       }
     };
