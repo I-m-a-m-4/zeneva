@@ -476,7 +476,7 @@ export default function SelectProductsPage() {
             <div className="md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
-                        <Button variant="default" className="fixed bottom-[70px] left-4 right-4 z-20 h-16 shadow-lg rounded-xl text-lg">
+                        <Button variant="default" className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+6px)] left-4 right-4 z-20 h-16 shadow-lg rounded-xl text-lg">
                             <div className="flex justify-between items-center w-full">
                                 <div className="flex items-center gap-2">
                                     <ChevronsUp className="h-5 w-5" />
