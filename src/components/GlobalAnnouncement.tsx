@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SystemBroadcast } from '@/types';
 
+import { useRouter } from 'next/navigation';
+
 export function GlobalAnnouncement() {
     const firestore = useFirestore();
+    const router = useRouter();
     const [broadcast, setBroadcast] = useState<SystemBroadcast | null>(null);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -49,11 +52,21 @@ export function GlobalAnnouncement() {
         return () => unsubscribe();
     }, [firestore]);
 
-    const handleDismiss = () => {
+    const handleDismiss = (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+        }
         if (broadcast) {
             sessionStorage.setItem('dismissed_broadcast', broadcast.id);
         }
         setIsVisible(false);
+    };
+
+    const handleBannerClick = () => {
+        if (broadcast?.link) {
+            router.push(broadcast.link);
+            handleDismiss();
+        }
     };
 
     if (!broadcast || !isVisible) return null;
@@ -79,7 +92,8 @@ export function GlobalAnnouncement() {
                     initial={{ y: -100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -100, opacity: 0 }}
-                    className={`fixed top-[var(--tauri-title-height,0)] left-0 right-0 z-[100] ${bgColors[broadcast.type] || 'bg-primary'} text-white shadow-lg`}
+                    onClick={handleBannerClick}
+                    className={`fixed top-[var(--tauri-title-height,0)] left-0 right-0 z-[100] ${bgColors[broadcast.type] || 'bg-primary'} text-white shadow-lg ${broadcast.link ? 'cursor-pointer hover:brightness-105 active:brightness-95 transition-all' : ''}`}
                 >
                     <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 overflow-hidden">
@@ -90,14 +104,21 @@ export function GlobalAnnouncement() {
                                 <span className="text-sm sm:text-base truncate">{broadcast.message}</span>
                             </div>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleDismiss}
-                            className="text-white hover:bg-white/20 h-8 w-8 rounded-full"
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {broadcast.link && (
+                                <span className="hidden md:inline-block text-xs bg-white/20 px-2 py-1 rounded font-bold uppercase tracking-wider">
+                                    Click to view
+                                </span>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleDismiss}
+                                className="text-white hover:bg-white/20 h-8 w-8 rounded-full"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </motion.div>
             )}

@@ -708,6 +708,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const [broadcastType, setBroadcastType] = useState<'info' | 'warning' | 'alert'>('info');
     const [broadcastDuration, setBroadcastDuration] = useState('24'); // hours
+    const [broadcastLink, setBroadcastLink] = useState('');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
     // User Management State
@@ -1334,6 +1335,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromDate(expiryDate),
                 active: true,
+                isActive: true, // Write both active and isActive for absolute backward safety
+                link: broadcastLink || null,
             });
 
             toast({ variant: 'success', title: 'Broadcast Sent!', description: 'Your message has been sent to all active users.' });
@@ -1341,6 +1344,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             setBroadcastMessage('');
             setBroadcastType('info');
             setBroadcastDuration('24');
+            setBroadcastLink('');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Broadcast Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
@@ -2012,6 +2016,57 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             <CardDescription>Send a notification to all active users on the platform.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4 max-w-2xl">
+                            {/* Preset Templates Selector */}
+                            <div className="flex flex-wrap gap-2 mb-4 items-center">
+                              <span className="text-xs font-semibold text-muted-foreground">Select Template:</span>
+                              {[
+                                {
+                                  name: 'Theft Prevention Warning',
+                                  title: 'Security Alert: Prevent Theft & Monitor Activity',
+                                  message: 'We recommend checking your store\'s user activity logs and auditing handovers regularly to verify inventory balance.',
+                                  type: 'alert',
+                                  link: '/audit-log'
+                                },
+                                {
+                                  name: 'Inventory Audit Required',
+                                  title: 'Catalog Sync & Physical Stock Count',
+                                  message: 'To prevent losses, please perform a physical inventory audit to ensure records in your local POS match your actual shelf stock.',
+                                  type: 'warning',
+                                  link: '/inventory'
+                                },
+                                {
+                                  name: 'End of Day Reconciliation',
+                                  title: 'Daily Sales & Cash Reconciliation',
+                                  message: 'Make sure your cashiers do a final cash register count and compare it with the sales summary in daily sales report.',
+                                  type: 'info',
+                                  link: '/reports?tab=daily-sales'
+                                },
+                                {
+                                  name: 'Scheduled Maintenance',
+                                  title: 'Scheduled System Maintenance',
+                                  message: 'Zeneva will undergo brief platform optimizations tonight at 12:00 AM UTC. Offline functionality will remain fully operational.',
+                                  type: 'info',
+                                  link: '/audit-log'
+                                }
+                              ].map(t => (
+                                <Button 
+                                  key={t.name} 
+                                  type="button"
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-[10px] h-6 border-primary/20 text-primary hover:bg-primary/5 font-semibold" 
+                                  onClick={() => {
+                                    setBroadcastTitle(t.title);
+                                    setBroadcastMessage(t.message);
+                                    setBroadcastType(t.type as any);
+                                    setBroadcastLink(t.link);
+                                  }}
+                                >
+                                  {t.name}
+                                </Button>
+                              ))}
+                            </div>
+
                             <div className="space-y-2">
                                 <Label>Broadcast Title</Label>
                                 <Input placeholder="e.g. Scheduled Maintenance" value={broadcastTitle} onChange={(e) => setBroadcastTitle(e.target.value)} />
@@ -2019,6 +2074,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                             <div className="space-y-2">
                                 <Label>Message Body</Label>
                                 <Textarea placeholder="Details about the announcement..." value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Redirect Link / Target Page (Optional)</Label>
+                                <Input placeholder="e.g. /audit-log, /inventory" value={broadcastLink} onChange={(e) => setBroadcastLink(e.target.value)} />
+                                <p className="text-[10px] text-muted-foreground">Clicking the announcement bar will navigate users to this exact page (e.g. /audit-log for security or theft prevention).</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">

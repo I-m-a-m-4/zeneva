@@ -416,6 +416,7 @@ export interface SystemBroadcast {
     createdAt: any; // Firestore Timestamp
     isActive: boolean;
     createdBy: string;
+    link?: string;
 }
 
 
