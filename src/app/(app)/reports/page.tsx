@@ -211,6 +211,17 @@ export default function ReportsDashboard() {
     const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
     const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
     const [activeTab, setActiveTab] = React.useState<string>('analytics');
+
+    React.useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get('tab');
+            if (tab && (tab === 'analytics' || tab === 'daily-sales')) {
+                setActiveTab(tab);
+            }
+        }
+    }, []);
+
     const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
     const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
 

@@ -25,6 +25,7 @@ import {
   Users, // for new customers
   ShoppingBag, // for units sold
   TrendingDown,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import type { TopSellingItem, BusinessAnalysisOutput, Receipt } from '@/types';
@@ -42,8 +43,10 @@ import { cn } from '@/lib/utils';
 // New imports for date filtering
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
-import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { isWithinInterval, startOfDay, endOfDay, format, formatDistanceToNow } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CachedImage } from '@/components/shared/cached-image';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -257,17 +260,62 @@ export default function DashboardPage() {
       }
     });
 
-    const sortedCustomers = [...allCustomers].sort((a, b) => {
-      if (isLoyaltyEnabled) {
-        return (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0);
-      }
-      return (customerSpendInRange[b.id] || 0) - (customerSpendInRange[a.id] || 0);
-    });
+    let sortedCustomers = [...allCustomers];
+    if (isLoyaltyEnabled) {
+      sortedCustomers = sortedCustomers.filter(c => (c.loyaltyPoints || 0) > 0);
+      sortedCustomers.sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0));
+    } else {
+      sortedCustomers = sortedCustomers.filter(c => (customerSpendInRange[c.id] || 0) > 0);
+      sortedCustomers.sort((a, b) => (customerSpendInRange[b.id] || 0) - (customerSpendInRange[a.id] || 0));
+    }
 
     const topLoyaltyCustomers = sortedCustomers.slice(0, 3).map(c => ({
         ...c,
         spendInRange: customerSpendInRange[c.id] || 0
     }));
+
+    // Flatten receipts to get sales items for the current period (limit to 5 items for dashboard preview)
+    const recentSalesItems: {
+      id: string;
+      productId: string;
+      receiptId: string;
+      name: string;
+      quantity: number;
+      price: number;
+      total: number;
+      receiptNumber: string;
+      createdAt: Date;
+      paymentMethod: string;
+      imageUrl?: string;
+      categoryType?: string;
+    }[] = [];
+
+    filteredReceipts.forEach(r => {
+      const date = safeToDate(r.createdAt);
+      r.items?.forEach((item, index) => {
+        const cleanItemName = item.name.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+        const product = inventoryItems.find(p => 
+          p.id === item.productId || 
+          p.name.toLowerCase() === cleanItemName
+        );
+        recentSalesItems.push({
+          id: `${r.id}-${item.productId}-${index}`,
+          productId: item.productId,
+          receiptId: r.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+          receiptNumber: r.receiptNumber || 'N/A',
+          createdAt: date,
+          paymentMethod: r.paymentMethod || 'Walk-in',
+          imageUrl: product?.imageUrl || undefined,
+          categoryType: product?.categoryType || 'product'
+        });
+      });
+    });
+
+    recentSalesItems.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     // Default to lifetime stats if no range is selected or if it's broad
     const showLifetime = !date?.from || !date?.to;
@@ -287,6 +335,7 @@ export default function DashboardPage() {
       topSellingItems,
       topLoyaltyCustomers,
       isLoyaltyEnabled,
+      recentSalesItems: recentSalesItems.slice(0, 5),
       debtItemsCount: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).length,
       totalDebtUnits: inventoryItems.filter(p => p.categoryType !== 'service' && (p.stock || 0) < 0).reduce((acc, p) => acc + Math.abs(p.stock || 0), 0),
       serviceUnitsSold,
@@ -424,7 +473,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue } = finalDashboardData;
+  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue, recentSalesItems } = finalDashboardData;
 
   const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
   const isRestricted = !hasReportPermission;
@@ -630,7 +679,9 @@ export default function DashboardPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No customer loyalty data yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {isLoyaltyEnabled ? "No customer loyalty data yet." : "No customer sales recorded in this period."}
+              </p>
             )}
             <Button variant="link" size="sm" asChild className="mt-3 w-full justify-center">
               <Link href="/customers">View All Customers</Link>
@@ -685,6 +736,135 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+ 
+      {/* Daily Sales Items Card */}
+      {!isRestricted && (
+        <Card className="shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-primary" />
+                Daily Sales Items Log
+              </CardTitle>
+              <CardDescription>Recent sales items sold during the selected period.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild className="h-9">
+              <Link href="/reports?tab=daily-sales">
+                View All Daily Sales
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {recentSalesItems && recentSalesItems.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead className="font-semibold text-sm">Item Name</TableHead>
+                      <TableHead className="font-semibold text-sm text-center">Qty</TableHead>
+                      <TableHead className="font-semibold text-sm">Price</TableHead>
+                      <TableHead className="font-semibold text-sm">Total</TableHead>
+                      <TableHead className="font-semibold text-sm">Receipt</TableHead>
+                      <TableHead className="font-semibold text-sm text-right pr-4">Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentSalesItems.map((item) => (
+                      <TableRow key={item.id} className="hover:bg-muted/10">
+                        <TableCell className="py-2.5">
+                          {item.productId && item.productId !== 'custom' ? (
+                            <Link href={`/inventory/details?id=${item.productId}`} className="hover:opacity-80 transition-opacity block w-max">
+                              {item.imageUrl ? (
+                                <div className="relative h-9 w-9">
+                                  <CachedImage
+                                    alt={item.name}
+                                    className="aspect-square rounded-md object-cover w-full h-full border border-border"
+                                    src={item.imageUrl}
+                                    fallback={<Package className="h-4.5 w-4.5" />}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="h-9 w-9 bg-muted rounded-md flex items-center justify-center text-muted-foreground border border-border">
+                                  <Package className="h-4 w-4" />
+                                </div>
+                              )}
+                            </Link>
+                          ) : (
+                            item.imageUrl ? (
+                              <div className="relative h-9 w-9">
+                                <CachedImage
+                                  alt={item.name}
+                                  className="aspect-square rounded-md object-cover w-full h-full border border-border"
+                                  src={item.imageUrl}
+                                  fallback={<Package className="h-4.5 w-4.5" />}
+                                />
+                              </div>
+                            ) : (
+                              <div className="h-9 w-9 bg-muted rounded-md flex items-center justify-center text-muted-foreground border border-border">
+                                <Package className="h-4 w-4" />
+                              </div>
+                            )
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium py-2.5">
+                          <div className="flex flex-col">
+                            {item.productId && item.productId !== 'custom' ? (
+                              <Link href={`/inventory/details?id=${item.productId}`} className="text-sm font-semibold hover:underline text-foreground hover:text-primary transition-colors">
+                                {item.name}
+                              </Link>
+                            ) : (
+                              <span className="text-sm font-semibold text-foreground">{item.name}</span>
+                            )}
+                            <div className="mt-0.5">
+                              <Badge
+                                variant="outline"
+                                className={item.categoryType === 'service' 
+                                  ? "text-[9px] h-3.5 bg-blue-500/10 text-blue-600 border-blue-500/20 px-1 font-semibold" 
+                                  : "text-[9px] h-3.5 bg-orange-500/10 text-orange-600 border-orange-500/20 px-1 font-semibold"}
+                              >
+                                {item.categoryType === 'service' ? 'Service' : 'Product'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-bold py-2.5 text-sm text-foreground">
+                          {item.quantity}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-sm text-muted-foreground">
+                          {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="py-2.5 font-bold text-sm text-foreground">
+                          {currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <Link href={`/receipts/details?id=${item.receiptId}`} className="group flex flex-col w-max">
+                            <span className="text-xs font-mono bg-muted group-hover:bg-primary/10 group-hover:text-primary py-0.5 px-1.5 rounded w-max text-foreground font-medium flex items-center gap-1 border border-border transition-colors">
+                              <FileText className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                              {item.receiptNumber}
+                            </span>
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground py-2.5 pr-4 whitespace-nowrap">
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-foreground">{formatDistanceToNow(item.createdAt, { addSuffix: true })}</span>
+                            <span className="text-[10px] text-muted-foreground/85 mt-0.5">{format(item.createdAt, 'PPp')}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <ShoppingCart className="mx-auto h-12 w-12 opacity-50 mb-3" />
+                <p>No sales items recorded in this period.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {business && (
         <AddCustomerDialog
