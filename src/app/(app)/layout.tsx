@@ -254,6 +254,7 @@ export default function AuthenticatedLayout({
   // Helper: resolve a navigation link for each notification
   const getNotificationLink = React.useCallback((notif: any): string => {
     if (notif.link) return notif.link;
+    if (notif.type === 'billing' || notif.body?.toLowerCase().includes('expire') || notif.body?.toLowerCase().includes('subscribe') || notif.title?.toLowerCase().includes('subscription')) return '/billing';
     if (notif.type === 'inventory' || notif.body?.toLowerCase().includes('stock') || notif.body?.toLowerCase().includes('backorder')) return '/inventory';
     if (notif.type === 'sale' || notif.body?.toLowerCase().includes('order')) return '/online-orders';
     if (notif.type === 'sync') return '/audit-log';
