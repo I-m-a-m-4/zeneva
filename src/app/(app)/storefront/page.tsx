@@ -443,8 +443,15 @@ function StorefrontCustomizationPage() {
     const publicStoreUrl = React.useMemo(() => {
         if (typeof window === 'undefined') return '';
         const origin = window.location.origin;
-        // Check if localhost
-        if (origin.includes('localhost')) {
+        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        
+        // If running in Tauri desktop app, always show the production URL
+        if (isTauri) {
+            return `https://${storePath}.zeneva.space`;
+        }
+
+        // Check if local web development (localhost) and not Tauri localhost
+        if (origin.includes('localhost') && !origin.includes('tauri')) {
             return `${origin}/store/${storePath}`;
         }
         // Production: Use subdomain
