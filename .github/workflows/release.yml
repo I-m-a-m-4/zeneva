@@ -349,8 +349,8 @@ jobs:
             APP_DIR=$(dirname "$APP_PATH")
             APP_NAME=$(basename "$APP_PATH")
             cd "$APP_DIR"
-            zip -r "../../../../zeneva-v${{ env.APP_VERSION }}-ios.zip" "$APP_NAME"
-            echo "iOS App zipped successfully to zeneva-v${{ env.APP_VERSION }}-ios.zip"
+            zip -r "$GITHUB_WORKSPACE/zeneva-v${{ env.APP_VERSION }}-ios.zip" "$APP_NAME"
+            echo "iOS App zipped successfully to $GITHUB_WORKSPACE/zeneva-v${{ env.APP_VERSION }}-ios.zip"
           else
             echo "Warning: No .app file found to compress!"
           fi
