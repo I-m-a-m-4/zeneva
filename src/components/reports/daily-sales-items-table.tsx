@@ -204,7 +204,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               <TableHead className="font-semibold">Price</TableHead>
               <TableHead className="font-semibold">Total Revenue</TableHead>
               <TableHead className="font-semibold">Receipt</TableHead>
-              <TableHead className="font-semibold text-right pr-6">Date & Time</TableHead>
+              <TableHead className="font-semibold text-right pr-6 w-[180px] min-w-[180px]">Date & Time</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -260,7 +260,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                       <span className="text-[10px] text-muted-foreground mt-0.5">{item.paymentMethod}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground py-2 pr-6">
+                  <TableCell className="text-right text-xs text-muted-foreground py-2 pr-6 w-[180px] min-w-[180px] whitespace-nowrap">
                     <div className="flex flex-col items-end">
                       <span className="font-semibold text-foreground">{formatDistanceToNow(item.createdAt, { addSuffix: true })}</span>
                       <span className="text-[10px] text-muted-foreground/80 mt-0.5">{format(item.createdAt, 'PPp')}</span>
