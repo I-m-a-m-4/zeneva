@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/hooks/use-toast';
 import { Check, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import type { UserProfile, BusinessInstance } from '@/types';
-import { useFirestore } from '@/firebase';
+import { useFirestore, auth } from '@/firebase';
 import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore';
 import { add, format } from 'date-fns';
 import { Badge } from '../ui/badge';
@@ -324,16 +324,40 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
     const isMobileApp = isTauri && isMobile;
 
     const handleOpenWebDashboard = async () => {
+        let checkoutLink = 'https://zeneva.space/billing';
+        
+        try {
+            // Generate auto-login link to prevent user from having to log in again in their mobile browser
+            const currentUser = auth?.currentUser;
+            if (currentUser) {
+                const idToken = await currentUser.getIdToken(true);
+                const response = await fetch('https://zeneva.space/api/auth/create-login-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.customToken) {
+                        checkoutLink = `https://zeneva.space/auth/login-session?token=${data.customToken}&redirect=/billing`;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Failed to generate magic login token:", err);
+        }
+
         if (isTauri) {
             try {
                 const { open } = await import('@tauri-apps/plugin-shell');
-                await open('https://zeneva.space/billing');
+                await open(checkoutLink);
             } catch (e) {
                 console.error("Failed to open via Tauri shell:", e);
-                window.location.href = 'https://zeneva.space/billing';
+                window.location.href = checkoutLink;
             }
         } else {
-            window.location.href = 'https://zeneva.space/billing';
+            window.location.href = checkoutLink;
         }
     };
 
