@@ -748,9 +748,14 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription>Recent sales items sold during the selected period.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" asChild className="h-9">
+            <Button 
+              size="sm" 
+              asChild 
+              className="h-9 bg-primary text-white hover:bg-primary/95 hover:scale-[1.03] active:scale-[0.97] shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/40 transition-all duration-300 font-bold px-4 rounded-lg flex items-center gap-2 border border-primary/20"
+            >
               <Link href="/reports?tab=daily-sales">
-                View All Daily Sales
+                <span>View All Daily Sales</span>
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </CardHeader>
