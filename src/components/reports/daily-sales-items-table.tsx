@@ -7,60 +7,32 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { CachedImage } from '../shared/cached-image';
-import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
 import { format, formatDistanceToNow, startOfDay, endOfDay, isSameDay, subDays } from 'date-fns';
 import { safeToDate, cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
-import { usePOS } from '@/context/pos-context';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
 interface DailySalesItemsTableProps {
-  receipts: Receipt[]; // kept for signature compatibility
+  receipts: Receipt[];
   products: Product[];
   currencySymbol: string;
 }
 
-export default function DailySalesItemsTable({ products, currencySymbol }: DailySalesItemsTableProps) {
+export default function DailySalesItemsTable({ receipts, products, currencySymbol }: DailySalesItemsTableProps) {
   const { toast } = useToast();
-  const { fetchReceiptsInRange } = usePOS();
 
   const [selectedDate, setSelectedDate] = React.useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-  const [localReceipts, setLocalReceipts] = React.useState<Receipt[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
 
   const [searchTerm, setSearchTerm] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('all');
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
-
-  // Fetch receipts for the selected day
-  React.useEffect(() => {
-    const loadReceipts = async () => {
-      setIsLoading(true);
-      try {
-        const from = startOfDay(selectedDate);
-        const to = endOfDay(selectedDate);
-        const res = await fetchReceiptsInRange(from, to);
-        setLocalReceipts(res || []);
-      } catch (err) {
-        console.error('Error fetching daily sales items:', err);
-        toast({
-          variant: 'destructive',
-          title: 'Fetch Error',
-          description: 'Failed to load sales items for the selected day.'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadReceipts();
-  }, [selectedDate, fetchReceiptsInRange, toast]);
 
   // Flatten receipts into individual product/service sales items
   const salesItems = React.useMemo(() => {
@@ -79,30 +51,39 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
       category?: string;
     }[] = [];
 
-    localReceipts.forEach(r => {
+    const targetDateStart = startOfDay(selectedDate).getTime();
+    const targetDateEnd = endOfDay(selectedDate).getTime();
+    const sourceReceipts = receipts || [];
+
+    sourceReceipts.forEach(r => {
       const date = safeToDate(r.createdAt);
-      r.items?.forEach((item, index) => {
-        const product = products?.find(p => p.id === item.productId);
-        list.push({
-          id: `${r.id}-${item.productId}-${index}`,
-          productId: item.productId,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          total: item.price * item.quantity,
-          receiptNumber: r.receiptNumber || 'N/A',
-          createdAt: date,
-          paymentMethod: r.paymentMethod || 'Walk-in',
-          imageUrl: product?.imageUrl || undefined,
-          categoryType: product?.categoryType || 'product',
-          category: product?.category || undefined
+      const rTime = date.getTime();
+
+      // Filter by the selected day
+      if (rTime >= targetDateStart && rTime <= targetDateEnd) {
+        r.items?.forEach((item, index) => {
+          const product = products?.find(p => p.id === item.productId);
+          list.push({
+            id: `${r.id}-${item.productId}-${index}`,
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.price * item.quantity,
+            receiptNumber: r.receiptNumber || 'N/A',
+            createdAt: date,
+            paymentMethod: r.paymentMethod || 'Walk-in',
+            imageUrl: product?.imageUrl || undefined,
+            categoryType: product?.categoryType || 'product',
+            category: product?.category || undefined
+          });
         });
-      });
+      }
     });
 
     // Sort by date descending (newest sold items first)
     return list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [localReceipts, products]);
+  }, [receipts, products, selectedDate]);
 
   // Apply filters and search term
   const filteredItems = React.useMemo(() => {
@@ -244,7 +225,7 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
         </div>
         
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[180px] h-9">
+          <SelectTrigger className="w-[180px] min-w-[180px] h-9">
             <SelectValue placeholder="Filter by Type" />
           </SelectTrigger>
           <SelectContent>
@@ -255,7 +236,7 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
         </Select>
 
         <Select value={pageSize.toString()} onValueChange={(val) => { setPageSize(Number(val)); setCurrentPage(1); }}>
-          <SelectTrigger className="w-[120px] h-9">
+          <SelectTrigger className="w-[120px] min-w-[120px] h-9">
             <SelectValue placeholder="Page Size" />
           </SelectTrigger>
           <SelectContent>
@@ -266,9 +247,8 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
           </SelectContent>
         </Select>
         
-        <div className="text-xs text-muted-foreground ml-auto font-medium flex items-center gap-2">
-          {isLoading && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-          <span>Showing {filteredItems.length} item sales</span>
+        <div className="text-xs text-muted-foreground ml-auto font-medium">
+          Showing {filteredItems.length} item sales
         </div>
       </div>
 
@@ -286,16 +266,7 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-                    <p className="font-semibold text-sm">Loading sales log...</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : paginatedItems.length > 0 ? (
+            {paginatedItems.length > 0 ? (
               paginatedItems.map((item) => (
                 <TableRow key={item.id} className="hover:bg-muted/10">
                   <TableCell className="py-2">

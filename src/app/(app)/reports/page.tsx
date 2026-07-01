@@ -210,7 +210,7 @@ export default function ReportsDashboard() {
     const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
     const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
     const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
-
+    const [activeTab, setActiveTab] = React.useState<string>('analytics');
     const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
     const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
 
@@ -325,19 +325,23 @@ export default function ReportsDashboard() {
                 className="flex-grow flex flex-col"
                 isLoading={isPosLoading}
             >
-                <Tabs defaultValue="analytics" className="w-full flex flex-col flex-grow">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
                   <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
                       <TabsList className="grid grid-cols-2 w-[350px]">
                           <TabsTrigger value="analytics" className="text-sm font-semibold">Analytics Dashboard</TabsTrigger>
                           <TabsTrigger value="daily-sales" className="text-sm font-semibold">Daily Sales Items</TabsTrigger>
                       </TabsList>
                       <div className="flex flex-wrap items-center gap-4">
-                          <DateRangePicker date={date} onDateChange={setDate} />
-                          {isFetchingBatch && (
-                              <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                  <span>Updating metrics...</span>
-                              </div>
+                          {activeTab === 'analytics' && (
+                              <>
+                                  <DateRangePicker date={date} onDateChange={setDate} />
+                                  {isFetchingBatch && (
+                                      <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                          <span>Updating metrics...</span>
+                                      </div>
+                                  )}
+                              </>
                           )}
                           <Button onClick={handleDownloadImage} variant="outline" size="sm" className="h-9"><Download className="mr-2 h-4 w-4" />Export Image</Button>
                       </div>
@@ -475,7 +479,7 @@ export default function ReportsDashboard() {
                             </FeatureGate>
                         </TabsContent>
                         <TabsContent value="daily-sales" className="mt-0">
-                            <DailySalesItemsTable receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                            <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />
                         </TabsContent>
                       </>
                   )}
