@@ -199,18 +199,18 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-9 justify-start text-left font-normal w-[240px] border border-border bg-background hover:bg-muted/50",
+                  "h-9 justify-start text-left font-normal w-[280px] border border-border bg-background hover:bg-orange-500 hover:text-white transition-all duration-200 group",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-white transition-colors" />
                 {selectedDate ? (
                   isSameDay(selectedDate, new Date()) ? (
-                    `Today (${format(selectedDate, 'PP')})`
+                    `Today (${format(selectedDate, 'EEEE, PP')})`
                   ) : isSameDay(selectedDate, subDays(new Date(), 1)) ? (
-                    `Yesterday (${format(selectedDate, 'PP')})`
+                    `Yesterday (${format(selectedDate, 'EEEE, PP')})`
                   ) : (
-                    format(selectedDate, 'PP')
+                    format(selectedDate, 'EEEE, PP')
                   )
                 ) : (
                   <span>Pick a day</span>
@@ -350,7 +350,7 @@ export default function DailySalesItemsTable({ products, currencySymbol }: Daily
                   <TableCell className="text-right text-xs text-muted-foreground py-2 pr-6 w-[180px] min-w-[180px] whitespace-nowrap">
                     <div className="flex flex-col items-end">
                       <span className="font-semibold text-foreground">{formatDistanceToNow(item.createdAt, { addSuffix: true })}</span>
-                      <span className="text-[10px] text-muted-foreground/80 mt-0.5">{format(item.createdAt, 'PPp')}</span>
+                      <span className="text-[10px] text-muted-foreground/80 mt-0.5">{format(item.createdAt, 'EEE, PPp')}</span>
                     </div>
                   </TableCell>
                 </TableRow>
