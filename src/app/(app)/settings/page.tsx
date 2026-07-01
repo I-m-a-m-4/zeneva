@@ -344,7 +344,7 @@ function SettingsPageContent() {
         setIsVerifying(true);
         setPaymentAccountName('');
         try {
-            const response = await fetch('/api/paystack/resolve-account', {
+            const response = await fetch('https://zeneva.space/api/paystack/resolve-account', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ account_number: paymentBankAccountId, bank_code: paymentBankCode })

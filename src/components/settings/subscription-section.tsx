@@ -269,7 +269,7 @@ const DodoSubscriptionButton = ({
         setProcessingPlan(plan.planId);
 
         try {
-            const response = await fetch('/api/dodo/checkout', {
+            const response = await fetch('https://zeneva.space/api/dodo/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
