@@ -197,11 +197,11 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="onboarding-bg flex flex-col items-center justify-center min-h-screen p-4 sm:p-6">
-      <div className="w-full max-w-3xl space-y-12">
+    <div className="onboarding-bg flex flex-col items-center md:justify-center min-h-screen py-8 px-4 sm:p-6 overflow-y-auto">
+      <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight mb-3">Initialize Your Business Galaxy, {currentUserProfile.name.split(' ')[0]}</h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-2 sm:mb-3">Initialize Your Business Galaxy, {currentUserProfile.name.split(' ')[0]}</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm md:text-base max-w-xl mx-auto">
             You're entering an ecosystem built for exponential growth. Let's configure your Zeneva intelligence profile.
           </p>
         </div>
@@ -212,81 +212,81 @@ export default function OnboardingPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               {step === 1 && (
-                <CardContent className="pt-6 space-y-6">
-                  <CardTitle className="flex items-center gap-3 text-2xl font-bold"><Building className="text-primary h-6 w-6" /> Strategic Identity</CardTitle>
-                  <p className="text-sm text-muted-foreground">Define your organization's core identity to calibrate our intelligence models.</p>
+                <CardContent className="pt-6 space-y-4 sm:space-y-6">
+                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Building className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Strategic Identity</CardTitle>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Define your organization's core identity to calibrate our intelligence models.</p>
                   <FormField control={form.control} name="organizationName" render={({ field }) => (
-                    <FormItem><FormLabel>Organization Name</FormLabel><FormControl><Input placeholder="e.g. Zenith Global" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Organization Name</FormLabel><FormControl><Input placeholder="e.g. Zenith Global" className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                   )} />
                   <FormField control={form.control} name="industry" render={({ field }) => (
-                    <FormItem><FormLabel>Industry</FormLabel>
+                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Industry</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select an industry" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue placeholder="Select an industry" /></SelectTrigger></FormControl>
                         <SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-                      </Select><FormMessage /></FormItem>
+                      </Select><FormMessage className="text-[11px]" /></FormItem>
                   )} />
                 </CardContent>
               )}
               {step === 2 && (
-                <CardContent className="pt-6 space-y-6">
-                  <CardTitle className="flex items-center gap-3"><MapPin className="text-primary" /> Organization Location</CardTitle>
+                <CardContent className="pt-6 space-y-4 sm:space-y-6">
+                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><MapPin className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Organization Location</CardTitle>
                   <FormField control={form.control} name="address" render={({ field }) => (
-                    <FormItem><FormLabel>Organization Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Organization Address</FormLabel><FormControl><Input className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                   )} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <FormField control={form.control} name="state" render={({ field }) => (
-                      <FormItem><FormLabel>State/Province</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">State/Province</FormLabel><FormControl><Input className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                     <FormField control={form.control} name="country" render={({ field }) => (
-                      <FormItem><FormLabel>Country</FormLabel>
+                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Country</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem><SelectItem value="Ghana">Ghana</SelectItem><SelectItem value="Kenya">Kenya</SelectItem><SelectItem value="United States">United States</SelectItem><SelectItem value="United Kingdom">United Kingdom</SelectItem></SelectContent>
-                        </Select><FormMessage /></FormItem>
+                        </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                   </div>
                 </CardContent>
               )}
               {step === 3 && (
-                <CardContent className="pt-6 space-y-6">
-                  <CardTitle className="flex items-center gap-3"><Globe className="text-primary" /> Regional Settings</CardTitle>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <CardContent className="pt-6 space-y-4 sm:space-y-6">
+                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Globe className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Regional Settings</CardTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <FormField control={form.control} name="currency" render={({ field }) => (
-                      <FormItem><FormLabel>Currency</FormLabel>
+                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Currency</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent>
-                        </Select><FormMessage /></FormItem>
+                        </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                     <FormField control={form.control} name="language" render={({ field }) => (
-                      <FormItem><FormLabel>Language</FormLabel>
+                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Language</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="English">English</SelectItem></SelectContent>
-                        </Select><FormMessage /></FormItem>
+                        </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                     <FormField control={form.control} name="timezone" render={({ field }) => (
-                      <FormItem><FormLabel>Time Zone</FormLabel>
+                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Time Zone</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="Africa/Lagos">(GMT+1) West Africa Time</SelectItem><SelectItem value="America/New_York">(GMT-4) Eastern Time</SelectItem></SelectContent>
-                        </Select><FormMessage /></FormItem>
+                        </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                   </div>
-                  <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground p-2 sm:p-3 bg-muted/50 rounded-lg">
                     <strong>Note:</strong> The language you select will be the default for email templates and other customizations.
                   </div>
                 </CardContent>
               )}
               {step === 4 && (
-                <CardContent className="pt-6 space-y-6">
-                  <CardTitle className="flex items-center gap-3"><Landmark className="text-primary" /> Financial Year</CardTitle>
+                <CardContent className="pt-6 space-y-4 sm:space-y-6">
+                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Landmark className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Financial Year</CardTitle>
                   <FormField control={form.control} name="inventoryStartDate" render={({ field }) => (
-                    <FormItem className="flex flex-col"><FormLabel>Inventory Start Date</FormLabel>
+                    <FormItem className="flex flex-col space-y-1"><FormLabel className="text-xs sm:text-sm">Inventory Start Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal h-9 sm:h-10 text-sm", !field.value && "text-muted-foreground")}>
                               {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -295,21 +295,21 @@ export default function OnboardingPage() {
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
                         </PopoverContent>
-                      </Popover><FormMessage /></FormItem>
+                      </Popover><FormMessage className="text-[11px]" /></FormItem>
                   )} />
                   <FormField control={form.control} name="fiscalYearStart" render={({ field }) => (
-                    <FormItem><FormLabel>Fiscal Year Starts In</FormLabel>
+                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Fiscal Year Starts In</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                      </Select><FormMessage /></FormItem>
+                      </Select><FormMessage className="text-[11px]" /></FormItem>
                   )} />
                 </CardContent>
               )}
-              <CardContent className="flex justify-between mt-6">
-                {step > 1 ? (<Button type="button" variant="outline" onClick={handlePrevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>) : (<div />)}
-                {step < steps.length ? (<Button type="button" onClick={handleNextStep}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>) : (
-                  <Button type="submit" disabled={isSubmitting}>
+              <CardContent className="flex justify-between pt-4 sm:pt-6">
+                {step > 1 ? (<Button type="button" variant="outline" size="sm" className="sm:size-default" onClick={handlePrevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>) : (<div />)}
+                {step < steps.length ? (<Button type="button" size="sm" className="sm:size-default" onClick={handleNextStep}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>) : (
+                  <Button type="submit" size="sm" className="sm:size-default" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Finish Setup
                   </Button>)}

@@ -286,7 +286,16 @@ const DodoSubscriptionButton = ({
                 throw new Error(data.error || 'Failed to initialize checkout');
             }
 
-            initializeCheckout(data.checkout_url);
+            const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+            if (isTauri) {
+                window.open(data.checkout_url, '_blank');
+                toast({
+                    title: 'Redirecting to Payment',
+                    description: 'Opened payment gateway in your browser. Once completed, your subscription status will automatically sync here.'
+                });
+            } else {
+                initializeCheckout(data.checkout_url);
+            }
         } catch (error: any) {
             console.error("Dodo initialization error:", error);
             toast({ 
