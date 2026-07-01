@@ -223,9 +223,9 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
         run: |
           # Build standard AAB app bundle for Play Store
-          npm run tauri android build -- --aab --target aarch64,armv7 --ignore-version-mismatches
+          npm run tauri android build -- --aab --target aarch64 --target armv7 --ignore-version-mismatches
           # Build APK package for testing
-          npm run tauri android build -- --apk --target aarch64,armv7 --ignore-version-mismatches
+          npm run tauri android build -- --apk --target aarch64 --target armv7 --ignore-version-mismatches
 
       - name: Locate, Sign and Prepare Android Files
         run: |

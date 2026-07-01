@@ -574,7 +574,13 @@ body {
   }
 }
 
-/* Prevent Radix UI scroll-lock from shifting the viewport layout */
+/* Prevent Radix UI / react-remove-scroll scroll-lock from shifting the viewport layout */
+:root, [data-scroll-locked], body, html {
+  --removed-body-scroll-width: 0px !important;
+}
+
+body[data-scroll-locked],
+html[data-scroll-locked],
 body[style*="margin-right"],
 html[style*="margin-right"],
 body[style*="padding-right"],

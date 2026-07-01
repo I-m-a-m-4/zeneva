@@ -805,7 +805,7 @@ export default function AuthenticatedLayout({
                   ))}
                 </SidebarMenu>
                 <Separator className="my-2 bg-sidebar-border" />
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start p-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                       <div className="flex items-center gap-2 w-full">
@@ -973,7 +973,7 @@ export default function AuthenticatedLayout({
                     </TooltipContent>
                   </Tooltip>
 
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-8 w-8 rounded-full flex">
                         {isUserLoading ? (

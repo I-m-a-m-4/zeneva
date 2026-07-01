@@ -181,7 +181,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         
         {/* Single Date Picker */}
         <div className="flex items-center gap-2">
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal={false}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -231,7 +231,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           />
         </div>
         
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={setTypeFilter} modal={false}>
           <SelectTrigger className="w-[180px] min-w-[180px] h-9">
             <SelectValue placeholder="Filter by Type" />
           </SelectTrigger>
@@ -242,7 +242,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           </SelectContent>
         </Select>
 
-        <Select value={pageSize.toString()} onValueChange={(val) => { setPageSize(Number(val)); setCurrentPage(1); }}>
+        <Select value={pageSize.toString()} onValueChange={(val) => { setPageSize(Number(val)); setCurrentPage(1); }} modal={false}>
           <SelectTrigger className="w-[120px] min-w-[120px] h-9">
             <SelectValue placeholder="Page Size" />
           </SelectTrigger>
