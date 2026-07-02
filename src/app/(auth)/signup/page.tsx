@@ -170,7 +170,7 @@ export default function SignupPage() {
 
   return (
     <div className="w-full min-h-screen flex lg:grid lg:grid-cols-2">
-      <div className="flex items-center justify-center relative w-full">
+      <div className="flex items-center justify-center relative w-full px-4 sm:px-6 py-12">
         <div className="absolute top-8 left-4 sm:left-8">
           <Button variant="ghost" asChild>
             <Link href="/login">
