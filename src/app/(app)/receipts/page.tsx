@@ -89,6 +89,8 @@ function ReceiptsContent() {
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = React.useState(initialSearch);
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
@@ -120,8 +122,27 @@ function ReceiptsContent() {
           (r.total || 0).toString().includes(lower);
       });
     }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(r => {
+        const date = safeToDate(r.createdAt);
+        return date >= start;
+      });
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(r => {
+        const date = safeToDate(r.createdAt);
+        return date <= end;
+      });
+    }
+
     return filtered;
-  }, [receipts, searchTerm, customerId]);
+  }, [receipts, searchTerm, customerId, startDate, endDate]);
 
   const handleLoadMore = async () => {
     setIsFetchingMore(true);
@@ -224,13 +245,13 @@ function ReceiptsContent() {
     <>
       <Card className="w-full">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <CardTitle>Transaction History</CardTitle>
               <CardDescription>A log of all completed sales.</CardDescription>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="relative w-full sm:w-64 no-print">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 no-print w-full md:w-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search sales..."
@@ -238,6 +259,31 @@ function ReceiptsContent() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  className="w-full sm:w-auto h-9 text-xs"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <span className="text-muted-foreground text-xs">to</span>
+                <Input
+                  type="date"
+                  className="w-full sm:w-auto h-9 text-xs"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+                {(startDate || endDate) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                    className="text-xs text-muted-foreground hover:text-foreground h-9 px-2"
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
               <RefreshButton />
             </div>
