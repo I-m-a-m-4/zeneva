@@ -58,17 +58,66 @@ export function UserActivityTracker() {
                     // Detect country from IP once per session
                     let country = sessionStorage.getItem('zeneva_session_country') || '';
                     if (!country) {
+                        // Try Service 1: ipapi.co
                         try {
                             const res = await fetch('https://ipapi.co/json/');
                             if (res.ok) {
                                 const ipData = await res.json();
                                 if (ipData && ipData.country_name) {
                                     country = ipData.country_name;
-                                    sessionStorage.setItem('zeneva_session_country', country);
                                 }
                             }
                         } catch (e) {
-                            console.error("Failed to detect location/country:", e);
+                            console.warn("ipapi.co failed, trying fallback:", e);
+                        }
+
+                        // Try Service 2: freeipapi.com
+                        if (!country) {
+                            try {
+                                const res = await fetch('https://freeipapi.com/api/json');
+                                if (res.ok) {
+                                    const ipData = await res.json();
+                                    if (ipData && ipData.countryName) {
+                                        country = ipData.countryName;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("freeipapi failed, trying fallback:", e);
+                            }
+                        }
+
+                        // Try Service 3: ipwho.is
+                        if (!country) {
+                            try {
+                                const res = await fetch('https://ipwho.is/');
+                                if (res.ok) {
+                                    const ipData = await res.json();
+                                    if (ipData && ipData.success && ipData.country) {
+                                        country = ipData.country;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("ipwho.is failed, trying fallback:", e);
+                            }
+                        }
+
+                        // Try Service 4: db-ip.com
+                        if (!country) {
+                            try {
+                                const res = await fetch('https://api.db-ip.com/v2/free/self');
+                                if (res.ok) {
+                                    const ipData = await res.json();
+                                    if (ipData && ipData.countryName) {
+                                        country = ipData.countryName;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("db-ip failed:", e);
+                            }
+                        }
+
+                        if (country) {
+                            sessionStorage.setItem('zeneva_session_country', country);
                         }
                     }
 
