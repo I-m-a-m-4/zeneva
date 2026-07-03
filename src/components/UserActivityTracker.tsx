@@ -55,11 +55,29 @@ export function UserActivityTracker() {
                     const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     const deviceType = isTauriEnv ? 'Desktop App' : (isMobile ? 'Mobile' : 'Web');
 
+                    // Detect country from IP once per session
+                    let country = sessionStorage.getItem('zeneva_session_country') || '';
+                    if (!country) {
+                        try {
+                            const res = await fetch('https://ipapi.co/json/');
+                            if (res.ok) {
+                                const ipData = await res.json();
+                                if (ipData && ipData.country_name) {
+                                    country = ipData.country_name;
+                                    sessionStorage.setItem('zeneva_session_country', country);
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Failed to detect location/country:", e);
+                        }
+                    }
+
                     batch.set(userRef, {
                         lastSeen: serverTimestamp(),
                         status: 'active',
                         deviceType,
-                        userAgent: navigator.userAgent
+                        userAgent: navigator.userAgent,
+                        country: country || 'Unknown'
                     }, { merge: true });
 
                     batch.set(sessionRef, {

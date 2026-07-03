@@ -591,6 +591,13 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                                 <span>{user.deviceType || 'Unknown'}</span>
                             </div>
                         </div>
+                        <div>
+                            <Label className="text-xs text-muted-foreground font-bold">Login Location (IP)</Label>
+                            <div className="mt-1 flex items-center gap-1.5 font-medium">
+                                <Globe className="h-4 w-4 text-primary" />
+                                <span>{user.country || 'Unknown'}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </DialogContent>

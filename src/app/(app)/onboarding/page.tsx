@@ -102,6 +102,24 @@ export default function OnboardingPage() {
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const [countries, setCountries] = React.useState([
+    { value: 'Nigeria', label: 'Nigeria' },
+    { value: 'Ghana', label: 'Ghana' },
+    { value: 'Kenya', label: 'Kenya' },
+    { value: 'United States', label: 'United States' },
+    { value: 'United Kingdom', label: 'United Kingdom' }
+  ]);
+
+  const [currencies, setCurrencies] = React.useState([
+    { value: 'NGN', label: 'NGN (₦)' },
+    { value: 'USD', label: 'USD ($)' }
+  ]);
+
+  const [timezones, setTimezones] = React.useState([
+    { value: 'Africa/Lagos', label: '(GMT+1) West Africa Time' },
+    { value: 'America/New_York', label: '(GMT-4) Eastern Time' }
+  ]);
+
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
@@ -117,6 +135,50 @@ export default function OnboardingPage() {
       fiscalYearStart: 'January',
     },
   });
+
+  React.useEffect(() => {
+    const detectLocation = async () => {
+      try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.country_name) {
+            setCountries(prev => {
+              if (!prev.some(c => c.value === data.country_name)) {
+                return [...prev, { value: data.country_name, label: data.country_name }];
+              }
+              return prev;
+            });
+            form.setValue('country', data.country_name);
+          }
+          if (data.region) {
+            form.setValue('state', data.region);
+          }
+          if (data.currency) {
+            setCurrencies(prev => {
+              if (!prev.some(c => c.value === data.currency)) {
+                return [...prev, { value: data.currency, label: `${data.currency} (${data.currency})` }];
+              }
+              return prev;
+            });
+            form.setValue('currency', data.currency);
+          }
+          if (data.timezone) {
+            setTimezones(prev => {
+              if (!prev.some(t => t.value === data.timezone)) {
+                return [...prev, { value: data.timezone, label: data.timezone }];
+              }
+              return prev;
+            });
+            form.setValue('timezone', data.timezone);
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-detecting location:', error);
+      }
+    };
+    detectLocation();
+  }, [form]);
 
   const onSubmit = async (data: OnboardingFormValues) => {
     const authUser = getAuth().currentUser;
@@ -239,9 +301,9 @@ export default function OnboardingPage() {
                     )} />
                     <FormField control={form.control} name="country" render={({ field }) => (
                       <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Country</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                           <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem><SelectItem value="Ghana">Ghana</SelectItem><SelectItem value="Kenya">Kenya</SelectItem><SelectItem value="United States">United States</SelectItem><SelectItem value="United Kingdom">United Kingdom</SelectItem></SelectContent>
+                          <SelectContent>{countries.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                         </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                   </div>
@@ -253,9 +315,9 @@ export default function OnboardingPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <FormField control={form.control} name="currency" render={({ field }) => (
                       <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Currency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                           <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="NGN">NGN (₦)</SelectItem><SelectItem value="USD">USD ($)</SelectItem></SelectContent>
+                          <SelectContent>{currencies.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                         </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                     <FormField control={form.control} name="language" render={({ field }) => (
@@ -267,9 +329,9 @@ export default function OnboardingPage() {
                     )} />
                     <FormField control={form.control} name="timezone" render={({ field }) => (
                       <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Time Zone</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                           <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="Africa/Lagos">(GMT+1) West Africa Time</SelectItem><SelectItem value="America/New_York">(GMT-4) Eastern Time</SelectItem></SelectContent>
+                          <SelectContent>{timezones.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                         </Select><FormMessage className="text-[11px]" /></FormItem>
                     )} />
                   </div>
