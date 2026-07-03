@@ -290,7 +290,13 @@ const DodoSubscriptionButton = ({
             if (isTauri) {
                 try {
                     const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-                    new WebviewWindow('dodo-checkout', {
+                    const existing = await WebviewWindow.getByLabel('dodo-checkout');
+                    if (existing) {
+                        try {
+                            await existing.destroy();
+                        } catch (e) {}
+                    }
+                    const webview = new WebviewWindow('dodo-checkout', {
                         url: data.checkout_url,
                         title: `Subscribe to Zeneva ${plan.name}`,
                         width: 550,
@@ -299,10 +305,8 @@ const DodoSubscriptionButton = ({
                         alwaysOnTop: true,
                         center: true,
                     });
-                    toast({
-                        title: "Checkout Opened",
-                        description: "A secure window has been opened for your checkout payment."
-                    });
+                    await webview.show();
+                    await webview.setFocus();
                 } catch (err) {
                     console.error("Tauri WebviewWindow creation failed, falling back:", err);
                     initializeCheckout(data.checkout_url);
