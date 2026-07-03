@@ -46,9 +46,20 @@ export function UserActivityTracker() {
                     const sessionExists = sessionSnap.exists();
                     const batch = writeBatch(firestore);
                     
+                    const isTauriEnv = typeof window !== 'undefined' && (
+                        !!(window as any).__TAURI__ || 
+                        !!(window as any).__TAURI_INTERNALS__ || 
+                        !!(window as any).__TAURI_METADATA__ || 
+                        typeof (window as any).rpc !== 'undefined'
+                    );
+                    const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    const deviceType = isTauriEnv ? 'Desktop App' : (isMobile ? 'Mobile' : 'Web');
+
                     batch.set(userRef, {
                         lastSeen: serverTimestamp(),
-                        status: 'active'
+                        status: 'active',
+                        deviceType,
+                        userAgent: navigator.userAgent
                     }, { merge: true });
 
                     batch.set(sessionRef, {

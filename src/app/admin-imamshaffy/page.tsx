@@ -83,6 +83,8 @@ import {
     Globe,
     Mail,
     Zap,
+    Laptop,
+    Smartphone,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -578,6 +580,15 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             <Label className="text-xs text-muted-foreground font-bold">Last Seen</Label>
                             <div className="mt-1">
                                 <UserPresence lastSeen={user.lastSeen} />
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="text-xs text-muted-foreground font-bold">Device Type</Label>
+                            <div className="mt-1 flex items-center gap-1.5 font-medium">
+                                {user.deviceType === 'Desktop App' && <Laptop className="h-4 w-4 text-blue-500" />}
+                                {user.deviceType === 'Web' && <Globe className="h-4 w-4 text-zinc-500" />}
+                                {user.deviceType === 'Mobile' && <Smartphone className="h-4 w-4 text-emerald-500" />}
+                                <span>{user.deviceType || 'Unknown'}</span>
                             </div>
                         </div>
                     </div>
@@ -1933,6 +1944,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                     <TableHead>User</TableHead>
                                                     <TableHead>Business Name</TableHead>
                                                     <TableHead>Plan</TableHead>
+                                                    <TableHead>Device</TableHead>
                                                     <TableHead>Activity</TableHead>
                                                     <TableHead>Actions</TableHead>
                                                 </TableRow>
@@ -1955,6 +1967,18 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                                 {business ? (
                                                                     business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
                                                                 ) : <Badge variant="outline">N/A</Badge>}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {user.deviceType ? (
+                                                                    <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs font-normal">
+                                                                        {user.deviceType === 'Desktop App' && <Laptop className="h-3.5 w-3.5 text-blue-500" />}
+                                                                        {user.deviceType === 'Web' && <Globe className="h-3.5 w-3.5 text-zinc-500" />}
+                                                                        {user.deviceType === 'Mobile' && <Smartphone className="h-3.5 w-3.5 text-emerald-500" />}
+                                                                        <span>{user.deviceType}</span>
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground text-xs">Unknown</span>
+                                                                )}
                                                             </TableCell>
                                                             <TableCell>
                                                                 <UserPresence lastSeen={user.lastSeen} />
