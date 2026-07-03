@@ -286,7 +286,30 @@ const DodoSubscriptionButton = ({
                 throw new Error(data.error || 'Failed to initialize checkout');
             }
 
-            initializeCheckout(data.checkout_url);
+            const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+            if (isTauri) {
+                try {
+                    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+                    new WebviewWindow('dodo-checkout', {
+                        url: data.checkout_url,
+                        title: `Subscribe to Zeneva ${plan.name}`,
+                        width: 550,
+                        height: 750,
+                        resizable: true,
+                        alwaysOnTop: true,
+                        center: true,
+                    });
+                    toast({
+                        title: "Checkout Opened",
+                        description: "A secure window has been opened for your checkout payment."
+                    });
+                } catch (err) {
+                    console.error("Tauri WebviewWindow creation failed, falling back:", err);
+                    initializeCheckout(data.checkout_url);
+                }
+            } else {
+                initializeCheckout(data.checkout_url);
+            }
         } catch (error: any) {
             console.error("Dodo initialization error:", error);
             toast({ 
