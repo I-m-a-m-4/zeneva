@@ -98,10 +98,10 @@ export default function OurMissionPage() {
               WebkitMaskImage: 'linear-gradient(150deg, transparent, black 30%, black 50%, transparent)' 
             }}
           >
-            Turning Retail Data Into Clear Decisions
+            Preventing Theft & Empowering Retailers
           </h1>
           <p className="mt-5 text-base md:text-lg text-neutral-600 max-w-2xl mx-auto font-geist">
-            Zeneva unifies your entire inventory, sales, and customer data into a single, proactive AI intelligence layer. Never operate in the dark again.
+            Our biggest mission is to prevent theft and losses, especially for large retailers who cannot always be physically present at their stores. Zeneva unifies your operations into a single, proactive AI intelligence layer.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-8 items-center justify-center">
@@ -151,72 +151,7 @@ export default function OurMissionPage() {
             </div>
           </div>
         </section>
-{/* Admin Dashboard Metrics */}
-<section className="max-w-7xl mx-auto mt-16 px-6">
-  <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-8 text-center">Zeneva Admin Dashboard Achievements</h2>
-  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">47</p>
-      <p className="text-sm text-neutral-600">Total Users</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">44</p>
-      <p className="text-sm text-neutral-600">Total Businesses</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">7</p>
-      <p className="text-sm text-neutral-600">Inventory Active</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">2</p>
-      <p className="text-sm text-neutral-600">Generating Sales</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">136 Days</p>
-      <p className="text-sm text-neutral-600">Zeneva Age</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">37</p>
-      <p className="text-sm text-neutral-600">Unique Downloaders</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">44</p>
-      <p className="text-sm text-neutral-600">Active Stores</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦0</p>
-      <p className="text-sm text-neutral-600">MRR</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦677,934/day</p>
-      <p className="text-sm text-neutral-600">Sales Velocity</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">2</p>
-      <p className="text-sm text-neutral-600">Activated</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">42</p>
-      <p className="text-sm text-neutral-600">At Risk</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦0</p>
-      <p className="text-sm text-neutral-600">ARR</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦1</p>
-      <p className="text-sm text-neutral-600">LTV</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦50</p>
-      <p className="text-sm text-neutral-600">Sub Revenue</p>
-    </div>
-    <div className="bg-white rounded-xl shadow p-6 text-center">
-      <p className="text-2xl font-semibold text-primary mb-1">₦43,064</p>
-      <p className="text-sm text-neutral-600">Platform AOV</p>
-    </div>
-  </div>
-</section>
+
 
         {/* Intelligent Inventory */}
         <section className="sm:px-6 sm:mt-24 md:mt-32 max-w-7xl mt-16 mr-auto ml-auto pr-4 pl-4 relative">
@@ -314,16 +249,16 @@ export default function OurMissionPage() {
 
                 <div className="border-t border-neutral-200 pt-8 mt-4 grid grid-cols-2 md:grid-cols-3 gap-6">
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">1,100+</p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Transactions Sync</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">2,141+</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Total Sales Count</p>
                    </div>
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦45.6M</p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">GMV Processed</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦92.1M+</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Platform GMV</p>
                    </div>
                    <div className="hidden md:block">
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">1,070+</p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Catalog Variants</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦2.09M</p>
+                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Overall ARPU</p>
                    </div>
                 </div>
               </div>

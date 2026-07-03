@@ -35,6 +35,42 @@ import { useFirestore } from '@/firebase';
 
 const fallbackOpportunities = [
   {
+    id: "moonshot-awards-2026",
+    title: "Moonshot Awards Global",
+    funder: "FoundersBeta",
+    amount: "$10,000",
+    description: "Global grant funding opportunity for young innovators and founders pushing the boundaries of what is possible.",
+    eligibility: "Young innovators and founders globally",
+    applicationUrl: "http://foundersbeta.com/community/startup-funding/moonshot-awards-global/"
+  },
+  {
+    id: "abh-2026",
+    title: "Africa's Business Heroes (ABH) Cash Grant",
+    funder: "Africa's Business Heroes",
+    amount: "Up to $1,500,000",
+    description: "Open to founders from all 54 African countries operating registered, profitable, or mission-driven businesses that have been active for at least 3 years.",
+    eligibility: "African founders, active for 3+ years",
+    applicationUrl: "https://africabusinessheroes.org/en/"
+  },
+  {
+    id: "heconnects-2026",
+    title: "heConnects Digital Accelerator Program",
+    funder: "heConnects",
+    amount: "$500,000 - $1,000,000",
+    description: "Focused entirely on scaling proven, high-impact tech solutions that empower and enable women across the continent. Deadline: July 8, 2026.",
+    eligibility: "Tech solutions empowering women",
+    applicationUrl: "https://drive.google.com/file/d/145ONFA4tCQACoGhuOMRuoNRMCIaB_GHY/view"
+  },
+  {
+    id: "global-citizen-2026",
+    title: "Global Citizen Small Business Program",
+    funder: "Global Citizen",
+    amount: "Variable",
+    description: "Support and resources for small businesses operating globally to make a positive impact.",
+    eligibility: "Small business owners globally",
+    applicationUrl: "https://www.globalcitizen.org/en/programs/small-business/"
+  },
+  {
     id: "tef-2026",
     title: "Tony Elumelu Foundation Entrepreneurship Programme",
     funder: "Tony Elumelu Foundation (TEF)",

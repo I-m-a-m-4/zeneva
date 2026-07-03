@@ -53,7 +53,12 @@ export function UserActivityTracker() {
                         typeof (window as any).rpc !== 'undefined'
                     );
                     const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    const deviceType = isTauriEnv ? 'Desktop App' : (isMobile ? 'Mobile' : 'Web');
+                    let deviceType = 'Web';
+                    if (isTauriEnv) {
+                        deviceType = isMobile ? 'Mobile App' : 'Desktop App';
+                    } else {
+                        deviceType = isMobile ? 'Mobile' : 'Web';
+                    }
 
                     // Detect country from IP once per session
                     let country = sessionStorage.getItem('zeneva_session_country') || '';

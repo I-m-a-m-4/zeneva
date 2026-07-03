@@ -8,6 +8,9 @@ import { useEffect } from 'react';
 export function DesktopLauncher() {
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) return;
+
       // Mark as desktop environment
       document.body.classList.add('is-desktop');
       

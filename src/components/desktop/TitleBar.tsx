@@ -20,6 +20,11 @@ export function DesktopTitleBar() {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         if (getCurrentWindow()) {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            setIsTauri(false);
+            return;
+          }
           setIsTauri(true);
           const win = getCurrentWindow();
           setIsMaximized(await win.isMaximized());
