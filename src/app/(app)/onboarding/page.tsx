@@ -270,7 +270,7 @@ export default function OnboardingPage() {
 
         <OnboardingStepper currentStep={step} />
 
-        <Card className="shadow-xl shadow-slate-200/50">
+        <Card className="shadow-xl shadow-slate-200/50 mt-10 sm:mt-12">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               {step === 1 && (

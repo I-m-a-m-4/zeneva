@@ -1360,7 +1360,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 link: broadcastLink || null,
             });
 
-            toast({ variant: 'success', title: 'Broadcast Sent!', description: 'Your message has been sent to all active users.' });
+            // Trigger FCM Native Push Notification to all active users/devices
+            try {
+                const { broadcastNotification } = await import('@/actions/notifications');
+                const pushResult = await broadcastNotification(broadcastTitle, broadcastMessage, broadcastLink || '/');
+                if (pushResult.success) {
+                    toast({ variant: 'success', title: 'Broadcast Sent!', description: `Announcement stored and pushed: ${pushResult.message}` });
+                } else {
+                    toast({ variant: 'warning', title: 'Announcement Saved', description: `Stored in app, but push failed: ${pushResult.error}` });
+                }
+            } catch (err: any) {
+                console.error("FCM Push notification broadcast error:", err);
+                toast({ variant: 'warning', title: 'Announcement Saved', description: 'Stored in app. Failed to trigger push notification service.' });
+            }
+
             setBroadcastTitle('');
             setBroadcastMessage('');
             setBroadcastType('info');
