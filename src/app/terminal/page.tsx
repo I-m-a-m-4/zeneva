@@ -199,8 +199,12 @@ export default function TerminalPage() {
               </div>
             </div>
             <div className="lg:col-span-6 flex justify-center">
-              <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl border border-slate-200 bg-slate-50 p-2 overflow-hidden shadow-md">
-                <img src="/images/lefttrf.png" alt="Theft Verification Illustration" className="w-full h-full object-cover rounded-xl" />
+              <div className="relative w-full max-w-lg aspect-[4/3.2] bg-[#FDF2F4] rounded-[2.5rem] p-6 flex justify-center items-center overflow-hidden shadow-sm">
+                <img 
+                  src="/images/lefttrf.png" 
+                  alt="Theft Verification Illustration" 
+                  className="w-[90%] h-auto max-h-[90%] object-contain" 
+                />
               </div>
             </div>
           </div>
@@ -223,8 +227,12 @@ export default function TerminalPage() {
               </div>
             </div>
             <div className="lg:col-span-6 lg:order-1 flex justify-center">
-              <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl border border-slate-200 bg-slate-50 p-2 overflow-hidden shadow-md">
-                <img src="/images/bottom.png" alt="Revenue Flow Illustration" className="w-full h-full object-cover rounded-xl" />
+              <div className="relative w-full max-w-lg aspect-[4/4.5] bg-[#EEF4FC] rounded-[2.5rem] p-6 flex justify-center items-end overflow-hidden shadow-sm">
+                <img 
+                  src="/images/bottom.png" 
+                  alt="Revenue Flow Illustration" 
+                  className="w-[85%] sm:w-[75%] h-auto max-h-[102%] object-contain object-bottom translate-y-3" 
+                />
               </div>
             </div>
           </div>
