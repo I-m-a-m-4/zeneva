@@ -233,6 +233,18 @@ function EditProductContent() {
         });
     }, [queuedActions, stockLogs, product?.id]);
 
+    const [logFilter, setLogFilter] = React.useState('all');
+
+    const filteredLogs = React.useMemo(() => {
+        if (logFilter === 'all') return combinedLogs;
+        return combinedLogs.filter((log: any) => {
+            if (logFilter === 'sale') return log.action === 'product.sale';
+            if (logFilter === 'stock_adjustment') return log.action === 'product.stock_adjustment';
+            if (logFilter === 'update') return log.action === 'product.create' || log.action === 'product.update' || log.action === 'product.bulk_update';
+            return true;
+        });
+    }, [combinedLogs, logFilter]);
+
 
 
     const form = useForm<ProductFormValues>({
@@ -857,19 +869,32 @@ function EditProductContent() {
                     </div>
                 </div>
 
-                {categoryType === 'product' && (
+                {(categoryType === 'product' || categoryType === 'service') && (
                     <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
                         <CardHeader className="bg-primary/5 pb-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <HistoryIcon className="h-4 w-4 text-primary" />
-                                        Stock Adjustment History
+                                        {categoryType === 'service' ? 'Service Activity & Sales History' : 'Stock Adjustment & Sales History'}
                                     </CardTitle>
                                     <CardDescription className="text-xs">
-                                        Track manual additions and changes to stock quantity. Changes made offline will appear as "Syncing".
+                                        {categoryType === 'service' 
+                                            ? 'Track sales, creations, and updates for this service. Changes made offline will appear as "Syncing".'
+                                            : 'Track manual additions, sales, and changes to stock quantity. Changes made offline will appear as "Syncing".'}
                                     </CardDescription>
                                 </div>
+                                <Select value={logFilter} onValueChange={setLogFilter} modal={false}>
+                                    <SelectTrigger className="w-[150px] h-8 text-[11px] bg-background">
+                                        <SelectValue placeholder="All Activities" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Activities</SelectItem>
+                                        <SelectItem value="sale">Sales Only</SelectItem>
+                                        {categoryType === 'product' && <SelectItem value="stock_adjustment">Adjustments Only</SelectItem>}
+                                        <SelectItem value="update">Updates & Cre. Only</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -889,14 +914,14 @@ function EditProductContent() {
                                                 <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
                                             </TableCell>
                                         </TableRow>
-                                    ) : combinedLogs.length === 0 ? (
+                                    ) : filteredLogs.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
-                                                No stock adjustment logs found for this product.
+                                                No activity or sales logs found matching the filter.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        combinedLogs.map((log: any) => {
+                                        filteredLogs.map((log: any) => {
                                             const adjustment = log.details?.adjustment !== undefined 
                                                 ? log.details.adjustment 
                                                 : (log.action === 'product.create' ? log.details?.stock : (log.details?.newStock !== undefined && log.details?.oldStock !== undefined ? log.details.newStock - log.details.oldStock : undefined));
@@ -916,9 +941,30 @@ function EditProductContent() {
                                                                     </Badge>
                                                                 )}
                                                             </div>
-                                                            {log.details?.reason && (
-                                                                <span className="text-[10px] text-muted-foreground">{log.details.reason}</span>
-                                                            )}
+                                                            {log.details?.reason && (() => {
+                                                                const match = log.details.reason.match(/(rec-[a-f0-9]+)/i);
+                                                                if (match) {
+                                                                    const receiptNumber = match[1];
+                                                                    const parts = log.details.reason.split(receiptNumber);
+                                                                    const receiptId = log.details?.receiptId;
+                                                                    const href = receiptId 
+                                                                        ? `/receipts/details?id=${receiptId}`
+                                                                        : `/receipts?search=${receiptNumber}`;
+                                                                    return (
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {parts[0]}
+                                                                            <Link 
+                                                                                href={href} 
+                                                                                className="text-primary hover:underline font-mono font-medium"
+                                                                            >
+                                                                                {receiptNumber}
+                                                                            </Link>
+                                                                            {parts[1]}
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                return <span className="text-[10px] text-muted-foreground">{log.details.reason}</span>;
+                                                            })()}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>

@@ -73,7 +73,7 @@ export function UserActivityTracker() {
                                 }
                             }
                         } catch (e) {
-                            console.warn("ipapi.co failed, trying fallback:", e);
+                            // Silently fail to prevent console clutter
                         }
 
                         // Try Service 2: freeipapi.com
@@ -87,7 +87,7 @@ export function UserActivityTracker() {
                                     }
                                 }
                             } catch (e) {
-                                console.warn("freeipapi failed, trying fallback:", e);
+                                // Silently fail
                             }
                         }
 
@@ -102,7 +102,7 @@ export function UserActivityTracker() {
                                     }
                                 }
                             } catch (e) {
-                                console.warn("ipwho.is failed, trying fallback:", e);
+                                // Silently fail
                             }
                         }
 
@@ -117,7 +117,7 @@ export function UserActivityTracker() {
                                     }
                                 }
                             } catch (e) {
-                                console.warn("db-ip failed:", e);
+                                // Silently fail
                             }
                         }
 

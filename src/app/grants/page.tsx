@@ -35,6 +35,15 @@ import { useFirestore } from '@/firebase';
 
 const fallbackOpportunities = [
   {
+    id: "accelerate-africa-2026",
+    title: "Accelerate Africa Startup Programme",
+    funder: "Accelerate Africa",
+    amount: "$250,000 - $500,000",
+    description: "Investment opportunities accelerating bold and visionary founders in the earliest stages of building global businesses. Deadline: July 25, 2026.",
+    eligibility: "Africa-based, early-stage, 2+ co-founders with MVP & traction",
+    applicationUrl: "https://coach.acceler8.africa"
+  },
+  {
     id: "moonshot-awards-2026",
     title: "Moonshot Awards Global",
     funder: "FoundersBeta",

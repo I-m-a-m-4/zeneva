@@ -215,10 +215,32 @@ function ReviewPageContent() {
         cart.forEach(cartItem => {
             const masterProduct = products.find(p => p.id === cartItem.product.id);
             const isService = masterProduct?.categoryType === 'service';
-            if (isService) return; // Skip audit logging stock for services as they have no inventory
             
             const multiplier = cartItem.multiplier || 1;
             const quantitySold = cartItem.quantity * multiplier;
+            
+            if (isService) {
+                addToQueue({
+                    type: 'add-audit-log',
+                    payload: {
+                        businessId: business.id,
+                        userId: activeProfile?.id || user.uid,
+                        userName: activeProfile?.name || 'Staff',
+                        userEmail: activeProfile?.email || user.email || '',
+                        userRole: activeProfile?.role || 'staff',
+                        action: 'product.sale',
+                        entityType: 'Service',
+                        entityId: cartItem.product.id,
+                        details: {
+                            entityName: cartItem.product.name,
+                            adjustment: -quantitySold,
+                            reason: `Sold in Sale ${displayReceipt.receiptNumber}`,
+                            receiptId: newReceiptId
+                        }
+                    }
+                }, `Logging sale for service ${cartItem.product.name}`);
+                return;
+            }
             
             addToQueue({
                 type: 'add-audit-log',
@@ -236,7 +258,8 @@ function ReviewPageContent() {
                         oldStock: masterProduct?.stock || 0,
                         newStock: (masterProduct?.stock || 0) - quantitySold,
                         adjustment: -quantitySold,
-                        reason: `Sold in Sale ${displayReceipt.receiptNumber}`
+                        reason: `Sold in Sale ${displayReceipt.receiptNumber}`,
+                        receiptId: newReceiptId
                     }
                 }
             }, `Logging sale deduction for ${cartItem.product.name}`);
