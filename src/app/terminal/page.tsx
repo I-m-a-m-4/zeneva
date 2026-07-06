@@ -256,34 +256,75 @@ export default function TerminalPage() {
               </Link>
             </div>
 
-            {/* Steps */}
-            <div className="space-y-12">
-              <h2 className="text-2xl sm:text-3xl font-medium text-slate-900 text-center">How To Get Started</h2>
+            {/* Steps Container matching the image */}
+            <div className="bg-[#EEF4FC]/60 rounded-[2.5rem] p-8 sm:p-12 lg:p-16 shadow-sm border border-slate-100/50">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 text-center mb-12">How To Get Started</h2>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                <div className="lg:col-span-7 space-y-6">
-                  <div className="flex gap-4 items-start">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">1</div>
-                    <p className="text-slate-700 text-lg pt-1 font-light">Sign up to get a Zeneva Terminal account.</p>
+                <div className="lg:col-span-7 space-y-4">
+                  {/* Step 1 */}
+                  <div className="bg-white rounded-2xl sm:rounded-full p-4 sm:py-5 sm:px-8 shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div className="h-8 w-8 rounded-full bg-[#EBF3FE] flex items-center justify-center font-bold text-primary flex-shrink-0 text-sm">1</div>
+                    <p className="text-slate-700 text-sm sm:text-base font-normal">Sign up to get a Zeneva Terminal account.</p>
                   </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">2</div>
-                    <p className="text-slate-700 text-lg pt-1 font-light">Wait for your confirmation email with your Zeneva Terminal account details.</p>
+                  
+                  {/* Arrow */}
+                  <div className="pl-8 sm:pl-12">
+                    <svg width="12" height="24" viewBox="0 0 12 24" fill="none" className="text-primary/70">
+                      <path d="M6 0V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3"/>
+                      <path d="M3 15L6 20L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">3</div>
-                    <p className="text-slate-700 text-lg pt-1 font-light">Log into your Terminal dashboard.</p>
+
+                  {/* Step 2 */}
+                  <div className="bg-white rounded-2xl sm:rounded-full p-4 sm:py-5 sm:px-8 shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div className="h-8 w-8 rounded-full bg-[#EBF3FE] flex items-center justify-center font-bold text-primary flex-shrink-0 text-sm">2</div>
+                    <p className="text-slate-700 text-sm sm:text-base font-normal">Wait for your confirmation email with your Zeneva Terminal account details.</p>
                   </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">4</div>
-                    <p className="text-slate-700 text-lg pt-1 font-light">Add the staff you want to receive payment alerts on your Zeneva Terminal dashboard.</p>
+                  
+                  {/* Arrow */}
+                  <div className="pl-8 sm:pl-12">
+                    <svg width="12" height="24" viewBox="0 0 12 24" fill="none" className="text-primary/70">
+                      <path d="M6 0V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3"/>
+                      <path d="M3 15L6 20L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
-                  <div className="flex gap-4 items-start">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">5</div>
-                    <p className="text-slate-700 text-lg pt-1 font-light">Put up your Terminal account number in your physical store and start receiving payments notifications for you and your staff seamlessly!</p>
+
+                  {/* Step 3 */}
+                  <div className="bg-white rounded-2xl sm:rounded-full p-4 sm:py-5 sm:px-8 shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div className="h-8 w-8 rounded-full bg-[#EBF3FE] flex items-center justify-center font-bold text-primary flex-shrink-0 text-sm">3</div>
+                    <p className="text-slate-700 text-sm sm:text-base font-normal">Log into your Terminal dashboard.</p>
+                  </div>
+                  
+                  {/* Arrow */}
+                  <div className="pl-8 sm:pl-12">
+                    <svg width="12" height="24" viewBox="0 0 12 24" fill="none" className="text-primary/70">
+                      <path d="M6 0V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3"/>
+                      <path d="M3 15L6 20L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="bg-white rounded-2xl sm:rounded-full p-4 sm:py-5 sm:px-8 shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div className="h-8 w-8 rounded-full bg-[#EBF3FE] flex items-center justify-center font-bold text-primary flex-shrink-0 text-sm">4</div>
+                    <p className="text-slate-700 text-sm sm:text-base font-normal">Add the staff you want to receive payment alerts on your Zeneva Terminal dashboard.</p>
+                  </div>
+                  
+                  {/* Arrow */}
+                  <div className="pl-8 sm:pl-12">
+                    <svg width="12" height="24" viewBox="0 0 12 24" fill="none" className="text-primary/70">
+                      <path d="M6 0V18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3"/>
+                      <path d="M3 15L6 20L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className="bg-white rounded-2xl sm:rounded-full p-4 sm:py-5 sm:px-8 shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div className="h-8 w-8 rounded-full bg-[#EBF3FE] flex items-center justify-center font-bold text-primary flex-shrink-0 text-sm">5</div>
+                    <p className="text-slate-700 text-sm sm:text-base font-normal">Put up your Terminal account number in your physical store and start receiving payments notifications for you and your staff seamlessly!</p>
                   </div>
                 </div>
                 <div className="lg:col-span-5 flex justify-center">
-                  <div className="relative w-full max-w-sm aspect-[4/5] rounded-3xl overflow-hidden shadow-lg border border-slate-200">
+                  <div className="relative w-full max-w-sm aspect-[3.8/5] rounded-[2rem] overflow-hidden shadow-md">
                     <img src="/images/howitworks.png" alt="Smiling Retailer" className="w-full h-full object-cover" />
                   </div>
                 </div>
