@@ -76,22 +76,22 @@ export default function TerminalPage() {
         {/* MARKETING HEADER */}
         <MarketingHeader />
 
-        {/* HERO SECTION */}
-        <header className="relative pt-20 overflow-hidden bg-slate-950">
+        {/* HERO SECTION - INCREASED HEIGHT */}
+        <header className="relative pt-24 overflow-hidden bg-slate-950 min-h-[650px] lg:min-h-[750px] flex items-center">
           <div className="absolute inset-0 z-0">
             <img 
               src="/images/herobg.png" 
               alt="Cashier Background" 
               className="w-full h-full object-cover object-center opacity-40"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/65 to-slate-950/45" />
           </div>
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-28 pb-32 flex flex-col items-center text-center space-y-6">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight max-w-4xl">
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10 pt-36 pb-48 lg:pt-48 lg:pb-60 flex flex-col items-center text-center space-y-6">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-white leading-tight max-w-4xl">
               Enable multiple staff receive bank <br className="hidden md:block" /> alerts & confirm payments faster.
             </h1>
-            <p className="text-lg sm:text-xl text-slate-200 leading-relaxed max-w-2xl font-light">
+            <p className="text-base sm:text-lg text-slate-200 leading-relaxed max-w-2xl font-light">
               Reduce wait time in your physical store when staff can confirm payments without calling you or seeing your account balance.
             </p>
             <div className="pt-4">
@@ -122,7 +122,7 @@ export default function TerminalPage() {
             {/* Green Card */}
             <div className="p-8 sm:p-10 rounded-3xl bg-[#00A75C] text-white space-y-6 flex flex-col justify-between overflow-hidden shadow-xl min-h-[350px] relative">
               <div className="space-y-3 z-10">
-                <h3 className="text-2xl font-bold leading-snug">Keep payments going even when you’re not available.</h3>
+                <h3 className="text-xl sm:text-2xl font-medium leading-snug">Keep payments going even when you’re not available.</h3>
                 <p className="text-white/90 text-sm font-light leading-relaxed max-w-md">
                   Connect your staff to Terminal so they can get immediate confirmation of payments on WhatsApp & process orders without delay.
                 </p>
@@ -139,7 +139,7 @@ export default function TerminalPage() {
             {/* Blue Card */}
             <div className="p-8 sm:p-10 rounded-3xl bg-[#0D46A0] text-white space-y-6 flex flex-col justify-between overflow-hidden shadow-xl min-h-[350px]">
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold leading-snug">Open your business to local & international payments.</h3>
+                <h3 className="text-xl sm:text-2xl font-medium leading-snug">Open your business to local & international payments.</h3>
                 <p className="text-white/90 text-sm font-light leading-relaxed max-w-md">
                   Your Zeneva Terminal account accepts payment through Bank Transfer, USSD, QR Code, Apple Pay, & Card payments (Verve, Visa, Mastercard & American Express)
                 </p>
@@ -156,10 +156,10 @@ export default function TerminalPage() {
         {/* THIRD SECTION (DESK CARD HIGHLIGHT) */}
         <section className="py-20 bg-slate-50 border-y border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-medium text-slate-900">
               Powered by <span className="text-primary">Zeneva</span>, Supported by <span className="text-primary">Paystack.</span>
             </h2>
-            <p className="text-base text-slate-600 max-w-2xl mx-auto font-light">
+            <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto font-light">
               Match Terminal payments to specific orders for efficient inventory tracking with the Zeneva app.
             </p>
             
@@ -169,25 +169,25 @@ export default function TerminalPage() {
               </div>
             </div>
 
-          <div className="pt-4">
-            <Link href="/login">
-              <Button size="lg" className="bg-primary hover:bg-primary/95 text-white px-8 h-14 rounded-xl font-semibold transition-all">
-                Get Zeneva Terminal
-              </Button>
-            </Link>
+            <div className="pt-4">
+              <Link href="/login">
+                <Button size="lg" className="bg-primary hover:bg-primary/95 text-white px-8 h-14 rounded-xl font-semibold transition-all">
+                  Get Zeneva Terminal
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-        {/* FOURTH SECTION (ANTI-THEFT ROWS) */}
+        {/* FOURTH SECTION (ANTI-THEFT ROWS) - REDUCED HEADING BOLDNESS AND SIZES */}
         <section className="py-24 bg-white space-y-24">
           {/* Row 1 */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
-              <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              <h3 className="text-2xl sm:text-3xl font-medium text-slate-900 leading-tight">
                 Protect your business <br className="hidden sm:block"/> from theft
               </h3>
-              <p className="text-slate-600 text-lg leading-relaxed font-light">
+              <p className="text-slate-600 text-base sm:text-lg leading-relaxed font-light">
                 With fast transfers & zero downtimes, you can protect your business from fake bank alert or a staff using their personal account.
               </p>
               <div className="pt-2">
@@ -208,10 +208,10 @@ export default function TerminalPage() {
           {/* Row 2 */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 lg:order-2 space-y-6 text-center lg:text-left">
-              <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              <h3 className="text-2xl sm:text-3xl font-medium text-slate-900 leading-tight">
                 Track how money <br /> comes in & out of your <br className="hidden sm:block" /> business.
               </h3>
-              <p className="text-slate-600 text-lg leading-relaxed font-light">
+              <p className="text-slate-600 text-base sm:text-lg leading-relaxed font-light">
                 View your revenue flow, spendings and withdrawals on your Zeneva Terminal dashboard.
               </p>
               <div className="pt-2">
@@ -237,7 +237,7 @@ export default function TerminalPage() {
             {/* Banner */}
             <div className="bg-[#EAFDF5] rounded-3xl p-8 sm:p-10 border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
               <div className="space-y-2">
-                <h5 className="text-xl sm:text-2xl font-bold text-slate-950">
+                <h5 className="text-lg sm:text-xl font-medium text-slate-950">
                   The Zeneva app will help you manage inventory and sales from your physical store & online sales platforms seamlessly.
                 </h5>
               </div>
@@ -250,7 +250,7 @@ export default function TerminalPage() {
 
             {/* Steps */}
             <div className="space-y-12">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 text-center">How To Get Started</h2>
+              <h2 className="text-2xl sm:text-3xl font-medium text-slate-900 text-center">How To Get Started</h2>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div className="lg:col-span-7 space-y-6">
                   <div className="flex gap-4 items-start">
@@ -288,7 +288,7 @@ export default function TerminalPage() {
         {/* SIXTH SECTION (TESTIMONIALS) */}
         <section className="py-24 bg-white border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 text-center">
+            <h2 className="text-2xl sm:text-3xl font-medium text-slate-900 text-center">
               These Businesses Use and <br /> Love Zeneva Terminal
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -377,7 +377,7 @@ export default function TerminalPage() {
         {/* FAQS */}
         <section className="py-24 bg-slate-50 border-t border-slate-100" id="faq">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 text-center">Frequently Asked Questions</h2>
+            <h2 className="text-2xl sm:text-3xl font-medium text-slate-900 text-center">Frequently Asked Questions</h2>
             <div className="space-y-4">
               {faqs.map((faq, idx) => (
                 <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden bg-white hover:border-slate-300 transition-all shadow-sm">
@@ -416,7 +416,7 @@ export default function TerminalPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-[#00A75C] rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-medium tracking-tight">
                   Get started with Zeneva
                 </h2>
                 <p className="text-lg text-white/90 font-light leading-relaxed max-w-xl">
