@@ -76,8 +76,8 @@ export default function TerminalPage() {
         {/* MARKETING HEADER */}
         <MarketingHeader />
 
-        {/* HERO SECTION - INCREASED HEIGHT */}
-        <header className="relative pt-24 overflow-hidden bg-slate-900 min-h-[650px] lg:min-h-[750px] flex items-center">
+        {/* HERO SECTION - FURTHER INCREASED HEIGHT */}
+        <header className="relative pt-24 overflow-hidden bg-slate-900 min-h-[800px] lg:min-h-[900px] flex items-center">
           <div className="absolute inset-0 z-0">
             <img 
               src="/images/herobg.png" 
@@ -87,7 +87,7 @@ export default function TerminalPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-slate-950/20" />
           </div>
 
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10 pt-36 pb-48 lg:pt-48 lg:pb-60 flex flex-col items-center text-center space-y-6">
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10 pt-48 pb-56 lg:pt-60 lg:pb-72 flex flex-col items-center text-center space-y-6">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-white leading-tight max-w-4xl">
               Enable multiple staff receive bank <br className="hidden md:block" /> alerts & confirm payments faster.
             </h1>
