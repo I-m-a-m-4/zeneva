@@ -77,14 +77,14 @@ export default function TerminalPage() {
         <MarketingHeader />
 
         {/* HERO SECTION - INCREASED HEIGHT */}
-        <header className="relative pt-24 overflow-hidden bg-slate-950 min-h-[650px] lg:min-h-[750px] flex items-center">
+        <header className="relative pt-24 overflow-hidden bg-slate-900 min-h-[650px] lg:min-h-[750px] flex items-center">
           <div className="absolute inset-0 z-0">
             <img 
               src="/images/herobg.png" 
               alt="Cashier Background" 
-              className="w-full h-full object-cover object-center opacity-40"
+              className="w-full h-full object-cover object-center opacity-70"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/65 to-slate-950/45" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-slate-950/20" />
           </div>
 
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10 pt-36 pb-48 lg:pt-48 lg:pb-60 flex flex-col items-center text-center space-y-6">
