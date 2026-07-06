@@ -82,9 +82,9 @@ export default function TerminalPage() {
             <img 
               src="/images/herobg.png" 
               alt="Cashier Background" 
-              className="w-full h-full object-cover object-center opacity-70"
+              className="w-full h-full object-cover object-center opacity-90"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-slate-950/20" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-slate-950/15 to-transparent" />
           </div>
 
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10 pt-48 pb-56 lg:pt-60 lg:pb-72 flex flex-col items-center text-center space-y-6">
