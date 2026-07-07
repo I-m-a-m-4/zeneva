@@ -308,6 +308,15 @@ export default function OurMissionPage() {
                          <p className="text-sm text-neutral-500 mt-1">Market conditions aren't perfect. Your POS should be. Zeneva works 100% offline and syncs when back online.</p>
                       </div>
                     </div>
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
+                        {mounted && <iconify-icon icon="solar:lock-keyhole-linear" class="text-primary w-5 h-5" />}
+                      </div>
+                      <div>
+                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Anti-Theft Terminal</h4>
+                         <p className="text-sm text-neutral-500 mt-1">Eliminate staff cash-pocketing and fake bank alerts. Zeneva Terminal confirms customer transfers instantly and alerts cashiers on-site.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
