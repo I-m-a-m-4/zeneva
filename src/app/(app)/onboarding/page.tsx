@@ -265,7 +265,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="onboarding-bg flex flex-col items-center md:justify-center min-h-screen py-8 px-4 sm:p-6 overflow-y-auto">
+    <div className="onboarding-bg flex flex-col items-center md:justify-center min-h-screen py-8 px-4 sm:p-6">
       <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
         <div className="text-center">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-2 sm:mb-3">Initialize Your Business Galaxy, {currentUserProfile.name.split(' ')[0]}</h1>

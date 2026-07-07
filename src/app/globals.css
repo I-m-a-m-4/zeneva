@@ -114,7 +114,8 @@
   }
 
   html[data-scroll-locked],
-  body[data-scroll-locked] {
+  body[data-scroll-locked],
+  body {
     margin-right: 0px !important;
     padding-right: 0px !important;
   }
