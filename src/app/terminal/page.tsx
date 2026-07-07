@@ -54,11 +54,11 @@ export default function TerminalPage() {
     },
     {
       question: "How long does it take for payments to reflect in my account?",
-      answer: "Payments reflect in your Terminal account Immediately. You receive the settlement in personal bank account in less than 24 hours."
+      answer: "Payments reflect in your Terminal account immediately. You receive the settlement automatically in your business bank account the next business day (T+1). Weekend transactions (Friday – Sunday) are settled on Monday morning."
     },
     {
-      question: "Do I have to be using Zeneva to use Zeneva terminal?",
-      answer: "No. However, if you use Zeneva, you can connect your terminal account to your Zeneva store."
+      question: "Do I have to use Zeneva Terminal?",
+      answer: "No, Zeneva Terminal is completely optional. You can use Zeneva POS for standard cash, card, and manual bank transfer sales. However, if you want automated confirmation and to protect your business from employee theft or fake alerts, you can choose to activate it anytime."
     }
   ];
 
@@ -188,7 +188,7 @@ export default function TerminalPage() {
                 Protect your business <br className="hidden sm:block"/> from theft
               </h3>
               <p className="text-slate-600 text-base sm:text-lg leading-relaxed font-light">
-                With fast transfers & zero downtimes, you can protect your business from fake bank alert or a staff using their personal account.
+                Zeneva Terminal is completely optional. If you want to take your business security a step further, you can activate it to prevent staff fraud, fake bank alerts, or staff using their personal accounts. Funds are settled automatically to your bank account next business day (T+1).
               </p>
               <div className="pt-2">
                 <Link href="/login">
