@@ -99,8 +99,13 @@ export default function OnboardingPage() {
   const firestore = useFirestore();
   const { business, currentUserProfile, triggerRefresh } = usePOS();
 
+  const [mounted, setMounted] = React.useState(false);
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [countries, setCountries] = React.useState([
     { value: 'Nigeria', label: 'Nigeria' },
@@ -255,7 +260,7 @@ export default function OnboardingPage() {
     setStep(prev => prev - 1);
   };
 
-  if (!business || !currentUserProfile) {
+  if (!mounted || !business || !currentUserProfile) {
     return <div className="flex justify-center items-center h-screen bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
