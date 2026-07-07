@@ -183,6 +183,11 @@ export default function ReportsDashboard() {
             }
         });
 
+        const activeDays = new Set(targetReceipts.map(r => {
+            const d = safeToDate(r.createdAt);
+            return d.toISOString().split('T')[0];
+        })).size || 1;
+
         const totalProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
 
         return {
