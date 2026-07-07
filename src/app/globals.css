@@ -113,6 +113,12 @@
     opacity: 1;
   }
 
+  html[data-scroll-locked],
+  body[data-scroll-locked] {
+    margin-right: 0px !important;
+    padding-right: 0px !important;
+  }
+
   body[unresolved] {
     opacity: 0;
     display: block;
