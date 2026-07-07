@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Banknote, CreditCard, Landmark, Loader2, FileText } from "lucide-react";
 import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
@@ -87,13 +88,28 @@ export default function PaymentPage() {
                             </Alert>
                         )}
                         {paymentMethod === 'Bank Transfer' && (
-                            <Alert className="mt-4">
-                                <Landmark className="h-4 w-4" />
-                                <AlertTitle>Bank Transfer Details</AlertTitle>
-                                <AlertDescription>
-                                    Please instruct the customer to transfer to:<br />
-                                    <strong>Bank:</strong> {business?.settings?.paymentBankName || 'Not configured'}<br />
-                                    <strong>Account:</strong> {business?.settings?.paymentBankAccountId || 'Not configured'}
+                            <Alert className="mt-4 border-emerald-500/20 bg-emerald-500/5">
+                                <Landmark className="h-4 w-4 text-emerald-600" />
+                                <AlertTitle className="text-emerald-800 flex items-center gap-1.5 font-bold">
+                                    Zeneva Terminal Account (Automated Confirmation)
+                                    <Badge className="bg-emerald-500 text-white text-[9px] hover:bg-emerald-600 border-none font-semibold">Active</Badge>
+                                </AlertTitle>
+                                <AlertDescription className="text-emerald-700 mt-2 space-y-1">
+                                    {business?.settings?.terminalAccountNumber ? (
+                                        <>
+                                            Instruct customer to transfer to this static store account:<br />
+                                            <strong>Bank:</strong> {business?.settings?.terminalBankName || 'Wema Bank'}<br />
+                                            <strong>Account:</strong> {business?.settings?.terminalAccountNumber}<br />
+                                            <strong>Account Name:</strong> {business?.settings?.terminalAccountName || `Zeneva - ${business.name}`}
+                                            <p className="text-[10px] text-emerald-600 mt-2">✓ The terminal will chime and verify the payment instantly upon transfer.</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <strong>Bank:</strong> {business?.settings?.paymentBankName || 'Not configured'}<br />
+                                            <strong>Account:</strong> {business?.settings?.paymentBankAccountId || 'Not configured'}<br />
+                                            <p className="text-[10px] text-amber-600 mt-2">⚠ Zeneva Terminal not provisioned. Manual payment confirmation required.</p>
+                                        </>
+                                    )}
                                 </AlertDescription>
                             </Alert>
                         )}

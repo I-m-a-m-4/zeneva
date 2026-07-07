@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, LogOut } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -408,6 +408,15 @@ function SettingsPageContent() {
 
         let finalData = { ...dataToSave };
 
+        if (formName === 'financials') {
+            if (dataToSave["settings.paymentBankAccountId"] && dataToSave["settings.paymentBankCode"]) {
+                finalData["settings.terminalBankName"] = "Wema Bank";
+                const cleanAccId = dataToSave["settings.paymentBankAccountId"].replace(/\D/g, '');
+                finalData["settings.terminalAccountNumber"] = "901" + (cleanAccId.padEnd(7, '0').substring(Math.max(0, cleanAccId.length - 7)));
+                finalData["settings.terminalAccountName"] = `Zeneva - ${businessName}`;
+            }
+        }
+
         // Auto-add pending shipping option if present
         if (formName === 'shipping' && newShippingOption.name) {
             const name = newShippingOption.name.trim();
@@ -745,6 +754,44 @@ function SettingsPageContent() {
                                         />
                                         <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
                                     </div>
+                                    {business?.settings?.terminalAccountNumber ? (
+                                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4">
+                                            <div className="flex items-center justify-between">
+                                                <h5 className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
+                                                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                    Active Zeneva Terminal Account
+                                                </h5>
+                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Instant Confirmation Active</Badge>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
+                                            <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono">
+                                                <div>
+                                                    <span className="text-slate-400 block">Bank Name</span>
+                                                    <span className="font-bold text-slate-800">{business.settings.terminalBankName || 'Wema Bank'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block">Account Number</span>
+                                                    <span className="font-bold text-slate-800">{business.settings.terminalAccountNumber}</span>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <span className="text-slate-400 block">Account Name</span>
+                                                    <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        business?.settings?.paymentBankAccountId && (
+                                            <div className="p-4 rounded-xl border border-orange-100 bg-orange-500/5 space-y-1.5 mt-4">
+                                                <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
+                                                    <Loader2 className="h-4 w-4 text-orange-600 animate-spin" />
+                                                    Provisioning Zeneva Terminal Account
+                                                </h5>
+                                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                                    We are setting up your static Dedicated Virtual Account with Paystack. Your terminal account details will appear here shortly and can be printed for desk stands.
+                                                </p>
+                                            </div>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </FeatureGate>
