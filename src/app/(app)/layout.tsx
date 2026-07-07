@@ -87,8 +87,8 @@ const navItems = [
 ];
 
 const bottomLinks = [
-  { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['owner'] },
-  { href: '/settings', icon: Settings, label: 'Settings', roles: ['owner'] },
+  { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['admin', 'owner'] },
+  { href: '/settings', icon: Settings, label: 'Settings', roles: ['admin', 'owner'] },
   { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'] },
 ];
 
@@ -375,8 +375,8 @@ export default function AuthenticatedLayout({
       '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/users': ['admin', 'owner', 'super-admin'],
       '/audit-log': ['admin', 'owner', 'super-admin'],
-      '/billing': ['owner', 'super-admin'],
-      '/settings': ['owner', 'super-admin'],
+      '/billing': ['admin', 'owner', 'super-admin'],
+      '/settings': ['admin', 'owner', 'super-admin'],
       '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/terminal-alerts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
@@ -648,6 +648,12 @@ export default function AuthenticatedLayout({
       if (item.href === '/audit-log' && permissions.view_audit_logs === false) return false;
       if (item.href === '/online-orders' && permissions.manage_online_orders === false) return false;
 
+      // 4. Zeneva Terminal Activation Check
+      if (item.href === '/terminal-alerts') {
+        const hasActiveTerminal = !!businessInstance?.settings?.paymentBankAccountId && !!businessInstance?.settings?.paymentBankCode;
+        if (!hasActiveTerminal) return false;
+      }
+
       return true;
     });
   };
@@ -684,8 +690,8 @@ export default function AuthenticatedLayout({
     '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/users': ['admin', 'owner', 'super-admin'],
     '/audit-log': ['admin', 'owner', 'super-admin'],
-    '/billing': ['owner', 'super-admin'],
-    '/settings': ['owner', 'super-admin'],
+    '/billing': ['admin', 'owner', 'super-admin'],
+    '/settings': ['admin', 'owner', 'super-admin'],
     '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/terminal-alerts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
@@ -719,6 +725,12 @@ export default function AuthenticatedLayout({
       (protectedRoute.startsWith('/sales') && permissions.record_sales === true);
 
     hasRouteAccess = isSuperAdmin || (allowedRoles.includes(userRole) && !isExplicitlyDenied) || isExplicitlyAllowed;
+    
+    // Extra Route Guard for Terminal Alerts
+    if (protectedRoute === '/terminal-alerts') {
+      const hasActiveTerminal = !!businessInstance?.settings?.paymentBankAccountId && !!businessInstance?.settings?.paymentBankCode;
+      if (!hasActiveTerminal) hasRouteAccess = false;
+    }
   }
 
   const formatBodyText = (text: string) => {
