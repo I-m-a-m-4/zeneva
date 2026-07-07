@@ -430,6 +430,12 @@ export default function ReportsDashboard() {
                                     description="Sales per day"
                                 />
                                 <ReportStatCard
+                                    title="Daily Revenue"
+                                    value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={DollarSign}
+                                    description="Average revenue per day"
+                                />
+                                <ReportStatCard
                                     title="Catalog Size"
                                     value={finalReportData?.catalogSize?.toLocaleString() || '0'}
                                     icon={Package}
