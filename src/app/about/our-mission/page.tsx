@@ -15,11 +15,44 @@ declare global {
   }
 }
 
+function useAnimatedCounter(targetValue: number, duration: number = 2000, trigger: boolean = true) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!trigger || targetValue <= 0) return;
+
+    let startTimestamp: number | null = null;
+    const startValue = 0;
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      
+      // Ease-out cubic: progress = 1 - (1 - x)^3 (starts fast, slows down at the end)
+      const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+      
+      setCount(Math.floor(easeOutProgress * (targetValue - startValue) + startValue));
+
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        setCount(targetValue);
+      }
+    };
+
+    window.requestAnimationFrame(step);
+  }, [targetValue, duration, trigger]);
+
+  return count;
+}
+
 export default function OurMissionPage() {
   const railRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState({ totalSalesCount: 2141, platformGmv: 92100000, overallArpu: 2090000 });
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   const checkScroll = () => {
     if (railRef.current) {
@@ -33,8 +66,39 @@ export default function OurMissionPage() {
     setMounted(true);
     checkScroll();
     window.addEventListener('resize', checkScroll);
+    
+    // Fetch live cached stats from our API
+    fetch('/api/platform-stats')
+      .then(res => res.json())
+      .then(data => {
+        setStats(data);
+        setStatsLoaded(true);
+      })
+      .catch(err => {
+        console.error("Failed to load platform stats:", err);
+        setStatsLoaded(true); // fall back to defaults
+      });
+
     return () => window.removeEventListener('resize', checkScroll);
   }, []);
+
+  const animatedSales = useAnimatedCounter(stats.totalSalesCount, 2500, statsLoaded || mounted);
+  const animatedGmv = useAnimatedCounter(stats.platformGmv, 2500, statsLoaded || mounted);
+  const animatedArpu = useAnimatedCounter(stats.overallArpu, 2500, statsLoaded || mounted);
+
+  const formatGMV = (val: number) => {
+    if (val >= 1000000) {
+      return `₦${(val / 1000000).toFixed(1)}M+`;
+    }
+    return `₦${val.toLocaleString()}+`;
+  };
+
+  const formatARPU = (val: number) => {
+    if (val >= 1000000) {
+      return `₦${(val / 1000000).toFixed(2)}M`;
+    }
+    return `₦${val.toLocaleString()}`;
+  };
 
   const scroll = (direction: number) => {
     if (railRef.current) {
@@ -249,15 +313,21 @@ export default function OurMissionPage() {
 
                 <div className="border-t border-neutral-200 pt-8 mt-4 grid grid-cols-2 md:grid-cols-3 gap-6">
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">2,141+</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
+                        {animatedSales.toLocaleString()}+
+                      </p>
                       <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Total Sales Count</p>
                    </div>
                    <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦92.1M+</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
+                        {formatGMV(animatedGmv)}
+                      </p>
                       <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Platform GMV</p>
                    </div>
                    <div className="hidden md:block">
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">₦2.09M</p>
+                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
+                        {formatARPU(animatedArpu)}
+                      </p>
                       <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Overall ARPU</p>
                    </div>
                 </div>
