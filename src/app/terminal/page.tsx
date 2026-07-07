@@ -460,35 +460,6 @@ export default function TerminalPage() {
           </div>
         </section>
 
-        {/* EIGHTH SECTION (BOTTOM CTA WITH PHONES MOCKUP) */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-[#00A75C] rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-medium tracking-tight">
-                  Get started with Zeneva
-                </h2>
-                <p className="text-lg text-white/90 font-light leading-relaxed max-w-xl">
-                  Turn your phone into a mobile store instantly. Start selling online and managing your business with ease.
-                </p>
-                <div className="flex gap-4 justify-center lg:justify-start pt-2 flex-wrap">
-                  <a href="https://play.google.com/store" target="_blank" rel="noopener noreferrer" className="hover:opacity-85 transition-opacity">
-                    <img src="/images/playstore.png" alt="Google Play Store" className="h-10 w-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                  </a>
-                  <a href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-85 transition-opacity">
-                    <img src="/images/appstore.png" alt="Apple App Store" className="h-10 w-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                  </a>
-                </div>
-              </div>
-              <div className="lg:col-span-5 flex justify-center">
-                <div className="relative w-full max-w-xs aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 p-1 border border-white/10">
-                  <img src="/images/abt-terminal.png" alt="Zeneva Mobile App Mockups" className="w-full h-full object-cover rounded-xl" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* MARKETING FOOTER */}
         <MarketingFooter />
       </div>
