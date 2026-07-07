@@ -139,9 +139,10 @@ export default function OnboardingPage() {
   React.useEffect(() => {
     const detectLocation = async () => {
       try {
-        const response = await fetch('https://ipapi.co/json/');
-        if (response.ok) {
-          const data = await response.json();
+        const response = await fetch('https://ipapi.co/json/').catch(() => null);
+        if (response && response.ok) {
+          const data = await response.json().catch(() => null);
+          if (!data) return;
           if (data.country_name) {
             setCountries(prev => {
               if (!prev.some(c => c.value === data.country_name)) {
@@ -174,7 +175,7 @@ export default function OnboardingPage() {
           }
         }
       } catch (error) {
-        console.error('Error auto-detecting location:', error);
+        console.warn('Error auto-detecting location:', error);
       }
     };
     detectLocation();
