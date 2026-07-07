@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
+import TopServicesChart from '@/components/reports/top-services-chart';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays } from 'date-fns';
@@ -435,14 +436,16 @@ export default function ReportsDashboard() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                <div className="lg:col-span-3">
-                                    <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
-                                </div>
-                                <div className="lg:col-span-2">
-                                    <TopProductsChart receipts={deepReceipts} />
-                                </div>
-                            </div>
+                             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                                 <div className="lg:col-span-5">
+                                     <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                 </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                 <TopProductsChart receipts={deepReceipts} />
+                                 <TopServicesChart receipts={deepReceipts} />
+                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                                 <div className="lg:col-span-3">

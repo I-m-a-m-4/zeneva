@@ -1,11 +1,10 @@
-
 'use client';
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
-import { Package, Bot } from 'lucide-react';
+import { Sparkles, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
@@ -15,16 +14,16 @@ import { usePOS } from '@/context/pos-context';
 
 const chartConfig = {
   quantity: {
-    label: "Quantity Sold",
+    label: "Times Booked",
     color: "hsl(var(--primary))",
   },
 } satisfies ChartConfig;
 
-interface TopProductsChartProps {
+interface TopServicesChartProps {
     receipts: Receipt[];
 }
 
-export default function TopProductsChart({ receipts }: TopProductsChartProps) {
+export default function TopServicesChart({ receipts }: TopServicesChartProps) {
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
     const { products } = usePOS();
 
@@ -45,17 +44,17 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
             });
         }
 
-        const productSales: Record<string, number> = {};
+        const serviceSales: Record<string, number> = {};
         filteredReceipts.forEach(receipt => {
             receipt.items.forEach(item => {
                 const isService = products?.some(p => (p.id === item.productId || p.name === item.name) && p.categoryType === 'service');
-                if (!isService) {
-                    productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
+                if (isService) {
+                    serviceSales[item.name] = (serviceSales[item.name] || 0) + item.quantity;
                 }
             });
         });
 
-        return Object.entries(productSales)
+        return Object.entries(serviceSales)
             .sort(([, qtyA], [, qtyB]) => qtyB - qtyA)
             .slice(0, 5)
             .map(([name, quantity]) => ({ name, quantity }));
@@ -67,18 +66,18 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
-                  <CardTitle>Top Selling Products</CardTitle>
-                  <CardDescription>Bestsellers by quantity sold.</CardDescription>
+                  <CardTitle>Top Popular Services</CardTitle>
+                  <CardDescription>Most requested services by frequency.</CardDescription>
                 </div>
                 <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                  {noData ? (
                     <div className="h-[300px] flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                        <Package className="h-16 w-16 opacity-50 mb-4" />
+                        <Sparkles className="h-16 w-16 opacity-50 mb-4 text-primary animate-pulse" />
                         <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
                              <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
-                            <p>This chart will highlight your bestsellers once you start making sales through the POS.</p>
+                            <p>This chart will highlight your most booked services once you start recording service sales.</p>
                         </div>
                     </div>
                 ) : (
@@ -93,6 +92,6 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
                     </ChartContainer>
                 )}
             </CardContent>
-        </Card>
+         </Card>
     );
 }
