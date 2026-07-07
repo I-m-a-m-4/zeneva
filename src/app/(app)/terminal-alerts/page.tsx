@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { usePOS } from '@/context/pos-context';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +12,14 @@ import {
   Bell, 
   Search, 
   CheckCircle2, 
-  DollarSign, 
-  Clock, 
   Volume2, 
   VolumeX, 
-  Play,
   TrendingUp,
   ShieldCheck,
-  Building
+  Building,
+  Eye
 } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { safeToDate } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +40,6 @@ interface TerminalAlert {
 export default function TerminalAlertsPage() {
   const { currentUserProfile, currencySymbol } = usePOS();
   const firestore = useFirestore();
-  const { toast } = useToast();
 
   const [alerts, setAlerts] = React.useState<TerminalAlert[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -108,31 +106,6 @@ export default function TerminalAlertsPage() {
     });
   }, [alerts, searchQuery]);
 
-  // Trigger a test alert in development
-  const handleTriggerTestAlert = async () => {
-    if (!currentUserProfile?.id || !firestore) return;
-    try {
-      const testAmount = Math.floor(Math.random() * 45000) + 5000;
-      const references = ['TXN893274982', 'TXN304928402', 'TXN029384920'];
-      const banks = ['Access Bank', 'GTBank', 'Wema Bank', 'Zenith Bank'];
-      
-      await addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
-        title: "Payment Received",
-        body: `₦${testAmount.toLocaleString()} received via Bank Transfer reference ${references[Math.floor(Math.random() * references.length)]}`,
-        createdAt: serverTimestamp(),
-        read: false,
-        type: 'payment',
-        amount: testAmount,
-        reference: references[Math.floor(Math.random() * references.length)],
-        bankName: banks[Math.floor(Math.random() * banks.length)],
-        accountNumber: '901***5932'
-      });
-      toast({ title: "Test Alert Triggered", description: "Incoming payment simulated." });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between border-b pb-4">
@@ -147,18 +120,6 @@ export default function TerminalAlertsPage() {
             {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
             {soundEnabled ? "Sound On" : "Sound Muted"}
           </Button>
-
-          {process.env.NODE_ENV !== 'production' && (
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={handleTriggerTestAlert}
-              className="flex items-center gap-2 bg-orange-50 text-primary border border-orange-100 hover:bg-orange-100/50"
-            >
-              <Play className="h-3.5 w-3.5" />
-              Simulate Payment
-            </Button>
-          )}
         </div>
       </div>
 
@@ -201,7 +162,7 @@ export default function TerminalAlertsPage() {
                         Verified Payout
                       </Badge>
                       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Clock className="h-3 w-3" />
+                        <TrendingUp className="h-3 w-3" />
                         {alertDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </div>
                     </div>
@@ -234,6 +195,15 @@ export default function TerminalAlertsPage() {
                           <CheckCircle2 className="h-3 w-3" /> Success
                         </span>
                       </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end border-t border-slate-100">
+                      <Link href={`/receipts?search=${alert.reference || alert.id}`}>
+                        <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 hover:bg-slate-100 h-8 px-3">
+                          <Eye className="h-3.5 w-3.5" />
+                          Trace POS Receipt
+                        </Button>
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>
