@@ -5,7 +5,7 @@ import { usePOS } from '@/context/pos-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
@@ -135,7 +135,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -182,10 +182,7 @@ export default function ReportsDashboard() {
             }
         });
 
-        const activeDays = new Set(targetReceipts.map(r => {
-            const d = safeToDate(r.createdAt);
-            return d.toISOString().split('T')[0];
-        })).size || 1;
+        const totalProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
 
         return {
             totalRevenue,
@@ -201,7 +198,8 @@ export default function ReportsDashboard() {
             uniqueProductsSold: uniqueProductIds.size,
             catalogSize: Math.max(stats?.totalProducts || 0, products.length),
             dailyAverageSales: totalSales / activeDays,
-            dailyAverageRevenue: totalRevenue / activeDays
+            dailyAverageRevenue: totalRevenue / activeDays,
+            totalProfit
         }
 
     }, [reportBatchReceipts, receipts, products, customers, stats]);
@@ -374,6 +372,12 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
                                     description="Total earnings"
+                                />
+                                <ReportStatCard
+                                    title="Net Profit"
+                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={Coins}
+                                    description="Earnings minus costs"
                                 />
                                 <ReportStatCard
                                     title="Product Revenue"
