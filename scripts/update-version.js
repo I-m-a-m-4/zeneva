@@ -34,3 +34,12 @@ if (fs.existsSync(cargoPath)) {
   fs.writeFileSync(cargoPath, cargo);
   console.log(`Updated Cargo.toml to ${newVersion}`);
 }
+
+// Update AppxManifest.xml
+const appxManifestPath = 'C:\\Users\\Bello Imam\\Downloads\\ZenevaPack\\AppxManifest.xml';
+if (fs.existsSync(appxManifestPath)) {
+  let manifest = fs.readFileSync(appxManifestPath, 'utf8');
+  manifest = manifest.replace(/Version="[\d\.]+"/, `Version="${newVersion}.0"`);
+  fs.writeFileSync(appxManifestPath, manifest);
+  console.log(`Updated AppxManifest.xml to ${newVersion}.0`);
+}
