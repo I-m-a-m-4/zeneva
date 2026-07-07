@@ -81,14 +81,15 @@ const navItems = [
   { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'owner'] },
   { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
   { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/terminal-alerts', icon: Bell, label: 'Terminal Alerts', roles: ['admin', 'manager', 'vendor_operator', 'owner'] },
   { href: '/users', icon: UserRound, label: 'Users', roles: ['admin'] },
   { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
 ];
 
 const bottomLinks = [
-  { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['admin'] },
-  { href: '/settings', icon: Settings, label: 'Settings', roles: ['admin'] },
-  { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['owner'] },
+  { href: '/settings', icon: Settings, label: 'Settings', roles: ['owner'] },
+  { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'] },
 ];
 
 const moreNavLinks: { href: string; icon: React.ElementType; label: string; roles: string[]; }[] = [
@@ -374,9 +375,10 @@ export default function AuthenticatedLayout({
       '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/users': ['admin', 'owner', 'super-admin'],
       '/audit-log': ['admin', 'owner', 'super-admin'],
-      '/billing': ['admin', 'owner', 'super-admin'],
-      '/settings': ['admin', 'owner', 'super-admin'],
+      '/billing': ['owner', 'super-admin'],
+      '/settings': ['owner', 'super-admin'],
       '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/terminal-alerts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     };
 
@@ -682,9 +684,10 @@ export default function AuthenticatedLayout({
     '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/users': ['admin', 'owner', 'super-admin'],
     '/audit-log': ['admin', 'owner', 'super-admin'],
-    '/billing': ['admin', 'owner', 'super-admin'],
-    '/settings': ['admin', 'owner', 'super-admin'],
+    '/billing': ['owner', 'super-admin'],
+    '/settings': ['owner', 'super-admin'],
     '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/terminal-alerts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/achievements': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
   };
 
