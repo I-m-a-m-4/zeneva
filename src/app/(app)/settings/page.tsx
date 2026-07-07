@@ -788,16 +788,16 @@ function SettingsPageContent() {
                                         <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
                                     </div>
                                     {business?.settings?.terminalAccountNumber ? (
-                                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4">
+                                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4 animate-fadeIn">
                                             <div className="flex items-center justify-between">
                                                 <h5 className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
                                                     <ShieldCheck className="h-4 w-4 text-emerald-600" />
                                                     Active Zeneva Terminal Account
                                                 </h5>
-                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Instant Confirmation Active</Badge>
+                                                <Badge className="bg-amber-500 hover:bg-amber-600 border-none text-white text-[10px]">Sandbox Mode</Badge>
                                             </div>
                                             <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
-                                            <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono">
+                                            <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
                                                 <div>
                                                     <span className="text-slate-400 block">Bank Name</span>
                                                     <span className="font-bold text-slate-800">{business.settings.terminalBankName || 'Wema Bank'}</span>
@@ -810,6 +810,9 @@ function SettingsPageContent() {
                                                     <span className="text-slate-400 block">Account Name</span>
                                                     <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
                                                 </div>
+                                            </div>
+                                            <div className="pt-1 text-[11px] text-amber-600 leading-relaxed">
+                                                <strong>ℹ Demonstration Mode:</strong> This account was generated in our sandbox environment for testing. To map a live account that accepts real transfers, please contact Zeneva integrations to link your active Paystack Merchant API keys.
                                             </div>
                                         </div>
                                     ) : (
