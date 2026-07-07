@@ -23,6 +23,7 @@ import { useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
+import FeatureGate from '@/components/shared/feature-gate';
 import { BusinessInstance, UserProfile } from '@/types';
 import {
     AlertDialog,
@@ -123,6 +124,7 @@ import { useFCM } from '@/hooks/use-fcm';
 
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh, addToQueue, mutateBusiness } = usePOS();
+    const hasLifetimeAccess = business?.accessLevel === 'lifetime';
     const { promptInstall, isInstallable, isAppInstalled } = usePWA();
 
     const { permission, requestPermission, unsubscribe, fcmToken, isLoading: isFcmLoading } = useFCM();
@@ -707,37 +709,45 @@ function SettingsPageContent() {
                             <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>
                         <Separator />
-                        <div>
-                            <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
-                            <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.</p>
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <Label>Bank Name</Label>
-                                            <Select value={paymentBankCode} onValueChange={setPaymentBankCode}>
-                                                <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
-                                                <SelectContent>{NIGERIAN_BANKS.map(b => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
-                                            </Select>
+                        <FeatureGate
+                            requiredPlan="business"
+                            currentPlan={business?.plan}
+                            hasLifetimeAccess={hasLifetimeAccess}
+                            featureName="Zeneva Terminal Integration"
+                            featureDescription="Enable direct Paystack subaccount creation and automated payout routing with the Zeneva Terminal."
+                        >
+                            <div>
+                                <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
+                                <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.</p>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Bank Name</Label>
+                                                <Select value={paymentBankCode} onValueChange={setPaymentBankCode}>
+                                                    <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
+                                                    <SelectContent>{NIGERIAN_BANKS.map(b => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div><Label>Account Number</Label><Input value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
                                         </div>
-                                        <div><Label>Account Number</Label><Input value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
+                                        <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account</Button>
                                     </div>
-                                    <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account</Button>
-                                </div>
-                                {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted" /></div>}
-                                <div>
-                                    <Label htmlFor="paymentInstructions">Payment Instructions / Invoice Notes</Label>
-                                    <Textarea
-                                        id="paymentInstructions"
-                                        placeholder="e.g. Please include your Invoice ID as the payment reference. Thank you!"
-                                        value={paymentInstructions}
-                                        onChange={e => setPaymentInstructions(e.target.value)}
-                                        className="h-20"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
+                                    {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted" /></div>}
+                                    <div>
+                                        <Label htmlFor="paymentInstructions">Payment Instructions / Invoice Notes</Label>
+                                        <Textarea
+                                            id="paymentInstructions"
+                                            placeholder="e.g. Please include your Invoice ID as the payment reference. Thank you!"
+                                            value={paymentInstructions}
+                                            onChange={e => setPaymentInstructions(e.target.value)}
+                                            className="h-20"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </FeatureGate>
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>

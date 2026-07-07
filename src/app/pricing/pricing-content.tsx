@@ -244,6 +244,7 @@ export default function PricingContent() {
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Granular Role-Based Access Control</li>
+                                    <li className="flex items-center gap-3 text-slate-700 font-semibold text-primary animate-pulse"><Check className="h-5 w-5 text-primary" /> Integrated Zeneva Terminal (Anti-Theft)</li>
                                     <li className="flex items-center gap-3 text-slate-700"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
                                 </ul>
                                 <div className="mt-auto pt-8">
