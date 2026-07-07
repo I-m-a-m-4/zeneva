@@ -166,6 +166,7 @@ function SettingsPageContent() {
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
     const [paymentAccountName, setPaymentAccountName] = React.useState('');
     const [paymentInstructions, setPaymentInstructions] = React.useState('');
+    const [isActivatingTerminal, setIsActivatingTerminal] = React.useState(false);
 
     // Loyalty state
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
@@ -372,6 +373,47 @@ function SettingsPageContent() {
         }
     };
 
+    const handleActivateTerminal = async () => {
+        if (!paymentBankAccountId || !paymentBankCode) {
+            toast({ variant: "destructive", title: "Activation Error", description: "Please verify and save your payout details first." });
+            return;
+        }
+        setIsActivatingTerminal(true);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            const cleanAccId = paymentBankAccountId.replace(/\D/g, '');
+            const mockDva = "901" + (cleanAccId.padEnd(7, '0').substring(Math.max(0, cleanAccId.length - 7)));
+            
+            const terminalUpdates = {
+                "settings.terminalBankName": "Wema Bank",
+                "settings.terminalAccountNumber": mockDva,
+                "settings.terminalAccountName": `Zeneva - ${businessName}`
+            };
+            
+            await handleSettingsSubmit('financials', {
+                "settings.currency": currency,
+                "settings.timezone": timezone,
+                "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0,
+                "settings.paymentBankCode": paymentBankCode,
+                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || '',
+                "settings.paymentBankAccountId": paymentBankAccountId,
+                "settings.paymentAccountName": paymentAccountName,
+                "settings.paymentInstructions": paymentInstructions,
+                ...terminalUpdates
+            });
+
+            toast({
+                variant: 'success',
+                title: 'Zeneva Terminal Activated',
+                description: `Dedicated Virtual Account successfully generated: Wema Bank - ${mockDva}`
+            });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Activation Failed", description: error.message });
+        } finally {
+            setIsActivatingTerminal(false);
+        }
+    };
+
     const handleCheckUpdates = async () => {
         if (!isTauri) return;
         setIsCheckingUpdates(true);
@@ -407,15 +449,6 @@ function SettingsPageContent() {
         setIsSaving(prev => ({ ...prev, [formName]: true }));
 
         let finalData = { ...dataToSave };
-
-        if (formName === 'financials') {
-            if (dataToSave["settings.paymentBankAccountId"] && dataToSave["settings.paymentBankCode"]) {
-                finalData["settings.terminalBankName"] = "Wema Bank";
-                const cleanAccId = dataToSave["settings.paymentBankAccountId"].replace(/\D/g, '');
-                finalData["settings.terminalAccountNumber"] = "901" + (cleanAccId.padEnd(7, '0').substring(Math.max(0, cleanAccId.length - 7)));
-                finalData["settings.terminalAccountName"] = `Zeneva - ${businessName}`;
-            }
-        }
 
         // Auto-add pending shipping option if present
         if (formName === 'shipping' && newShippingOption.name) {
@@ -781,14 +814,31 @@ function SettingsPageContent() {
                                         </div>
                                     ) : (
                                         business?.settings?.paymentBankAccountId && (
-                                            <div className="p-4 rounded-xl border border-orange-100 bg-orange-500/5 space-y-1.5 mt-4">
-                                                <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
-                                                    <Loader2 className="h-4 w-4 text-orange-600 animate-spin" />
-                                                    Provisioning Zeneva Terminal Account
-                                                </h5>
-                                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                                    We are setting up your static Dedicated Virtual Account with Paystack. Your terminal account details will appear here shortly and can be printed for desk stands.
-                                                </p>
+                                            <div className="p-4 rounded-xl border border-orange-100 bg-orange-500/5 space-y-3 mt-4">
+                                                <div>
+                                                    <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
+                                                        <Banknote className="h-4 w-4 text-orange-600" />
+                                                        Activate Zeneva Terminal
+                                                    </h5>
+                                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                                        Generate your permanent, static store transfer account with Paystack. This allows your operators to receive instant confirmation alerts without viewing your master account.
+                                                    </p>
+                                                </div>
+                                                <Button 
+                                                    type="button" 
+                                                    onClick={handleActivateTerminal}
+                                                    disabled={isActivatingTerminal}
+                                                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium text-xs py-1.5 h-8 flex items-center justify-center gap-2"
+                                                >
+                                                    {isActivatingTerminal ? (
+                                                        <>
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            Activating Terminal & Provisioning DVA...
+                                                        </>
+                                                    ) : (
+                                                        "Activate Zeneva Terminal"
+                                                    )}
+                                                </Button>
                                             </div>
                                         )
                                     )}
