@@ -136,7 +136,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -188,6 +188,7 @@ export default function ReportsDashboard() {
             return d.toISOString().split('T')[0];
         })).size || 1;
 
+        const totalCost = targetReceipts.reduce((sum, r) => sum + (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0), 0);
         const totalProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
 
         return {
@@ -205,7 +206,8 @@ export default function ReportsDashboard() {
             catalogSize: Math.max(stats?.totalProducts || 0, products.length),
             dailyAverageSales: totalSales / activeDays,
             dailyAverageRevenue: totalRevenue / activeDays,
-            totalProfit
+            totalProfit,
+            totalCost
         }
 
     }, [reportBatchReceipts, receipts, products, customers, stats]);
@@ -378,6 +380,12 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
                                     description="Total earnings"
+                                />
+                                <ReportStatCard
+                                    title="Net Cost"
+                                    value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={FileText}
+                                    description="Total cost of sales"
                                 />
                                 <ReportStatCard
                                     title="Net Profit"
