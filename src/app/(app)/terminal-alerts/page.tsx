@@ -134,7 +134,7 @@ export default function TerminalAlertsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 bg-background p-1 h-full min-h-[calc(100vh-4rem)]">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between border-b pb-4">
         <PageTitle title="Terminal Alerts" subtitle="Live stream of confirmed payments and transfers." />
         <div className="flex items-center gap-3">

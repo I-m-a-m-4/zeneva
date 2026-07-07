@@ -162,8 +162,6 @@
   .high-fidelity-shell .sidebar-border,
   .high-fidelity-shell [class*='border-border'] {
     border-color: hsl(var(--border)) !important; 
-    border-width: 1px;
-    border-style: solid;
   }
 
   /* Keep sidebar borders slightly more subtle even in high-fidelity mode */
