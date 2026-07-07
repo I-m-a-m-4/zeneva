@@ -163,8 +163,8 @@ export default function TerminalPage() {
               Match Terminal payments to specific orders for efficient inventory tracking with the Zeneva app.
             </p>
             
-            <div className="relative max-w-2xl mx-auto py-8 flex justify-center">
-              <div className="relative w-full max-w-md aspect-video rounded-2xl border-2 border-slate-200/80 bg-white p-2 overflow-hidden shadow-xl">
+            <div className="relative max-w-4xl mx-auto py-8 flex justify-center">
+              <div className="relative w-full max-w-2xl aspect-video rounded-2xl border-2 border-slate-200/80 bg-white p-2 overflow-hidden shadow-xl">
                 <img src="/images/kimberly.png" alt="Zeneva Account Desk Stand" className="w-full h-full object-cover rounded-xl" />
               </div>
             </div>
