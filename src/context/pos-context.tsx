@@ -5,7 +5,7 @@ import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfil
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum, Timestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
@@ -1064,7 +1064,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
             chunk.forEach(action => {
               // Write Discrete Receipt Record
               const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
-              batch.set(rRef, { ...action.payload.receiptData, businessId: businessId, createdAt: serverTimestamp() });
+              
+              // Handle backdated sales correctly (preserve user-selected date)
+              const isBackdated = action.payload.receiptData.isBackdated;
+              const dateVal = isBackdated && action.payload.receiptData.createdAt 
+                ? Timestamp.fromDate(new Date(action.payload.receiptData.createdAt)) 
+                : serverTimestamp();
+                
+              batch.set(rRef, { 
+                ...action.payload.receiptData, 
+                businessId: businessId, 
+                createdAt: dateVal 
+              });
 
               // Cascade product stock values (LIFO sequence logic applies naturally via Map overwrite)
               action.payload.productUpdates.forEach((u: any) => combinedStocks.set(u.id, u.newStock));

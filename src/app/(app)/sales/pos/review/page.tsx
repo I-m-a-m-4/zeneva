@@ -178,6 +178,7 @@ function ReviewPageContent() {
             paymentMethod,
             status,
             createdAt: backdate ? new Date(backdate) : new Date(),
+            isBackdated: !!backdate,
             createdBy: user.uid,
             flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
         };
