@@ -387,7 +387,7 @@ function SettingsPageContent() {
                 body: JSON.stringify({
                     businessId: business.id,
                     businessName: businessName,
-                    email: user?.email || '',
+                    email: currentUserProfile?.email || '',
                     bankCode: paymentBankCode,
                     accountNumber: paymentBankAccountId
                 })
