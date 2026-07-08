@@ -380,14 +380,29 @@ function SettingsPageContent() {
         }
         setIsActivatingTerminal(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            const cleanAccId = paymentBankAccountId.replace(/\D/g, '');
-            const mockDva = "901" + (cleanAccId.padEnd(7, '0').substring(Math.max(0, cleanAccId.length - 7)));
+            const response = await fetch('/api/paystack/activate-terminal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    businessId: business.id,
+                    businessName: businessName,
+                    email: user?.email || '',
+                    bankCode: paymentBankCode,
+                    accountNumber: paymentBankAccountId
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || 'Paystack terminal activation failed.');
+            }
             
             const terminalUpdates = {
-                "settings.terminalBankName": "Wema Bank",
-                "settings.terminalAccountNumber": mockDva,
-                "settings.terminalAccountName": `Zeneva - ${businessName}`
+                "settings.terminalBankName": result.bankName,
+                "settings.terminalAccountNumber": result.accountNumber,
+                "settings.terminalAccountName": result.accountName,
+                "settings.paystackSubaccountCode": result.subaccountCode
             };
             
             await handleSettingsSubmit('financials', {
@@ -405,7 +420,7 @@ function SettingsPageContent() {
             toast({
                 variant: 'success',
                 title: 'Zeneva Terminal Activated',
-                description: `Dedicated Virtual Account successfully generated: Wema Bank - ${mockDva}`
+                description: `Dedicated Virtual Account generated successfully: ${result.bankName} - ${result.accountNumber}`
             });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Activation Failed", description: error.message });
@@ -794,7 +809,11 @@ function SettingsPageContent() {
                                                     <ShieldCheck className="h-4 w-4 text-emerald-600" />
                                                     Active Zeneva Terminal Account
                                                 </h5>
-                                                <Badge className="bg-amber-500 hover:bg-amber-600 border-none text-white text-[10px]">Sandbox Mode</Badge>
+                                                {business.settings.terminalAccountNumber?.startsWith('901') ? (
+                                                    <Badge className="bg-amber-500 hover:bg-amber-600 border-none text-white text-[10px]">Sandbox Mode</Badge>
+                                                ) : (
+                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Live Mode</Badge>
+                                                )}
                                             </div>
                                             <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
                                             <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
@@ -811,9 +830,15 @@ function SettingsPageContent() {
                                                     <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
                                                 </div>
                                             </div>
-                                            <div className="pt-1 text-[11px] text-amber-600 leading-relaxed">
-                                                <strong>ℹ Demonstration Mode:</strong> This account was generated in our sandbox environment for testing. To map a live account that accepts real transfers, please contact Zeneva integrations to link your active Paystack Merchant API keys.
-                                            </div>
+                                            {business.settings.terminalAccountNumber?.startsWith('901') ? (
+                                                <div className="pt-1 text-[11px] text-amber-600 leading-relaxed">
+                                                    <strong>ℹ Sandbox Mode:</strong> This simulated account is for testing. To map a live account that accepts real transfers, please enter your live Paystack Secret Key in your environment configurations.
+                                                </div>
+                                            ) : (
+                                                <div className="pt-1 text-[11px] text-emerald-600 leading-relaxed">
+                                                    <strong>✓ Live Mode:</strong> This account was successfully generated on Paystack's live network and is active for real customer transfers.
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         business?.settings?.paymentBankAccountId && (

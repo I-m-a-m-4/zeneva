@@ -92,7 +92,11 @@ export default function PaymentPage() {
                                 <Landmark className="h-4 w-4 text-emerald-600" />
                                 <AlertTitle className="text-emerald-800 flex items-center gap-1.5 font-bold">
                                     Zeneva Terminal Account (Automated Confirmation)
-                                    <Badge className="bg-amber-500 text-white text-[9px] hover:bg-amber-600 border-none font-semibold">Sandbox Mode</Badge>
+                                    {business?.settings?.terminalAccountNumber?.startsWith('901') ? (
+                                        <Badge className="bg-amber-500 text-white text-[9px] border-none font-semibold">Sandbox Mode</Badge>
+                                    ) : (
+                                        <Badge className="bg-emerald-500 text-white text-[9px] border-none font-semibold">Live Mode</Badge>
+                                    )}
                                 </AlertTitle>
                                 <AlertDescription className="text-emerald-700 mt-2 space-y-1">
                                     {business?.settings?.terminalAccountNumber ? (
@@ -102,9 +106,11 @@ export default function PaymentPage() {
                                             <strong>Account:</strong> {business?.settings?.terminalAccountNumber}<br />
                                             <strong>Account Name:</strong> {business?.settings?.terminalAccountName || `Zeneva - ${business.name}`}
                                             <p className="text-[10px] text-emerald-600 mt-2">✓ The terminal will chime and verify the payment instantly upon transfer.</p>
-                                            <div className="mt-2 text-[10px] text-amber-700 bg-amber-500/10 p-1.5 rounded border border-amber-200">
-                                                ⚠ <strong>Test Mode:</strong> Do not transfer real funds to this account. Real banking apps will reject this simulated number.
-                                            </div>
+                                            {business.settings.terminalAccountNumber.startsWith('901') && (
+                                                <div className="mt-2 text-[10px] text-amber-700 bg-amber-500/10 p-1.5 rounded border border-amber-200">
+                                                    ⚠ <strong>Test Mode:</strong> Do not transfer real funds to this account. Real banking apps will reject this simulated number.
+                                                </div>
+                                            )}
                                         </>
                                     ) : (
                                         <>
