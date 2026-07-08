@@ -15,6 +15,8 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from 'framer-motion';
+import { idb } from "@/lib/idb";
+import { secureStorage } from "@/lib/secure-storage";
 
 const loginSlides = [
   {
@@ -58,6 +60,99 @@ export default function LoginPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleLaunchDemo = async () => {
+    setIsLoading(true);
+    try {
+      // Seed IndexedDB with beautiful products, customers, and receipts
+      const mockProducts = [
+        { id: "prod-1", name: "Dermatology Cleanse Cream", sku: "SKU-CLEANSE", price: 4500, costPrice: 2500, stock: 42, category: "Skincare", type: "product" },
+        { id: "prod-2", name: "Laser Skincare Consultation", sku: "SKU-LASER", price: 25000, costPrice: 12000, stock: 9999, category: "Services", type: "service" },
+        { id: "prod-3", name: "Premium Sunscreen SPF 50+", sku: "SKU-SUNBLOCK", price: 9500, costPrice: 5000, stock: 28, category: "Sun Protection", type: "product" },
+        { id: "prod-4", name: "Hydrating Face Serum", sku: "SKU-SERUM", price: 12000, costPrice: 6200, stock: 19, category: "Skincare", type: "product" }
+      ];
+      const mockCustomers = [
+        { id: "cust-1", name: "Hamidah Bello", email: "hamidah@example.com", phone: "08038416847", totalSpent: 34500, loyaltyPoints: 345 },
+        { id: "cust-2", name: "John Doe", email: "john.doe@example.com", phone: "09012345678", totalSpent: 12000, loyaltyPoints: 120 }
+      ];
+      const mockReceipts = [
+        { 
+          id: "rec-1", 
+          receiptNumber: "REC-0001", 
+          total: 29500, 
+          paymentMethod: "Bank Transfer", 
+          status: "paid", 
+          createdAt: new Date().toISOString(),
+          items: [
+            { productId: "prod-1", name: "Dermatology Cleanse Cream", quantity: 1, price: 4500 },
+            { productId: "prod-2", name: "Laser Skincare Consultation", quantity: 1, price: 25000 }
+          ]
+        }
+      ];
+
+      await idb.set('pos_synced_products', mockProducts);
+      await idb.set('pos_synced_customers', mockCustomers);
+      await idb.set('pos_synced_receipts', mockReceipts);
+
+      // Set Session & Profile in Local storage
+      secureStorage.setItem('zeneva_auth_session', {
+        uid: "demo-tester-id",
+        email: "tester@zeneva.com",
+        displayName: "App Store Reviewer",
+        isAnonymous: false,
+        emailVerified: true,
+        isCached: true
+      });
+
+      secureStorage.setItem('zeneva_user_profile', {
+        id: "demo-tester-id",
+        name: "App Store Reviewer",
+        email: "tester@zeneva.com",
+        role: "owner",
+        businessId: "demo-business-id",
+        permissions: {
+          view_reports: true,
+          manage_inventory: true,
+          record_sales: true,
+          manage_settings: true
+        }
+      });
+
+      secureStorage.setItem('zeneva_business_instance', {
+        id: "demo-business-id",
+        name: "Safeway Dermatology & Laser Center",
+        currency: "NGN",
+        accessLevel: "lifetime",
+        plan: "business",
+        settings: {
+          paymentBankName: "Wema Bank",
+          paymentBankAccountId: "9018416847",
+          terminalBankName: "Wema Bank",
+          terminalAccountNumber: "9018416847",
+          terminalAccountName: "Zeneva - Safeway Dermatology and Laser Center",
+          defaultTaxRate: 0,
+          loyaltyProgramEnabled: false
+        }
+      });
+
+      toast({
+        title: "Demo Workspace Active",
+        description: "Launching Zeneva offline demo sandbox."
+      });
+
+      setTimeout(() => {
+        window.location.href = '/sales/pos/select-products';
+      }, 500);
+
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Demo Activation Failed",
+        description: err.message
+      });
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +254,23 @@ export default function LoginPage() {
             <Button type="submit" className="w-full button-glow" disabled={isLoading}>
               {isLoading && <Loader className="mr-2 h-4 w-4 animate-spin" />}
               Login
+            </Button>
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-muted" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase">
+                <span className="bg-background px-2 text-muted-foreground font-semibold">Store Reviewers Only</span>
+              </div>
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/5 transition-all text-xs h-9 flex items-center justify-center gap-1.5" 
+              onClick={handleLaunchDemo}
+              disabled={isLoading}
+            >
+              Launch Offline Demo Sandbox
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

@@ -151,7 +151,7 @@ function SettingsPageContent() {
     React.useEffect(() => {
         const checkTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
         setIsTauri(!!checkTauri);
-        
+
         if (checkTauri) {
             import('@tauri-apps/api/app').then(app => {
                 app.getVersion().then(setCurrentVersion);
@@ -304,7 +304,7 @@ function SettingsPageContent() {
         try {
             const { open } = await import('@tauri-apps/plugin-dialog');
             const { readFile } = await import('@tauri-apps/plugin-fs');
-            
+
             const selected = await open({
                 multiple: false,
                 filters: [{
@@ -319,7 +319,7 @@ function SettingsPageContent() {
                 // Detect mime type from extension
                 const ext = fileName.split('.').pop()?.toLowerCase();
                 const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
-                
+
                 const blob = new Blob([fileData], { type: mimeType });
                 const file = new File([blob], fileName, { type: mimeType });
                 processLogoFile(file);
@@ -398,14 +398,14 @@ function SettingsPageContent() {
             if (!response.ok) {
                 throw new Error(result.message || 'Paystack terminal activation failed.');
             }
-            
+
             const terminalUpdates = {
                 "settings.terminalBankName": result.bankName,
                 "settings.terminalAccountNumber": result.accountNumber,
                 "settings.terminalAccountName": result.accountName,
                 "settings.paystackSubaccountCode": result.subaccountCode
             };
-            
+
             await handleSettingsSubmit('financials', {
                 "settings.currency": currency,
                 "settings.timezone": timezone,
@@ -544,22 +544,22 @@ function SettingsPageContent() {
                     type: 'update-settings',
                     payload: finalData,
                 }, `Update ${formName} settings`);
-                
-                toast({ 
-                  variant: "success", 
-                  title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Queued`, 
-                  description: `Settings will be synced when online.` 
+
+                toast({
+                    variant: "success",
+                    title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Queued`,
+                    description: `Settings will be synced when online.`
                 });
-                
+
                 performOptimisticUpdate();
             } else {
                 // Web behavior
                 const businessDocRef = doc(firestore, 'businessInstances', business.id);
                 await updateDoc(businessDocRef, finalData);
                 toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
-                
+
                 performOptimisticUpdate();
-                
+
                 // Force a re-fetch of business data to update all industry-specific UI components
                 triggerRefresh();
             }
@@ -672,7 +672,7 @@ function SettingsPageContent() {
                             </div>
                             <div>
                                 <Label>Business Logo</Label>
-                                <div 
+                                <div
                                     className="mt-1 w-full aspect-square rounded-md border-2 border-dashed flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors"
                                     onClick={() => isTauri && handleNativeLogoUpload()}
                                 >
@@ -861,10 +861,10 @@ function SettingsPageContent() {
                                                 <div className="text-[11px] text-emerald-600 leading-relaxed">
                                                     <strong>✓ Live Mode:</strong> Automated payouts and chimes are active.
                                                 </div>
-                                                <Button 
-                                                    type="button" 
+                                                <Button
+                                                    type="button"
                                                     variant="destructive"
-                                                    size="sm" 
+                                                    size="sm"
                                                     onClick={handleDeactivateTerminal}
                                                     disabled={isDeactivatingTerminal}
                                                     className="text-xs h-7 px-3 flex items-center gap-1.5"
@@ -892,8 +892,8 @@ function SettingsPageContent() {
                                                         Generate your permanent, static store transfer account with Paystack. This allows your operators to receive instant confirmation alerts without viewing your master account.
                                                     </p>
                                                 </div>
-                                                <Button 
-                                                    type="button" 
+                                                <Button
+                                                    type="button"
                                                     onClick={handleActivateTerminal}
                                                     disabled={isActivatingTerminal}
                                                     className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium text-xs py-1.5 h-8 flex items-center justify-center gap-2"
@@ -1080,9 +1080,9 @@ function SettingsPageContent() {
                                                         </div>
                                                     </div>
                                                     {!session.revoked && !isCurrent && (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
                                                             className="text-muted-foreground hover:text-destructive"
                                                             disabled={isRevoking[session.id]}
                                                             onClick={() => handleRevokeSession(session.id)}
@@ -1094,10 +1094,10 @@ function SettingsPageContent() {
                                             );
                                         })}
                                     </div>
-                                    
+
                                     {processedSessions.length > 3 && (
-                                        <Button 
-                                            variant="outline" 
+                                        <Button
+                                            variant="outline"
                                             className="w-full mt-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200"
                                             onClick={() => setShowAllSessions(!showAllSessions)}
                                         >
@@ -1213,8 +1213,8 @@ function SettingsPageContent() {
                                     <p className="text-sm font-medium">Current Version</p>
                                     <p className="text-2xl font-bold text-primary">v{currentVersion}</p>
                                 </div>
-                                <Button 
-                                    onClick={handleCheckUpdates} 
+                                <Button
+                                    onClick={handleCheckUpdates}
                                     disabled={isCheckingUpdates}
                                     variant="outline"
                                     className="border-primary text-primary hover:bg-primary hover:text-white"
