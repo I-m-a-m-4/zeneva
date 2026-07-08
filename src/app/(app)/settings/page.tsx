@@ -167,6 +167,7 @@ function SettingsPageContent() {
     const [paymentAccountName, setPaymentAccountName] = React.useState('');
     const [paymentInstructions, setPaymentInstructions] = React.useState('');
     const [isActivatingTerminal, setIsActivatingTerminal] = React.useState(false);
+    const [isDeactivatingTerminal, setIsDeactivatingTerminal] = React.useState(false);
 
     // Loyalty state
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
@@ -426,6 +427,36 @@ function SettingsPageContent() {
             toast({ variant: "destructive", title: "Activation Failed", description: error.message });
         } finally {
             setIsActivatingTerminal(false);
+        }
+    };
+
+    const handleDeactivateTerminal = async () => {
+        setIsDeactivatingTerminal(true);
+        try {
+            await handleSettingsSubmit('financials', {
+                "settings.currency": currency,
+                "settings.timezone": timezone,
+                "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0,
+                "settings.paymentBankCode": paymentBankCode,
+                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || '',
+                "settings.paymentBankAccountId": paymentBankAccountId,
+                "settings.paymentAccountName": paymentAccountName,
+                "settings.paymentInstructions": paymentInstructions,
+                "settings.terminalBankName": null,
+                "settings.terminalAccountNumber": null,
+                "settings.terminalAccountName": null,
+                "settings.paystackSubaccountCode": null
+            });
+
+            toast({
+                variant: 'success',
+                title: 'Terminal Deactivated',
+                description: 'Zeneva Terminal has been successfully deactivated.'
+            });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Deactivation Failed", description: error.message });
+        } finally {
+            setIsDeactivatingTerminal(false);
         }
     };
 
@@ -809,11 +840,7 @@ function SettingsPageContent() {
                                                     <ShieldCheck className="h-4 w-4 text-emerald-600" />
                                                     Active Zeneva Terminal Account
                                                 </h5>
-                                                {business.settings.terminalAccountNumber?.startsWith('901') ? (
-                                                    <Badge className="bg-amber-500 hover:bg-amber-600 border-none text-white text-[10px]">Sandbox Mode</Badge>
-                                                ) : (
-                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Live Mode</Badge>
-                                                )}
+                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Active (Live)</Badge>
                                             </div>
                                             <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
                                             <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
@@ -830,15 +857,28 @@ function SettingsPageContent() {
                                                     <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
                                                 </div>
                                             </div>
-                                            {business.settings.terminalAccountNumber?.startsWith('901') ? (
-                                                <div className="pt-1 text-[11px] text-amber-600 leading-relaxed">
-                                                    <strong>ℹ Sandbox Mode:</strong> This simulated account is for testing. To map a live account that accepts real transfers, please enter your live Paystack Secret Key in your environment configurations.
+                                            <div className="pt-2 flex items-center justify-between border-t border-emerald-100/10">
+                                                <div className="text-[11px] text-emerald-600 leading-relaxed">
+                                                    <strong>✓ Live Mode:</strong> Automated payouts and chimes are active.
                                                 </div>
-                                            ) : (
-                                                <div className="pt-1 text-[11px] text-emerald-600 leading-relaxed">
-                                                    <strong>✓ Live Mode:</strong> This account was successfully generated on Paystack's live network and is active for real customer transfers.
-                                                </div>
-                                            )}
+                                                <Button 
+                                                    type="button" 
+                                                    variant="destructive"
+                                                    size="sm" 
+                                                    onClick={handleDeactivateTerminal}
+                                                    disabled={isDeactivatingTerminal}
+                                                    className="text-xs h-7 px-3 flex items-center gap-1.5"
+                                                >
+                                                    {isDeactivatingTerminal ? (
+                                                        <>
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                            Deactivating...
+                                                        </>
+                                                    ) : (
+                                                        "Deactivate Terminal"
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                     ) : (
                                         business?.settings?.paymentBankAccountId && (
