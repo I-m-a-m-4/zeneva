@@ -78,21 +78,9 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
       return;
     }
 
-    // Safety timeout to prevent infinite loading screen on blocked networks (e.g., China)
-    const timeoutId = setTimeout(() => {
-      setUserAuthState(prev => {
-        if (prev.isUserLoading) {
-          console.warn("Auth initialization timed out. Proceeding with local state.");
-          return { ...prev, isUserLoading: false };
-        }
-        return prev;
-      });
-    }, 4000);
-
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => { // Auth state determined
-        clearTimeout(timeoutId);
         if (firebaseUser) {
           // Cache essential user info for offline restart
           const sessionData = {
@@ -112,16 +100,12 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => { // Auth listener error
-        clearTimeout(timeoutId);
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
         // If we have a cached user, we might want to keep it if it's a network error
         setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: error }));
       }
     );
-    return () => {
-      clearTimeout(timeoutId);
-      unsubscribe(); // Cleanup
-    };
+    return () => unsubscribe(); // Cleanup
   }, [auth]); // Depends on the auth instance
 
   // Memoize the context value
