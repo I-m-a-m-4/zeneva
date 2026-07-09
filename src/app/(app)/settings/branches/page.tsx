@@ -350,39 +350,39 @@ export default function BranchesSettingsPage() {
                       <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Users className="h-3.5 w-3.5 text-primary/70" /> Staff
                       </p>
-                      <p className="text-sm font-extrabold text-foreground mt-1">
-                        {stats.activeUsersCount} <span className="text-xs font-normal text-muted-foreground">/ {stats.usersCount} online</span>
+                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                        {stats.activeUsersCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">/ {stats.usersCount} online</span>
                       </p>
                     </div>
                     <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                       <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Package className="h-3.5 w-3.5 text-primary/70" /> Catalog
                       </p>
-                      <p className="text-sm font-extrabold text-foreground mt-1">
-                        {stats.productsCount} <span className="text-xs font-normal text-muted-foreground">items</span>
+                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                        {stats.productsCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">items</span>
                       </p>
                     </div>
                     <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                       <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Low Stock
                       </p>
-                      <p className={`text-sm font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-500' : 'text-foreground'}`}>
-                        {stats.lowStockCount} <span className="text-xs font-normal text-muted-foreground">alerts</span>
+                      <p className={`text-sm font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-black dark:text-white'}`}>
+                        {stats.lowStockCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">alerts</span>
                       </p>
                     </div>
                     <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                       <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Store className="h-3.5 w-3.5 text-primary/70" /> Txns
                       </p>
-                      <p className="text-sm font-extrabold text-foreground mt-1">
-                        {stats.salesCount} <span className="text-xs font-normal text-muted-foreground">sales</span>
+                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                        {stats.salesCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">sales</span>
                       </p>
                     </div>
                     <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center col-span-2 md:col-span-1">
                       <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Revenue
                       </p>
-                      <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-500 mt-1">
+                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
                         {formatSales(stats.salesVolume)}
                       </p>
                     </div>
@@ -391,7 +391,7 @@ export default function BranchesSettingsPage() {
 
                 <CardFooter className="bg-muted/30 py-3 px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-                    <p className="text-[10px] text-muted-foreground font-semibold">ID: {branch.id.slice(0, 8)}</p>
+                    <p className="text-[10px] text-black/70 dark:text-white/70 font-semibold">ID: {branch.id.slice(0, 8)}</p>
                     {isCurrentlySelected ? (
                       <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 w-full sm:w-auto">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Currently Operating Branch
