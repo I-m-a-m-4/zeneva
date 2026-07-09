@@ -340,13 +340,15 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         fontStyle: 'bold'
       },
       alternateRowStyles: { fillColor: [250, 250, 250] },
-      didDrawPage: function (data) {
+      willDrawPage: function (data) {
+        // Draw Watermark BEFORE the table content (so it sits behind the table cells)
         if (data.pageNumber > 1) {
           doc.setTextColor(242, 242, 242);
           doc.setFontSize(80);
           doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
         }
-        
+      },
+      didDrawPage: function (data) {
         // Footer: Page Number and Link to zeneva.space
         doc.setFontSize(8);
         doc.setTextColor(130, 130, 130);
@@ -355,8 +357,8 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         // Left side page number
         doc.text(`Page ${data.pageNumber}`, 14, doc.internal.pageSize.height - 10);
         
-        // Right side Zeneva link
-        doc.text("Generated via zeneva.space", doc.internal.pageSize.width - 55, doc.internal.pageSize.height - 10);
+        // Right side Zeneva link (clickable)
+        doc.textWithLink("Generated via zeneva.space", doc.internal.pageSize.width - 55, doc.internal.pageSize.height - 10, { url: "https://zeneva.space" });
       }
     });
 
