@@ -28,13 +28,13 @@ export default function BusinessHealthIndicator() {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Link href="/ai-insights" className="flex items-center gap-2 border rounded-md p-2 hover:bg-muted cursor-pointer transition-colors w-48">
+            <Link href="/ai-insights" className="flex items-center gap-1.5 sm:gap-2 border rounded-lg p-1.5 sm:p-2 hover:bg-muted cursor-pointer transition-colors w-auto sm:w-48 shrink-0">
               <div className="w-full">
-                <div className="text-sm font-semibold text-center flex items-center justify-center gap-2">
-                  <Bot className="h-4 w-4 text-primary" />
-                  Zen AI Briefing
+                <div className="text-xs sm:text-sm font-semibold text-center flex items-center justify-center gap-1.5">
+                  <Bot className="h-4 w-4 text-primary shrink-0" />
+                  <span className="hidden sm:inline">Zen AI Briefing</span>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">Click to view insights</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground text-center hidden sm:block">Click to view insights</p>
               </div>
             </Link>
           </TooltipTrigger>
@@ -66,9 +66,9 @@ export default function BusinessHealthIndicator() {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link href="/ai-insights" className="flex items-center gap-3 border rounded-lg p-2 hover:bg-muted cursor-pointer transition-colors w-48">
-            <div className="text-2xl font-bold">{score}</div>
-            <div className="w-full">
+          <Link href="/ai-insights" className="flex items-center gap-1.5 sm:gap-3 border rounded-lg p-1.5 sm:p-2 hover:bg-muted cursor-pointer transition-colors w-auto sm:w-48 shrink-0">
+            <div className="text-lg sm:text-2xl font-bold px-1 sm:px-0">{score}</div>
+            <div className="w-full hidden sm:block">
               {/* <p className={`font-semibold text-sm ${getStatusColor()}`}>{status}</p> */}
               <p className="text-xs text-muted-foreground">Business Health</p>
               <Progress value={score} className="h-1 mt-1" indicatorClassName={getProgressColor()} />

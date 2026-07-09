@@ -876,8 +876,9 @@ export default function AuthenticatedLayout({
               </SidebarFooter>
             </Sidebar>
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
-              <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 z-10">
+              <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
+                <BranchSwitcher variant="header" className="md:hidden shrink min-w-0" />
                 <BusinessHealthIndicator />
                 {isMounted && <Badge variant="outline" className="hidden md:inline-flex text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>}
                 <div className="flex-1" />

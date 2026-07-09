@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { collection, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { Store, MapPin, Plus, Trash2, Loader2, AlertTriangle, Users, Package, TrendingUp } from 'lucide-react';
+import { Store, MapPin, Plus, Trash2, Loader2, AlertTriangle, Users, Package, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/types';
 
@@ -280,12 +280,12 @@ export default function BranchesSettingsPage() {
                 onClick={() => handleSelectBranch(branch.id)}
                 className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
                   isCurrentlySelected 
-                    ? "border-muted-foreground/30 bg-muted/40" 
+                    ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20" 
                     : "border-border hover:border-muted-foreground/30 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
                 }`}
               >
                 {branch.isPrimary && (
-                  <div className="absolute top-0 right-0 bg-primary/95 text-primary-foreground text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm">
+                  <div className="absolute top-0 right-0 bg-primary/95 text-primary-foreground text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm z-10">
                     Primary
                   </div>
                 )}
@@ -293,14 +293,14 @@ export default function BranchesSettingsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
                       <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                        <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                        <div className={`p-1.5 rounded-lg ${isCurrentlySelected ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
                           <Store className="h-4.5 w-4.5" />
                         </div>
                         <span className="truncate max-w-[200px] xs:max-w-[280px] sm:max-w-[400px]" title={branch.name}>{branch.name}</span>
                       </CardTitle>
                       {isCurrentlySelected && (
-                        <span className="text-[10px] text-primary font-bold bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap">
-                          Active Branch
+                        <span className="flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/15 border border-primary/30 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap shadow-2xs">
+                          <CheckCircle2 className="h-3 w-3" /> Active Branch
                         </span>
                       )}
                     </div>
@@ -369,13 +369,24 @@ export default function BranchesSettingsPage() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="bg-muted/30 py-3 px-6 flex justify-between items-center border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
-                  <p className="text-[10px] text-muted-foreground font-semibold">ID: {branch.id.slice(0, 8)}</p>
+                <CardFooter className="bg-muted/30 py-3 px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                    <p className="text-[10px] text-muted-foreground font-semibold">ID: {branch.id.slice(0, 8)}</p>
+                    {isCurrentlySelected ? (
+                      <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 w-full sm:w-auto">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Currently Operating Branch
+                      </span>
+                    ) : (
+                      <Button size="sm" variant="outline" className="text-xs font-bold border-primary/40 text-primary hover:bg-primary hover:text-white h-8 w-full sm:w-auto" onClick={() => handleSelectBranch(branch.id)}>
+                        Switch to this Branch
+                      </Button>
+                    )}
+                  </div>
                   {!branch.isPrimary && (
                     <Button 
                        variant="ghost" 
                        size="icon" 
-                       className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full"
+                       className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full self-end sm:self-auto shrink-0"
                        disabled={isDeleting === branch.id}
                        onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(branch.id, branch.name, branch.isPrimary); }}
                        title="Delete branch"

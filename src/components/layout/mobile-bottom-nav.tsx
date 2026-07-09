@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet"
 import { LucideIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BranchSwitcher } from '@/components/layout/branch-switcher';
 
 interface NavItem {
     href: string;
@@ -64,12 +65,13 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading }: M
                 <span className='text-xs text-muted-foreground'>More</span>
               </button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[60%] flex flex-col">
-              <SheetHeader>
+            <SheetContent side="bottom" className="h-[65%] flex flex-col p-4 sm:p-6">
+              <SheetHeader className="pb-2 text-left">
                 <SheetTitle>More Options</SheetTitle>
               </SheetHeader>
               <div className="flex-1 overflow-y-auto">
-                  <ul className="space-y-1 py-4">
+                  <BranchSwitcher variant="sheet" className="mb-2 border-b border-border/60 pb-3" />
+                  <ul className="space-y-1 py-2">
                       {moreNavItems.map(item => {
                           const isActive = pathname.startsWith(item.href);
                           return (
