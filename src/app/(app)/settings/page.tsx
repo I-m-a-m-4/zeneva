@@ -384,6 +384,11 @@ function SettingsPageContent() {
             toast({ variant: "destructive", title: "Activation Error", description: "Please verify and save your payout details first." });
             return;
         }
+        const effectivePhone = businessPhone || business?.settings?.phone || '';
+        if (!effectivePhone) {
+            toast({ variant: "destructive", title: "Phone Number Required", description: "Please add a business phone number in the Business Profile section above, then save it before activating the terminal." });
+            return;
+        }
         setIsActivatingTerminal(true);
         try {
             const response = await fetch('/api/paystack/activate-terminal', {
@@ -393,6 +398,7 @@ function SettingsPageContent() {
                     businessId: business.id,
                     businessName: businessName,
                     email: currentUserProfile?.email || '',
+                    phone: effectivePhone,
                     bankCode: paymentBankCode,
                     accountNumber: paymentBankAccountId
                 })

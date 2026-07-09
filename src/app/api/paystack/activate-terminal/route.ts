@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { businessId, businessName, email, bankCode, accountNumber } = await request.json();
+    const { businessId, businessName, email, phone, bankCode, accountNumber } = await request.json();
 
     if (!businessId || !businessName || !bankCode || !accountNumber) {
       return NextResponse.json({ message: 'All parameters (businessId, businessName, bankCode, accountNumber) are required.' }, { status: 400 });
+    }
+
+    if (!phone) {
+      return NextResponse.json({ message: 'Phone number is required. Please add a business phone number in your profile settings before activating the terminal.' }, { status: 400 });
     }
 
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
           email: storeEmail,
           first_name: businessName,
           last_name: 'Terminal Store',
+          phone: phone,
         }),
       });
 
