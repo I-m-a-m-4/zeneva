@@ -9,7 +9,8 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const id = params.id;
+  const resolvedParams = await params;
+  const id = resolvedParams.id;
   
   // Try to find in static blog posts first for immediate SEO
   const staticPost = allBlogPosts.find(p => p.slug === id);

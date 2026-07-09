@@ -107,7 +107,7 @@ export function PricingPlans() {
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
-                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Granular Role-Based Access Control</li>
+                        <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> Multi-Branch Management</li>
                         <li className="flex items-center gap-3 font-semibold text-primary animate-pulse"><Check className="h-5 w-5 text-primary" /> Integrated Zeneva Terminal (Anti-Theft)</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
                     </ul>

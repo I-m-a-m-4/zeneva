@@ -24,6 +24,82 @@ export type StaticBlogPost = {
 
 export const blogPosts: StaticBlogPost[] = [
   {
+    slug: 'mastering-multi-branch-management',
+    title: "Mastering Retail Expansion: How Zeneva's Multi-Branch Management Scales Your Business",
+    excerpt: "Managing multiple stores just got easier. Discover how Zeneva's new Multi-Branch Management feature empowers you to oversee inventory, sales, and staff across all your locations from a single dashboard.",
+    imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop',
+    category: 'Product Updates',
+    directAnswer: "Zeneva's Multi-Branch Management allows you to track inventory, sales, and staff across multiple store locations from one unified dashboard.",
+    faq: [
+      { question: "Can I transfer stock between branches?", answer: "Yes, you can easily allocate and transfer inventory from your main warehouse to individual branches." },
+      { question: "Can staff see data from other branches?", answer: "No, you can restrict cashiers to only view and process transactions for their assigned branch." }
+    ],
+    content: `
+## The Challenge of Retail Expansion
+
+Expanding from a single storefront to multiple locations is a major milestone for any retail business. It signals growth, increased brand presence, and a larger customer base. However, this exciting phase often comes with a set of complex operational challenges.
+
+One of the biggest hurdles retailers face during expansion is inventory visibility. When you have products scattered across a main warehouse, a flagship store, and a new pop-up shop, keeping track of stock levels in real-time becomes a logistical nightmare without the right tools.
+
+Furthermore, standardizing operations and ensuring consistent customer experiences across all branches can be incredibly difficult. Business owners often find themselves physically shuttling between locations to manually audit stock, collect sales reports, and resolve discrepancies.
+
+This fragmented approach not only drains valuable time but also leads to costly errors. Stockouts at one branch while surplus sits idle at another can significantly impact your bottom line. You need a centralized system to orchestrate the chaos.
+
+---
+
+## Enter Zeneva Multi-Branch Management
+
+That is exactly why we built Zeneva's Multi-Branch Management feature. Designed specifically for ambitious retailers ready to scale, this powerful new tool transforms how you govern your growing empire.
+
+With Multi-Branch Management, you can instantly toggle between different store locations directly from your Zeneva dashboard. This means you have a unified, bird's-eye view of your entire operation, down to the granular performance of a single product at a specific branch.
+
+Inventory allocation is now seamless. You can transfer stock between your warehouse and individual branches with a few clicks, automatically updating the system without relying on paper trails or WhatsApp messages. 
+
+We've also integrated branch-specific reporting. You can now compare daily sales, identify your highest-performing locations, and pinpoint branches that might need additional marketing support or staff training. 
+
+Security and access control scale with you. Our advanced permissions allow you to restrict cashiers to only see data and perform transactions for the specific branch they are assigned to, protecting your overarching business intelligence.
+
+Your business is no longer confined by the walls of a single shop. By unifying your operations under Zeneva's Multi-Branch system, you can focus on what truly matters: serving more customers and scaling without limits. Activate it today in your Settings panel and step into the future of connected retail.`
+  },
+  {
+    slug: 'the-power-of-zeneva-terminal',
+    title: 'Say Goodbye to Fake Alerts: Introducing the Zeneva Terminal',
+    excerpt: 'Stop losing money to fraudulent transfers. Learn how the Zeneva Terminal automatically verifies bank transfers in real-time, protecting your revenue while speeding up checkout.',
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Product Updates',
+    directAnswer: "The Zeneva Terminal provides a dedicated virtual bank account that instantly detects incoming transfers and alerts your POS, eliminating the risk of fake payment screenshots.",
+    faq: [
+      { question: "Do I need to give staff my bank login?", answer: "No, the POS itself receives an automated alert when funds land, keeping your main account private." },
+      { question: "How fast are the alerts?", answer: "Alerts are delivered in real-time, instantly ringing on your POS screen the second the transfer is successful." }
+    ],
+    content: `
+## The Fake Alert Epidemic
+
+In the bustling retail landscape of Nigeria and beyond, bank transfers have become a dominant payment method. While convenient for customers, relying on manual bank transfers exposes merchants to a dangerous and increasingly sophisticated threat: fake payment alerts.
+
+Every day, hard-working business owners lose thousands to fraudsters presenting manipulated screenshots or deceptive SMS alerts. The traditional verification process—waiting for your personal bank app to refresh or calling a manager to confirm a deposit—is slow, frustrating, and creates massive bottlenecks at the checkout counter.
+
+This friction hurts your genuine customers, slows down your queue, and creates a stressful environment for your sales staff who are constantly second-guessing every transaction. It's an unsustainable model for a growing business.
+
+We believe you shouldn't have to choose between accepting a popular payment method and protecting your hard-earned revenue. That is why we are thrilled to introduce the Zeneva Terminal, a revolutionary feature designed to completely eradicate the risk of transfer fraud.
+
+---
+
+## How the Terminal Protects You
+
+The Zeneva Terminal provides your business with a permanent, dedicated virtual bank account. Instead of customers transferring money to your personal or primary corporate account, they transfer directly to your Zeneva Terminal account. 
+
+The magic happens the moment the funds hit the account. Zeneva instantly detects the transaction and sends a real-time, unforgeable alert directly to your Point of Sale dashboard. A distinct chime rings out, and a green success banner appears, confirming the payment.
+
+This means your cashiers never need to ask to see a customer's phone screen again. They don't need to text you to verify a payment, and you don't need to give your staff access to your master bank account just to verify daily sales. The POS system acts as the ultimate source of truth.
+
+But it doesn't stop at security. The Zeneva Terminal automatically links the incoming transfer to the specific customer's receipt in the system. This drastically simplifies your end-of-day reconciliation. Your expected transfers and actual received funds will match perfectly.
+
+We have built the Zeneva Terminal on top of rock-solid financial infrastructure, partnering with industry leaders to ensure 99.9% uptime. Even during peak holiday shopping rushes, you can trust that your alerts will come through instantly and reliably.
+
+Activation takes less than two minutes directly from your Zeneva settings. By activating the Zeneva Terminal, you are securing your revenue, empowering your staff, and providing a faster, smoother checkout experience for every customer who walks through your doors. Stop guessing, start verifying.`
+  },
+  {
     slug: 'zeneva-goes-global-paystack-usd-security-updates',
     title: 'Zeneva Goes Global: Now Accepting International Payments + Major Security Upgrades',
     excerpt: 'Big news! You can now accept USD payments globally on Zeneva. Plus, we\'ve implemented bank-grade encryption to keep your retail data safer than ever.',

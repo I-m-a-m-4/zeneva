@@ -109,12 +109,39 @@
     padding: 0;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+  }
+
+  /* Prevent layout shift from Radix UI Dialogs */
+  html, body {
+    --removed-body-scroll-bar-size: 0px !important;
+  }
+  
+  :root {
+    --removed-body-scroll-bar-size: 0px !important;
+  }
+
+  body[data-scroll-locked],
+  html[style*="overflow: hidden"] {
+    padding-right: 0px !important;
+    margin-right: 0px !important;
+  }
+
+  /* Override dynamic inline spacing injected by Radix UI */
+  body[data-scroll-locked] [style*="margin-right"],
+  body[data-scroll-locked] [style*="padding-right"],
+  [data-radix-portal] [style*="margin-right"],
+  [data-radix-portal] [style*="padding-right"] {
+    margin-right: 0px !important;
+    padding-right: 0px !important;
+  }
+
+  html, body {
     transition: opacity ease-in 0.3s;
     opacity: 1;
   }
 
   html {
-    overflow-y: scroll !important;
+    overflow-y: auto;
   }
 
   body[unresolved] {
@@ -366,6 +393,36 @@
   .whatsapp-button:hover {
     transform: scale(1.1);
     animation-play-state: paused;
+  }
+
+  body {
+    scrollbar-gutter: stable;
+  }
+
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  .blog-layout {
+    font-family: var(--font-inter), sans-serif !important;
+  }
+
+  .blog-layout h1, 
+  .blog-layout h2, 
+  .blog-layout h3, 
+  .blog-layout h4, 
+  .blog-layout h5, 
+  .blog-layout h6,
+  .blog-layout .prose h1,
+  .blog-layout .prose h2,
+  .blog-layout .prose h3,
+  .blog-layout .prose h4 {
+    font-family: var(--font-bricolage), sans-serif !important;
   }
 
   .whatsapp-button svg {

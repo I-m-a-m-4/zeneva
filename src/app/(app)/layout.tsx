@@ -50,6 +50,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
 import { History } from 'lucide-react';
+import { BranchSwitcher } from '@/components/layout/branch-switcher';
 
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -81,7 +82,7 @@ const navItems = [
   { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'owner'] },
   { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
   { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/terminal-alerts', icon: Bell, label: 'Terminal Alerts', roles: ['admin', 'manager', 'vendor_operator', 'owner'] },
+  { href: '/terminal-alerts', icon: Bell, label: 'Terminal Alerts', roles: ['admin', 'manager', 'vendor_operator', 'owner'], isNew: true },
   { href: '/users', icon: UserRound, label: 'Users', roles: ['admin'] },
   { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
 ];
@@ -769,6 +770,7 @@ export default function AuthenticatedLayout({
                     />
                   </div>
                 </Link>
+                <BranchSwitcher />
               </SidebarHeader>
               <SidebarContent className="flex-1 p-2">
                 <div className="flex-1 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-muted-foreground/20">
@@ -791,9 +793,14 @@ export default function AuthenticatedLayout({
                             tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
                             isActive={isLinkActive(link.href, pathname)}
                           >
-                            <Link href={link.href}>
-                              <link.icon className="h-5 w-5" />
-                              <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
+                            <Link href={link.href} className="flex items-center w-full">
+                              <link.icon className="h-5 w-5 shrink-0" />
+                              <span className="group-data-[state=collapsed]:hidden flex items-center justify-between flex-1 min-w-0">
+                                <span className="truncate">{link.label}</span>
+                                {(link as any).isNew && (
+                                  <Badge className="ml-2 h-[18px] px-1.5 bg-orange-500 hover:bg-orange-600 text-[9px] font-bold text-white border-0 shadow-none leading-none rounded">NEW</Badge>
+                                )}
+                              </span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -1034,7 +1041,7 @@ export default function AuthenticatedLayout({
                   </DropdownMenu>
                 </div>
               </header>
-              <main id="app-main-content" className="flex-1 overflow-y-auto p-4 sm:p-6 md:pb-6 font-body smooth-scroll bg-background relative">
+              <main id="app-main-content" className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 md:pb-6 font-body smooth-scroll bg-background relative">
                 <div className={cn("w-full transition-all duration-700 min-h-full pb-32 md:pb-0", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
                   {hasRouteAccess ? children : (
                     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6 bg-card rounded-2xl border shadow-sm animate-in fade-in duration-300">

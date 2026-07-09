@@ -23,6 +23,8 @@ import OverviewChart from '@/components/dashboard/overview-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
 import DailySalesItemsTable from '@/components/reports/daily-sales-items-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Printer, Image as ImageIcon } from 'lucide-react';
 
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
@@ -311,7 +313,7 @@ export default function ReportsDashboard() {
         toast({ title: 'Generating Report...', description: 'Please wait while we capture your dashboard.' });
         try {
             const canvas = await html2canvas(element, {
-                scale: 2,
+                scale: 4,
                 ignoreElements: (el) => el.classList.contains('no-capture')
             });
             const data = canvas.toDataURL('image/png');
@@ -360,7 +362,23 @@ export default function ReportsDashboard() {
                                   )}
                               </>
                           )}
-                          <Button onClick={handleDownloadImage} variant="outline" size="sm" className="h-9"><Download className="mr-2 h-4 w-4" />Export Image</Button>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-9">
+                                <Download className="mr-2 h-4 w-4" />Export Report
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={handleDownloadImage}>
+                                <ImageIcon className="h-4 w-4 mr-2" />
+                                Export as High-Res Image
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => window.print()}>
+                                <Printer className="h-4 w-4 mr-2" />
+                                Export as PDF (Print)
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                       </div>
                   </div>
 

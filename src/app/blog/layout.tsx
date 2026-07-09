@@ -12,10 +12,24 @@ export const metadata: Metadata = {
   }
 };
 
+import { Bricolage_Grotesque, Inter } from 'next/font/google';
+
+const bricolage = Bricolage_Grotesque({ 
+  subsets: ['latin'], 
+  variable: '--font-bricolage',
+  display: 'swap',
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export default function BlogLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <div className={`${bricolage.variable} ${inter.variable} blog-layout`}>{children}</div>;
 }

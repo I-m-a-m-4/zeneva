@@ -583,6 +583,21 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </div>
                         </div>
                         <div>
+                            <Label className="text-xs text-muted-foreground font-bold">Date Joined</Label>
+                            <p className="font-medium mt-1">
+                                {user.createdAt ? (
+                                    (() => {
+                                        try {
+                                            const d = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
+                                            return format(d, 'PPP');
+                                        } catch (e) {
+                                            return 'N/A';
+                                        }
+                                    })()
+                                ) : 'N/A'}
+                            </p>
+                        </div>
+                        <div>
                             <Label className="text-xs text-muted-foreground font-bold">Device Type</Label>
                             <div className="mt-1 flex items-center gap-1.5 font-medium">
                                 {user.deviceType === 'Desktop App' && <Laptop className="h-4 w-4 text-blue-500" />}
@@ -616,7 +631,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [grantEmail, setGrantEmail] = useState('');
     const [grantDate, setGrantDate] = useState<Date>();
     const [isGranting, setIsGranting] = useState(false);
+    const [isRevoking, setIsRevoking] = useState(false);
     const [grantLifetime, setGrantLifetime] = useState(false);
+
+    const selectedUserForGrant = useMemo(() => (users || []).find(u => u.email === grantEmail), [users, grantEmail]);
+    const selectedBusinessForGrant = useMemo(() => selectedUserForGrant ? (businesses || []).find(b => b.id === selectedUserForGrant.businessId) : null, [businesses, selectedUserForGrant]);
+    const hasLifetime = !!(selectedBusinessForGrant && selectedBusinessForGrant.accessLevel === 'lifetime');
     const [userStatusEmail, setUserStatusEmail] = useState('');
     const [isUserActive, setIsUserActive] = useState(true);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -1270,6 +1290,52 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             setIsGranting(false);
         }
     }
+
+    const handleRevokeLifetime = async () => {
+        if (!grantEmail) return;
+        setIsRevoking(true);
+        try {
+            const usersRef = collection(firestore, 'users');
+            const q = query(usersRef, where("email", "==", grantEmail));
+            const userSnapshot = await getDocs(q);
+            if (userSnapshot.empty) throw new Error(`User with email ${grantEmail} not found.`);
+            const userDoc = userSnapshot.docs[0];
+            const userData = userDoc.data() as UserProfile;
+            if (!userData.businessId) throw new Error("This user is not associated with any business.");
+            
+            const businessDocRef = doc(firestore, 'businessInstances', userData.businessId);
+            const historyColRef = collection(firestore, 'businessInstances', userData.businessId, 'subscription_history');
+
+            await updateDoc(businessDocRef, { 
+                accessLevel: null,
+                plan: 'starter',
+                trialExpiresAt: serverTimestamp()
+            });
+
+            await addDoc(historyColRef, {
+                action: 'Admin Revoke: Lifetime access revoked',
+                amount: 0,
+                currency: 'NGN',
+                timestamp: serverTimestamp()
+            });
+
+            if (currentUserProfile) {
+                await logAuditEvent(firestore, userData.businessId, currentUserProfile, {
+                    action: 'billing.revoke_lifetime',
+                    entity: { type: 'business', id: userData.businessId, name: userData.name },
+                    details: { targetEmail: grantEmail }
+                });
+            }
+
+            toast({ variant: 'success', title: 'Lifetime Access Revoked', description: `Lifetime access for ${userData.name} has been revoked.` });
+            setGrantEmail('');
+            setGrantLifetime(false);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Revocation Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsRevoking(false);
+        }
+    };
 
     const handleUserStatusSelection = (email: string) => {
         setUserStatusEmail(email);
@@ -2044,35 +2110,61 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                         </div>
                                     )}
                                 </CardContent>
-                                <CardFooter>
-                                    {grantLifetime ? (
+                                <CardFooter className="flex flex-col gap-2">
+                                    {hasLifetime && (
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button disabled={isGranting} className="w-full bg-green-600 hover:bg-green-700">
-                                                    {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                                                    Grant Lifetime Access
+                                                <Button disabled={isRevoking} variant="destructive" className="w-full">
+                                                    {isRevoking && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                                    Revoke Lifetime Access
                                                 </Button>
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        This will grant <strong className="text-foreground">{grantEmail}</strong> permanent, unlimited access to Zeneva Business. This action is recorded in the audit logs.
+                                                        This will revoke lifetime access for the business associated with <strong className="text-foreground">{grantEmail}</strong> and reset their plan to Starter.
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={handleGrantAccess} className="bg-green-600 hover:bg-green-700">
-                                                        Yes, Grant Lifetime
+                                                    <AlertDialogAction onClick={handleRevokeLifetime} className="bg-destructive hover:bg-destructive/90">
+                                                        Yes, Revoke Access
                                                     </AlertDialogAction>
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
-                                    ) : (
-                                        <Button onClick={handleGrantAccess} disabled={isGranting} className="w-full">
-                                            {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                                            Extend Trial
-                                        </Button>
+                                    )}
+                                    {!hasLifetime && (
+                                        grantLifetime ? (
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button disabled={isGranting} className="w-full bg-green-600 hover:bg-green-700">
+                                                        {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                                        Grant Lifetime Access
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This will grant <strong className="text-foreground">{grantEmail}</strong> permanent, unlimited access to Zeneva Business. This action is recorded in the audit logs.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={handleGrantAccess} className="bg-green-600 hover:bg-green-700">
+                                                            Yes, Grant Lifetime
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        ) : (
+                                            <Button onClick={handleGrantAccess} disabled={isGranting} className="w-full">
+                                                {isGranting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                                Extend Trial
+                                            </Button>
+                                        )
                                     )}
                                 </CardFooter>
                             </Card>

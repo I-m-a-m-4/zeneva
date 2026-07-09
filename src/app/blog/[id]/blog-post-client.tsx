@@ -197,47 +197,62 @@ export default function BlogPostClient() {
         <MarketingHeader />
         
         <main className="min-h-screen">
-          <div className="mx-auto max-w-6xl px-6 pb-16 pt-48 sm:px-6 sm:pb-24 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12 lg:pb-24 xl:gap-16">
-            <article className="min-w-0">
-               {/* Breadcrumbs */}
-              <nav className="mb-10 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <Link href="/blog" className="hover:text-slate-900 transition-colors">Blog</Link>
-                <span className="text-slate-300">/</span>
-                <span className="truncate">{post.title}</span>
+          {/* New Hero Section */}
+          <section className="relative w-full pt-56 pb-32 md:pt-72 md:pb-48 min-h-[55vh] overflow-hidden flex flex-col justify-end lg:justify-center items-center">
+            {/* Background Image with Dark Overlay */}
+            <div 
+              className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url('/zeneva blog hero  image.png')` }}
+            />
+            <div className="absolute inset-0 z-0 bg-black/80" /> {/* Dark overlay */}
+
+            <div className="relative z-10 w-full max-w-4xl mx-auto px-6 text-center text-white">
+              {/* Breadcrumbs */}
+              <nav className="mb-6 text-[11px] font-medium text-white/60 flex flex-wrap items-center justify-center gap-2 tracking-widest">
+                <Link href="/blog" className="hover:text-white transition-colors uppercase">Blog</Link>
+                <span className="text-white/40">/</span>
+                <span className="text-white max-w-full truncate">{post.title}</span>
               </nav>
 
-              <header className="mb-12">
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 mb-8 leading-[1.2]">
-                   {post.title}
-                </h1>
-                
-                <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                   <div className="flex items-center gap-1.5">
-                      <Briefcase className="h-3.5 w-3.5" />
-                      <span>{post.category || 'Operational Mastery'}</span>
-                   </div>
-                   <span className="text-slate-200">•</span>
-                   <time dateTime={post.createdAt ? post.createdAt.toDate().toISOString() : ''}>
-                     {post.createdAt ? format(post.createdAt.toDate(), 'MMMM d, yyyy') : 'Recently'}
-                   </time>
-                   <span className="text-slate-200">•</span>
-                   <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>{Math.ceil(post.content.length / 1000) + 3} MIN READ</span>
-                   </div>
-                </div>
-              </header>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-medium tracking-tight mb-6 leading-tight text-white">
+                 {post.title}
+              </h1>
+              
+              <div className="flex flex-wrap items-center justify-center gap-4 text-[12px] font-normal text-white/70 tracking-wide">
+                 <div className="flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5 text-white/50" />
+                    <span className="text-white">{post.category || 'Operational Mastery'}</span>
+                 </div>
+                 <span className="text-white/30">•</span>
+                 <time dateTime={post.createdAt ? post.createdAt.toDate().toISOString() : ''} className="text-white">
+                   {post.createdAt ? format(post.createdAt.toDate(), 'MMMM d, yyyy') : 'Recently'}
+                 </time>
+                 <span className="text-white/30">•</span>
+                 <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-white/50" />
+                    <span className="text-white">{Math.ceil(post.content.length / 1000) + 3} min read</span>
+                 </div>
+              </div>
+            </div>
+          </section>
 
+          <div className="mx-auto max-w-6xl px-6 pb-16 pt-16 sm:px-6 sm:pb-24 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12 lg:pb-24 xl:gap-16">
+            <article className="min-w-0">
               {/* Main Content Area */}
-              <div className="prose prose-slate max-w-none 
-                prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
-                prose-p:text-slate-600 prose-p:text-lg prose-p:leading-relaxed prose-p:mb-8
-                prose-strong:text-slate-900 prose-strong:font-bold
-                prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-a:transition-all
-                prose-blockquote:border-l-2 prose-blockquote:border-slate-200 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-slate-500
-                prose-img:rounded-3xl prose-img:shadow-sm
-                prose-hr:border-slate-100 prose-hr:my-16
-                prose-table:border-collapse prose-th:text-left prose-th:font-bold prose-th:text-slate-900 prose-th:pb-4 prose-td:py-4 prose-td:border-t prose-td:border-slate-100
+              <div className="max-w-none 
+                [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold 
+                [&_h1]:tracking-tight [&_h2]:tracking-tight [&_h3]:tracking-tight [&_h4]:tracking-tight 
+                [&_h1]:text-slate-900 [&_h2]:text-slate-900 [&_h3]:text-slate-900 [&_h4]:text-slate-900 
+                [&_h2]:text-2xl [&_h2]:sm:text-3xl [&_h3]:text-xl [&_h3]:sm:text-2xl [&_h4]:text-lg [&_h4]:sm:text-xl
+                [&_h1]:mt-12 [&_h2]:mt-12 [&_h3]:mt-12 [&_h4]:mt-12 
+                [&_h1]:mb-6 [&_h2]:mb-6 [&_h3]:mb-6 [&_h4]:mb-6
+                [&_p]:text-slate-600 [&_p]:text-base [&_p]:leading-loose [&_p]:mb-8
+                [&_strong]:text-slate-900 [&_strong]:font-semibold
+                [&_a]:text-orange-600 [&_a]:no-underline hover:[&_a]:underline [&_a]:transition-all
+                [&_blockquote]:border-l-2 [&_blockquote]:border-slate-200 [&_blockquote]:pl-6 [&_blockquote]:italic [&_blockquote]:text-slate-500
+                [&_img]:rounded-3xl [&_img]:shadow-sm
+                [&_hr]:border-slate-100 [&_hr]:my-16
+                [&_table]:border-collapse [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-900 [&_th]:pb-4 [&_td]:py-4 [&_td]:border-t [&_td]:border-slate-100
               ">
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}

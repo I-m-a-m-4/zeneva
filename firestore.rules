@@ -170,6 +170,12 @@ service cloud.firestore {
       allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(resource.data.businessId));
     }
 
+    match /branches/{branchId} {
+      allow get, list: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.businessId)));
+      allow create, update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId));
+    }
+
     match /products/{productId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.get('businessId', null))));
       allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid));

@@ -140,7 +140,7 @@ export default function BlogLandingPage() {
           <MarketingHeader />
 
           <main className="min-h-screen">
-            <section className="relative flex items-center justify-center px-6 pt-48 pb-20 md:py-56 overflow-hidden bg-transparent">
+            <section className="relative flex items-center justify-center px-6 pt-32 pb-12 md:pt-40 md:pb-16 overflow-hidden bg-transparent">
               <div className="absolute inset-0 z-0">
                 <InteractiveGrid />
                 <div className="aura-background"></div>
@@ -185,17 +185,17 @@ export default function BlogLandingPage() {
                 </div>
               </div>
 
-              <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <Sparkles className="h-4 w-4 text-slate-900 fill-slate-900" />
-                  <span className="text-sm font-semibold tracking-tight text-slate-900 uppercase">Strategic Intelligence</span>
+              <div className="max-w-3xl mx-auto text-center space-y-6 relative z-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <Sparkles className="h-3.5 w-3.5 text-slate-900 fill-slate-900" />
+                  <span className="text-xs font-semibold tracking-tight text-slate-900 uppercase">Retail Intelligence</span>
                 </div>
 
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tight leading-[0.95] text-slate-950">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1] text-slate-950">
                   The Zeneva <span className="text-slate-500">Blog</span>
                 </h1>
 
-                <p className="text-lg md:text-2xl text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed">
+                <p className="text-base md:text-lg text-slate-600 max-w-xl mx-auto font-medium leading-relaxed">
                   Expert insights, tactical guides, and industry reports for the modern retail era.
                 </p>
               </div>
@@ -249,12 +249,12 @@ export default function BlogLandingPage() {
                       href={`/blog/${post.slug || post.id}`}
                       className={`group relative flex ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-500 overflow-hidden`}
                     >
-                      <div className={`${viewMode === 'grid' ? 'aspect-[16/10]' : 'aspect-video md:w-80'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
+                      <div className={`${viewMode === 'grid' ? 'aspect-[3/1]' : 'aspect-video md:w-64'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
                         {/* Gradient replaces the image for a cleaner, more focused look */}
                       </div>
 
-                      <div className="flex flex-col flex-1 p-8">
-                        <div className="flex items-center gap-3 mb-4">
+                      <div className="flex flex-col flex-1 p-5">
+                        <div className="flex items-center gap-3 mb-3">
                           <Badge variant="secondary" className="bg-slate-100 text-slate-900 border-none px-3 py-0.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
                             Category
                           </Badge>
@@ -264,15 +264,15 @@ export default function BlogLandingPage() {
                           </div>
                         </div>
 
-                        <h2 className="text-xl md:text-2xl font-black leading-tight tracking-tight text-slate-950 group-hover:text-slate-600 transition-colors mb-4 line-clamp-2">
+                        <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-950 group-hover:text-slate-600 transition-colors mb-2 line-clamp-2">
                           {post.title}
                         </h2>
 
-                        <p className="text-slate-500 text-sm md:text-base leading-relaxed line-clamp-3 mb-8 font-medium">
+                        <p className="text-slate-500 text-xs md:text-sm leading-relaxed line-clamp-2 mb-4 font-medium">
                           {post.excerpt || "Unlock the potential of your retail business with our strategic breakdown and tactical execution guides."}
                         </p>
 
-                        <div className="mt-auto pt-6 border-t border-slate-100 flex items-center justify-between">
+                        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-950 uppercase tracking-tighter">{post.authorName}</span>
                             <span className="text-slate-300">·</span>
@@ -280,7 +280,7 @@ export default function BlogLandingPage() {
                               {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
                             </span>
                           </div>
-                          <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
+                          <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
                         </div>
                       </div>
                     </Link>
@@ -336,28 +336,28 @@ export default function BlogLandingPage() {
             </div>
 
 
-            {/* Newsletter Section */}
+            {/* CTA Section */}
             <section className="bg-slate-50 py-24 mb-0">
               <div className="container mx-auto px-6">
-                <div className="max-w-4xl mx-auto rounded-[3rem] bg-white border border-dashed border-slate-200 p-8 md:p-14 shadow-sm text-center">
-                  <h3 className="text-2xl md:text-4xl font-black tracking-tight text-slate-950 mb-6">
-                    Stay Tactical. <br /> Stay Informed.
+                <div className="max-w-5xl mx-auto rounded-[2rem] bg-[#fff6ed] border border-[#ffedd5] p-10 md:p-16 text-center shadow-sm">
+                  <h3 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-950 mb-6">
+                    Ready to transform your retail operations?
                   </h3>
-                  <p className="text-slate-500 text-base md:text-lg font-medium mb-10 max-w-2xl mx-auto">
-                    Join 5,000+ retail leaders who receive our weekly breakdown of market tactical shifts and Zeneva platform Mastery.
+                  <p className="text-slate-600 text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto">
+                    Join the thousands of retailers using Zeneva to automate profit and scale without limits.
                   </p>
-                  <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-                    <input
-                      placeholder="you@company.com"
-                      className="h-14 flex-1 rounded-2xl border border-slate-200 bg-slate-50/50 px-6 font-medium text-slate-950 outline-none focus:ring-4 focus:ring-slate-100 transition-all"
-                    />
-                    <Button className="h-14 px-8 rounded-2xl bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all">
-                      Subscribe
-                    </Button>
-                  </form>
-                  <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                    Mission-critical intelligence only. No spam.
-                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <Link href="/pricing">
+                      <Button className="h-14 px-8 rounded-full bg-[#ea580c] text-white font-bold hover:bg-[#c2410c] transition-all text-base shadow-md hover:shadow-lg">
+                        View Pricing
+                      </Button>
+                    </Link>
+                    <Link href="/about">
+                      <Button variant="outline" className="h-14 px-8 rounded-full border-slate-200 bg-white text-slate-900 font-bold hover:bg-slate-50 transition-all text-base shadow-sm">
+                        Our Mission
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </section>

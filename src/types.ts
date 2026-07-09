@@ -18,6 +18,7 @@ export interface Product {
     expiryDate?: any;
     categoryType?: 'product' | 'service';
     lowercaseName?: string;
+    branchId?: string;
 
     // --- Premium Inventory Features ---
     type?: 'single' | 'variant' | 'composite';
@@ -49,6 +50,7 @@ export interface HeldSale {
     timestamp: number;
     total: number;
     notes?: string;
+    branchId?: string;
 }
 
 export type TopSellingItem = Product & {
@@ -69,6 +71,7 @@ export interface UserProfile {
     status?: 'active' | 'inactive' | 'deleted';
     lastSeen?: any;
     permissions?: Record<string, boolean>;
+    branchId?: string;
 }
 
 export interface CustomerInsightsOutput {
@@ -93,6 +96,7 @@ export interface Customer {
     lowercaseName?: string;
     lowercaseEmail?: string;
     aiInsights?: CustomerInsightsOutput;
+    branchId?: string;
 }
 
 export interface Receipt {
@@ -122,6 +126,7 @@ export interface Receipt {
         openTime?: string;
         closeTime?: string;
     } | null;
+    branchId?: string;
 }
 
 export interface OnlineOrder {
@@ -149,6 +154,7 @@ export interface OnlineOrder {
     paymentMethod?: 'Paystack' | 'Bank Transfer';
     paymentReference?: string;
     createdAt: any;
+    branchId?: string;
 }
 
 export interface QueuedAction {
@@ -276,6 +282,16 @@ export interface BusinessAnalysisOutput {
 }
 
 
+export interface Branch {
+    id: string;
+    businessId: string;
+    name: string;
+    address?: string;
+    isPrimary: boolean;
+    isActive: boolean;
+    createdAt: any;
+}
+
 export interface BusinessInstance {
     id: string;
     name: string;
@@ -309,6 +325,7 @@ export interface BusinessInstance {
         loyaltyPointsForReward?: number;
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
+        multiBranchEnabled?: boolean;
         aiTroubleshootSuggestions?: AISuggestions;
         businessAnalysis?: BusinessAnalysisOutput;
         publicStore?: {
@@ -462,6 +479,7 @@ export interface AuditLog {
     entityId: string;
     details: Record<string, any>; // e.g., { name: 'New Product' } or { changes: [...] }
     createdAt: any; // Firestore Timestamp
+    branchId?: string;
 }
 
 export interface BusinessStats {

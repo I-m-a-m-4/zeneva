@@ -8,6 +8,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
 import { POSProvider } from '@/context/pos-context';
+import { BranchProvider } from '@/context/branch-context';
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
@@ -297,16 +298,18 @@ export default function RootLayout({
               <Loader />
               <InstallPrompt />
               <TauriUpdater />
-              <POSProvider>
-                <TauriLayoutWrapper>
-                   <DesktopTitleBar />
-                   <DesktopLauncher />
-                   <Suspense>
-                     <NavigationEvents />
-                   </Suspense>
-                   {children}
-                </TauriLayoutWrapper>
-              </POSProvider>
+              <BranchProvider>
+                <POSProvider>
+                  <TauriLayoutWrapper>
+                     <DesktopTitleBar />
+                     <DesktopLauncher />
+                     <Suspense>
+                       <NavigationEvents />
+                     </Suspense>
+                     {children}
+                  </TauriLayoutWrapper>
+                </POSProvider>
+              </BranchProvider>
             </PWAProvider>
           </FirebaseClientProvider>
         </ThemeProvider>

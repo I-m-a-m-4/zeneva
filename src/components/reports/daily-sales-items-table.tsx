@@ -7,15 +7,22 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { CachedImage } from '../shared/cached-image';
-import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon, Banknote, ArrowRightLeft, ShieldCheck } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
 import { format, formatDistanceToNow, startOfDay, endOfDay, isSameDay, subDays } from 'date-fns';
 import { safeToDate, cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { usePOS } from '@/context/pos-context';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Calendar } from '@/components/ui/calendar';
+import { Printer, Image as ImageIcon, FileSpreadsheet, Check, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 interface DailySalesItemsTableProps {
@@ -26,6 +33,7 @@ interface DailySalesItemsTableProps {
 
 export default function DailySalesItemsTable({ receipts, products, currencySymbol }: DailySalesItemsTableProps) {
   const { toast } = useToast();
+  const tableRef = React.useRef<HTMLDivElement>(null);
 
   const [selectedDate, setSelectedDate] = React.useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
@@ -34,6 +42,60 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const [typeFilter, setTypeFilter] = React.useState('all');
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
+
+  const firestore = useFirestore();
+  const { currentUserProfile } = usePOS();
+  const [dailyTransferReceived, setDailyTransferReceived] = React.useState(0);
+
+  // Compute Cash and Expected Transfers for the selected day
+  const { dailyCash, dailyTransferExpected } = React.useMemo(() => {
+    let cash = 0;
+    let transfer = 0;
+    const targetDateStart = startOfDay(selectedDate).getTime();
+    const targetDateEnd = endOfDay(selectedDate).getTime();
+
+    (receipts || []).forEach(r => {
+      const rTime = safeToDate(r.createdAt).getTime();
+      if (rTime >= targetDateStart && rTime <= targetDateEnd) {
+        if (r.paymentMethod === 'Cash') cash += r.total;
+        if (r.paymentMethod === 'Bank Transfer') transfer += r.total;
+      }
+    });
+
+    return { dailyCash: cash, dailyTransferExpected: transfer };
+  }, [receipts, selectedDate]);
+
+  // Fetch actual terminal alerts for the selected day to compute Verified Transfers
+  React.useEffect(() => {
+    if (!currentUserProfile?.id || !firestore) return;
+
+    const fetchAlerts = async () => {
+      try {
+        const targetDateStart = startOfDay(selectedDate);
+        const targetDateEnd = endOfDay(selectedDate);
+        
+        const q = query(
+          collection(firestore, `users/${currentUserProfile.id}/notifications`),
+          where('createdAt', '>=', targetDateStart),
+          where('createdAt', '<=', targetDateEnd)
+        );
+
+        const snapshot = await getDocs(q);
+        let total = 0;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.type === 'sale' || data.type === 'payment' || data.title?.toLowerCase().includes('payment') || data.title?.toLowerCase().includes('alert')) {
+             const amount = data.amount || parseFloat(data.body.match(/[\d,]+(\.\d+)?/)?.[0]?.replace(/,/g, '') || '0');
+             total += amount;
+          }
+        });
+        setDailyTransferReceived(total);
+      } catch (err) {
+        console.error('Error fetching terminal alerts for day', err);
+      }
+    };
+    fetchAlerts();
+  }, [currentUserProfile?.id, firestore, selectedDate]);
 
   // Flatten receipts into individual product/service sales items
   const salesItems = React.useMemo(() => {
@@ -159,25 +221,170 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     reader.readAsDataURL(blob);
   };
 
+  const handleExportImage = async () => {
+    const element = tableRef.current;
+    if (!element) return;
+    toast({ title: 'Generating Report...', description: 'Please wait while we capture the daily sales table.' });
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 4,
+            ignoreElements: (el) => el.classList.contains('no-capture')
+        });
+        const data = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = data;
+        link.download = `zeneva-daily-sales-${format(selectedDate, 'yyyy-MM-dd')}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ variant: 'success', title: 'Export Successful', description: 'Table exported as High-Res Image.' });
+    } catch (err) {
+        toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not capture the image.' });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (filteredItems.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data', description: 'No items available to export.' });
+      return;
+    }
+
+    toast({ title: 'Generating PDF...', description: 'Please wait while we create your document.' });
+
+    const doc = new jsPDF();
+    
+    // Add Watermark
+    doc.setTextColor(240, 240, 240);
+    doc.setFontSize(80);
+    doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
+    
+    // Add Title and Subtitle
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(16);
+    doc.text("Daily Sales Items Log", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Report Date: ${format(selectedDate, 'EEEE, MMMM d, yyyy')}`, 14, 28);
+    
+    // Add Summary Boxes
+    doc.setFontSize(9);
+    doc.setTextColor(50, 50, 50);
+    doc.text(`Cash Sales: ${currencySymbol}${dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 14, 38);
+    doc.text(`Expected Transfers: ${currencySymbol}${dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 70, 38);
+    doc.text(`Verified Transfers: ${currencySymbol}${dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 140, 38);
+
+    const tableColumn = ["Item", "Type", "Qty", "Price", "Total Revenue", "Receipt", "Time"];
+    const tableRows: any[] = [];
+
+    filteredItems.forEach(item => {
+      const rowData = [
+        item.name,
+        item.categoryType === 'service' ? 'Service' : 'Product',
+        item.quantity,
+        `${currencySymbol}${item.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+        `${currencySymbol}${item.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+        item.receiptNumber,
+        format(item.createdAt, 'HH:mm:ss')
+      ];
+      tableRows.push(rowData);
+    });
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [249, 115, 22], textColor: [255, 255, 255] }, // Orange-500 branding
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      didDrawPage: function (data) {
+        if (data.pageNumber > 1) {
+          doc.setTextColor(240, 240, 240);
+          doc.setFontSize(80);
+          doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
+        }
+      }
+    });
+
+    doc.save(`zeneva-daily-sales-${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+    toast({ variant: 'success', title: 'Export Successful', description: 'Table exported as PDF.' });
+  };
+
   return (
-    <Card className="flex flex-col min-h-0 w-full overflow-hidden">
+    <Card ref={tableRef} className="flex flex-col min-h-0 w-full overflow-hidden bg-white relative">
       <CardHeader className="pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-capture print:hidden">
           <div>
             <CardTitle>Daily Sales Items Log</CardTitle>
             <CardDescription>
               Detailed logs of individual product and service items sold on the selected day.
             </CardDescription>
           </div>
-          <Button onClick={handleExportCSV} variant="outline" size="sm" className="h-9 gap-1 self-start sm:self-auto">
-            <Download className="h-3.5 w-3.5" />
-            <span>Export CSV</span>
-          </Button>
+          
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 self-start sm:self-auto">
+                <Download className="mr-2 h-4 w-4" />Export Report
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportImage}>
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Export as High-Res Image
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <Printer className="h-4 w-4 mr-2" />
+                Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
         </div>
       </CardHeader>
       
+      {/* Daily Sales Summary Header */}
+      <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-border/50 bg-muted/5">
+        <Card className="bg-slate-50 border-slate-200 shadow-none">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-slate-500">Day's Cash Sales</CardTitle>
+            <Banknote className="h-4 w-4 text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900">{currencySymbol}{dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-slate-500 mt-1">Total physical cash expected in drawer</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-blue-50 border-blue-200 shadow-none">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-blue-600">Expected Bank Transfers</CardTitle>
+            <ArrowRightLeft className="h-4 w-4 text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-900">{currencySymbol}{dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-emerald-50 border-emerald-200 shadow-none">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-emerald-600">Verified Transfers</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-900">{currencySymbol}{dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing in terminal</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filtering Bar */}
-      <div className="px-6 pb-4 border-b flex flex-wrap items-center gap-4 bg-muted/20">
+      <div className="px-6 py-4 border-b flex flex-wrap items-center gap-4 bg-muted/20 no-capture">
         
         {/* Single Date Picker */}
         <div className="flex items-center gap-2">
@@ -231,28 +438,45 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           />
         </div>
         
-        <Select value={typeFilter} onValueChange={setTypeFilter} modal={false}>
-          <SelectTrigger className="w-[180px] min-w-[180px] h-9">
-            <SelectValue placeholder="Filter by Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="product">Products Only</SelectItem>
-            <SelectItem value="service">Services Only</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-[180px] min-w-[180px] h-9 justify-between font-normal">
+              {typeFilter === 'all' ? 'All Types' : typeFilter === 'product' ? 'Products Only' : 'Services Only'}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[180px]">
+            <DropdownMenuItem onClick={() => setTypeFilter('all')}>
+              {typeFilter === 'all' && <Check className="mr-2 h-4 w-4" />}
+              <span className={typeFilter === 'all' ? 'font-medium' : 'ml-6'}>All Types</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTypeFilter('product')}>
+              {typeFilter === 'product' && <Check className="mr-2 h-4 w-4" />}
+              <span className={typeFilter === 'product' ? 'font-medium' : 'ml-6'}>Products Only</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTypeFilter('service')}>
+              {typeFilter === 'service' && <Check className="mr-2 h-4 w-4" />}
+              <span className={typeFilter === 'service' ? 'font-medium' : 'ml-6'}>Services Only</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Select value={pageSize.toString()} onValueChange={(val) => { setPageSize(Number(val)); setCurrentPage(1); }} modal={false}>
-          <SelectTrigger className="w-[120px] min-w-[120px] h-9">
-            <SelectValue placeholder="Page Size" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="15">15 rows</SelectItem>
-            <SelectItem value="30">30 rows</SelectItem>
-            <SelectItem value="50">50 rows</SelectItem>
-            <SelectItem value="100">100 rows</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-[120px] min-w-[120px] h-9 justify-between font-normal">
+              {pageSize} rows
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[120px]">
+            {[15, 30, 50, 100].map(size => (
+              <DropdownMenuItem key={size} onClick={() => { setPageSize(size); setCurrentPage(1); }}>
+                {pageSize === size && <Check className="mr-2 h-4 w-4" />}
+                <span className={pageSize === size ? 'font-medium' : 'ml-6'}>{size} rows</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         
         <div className="text-xs text-muted-foreground ml-auto font-medium">
           Showing {filteredItems.length} item sales
