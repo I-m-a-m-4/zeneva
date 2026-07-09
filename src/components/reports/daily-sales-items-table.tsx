@@ -44,7 +44,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const [pageSize, setPageSize] = React.useState(15);
 
   const firestore = useFirestore();
-  const { currentUserProfile } = usePOS();
+  const { currentUserProfile, business } = usePOS();
   const [dailyTransferReceived, setDailyTransferReceived] = React.useState(0);
 
   // Compute Cash and Expected Transfers for the selected day
@@ -243,7 +243,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (filteredItems.length === 0) {
       toast({ variant: 'destructive', title: 'No Data', description: 'No items available to export.' });
       return;
@@ -253,26 +253,60 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
 
     const doc = new jsPDF();
     
+    // Load DM Sans dynamically
+    let hasDMSans = false;
+    try {
+      const fontUrl = 'https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.ttf';
+      const fontResponse = await fetch(fontUrl);
+      if (fontResponse.ok) {
+        const buffer = await fontResponse.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = window.btoa(binary);
+        doc.addFileToVFS('DMSans.ttf', base64);
+        doc.addFont('DMSans.ttf', 'DMSans', 'normal');
+        doc.setFont('DMSans');
+        hasDMSans = true;
+      }
+    } catch (e) {
+      console.warn('Could not load DM Sans font, falling back to Helvetica.', e);
+    }
+
+    // Helper to print currency safely
+    const formatCurrencyForPDF = (amount: number) => {
+      // Use Naira symbol if DM Sans is loaded successfully, otherwise fall back to NGN for Helvetica
+      const prefix = hasDMSans ? '₦' : 'NGN ';
+      return `${prefix}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
     // Add Watermark
-    doc.setTextColor(240, 240, 240);
+    doc.setTextColor(242, 242, 242);
     doc.setFontSize(80);
     doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
     
-    // Add Title and Subtitle
-    doc.setTextColor(30, 30, 30);
-    doc.setFontSize(16);
-    doc.text("Daily Sales Items Log", 14, 20);
+    // Add Title and Business Name
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(18);
+    doc.text(business?.name || "Zeneva POS", 14, 18);
     
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Report Date: ${format(selectedDate, 'EEEE, MMMM d, yyyy')}`, 14, 28);
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Daily Sales Items Log", 14, 25);
     
-    // Add Summary Boxes
     doc.setFontSize(9);
-    doc.setTextColor(50, 50, 50);
-    doc.text(`Cash Sales: ${currencySymbol}${dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 14, 38);
-    doc.text(`Expected Transfers: ${currencySymbol}${dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 70, 38);
-    doc.text(`Verified Transfers: ${currencySymbol}${dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 140, 38);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Report Date: ${format(selectedDate, 'EEEE, MMMM d, yyyy')}`, 14, 31);
+    
+    // Add Summary Row (Optimized layout and letter spacing)
+    doc.setFontSize(9.5);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`Cash Sales: ${formatCurrencyForPDF(dailyCash)}`, 14, 40);
+    doc.text(`Expected Transfers: ${formatCurrencyForPDF(dailyTransferExpected)}`, 74, 40);
+    doc.text(`Verified Transfers: ${formatCurrencyForPDF(dailyTransferReceived)}`, 144, 40);
 
     const tableColumn = ["Item", "Type", "Qty", "Price", "Total Revenue", "Receipt", "Time"];
     const tableRows: any[] = [];
@@ -282,8 +316,8 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         item.name,
         item.categoryType === 'service' ? 'Service' : 'Product',
         item.quantity,
-        `${currencySymbol}${item.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-        `${currencySymbol}${item.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+        formatCurrencyForPDF(item.price),
+        formatCurrencyForPDF(item.total),
         item.receiptNumber,
         format(item.createdAt, 'HH:mm:ss')
       ];
@@ -293,17 +327,36 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 45,
+      startY: 47,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [249, 115, 22], textColor: [255, 255, 255] }, // Orange-500 branding
+      styles: { 
+        fontSize: 8, 
+        cellPadding: 3.5,
+        font: hasDMSans ? 'DMSans' : 'helvetica'
+      },
+      headStyles: { 
+        fillColor: [249, 115, 22], 
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
       alternateRowStyles: { fillColor: [250, 250, 250] },
       didDrawPage: function (data) {
         if (data.pageNumber > 1) {
-          doc.setTextColor(240, 240, 240);
+          doc.setTextColor(242, 242, 242);
           doc.setFontSize(80);
           doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
         }
+        
+        // Footer: Page Number and Link to zeneva.space
+        doc.setFontSize(8);
+        doc.setTextColor(130, 130, 130);
+        if (hasDMSans) doc.setFont('DMSans');
+        
+        // Left side page number
+        doc.text(`Page ${data.pageNumber}`, 14, doc.internal.pageSize.height - 10);
+        
+        // Right side Zeneva link
+        doc.text("Generated via zeneva.space", doc.internal.pageSize.width - 55, doc.internal.pageSize.height - 10);
       }
     });
 
