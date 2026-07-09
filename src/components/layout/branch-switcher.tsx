@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useBranch } from '@/context/branch-context';
+import { usePOS } from '@/context/pos-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Store, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,10 +15,17 @@ interface BranchSwitcherProps {
 
 export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitcherProps) {
   const { activeBranchId, setActiveBranchId, branches, isMultiBranchEnabled, isLoadingBranches } = useBranch();
+  const { currentUserProfile, business } = usePOS();
   const { state } = useSidebar();
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
 
-  if (!isMultiBranchEnabled || isLoadingBranches) return null;
+  const isOwnerOrAdmin = currentUserProfile && (
+    currentUserProfile.role === 'admin' ||
+    currentUserProfile.role === 'owner' ||
+    business?.ownerId === currentUserProfile.id
+  );
+
+  if (!isMultiBranchEnabled || isLoadingBranches || !isOwnerOrAdmin) return null;
 
   const currentBranchName = activeBranchId === 'all' 
     ? 'All Branches' 

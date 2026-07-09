@@ -125,6 +125,11 @@ import { useFCM } from '@/hooks/use-fcm';
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh, addToQueue, mutateBusiness } = usePOS();
     const hasLifetimeAccess = business?.accessLevel === 'lifetime';
+    const isOwnerOrAdmin = currentUserProfile && (
+        currentUserProfile.role === 'admin' ||
+        currentUserProfile.role === 'owner' ||
+        business?.ownerId === currentUserProfile.id
+    );
     const { promptInstall, isInstallable, isAppInstalled } = usePWA();
 
     const { permission, requestPermission, unsubscribe, fcmToken, isLoading: isFcmLoading } = useFCM();
@@ -698,23 +703,25 @@ function SettingsPageContent() {
 
 
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Multi-Branch Management</CardTitle>
-                        <CardDescription>Manage multiple store locations, warehouses, and split inventory across locations.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-muted/20">
-                            <div className="space-y-1 mb-4 sm:mb-0">
-                                <h4 className="font-semibold text-sm">Branches & Locations</h4>
-                                <p className="text-sm text-muted-foreground">Manage your physical stores and track inventory per location.</p>
+                {isOwnerOrAdmin && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Multi-Branch Management</CardTitle>
+                            <CardDescription>Manage multiple store locations, warehouses, and split inventory across locations.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-muted/20">
+                                <div className="space-y-1 mb-4 sm:mb-0">
+                                    <h4 className="font-semibold text-sm">Branches & Locations</h4>
+                                    <p className="text-sm text-muted-foreground">Manage your physical stores and track inventory per location.</p>
+                                </div>
+                                <Button asChild>
+                                    <Link href="/settings/branches">Manage Branches</Link>
+                                </Button>
                             </div>
-                            <Button asChild>
-                                <Link href="/settings/branches">Manage Branches</Link>
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
