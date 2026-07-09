@@ -43,6 +43,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeSwitcher } from '@/components/settings/theme-switcher';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
@@ -679,26 +680,12 @@ function SettingsPageContent() {
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     <div>
                                         <Label htmlFor="businessPhone">Business Phone</Label>
-                                        <div className="flex items-center mt-1 rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 shadow-xs">
-                                            <div className="flex items-center gap-1.5 px-3 py-2 bg-muted/60 border-r border-input shrink-0 select-none">
-                                                <span className="text-base leading-none" role="img" aria-label="Nigeria flag">🇳🇬</span>
-                                                <span className="text-sm font-semibold text-foreground">+234</span>
-                                            </div>
-                                            <input
-                                                id="businessPhone"
-                                                type="tel"
-                                                inputMode="numeric"
-                                                maxLength={10}
-                                                placeholder="8012345678"
-                                                value={businessPhone.replace(/^\+?234/, '').replace(/^0/, '')}
-                                                onChange={e => {
-                                                    const raw = e.target.value.replace(/\D/g, '');
-                                                    setBusinessPhone(raw ? `+234${raw}` : '');
-                                                }}
-                                                className="flex-1 h-10 px-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">Enter your 10-digit number without the leading 0 (e.g. 8012345678)</p>
+                                        <PhoneInput
+                                            id="businessPhone"
+                                            value={businessPhone}
+                                            onChange={setBusinessPhone}
+                                            className="mt-1"
+                                        />
                                     </div>
                                     <div><Label htmlFor="businessEmail">Business Email</Label><Input id="businessEmail" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)} /></div>
                                 </div>
