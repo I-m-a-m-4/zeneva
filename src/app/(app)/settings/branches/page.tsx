@@ -57,7 +57,7 @@ export default function BranchesSettingsPage() {
     const activeUsersCount = branchUsers.filter(u => {
       if (!u.lastSeen) return false;
       const date = u.lastSeen.toDate ? u.lastSeen.toDate() : new Date(u.lastSeen);
-      return (Date.now() - date.getTime()) < 5 * 60 * 1000;
+      return Math.abs(Date.now() - date.getTime()) < 15 * 60 * 1000;
     }).length;
 
     const branchProducts = (products || []).filter(p => {
@@ -278,10 +278,10 @@ export default function BranchesSettingsPage() {
               <Card 
                 key={branch.id} 
                 onClick={() => handleSelectBranch(branch.id)}
-                className={`relative overflow-hidden group border border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
+                className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
                   isCurrentlySelected 
-                    ? "border-primary ring-2 ring-primary/20 bg-primary/[0.02]" 
-                    : "border-border/80 hover:border-primary/50 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
+                    ? "border-muted-foreground/30 bg-muted/40" 
+                    : "border-border hover:border-muted-foreground/30 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
                 }`}
               >
                 {branch.isPrimary && (
@@ -291,17 +291,19 @@ export default function BranchesSettingsPage() {
                 )}
                 <CardHeader className="pb-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                      <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                        <Store className="h-4.5 w-4.5" />
-                      </div>
-                      <span className="truncate max-w-[400px]" title={branch.name}>{branch.name}</span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                          <Store className="h-4.5 w-4.5" />
+                        </div>
+                        <span className="truncate max-w-[200px] xs:max-w-[280px] sm:max-w-[400px]" title={branch.name}>{branch.name}</span>
+                      </CardTitle>
                       {isCurrentlySelected && (
-                        <span className="text-[10px] text-primary font-bold bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full select-none ml-2">
+                        <span className="text-[10px] text-primary font-bold bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap">
                           Active Branch
                         </span>
                       )}
-                    </CardTitle>
+                    </div>
                     <div className="flex items-center gap-2">
                       {stats.activeUsersCount > 0 ? (
                         <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full select-none animate-pulse">
@@ -323,44 +325,44 @@ export default function BranchesSettingsPage() {
                 </CardHeader>
                 
                 <CardContent className="pb-4">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center bg-muted/40 p-3.5 rounded-xl border border-muted/50 w-full" onClick={(e) => e.stopPropagation()}>
-                    <div className="space-y-0.5">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center justify-center gap-1 select-none">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 w-full" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Users className="h-3.5 w-3.5 text-primary/70" /> Staff
                       </p>
-                      <p className="text-sm font-extrabold text-foreground">
-                        {stats.activeUsersCount} <span className="text-xs font-normal text-muted-foreground flex items-center justify-center gap-0.5">/ {stats.usersCount} online</span>
+                      <p className="text-sm font-extrabold text-foreground mt-1">
+                        {stats.activeUsersCount} <span className="text-xs font-normal text-muted-foreground">/ {stats.usersCount} online</span>
                       </p>
                     </div>
-                    <div className="space-y-0.5 border-l border-muted-foreground/10 md:border-l pl-2">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center justify-center gap-1 select-none">
+                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Package className="h-3.5 w-3.5 text-primary/70" /> Catalog
                       </p>
-                      <p className="text-sm font-extrabold text-foreground">
+                      <p className="text-sm font-extrabold text-foreground mt-1">
                         {stats.productsCount} <span className="text-xs font-normal text-muted-foreground">items</span>
                       </p>
                     </div>
-                    <div className="space-y-0.5 border-l border-muted-foreground/10 pl-2">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center justify-center gap-1 select-none">
+                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Low Stock
                       </p>
-                      <p className={`text-sm font-extrabold ${stats.lowStockCount > 0 ? 'text-amber-500' : 'text-foreground'}`}>
+                      <p className={`text-sm font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-500' : 'text-foreground'}`}>
                         {stats.lowStockCount} <span className="text-xs font-normal text-muted-foreground">alerts</span>
                       </p>
                     </div>
-                    <div className="space-y-0.5 border-l border-muted-foreground/10 pl-2">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center justify-center gap-1 select-none">
+                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <Store className="h-3.5 w-3.5 text-primary/70" /> Txns
                       </p>
-                      <p className="text-sm font-extrabold text-foreground">
+                      <p className="text-sm font-extrabold text-foreground mt-1">
                         {stats.salesCount} <span className="text-xs font-normal text-muted-foreground">sales</span>
                       </p>
                     </div>
-                    <div className="space-y-0.5 border-l border-muted-foreground/10 pl-2">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center justify-center gap-1 select-none">
+                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center col-span-2 md:col-span-1">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
                         <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Revenue
                       </p>
-                      <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-500">
+                      <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-500 mt-1">
                         {formatSales(stats.salesVolume)}
                       </p>
                     </div>
@@ -369,16 +371,18 @@ export default function BranchesSettingsPage() {
 
                 <CardFooter className="bg-muted/30 py-3 px-6 flex justify-between items-center border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
                   <p className="text-[10px] text-muted-foreground font-semibold">ID: {branch.id.slice(0, 8)}</p>
-                  <Button 
-                     variant="ghost" 
-                     size="icon" 
-                     className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full"
-                     disabled={branch.isPrimary || isDeleting === branch.id}
-                     onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(branch.id, branch.name, branch.isPrimary); }}
-                     title={branch.isPrimary ? "Cannot delete primary branch" : "Delete branch"}
-                  >
-                    {isDeleting === branch.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  </Button>
+                  {!branch.isPrimary && (
+                    <Button 
+                       variant="ghost" 
+                       size="icon" 
+                       className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full"
+                       disabled={isDeleting === branch.id}
+                       onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(branch.id, branch.name, branch.isPrimary); }}
+                       title="Delete branch"
+                    >
+                      {isDeleting === branch.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </Button>
+                  )}
                 </CardFooter>
               </Card>
             );
