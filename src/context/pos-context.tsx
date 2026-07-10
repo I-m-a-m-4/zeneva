@@ -1643,6 +1643,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let result = { revenue: 0, count: 0, customers: 0 };
     let uniqueCustomerIds = new Set<string>();
 
+    // For a specific sub-branch, compute from already branch-filtered receipts state
+    const isSubBranch = activeBranchId && activeBranchId !== 'all' && activeBranchId !== businessId;
+    if (isSubBranch) {
+      const fromTime = from.getTime();
+      const toTime = to.getTime();
+      const targetReceipts = (receipts || []).filter(r => {
+        const rt = safeToDate(r.createdAt).getTime();
+        return rt >= fromTime && rt <= toTime;
+      });
+      result.revenue = targetReceipts.reduce((acc, r) => acc + r.total, 0);
+      result.count = targetReceipts.length;
+      targetReceipts.forEach(r => { if (r.customer?.id) uniqueCustomerIds.add(r.customer.id); });
+      result.customers = uniqueCustomerIds.size;
+      return result;
+    }
+
     const isOnline = isRealOnline;
     if (isOnline) {
       try {
@@ -1739,7 +1755,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     result.customers = uniqueCustomerIds.size;
 
     return result;
-  }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions, isRealOnline]);
+  }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions, isRealOnline, activeBranchId]);
 
   const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
     const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
@@ -2165,8 +2181,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
 
     // Sort final outputs descendingly by Date
-    return results.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
-  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline]);
+    results = results.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+
+    // Branch-filter: apply the same logic as the `receipts` useMemo
+    if (activeBranchId && activeBranchId !== 'all') {
+      results = results.filter(r => {
+        if (activeBranchId === businessId) {
+          return !r.branchId || r.branchId === businessId || r.branchId === 'all';
+        }
+        return r.branchId === activeBranchId;
+      });
+    }
+
+    return results;
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline, activeBranchId]);
 
   const currencyCode = business?.settings?.currency || 'NGN';
 
@@ -2179,7 +2207,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const isOnline = isRealOnline;
     let results: { month: string, revenue: number }[] = [];
 
-    // 1. If Online, fetch precise aggregates from Firestore
+    // For a specific sub-branch, skip Firestore aggregates (they can't filter by branchId)
+    // and compute directly from the already branch-filtered receipts state.
+    const isSubBranch = activeBranchId && activeBranchId !== 'all' && activeBranchId !== businessId;
+    if (isSubBranch) {
+      const targetReceipts = receipts || [];
+      if (targetReceipts.length > 0) {
+        const monthly: Record<string, number> = {};
+        targetReceipts.forEach(r => {
+          const date = safeToDate(r.createdAt);
+          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          monthly[key] = (monthly[key] || 0) + (r.total || 0);
+        });
+        results = Object.entries(monthly).map(([month, revenue]) => ({ month, revenue }));
+      }
+      return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
+    }
+
+    // 1. If Online, fetch precise aggregates from Firestore (primary branch / all)
     if (isOnline) {
       try {
         const now = new Date();
@@ -2254,7 +2299,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
 
     return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
-  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline]);
+  }, [businessId, firestore, syncedReceipts, receipts, queuedActions, isRealOnline, activeBranchId]);
 
 
   const value: POSContextType = useMemo(() => ({
