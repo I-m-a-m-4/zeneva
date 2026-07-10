@@ -79,6 +79,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
@@ -149,6 +150,7 @@ function InventoryPageContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const { activeBranchId } = useBranch();
   const { 
     products, 
     receipts, 
@@ -335,7 +337,12 @@ function InventoryPageContent() {
                 const newId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random();
                 addToQueue({
                     type: 'add-product',
-                    payload: { ...item, id: newId, businessId: business.id }
+                    payload: { 
+                      ...item, 
+                      id: newId, 
+                      businessId: business.id,
+                      ...(activeBranchId && activeBranchId !== 'all' ? { branchId: activeBranchId } : {})
+                    }
                 }, `Importing product: ${item.name}`);
             });
 
@@ -350,7 +357,8 @@ function InventoryPageContent() {
                     ...item,
                     businessId: business.id,
                     createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
+                    updatedAt: serverTimestamp(),
+                    ...(activeBranchId && activeBranchId !== 'all' ? { branchId: activeBranchId } : {})
                 });
             });
             await batch.commit();

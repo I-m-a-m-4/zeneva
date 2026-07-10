@@ -45,6 +45,7 @@ import {
   POS_HELD_SALES_KEY
 } from '@/lib/constants';
 import { safeToDate } from '@/lib/utils';
+import { useBranch } from './branch-context';
 
 interface POSContextType {
   business: BusinessInstance | null;
@@ -131,6 +132,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
+  const { activeBranchId } = useBranch();
 
   // --- States ---
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('zeneva_impersonated_user_id') : null));
@@ -424,9 +426,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore]);
-  const { data: onlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
+  const { data: initialOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
-  const products = useMemo(() => {
+  const allProducts = useMemo(() => {
     if (initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline && !!businessId) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
@@ -449,6 +451,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return dateB - dateA;
     });
   }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId, hasFullSyncedProducts]);
+
+  const products = useMemo(() => {
+    if (!allProducts) return null;
+    if (!activeBranchId || activeBranchId === 'all') return allProducts;
+    return allProducts.filter(p => {
+      if (activeBranchId === businessId) {
+        return !p.branchId || p.branchId === businessId || p.branchId === 'all';
+      }
+      return p.branchId === activeBranchId;
+    });
+  }, [allProducts, activeBranchId, businessId]);
 
   const profile = useMemo(() => {
     if (currentUserProfile) return currentUserProfile;
@@ -474,7 +487,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return result;
   }, [initialBusiness, offlineBusiness, queuedActions]);
 
-  const receipts = useMemo(() => {
+  const allReceipts = useMemo(() => {
     const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
     if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && !hasFullSyncedReceipts && isRealOnline && !!businessId) return null;
     
@@ -514,7 +527,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   }, [initialReceipts, syncedReceipts, queuedActions, isRealOnline, businessId, hasFullSyncedReceipts]);
 
-  const customers = useMemo(() => {
+  const receipts = useMemo(() => {
+    if (!allReceipts) return null;
+    if (!activeBranchId || activeBranchId === 'all') return allReceipts;
+    return allReceipts.filter(r => {
+      if (activeBranchId === businessId) {
+        return !r.branchId || r.branchId === businessId || r.branchId === 'all';
+      }
+      return r.branchId === activeBranchId;
+    });
+  }, [allReceipts, activeBranchId, businessId]);
+
+  const allCustomers = useMemo(() => {
     let merged = [...(initialCustomers || [])];
     const existingIds = new Set(merged.map(c => c.id));
     syncedCustomers.forEach(c => { 
@@ -560,6 +584,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
     return merged.sort((a, b) => (Number(b.totalSpent) || 0) - (Number(a.totalSpent) || 0));
   }, [initialCustomers, syncedCustomers, queuedActions]);
+
+  const customers = useMemo(() => {
+    if (!allCustomers) return null;
+    if (!activeBranchId || activeBranchId === 'all') return allCustomers;
+    return allCustomers.filter(c => {
+      if (activeBranchId === businessId) {
+        return !c.branchId || c.branchId === businessId || c.branchId === 'all';
+      }
+      return c.branchId === activeBranchId;
+    });
+  }, [allCustomers, activeBranchId, businessId]);
+
+  const onlineOrders = useMemo(() => {
+    if (!initialOnlineOrders) return [];
+    if (!activeBranchId || activeBranchId === 'all') return initialOnlineOrders;
+    return initialOnlineOrders.filter(o => {
+      if (activeBranchId === businessId) {
+        return !o.branchId || o.branchId === businessId || o.branchId === 'all';
+      }
+      return o.branchId === activeBranchId;
+    });
+  }, [initialOnlineOrders, activeBranchId, businessId]);
 
   const users = useMemo(() => {
     if (syncedUsers.length > 0) return syncedUsers;
@@ -1390,8 +1436,30 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     // --- End RBAC Check ---
 
+    // Automatically inject activeBranchId if a specific branch is selected
+    const updatedPayload = { ...action.payload };
+    if (activeBranchId && activeBranchId !== 'all') {
+      if (action.type === 'complete-sale') {
+        if (updatedPayload.receiptData && !updatedPayload.receiptData.branchId) {
+          updatedPayload.receiptData = {
+            ...updatedPayload.receiptData,
+            branchId: activeBranchId
+          };
+        }
+      } else if (action.type === 'add-product') {
+        if (!updatedPayload.branchId) {
+          updatedPayload.branchId = activeBranchId;
+        }
+      } else if (action.type === 'add-customer') {
+        if (!updatedPayload.branchId) {
+          updatedPayload.branchId = activeBranchId;
+        }
+      }
+    }
+    const actionWithBranch = { ...action, payload: updatedPayload };
+
     const id = uuidv4();
-    const newAction: QueuedAction = { ...action, description, id, timestamp: Date.now(), status: 'pending' };
+    const newAction: QueuedAction = { ...actionWithBranch, description, id, timestamp: Date.now(), status: 'pending' };
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
     
     setQueuedActions(prev => [...prev, newAction]);
