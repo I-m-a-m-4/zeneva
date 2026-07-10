@@ -202,6 +202,12 @@ export default function AuthenticatedLayout({
         setHasPermissionError(true);
         setPermissionErrorDetails(error);
       } else {
+        // Suppress non-critical permission toasts right after signup
+        const path = typeof window !== 'undefined' ? window.location.pathname : '';
+        if (path.includes('/onboarding') || path.includes('/sales/pos/select-products')) {
+          return;
+        }
+
         toast({
           variant: "destructive",
           title: "Permission Error",

@@ -178,13 +178,13 @@ export default function SignupPage() {
             </Link>
           </Button>
         </div>
-        <div className="mx-auto grid w-full max-w-[380px] gap-6">
+        <div className="mx-auto grid w-full max-w-[380px] gap-4 sm:gap-6">
           <div className="grid gap-2 text-center">
             <div className="flex items-center justify-center gap-2 mb-4">
-              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
+              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-12 sm:h-16 w-auto" />
             </div>
-            <h1 className="text-3xl font-bold">Create an account</h1>
-            <p className="text-balance text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Create an account</h1>
+            <p className="text-balance text-sm sm:text-base text-muted-foreground">
               Enter your information to create your account
             </p>
           </div>
