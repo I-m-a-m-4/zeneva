@@ -59,6 +59,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 
 
 function UserRowSkeleton() {
@@ -151,6 +152,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [openMenuUserId, setOpenMenuUserId] = React.useState<string | null>(null);
 
     const { business: businessInstance, currentUserProfile, isLoading: isPosLoading, users } = usePOS();
+    const { activeBranchId } = useBranch();
     const areUsersLoading = false; // Handled by root lifecycle
 
     const invitationsQuery = useMemoFirebase(() => {
@@ -160,17 +162,37 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
     const forceRefresh = triggerRefresh; // Bind locally
 
+    const displayInvitations = React.useMemo(() => {
+        if (!invitations) return [];
+        if (!activeBranchId || activeBranchId === 'all') return invitations;
+        return invitations.filter(inv => {
+            if (activeBranchId === businessId) {
+                return !inv.branchId || inv.branchId === businessId || inv.branchId === 'all';
+            }
+            return inv.branchId === activeBranchId;
+        });
+    }, [invitations, activeBranchId, businessId]);
+
     const isLoading = isPosLoading || areUsersLoading || areInvitationsLoading;
 
     const staffUsers = React.useMemo(() => {
         if (!users) return [];
+        let filtered = users;
+        if (activeBranchId && activeBranchId !== 'all') {
+            filtered = users.filter(u => {
+                if (activeBranchId === businessId) {
+                    return !u.branchId || u.branchId === businessId || u.branchId === 'all';
+                }
+                return u.branchId === activeBranchId;
+            });
+        }
         // Sort current logged-in user to the top of the list, then sort others alphabetically by name
-        return [...users].sort((a, b) => {
+        return [...filtered].sort((a, b) => {
             if (a.id === currentUserId) return -1;
             if (b.id === currentUserId) return 1;
             return (a.name || '').localeCompare(b.name || '');
         });
-    }, [users, currentUserId]);
+    }, [users, currentUserId, activeBranchId, businessId]);
 
     const totalUsers = (users?.length || 0) + (invitations?.length || 0);
     const planLimit = businessInstance?.plan === 'business' ? 1000000 : (businessInstance?.plan === 'pro' ? 5 : 1);
@@ -467,7 +489,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     <CardContent>
                         {isLoading ? (
                             <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
-                        ) : invitations && invitations.length > 0 ? (
+                        ) : displayInvitations && displayInvitations.length > 0 ? (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -478,7 +500,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {invitations.map(invitation => (
+                                    {displayInvitations.map(invitation => (
                                         <TableRow key={invitation.id}>
                                             <TableCell className="font-medium">{invitation.email}</TableCell>
                                             <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>

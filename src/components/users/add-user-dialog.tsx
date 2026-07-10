@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { sendInvitationEmail } from '@/lib/email';
 import { v4 as uuidv4 } from 'uuid';
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 
 interface AddUserDialogProps {
     isOpen: boolean;
@@ -48,6 +49,7 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
     const { toast } = useToast();
     const firestore = useFirestore();
     const { business } = usePOS();
+    const { activeBranchId } = useBranch();
     const [isSubmitting, setIsSubmitting] = React.useState(false);
 
     const plan = business?.plan || 'starter';
@@ -111,6 +113,7 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
             await setDoc(invitationRef, {
                 ...values,
                 businessId,
+                branchId: (activeBranchId && activeBranchId !== 'all') ? activeBranchId : undefined,
                 createdAt: serverTimestamp(),
             });
 

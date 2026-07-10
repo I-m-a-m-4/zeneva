@@ -370,6 +370,7 @@ export interface Invitation {
     name: string;
     role: 'manager' | 'vendor_operator';
     createdAt: any; // Firestore timestamp
+    branchId?: string;
 }
 
 export interface Purchase {
