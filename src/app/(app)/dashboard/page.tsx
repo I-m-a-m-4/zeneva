@@ -417,7 +417,7 @@ export default function DashboardPage() {
       setDashboardBatchReceipts([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFromTime, dateToTime]);
+  }, [dateFromTime, dateToTime, fetchDetailedAnalytics, fetchReceiptsInRange]);
 
   // Merge range stats into dashboard calculations
   const finalDashboardData = React.useMemo(() => {

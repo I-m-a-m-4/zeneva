@@ -244,7 +244,7 @@ export default function ReportsDashboard() {
             setRangeStats(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFromTime, dateToTime]);
+    }, [dateFromTime, dateToTime, fetchDetailedAnalytics]);
 
     React.useEffect(() => {
         if (dateFromTime && dateToTime) {
@@ -271,7 +271,7 @@ export default function ReportsDashboard() {
             fetchBatch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFromTime, dateToTime]);
+    }, [dateFromTime, dateToTime, fetchReceiptsInRange]);
 
     React.useEffect(() => {
         const fetchHistory = async () => {
