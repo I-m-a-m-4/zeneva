@@ -41,6 +41,7 @@ export const createUserProfileDocument = async (
       
     let businessId: string;
     let userRole: UserRole;
+    let branchId: string | undefined;
     let surveyCompleted = true; // Default for invited users
 
     if (invitationCode) {
@@ -59,6 +60,7 @@ export const createUserProfileDocument = async (
 
       businessId = invitationData.businessId;
       userRole = invitationData.role;
+      branchId = invitationData.branchId;
       batch.delete(invDocRef);
     } else {
       const invitationQuery = query(collection(firestore, 'invitations'), where('email', '==', user.email));
@@ -90,6 +92,7 @@ export const createUserProfileDocument = async (
       phone: phone || '',
       createdAt: serverTimestamp(),
       businessId: businessId,
+      branchId: branchId,
       role: userRole,
       surveyCompleted: surveyCompleted,
       status: 'active',
