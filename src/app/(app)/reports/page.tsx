@@ -248,6 +248,8 @@ export default function ReportsDashboard() {
 
     React.useEffect(() => {
         if (dateFromTime && dateToTime) {
+            // Clear stale data immediately so old branch data doesn't flash while loading
+            setReportBatchReceipts([]);
             const fetchBatch = async () => {
                 setIsFetchingBatch(true);
                 const timeout = setTimeout(() => {

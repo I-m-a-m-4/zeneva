@@ -21,8 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil } from "lucide-react";
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, writeBatch, query, collection, where } from 'firebase/firestore';
+
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
@@ -99,7 +98,6 @@ export default function CustomersPage() {
     isFullSyncingCustomers,
     searchCustomers
   } = usePOS();
-  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -114,20 +112,19 @@ export default function CustomersPage() {
   const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
 
-  // Fetch ALL customers for this page without limits
-  const allCustomersQuery = useMemoFirebase(() => (business?.id && firestore ? query(collection(firestore, "customers"), where("businessId", "==", business.id)) : null), [business?.id, firestore]);
-  const { data: allCustomers, isLoading: isLoadingAllCustomers } = useCollection<Customer>(allCustomersQuery);
+  // Customers are fetched and branch-filtered by pos-context (via `customers`).
+  // We do NOT run a separate Firestore query here as it would bypass branch filtering.
 
   const [isDataLoaded, setIsDataLoaded] = React.useState(false);
   
 
 
-  // Use allCustomers if available, otherwise fallback to the POS context customers
-  const displayCustomers = isNative ? customers : (allCustomers || customers);
+  // Always use the branch-filtered customers from POS context
+  const displayCustomers = customers;
   
   const isLoading = isNative 
     ? (isPosLoading && (!customers || customers.length === 0))
-    : (isPosLoading || isLoadingAllCustomers || (!isDataLoaded && displayCustomers === null));
+    : isPosLoading;
 
   // Prevent flicker of "No Customers Found"
   React.useEffect(() => {
