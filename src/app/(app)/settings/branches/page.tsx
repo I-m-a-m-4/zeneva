@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBranch } from '@/context/branch-context';
 import { usePOS } from '@/context/pos-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/types';
 
 export default function BranchesSettingsPage() {
+  const router = useRouter();
   const { branches, isMultiBranchEnabled, isLoadingBranches, activeBranchId, setActiveBranchId } = useBranch();
   const { business, products, receipts, currencySymbol, currentUserProfile } = usePOS();
   const firestore = useFirestore();
@@ -150,7 +152,7 @@ export default function BranchesSettingsPage() {
         createdAt: serverTimestamp(),
       };
 
-      await addDoc(collection(firestore, 'branches'), newBranch);
+      const docRef = await addDoc(collection(firestore, 'branches'), newBranch);
       
       // If this is the first branch being created, enable multi-branch on the business instance
       if (!business.settings?.multiBranchEnabled) {
@@ -168,10 +170,14 @@ export default function BranchesSettingsPage() {
       setNewBranchAddress('');
       setIsDialogOpen(false);
       
-      // The BranchProvider will automatically pick up the new branch on its next snapshot or we might need to force a refresh if it's not a realtime listener.
-      // Wait, BranchProvider uses getDocs, not onSnapshot. We might need a way to refresh it.
-      // For now, let's just let the user refresh or we can update the context to use onSnapshot later.
-      window.location.reload(); 
+      // Switch active branch to the newly created branch
+      setActiveBranchId(docRef.id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('zeneva_active_branch', docRef.id);
+      }
+
+      // Take the user straight to the dashboard which will display fresh stats for this new branch!
+      router.push('/');
       
     } catch (err: any) {
       console.error(err);
