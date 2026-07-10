@@ -140,6 +140,19 @@ const CartContents = () => {
         deleteHeldSale
     } = usePOS();
 
+    // Suppress SSR/client hydration mismatch: cart is read from localStorage which
+    // doesn't exist on the server. Render a neutral placeholder until mounted.
+    const [isMounted, setIsMounted] = React.useState(false);
+    React.useEffect(() => { setIsMounted(true); }, []);
+
+    if (!isMounted) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8">
+                <ShoppingCart className="h-12 w-12 opacity-20" />
+            </div>
+        );
+    }
+
     return (
         <>
             {cart.length === 0 ? (
