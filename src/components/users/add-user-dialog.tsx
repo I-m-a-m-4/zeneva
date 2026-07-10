@@ -117,7 +117,9 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
                 createdAt: serverTimestamp(),
             });
 
-            const invitationLink = `${window.location.origin}/signup?invitationCode=${invitationCode}`;
+            const isDesktopOrLocal = window.location.origin.includes('localhost') || window.location.origin.includes('tauri.localhost') || window.location.origin.includes('127.0.0.1');
+            const baseUrl = isDesktopOrLocal ? 'https://zeneva.space' : window.location.origin;
+            const invitationLink = `${baseUrl}/signup?invitationCode=${invitationCode}`;
 
             try {
                 await sendInvitationEmail({
