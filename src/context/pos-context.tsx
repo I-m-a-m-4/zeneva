@@ -1898,7 +1898,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return; 
     }
     if (effectiveUserId !== lastUserId) { 
-      if (lastUserId) resetPOS(); 
+      if (lastUserId) {
+        // A different user has logged in — wipe ALL cached data from the previous business
+        // to prevent data bleeding between accounts
+        nuclearReset();
+        hasHydratedRef.current = false; // Allow the new user's data to be hydrated
+      }
       setLastUserId(effectiveUserId); 
     }
     
