@@ -99,7 +99,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
             <SelectValue placeholder="Select Branch" />
           </div>
         </SelectTrigger>
-        <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false}>
+        <SelectContent position="popper" side="bottom" align="start" sideOffset={4} avoidCollisions={false}>
           <SelectItem value="all" className="font-semibold text-primary">All Branches</SelectItem>
           {branches.map(branch => (
             <SelectItem key={branch.id} value={branch.id}>
