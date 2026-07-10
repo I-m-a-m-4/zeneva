@@ -1470,7 +1470,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     
     return id;
-  }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline]);
+  }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline, activeBranchId]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     // If there's an image, we handle it. Ideally in background but for now let's just queue the data.

@@ -383,6 +383,17 @@ function CustomerDetailContent() {
                                     </div>
                                     <Wallet className="h-6 w-6 opacity-50" />
                                 </div>
+                                {displayCustomer.createdAt && (
+                                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                                        <History className="h-3.5 w-3.5 shrink-0" />
+                                        <span>
+                                            Member since{' '}
+                                            <span className="font-medium text-foreground">
+                                                {format(safeToDate(displayCustomer.createdAt), 'dd MMM yyyy')}
+                                            </span>
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </CardContent>
