@@ -87,6 +87,20 @@ export async function POST(request: Request) {
         const fetchCustData = await fetchCustResponse.json();
         if (fetchCustData.status) {
           customerCode = fetchCustData.data.customer_code;
+          
+          // Ensure the existing customer has the phone number attached, as it is required for DVA
+          await fetch(`https://api.paystack.co/customer/${customerCode}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: authHeader,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              first_name: businessName,
+              last_name: 'Terminal Store',
+              phone: phone,
+            }),
+          });
         }
       } else if (!customerResponse.ok || !customerData.status) {
         return NextResponse.json({ message: customerData.message || 'Failed to create Paystack customer.' }, { status: customerResponse.status });
