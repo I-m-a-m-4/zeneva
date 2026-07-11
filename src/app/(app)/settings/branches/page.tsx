@@ -14,6 +14,37 @@ import { useFirestore } from '@/firebase';
 import { Store, MapPin, Plus, Trash2, Loader2, AlertTriangle, Users, Package, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/types';
+import { cn } from '@/lib/utils';
+
+const MOCK_BRANCHES: Branch[] = [
+  {
+    id: "mock-branch-1",
+    businessId: "mock-biz-id",
+    name: "Main Store (Downtown)",
+    address: "Plot 12, Broad Street, Lagos",
+    isPrimary: true,
+    isActive: true,
+    createdAt: null
+  },
+  {
+    id: "mock-branch-2",
+    businessId: "mock-biz-id",
+    name: "Lekki Phase 1 Outlet",
+    address: "Block 8, Admiralty Way, Lekki",
+    isPrimary: false,
+    isActive: true,
+    createdAt: null
+  },
+  {
+    id: "mock-branch-3",
+    businessId: "mock-biz-id",
+    name: "Main Warehouse (Storage)",
+    address: "Ikeja Industrial Estate, Lagos",
+    isPrimary: false,
+    isActive: true,
+    createdAt: null
+  }
+];
 
 export default function BranchesSettingsPage() {
   const router = useRouter();
@@ -106,6 +137,24 @@ export default function BranchesSettingsPage() {
       salesCount: branchReceipts.length,
       salesVolume,
     };
+  };
+
+  const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
+
+  const displayedBranches = isBusinessPlan ? branches : MOCK_BRANCHES;
+  const displayedActiveBranchId = isBusinessPlan ? activeBranchId : 'mock-branch-1';
+
+  const getBranchStatsOverride = (branchId: string, isPrimary: boolean) => {
+    if (!isBusinessPlan) {
+      if (branchId === 'mock-branch-1') {
+        return { usersCount: 5, activeUsersCount: 4, productsCount: 1240, lowStockCount: 12, salesCount: 890, salesVolume: 45000000 };
+      }
+      if (branchId === 'mock-branch-2') {
+        return { usersCount: 3, activeUsersCount: 2, productsCount: 820, lowStockCount: 5, salesCount: 340, salesVolume: 18500000 };
+      }
+      return { usersCount: 2, activeUsersCount: 1, productsCount: 2500, lowStockCount: 0, salesCount: 0, salesVolume: 0 };
+    }
+    return getBranchStats(branchId, isPrimary);
   };
 
   const formatSales = (amount: number) => {
@@ -223,14 +272,15 @@ export default function BranchesSettingsPage() {
   };
 
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Branch Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Create and manage multiple store locations for your business.
-          </p>
-        </div>
+    <div className="relative space-y-6 w-full max-w-full overflow-hidden min-h-[70vh]">
+      <div className={cn("space-y-6 w-full max-w-full transition-all duration-500", !isBusinessPlan && "blur-[3px] pointer-events-none select-none opacity-40")}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Branch Management</h1>
+            <p className="text-muted-foreground mt-1">
+              Create and manage multiple store locations for your business.
+            </p>
+          </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -277,196 +327,252 @@ export default function BranchesSettingsPage() {
         </Dialog>
       </div>
 
-      <div className="flex flex-col gap-4 w-full">
-        {isLoadingBranches ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-            <p className="text-sm text-muted-foreground">Loading branches...</p>
-          </div>
-        ) : branches.length === 0 ? (
-           <Card className="border-dashed w-full">
-             <CardContent className="flex flex-col items-center justify-center h-64 text-center">
-               <Store className="h-12 w-12 text-muted-foreground/30 mb-4" />
-               <h3 className="text-xl font-bold mb-2">No branches yet</h3>
-               <p className="text-muted-foreground max-w-sm mb-6">
-                 You are currently operating as a single-location business. Add a branch to enable multi-location features.
-               </p>
-               <Button onClick={() => setIsDialogOpen(true)} variant="outline">
-                 Get Started
-               </Button>
-             </CardContent>
-           </Card>
-        ) : (
-          branches.map((branch) => {
-            const stats = getBranchStats(branch.id, branch.isPrimary);
-            const isCurrentlySelected = activeBranchId === branch.id;
-            return (
-              <Card 
-                key={branch.id} 
-                onClick={() => handleSelectBranch(branch.id)}
-                className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
-                  isCurrentlySelected 
-                    ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20" 
-                    : "border-border hover:border-muted-foreground/30 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
-                }`}
-              >
-                {branch.isPrimary && (
-                  <div className="absolute top-0 right-0 bg-primary/95 text-primary-foreground text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm z-10">
-                    Primary
-                  </div>
-                )}
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                        <div className={`p-1.5 rounded-lg ${isCurrentlySelected ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
-                          <Store className="h-4.5 w-4.5" />
-                        </div>
-                        <span className="truncate max-w-[200px] xs:max-w-[280px] sm:max-w-[400px]" title={branch.name}>{branch.name}</span>
-                      </CardTitle>
-                      {isCurrentlySelected && (
-                        <span className="flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/15 border border-primary/30 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap shadow-2xs">
-                          <CheckCircle2 className="h-3 w-3" /> Active Branch
-                        </span>
-                      )}
+        <div className="flex flex-col gap-4 w-full">
+          {isLoadingBranches && isBusinessPlan ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+              <p className="text-sm text-muted-foreground">Loading branches...</p>
+            </div>
+          ) : displayedBranches.length === 0 ? (
+            <Card className="border-dashed w-full">
+              <CardContent className="flex flex-col items-center justify-center h-64 text-center">
+                <Store className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <h3 className="text-xl font-bold mb-2">No branches yet</h3>
+                <p className="text-muted-foreground max-w-sm mb-6">
+                  You are currently operating as a single-location business. Add a branch to enable multi-location features.
+                </p>
+                <Button onClick={() => setIsDialogOpen(true)} variant="outline">
+                  Get Started
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            displayedBranches.map((branch) => {
+              const stats = getBranchStatsOverride(branch.id, branch.isPrimary);
+              const isCurrentlySelected = displayedActiveBranchId === branch.id;
+              return (
+                <Card
+                  key={branch.id}
+                  onClick={() => isBusinessPlan && handleSelectBranch(branch.id)}
+                  className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
+                    isCurrentlySelected
+                      ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/30 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
+                  }`}
+                >
+                  {branch.isPrimary && (
+                    <div className="absolute top-0 right-0 bg-primary/95 text-primary-foreground text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm z-10">
+                      Primary
                     </div>
-                    <div className="flex items-center gap-2">
-                      {stats.activeUsersCount > 0 ? (
-                        <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full select-none animate-pulse">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          {stats.activeUsersCount} Active Now
+                  )}
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                          <div className={`p-1.5 rounded-lg ${isCurrentlySelected ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                            <Store className="h-4.5 w-4.5" />
+                          </div>
+                          <span className="truncate max-w-[200px] xs:max-w-[280px] sm:max-w-[400px]" title={branch.name}>{branch.name}</span>
+                        </CardTitle>
+                        {isCurrentlySelected && (
+                          <span className="flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/15 border border-primary/30 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap shadow-2xs">
+                            <CheckCircle2 className="h-3 w-3" /> Active Branch
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {stats.activeUsersCount > 0 ? (
+                          <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full select-none animate-pulse">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            {stats.activeUsersCount} Active Now
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold bg-muted/60 px-2.5 py-0.5 rounded-full select-none">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                            Idle
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <CardDescription className="flex items-start gap-2 pt-1.5 text-xs leading-relaxed">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 mt-0.5" />
+                      <span>{branch.address || 'No address registered'}</span>
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="pb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 w-full" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
+                          <Users className="h-3.5 w-3.5 text-primary/70" /> Staff
+                        </p>
+                        <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                          {stats.activeUsersCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">/ {stats.usersCount} online</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
+                          <Package className="h-3.5 w-3.5 text-primary/70" /> Catalog
+                        </p>
+                        <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                          {stats.productsCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">items</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Low Stock
+                        </p>
+                        <p className={`text-sm font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-black dark:text-white'}`}>
+                          {stats.lowStockCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">alerts</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
+                          <Store className="h-3.5 w-3.5 text-primary/70" /> Txns
+                        </p>
+                        <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                          {stats.salesCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">sales</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center col-span-2 md:col-span-1">
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Revenue
+                        </p>
+                        <p className="text-sm font-extrabold text-black dark:text-white mt-1">
+                          {formatSales(stats.salesVolume)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+
+                  <CardFooter className="bg-muted/30 py-3 px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                      <p className="text-[10px] text-black/70 dark:text-white/70 font-semibold">ID: {branch.id.slice(0, 8)}</p>
+                      {isCurrentlySelected ? (
+                        <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 w-full sm:w-auto">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Currently Operating Branch
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold bg-muted/60 px-2.5 py-0.5 rounded-full select-none">
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
-                          Idle
-                        </span>
+                        <Button size="sm" variant="outline" className="text-xs font-bold border-primary/40 text-primary hover:bg-primary hover:text-white h-8 w-full sm:w-auto" onClick={() => handleSelectBranch(branch.id)}>
+                          Switch to this Branch
+                        </Button>
                       )}
                     </div>
-                  </div>
-                  <CardDescription className="flex items-start gap-2 pt-1.5 text-xs leading-relaxed">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 mt-0.5" />
-                    <span>{branch.address || 'No address registered'}</span>
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="pb-4">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 w-full" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                        <Users className="h-3.5 w-3.5 text-primary/70" /> Staff
-                      </p>
-                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
-                        {stats.activeUsersCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">/ {stats.usersCount} online</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                        <Package className="h-3.5 w-3.5 text-primary/70" /> Catalog
-                      </p>
-                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
-                        {stats.productsCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">items</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Low Stock
-                      </p>
-                      <p className={`text-sm font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-black dark:text-white'}`}>
-                        {stats.lowStockCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">alerts</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                        <Store className="h-3.5 w-3.5 text-primary/70" /> Txns
-                      </p>
-                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
-                        {stats.salesCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">sales</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center col-span-2 md:col-span-1">
-                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                        <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Revenue
-                      </p>
-                      <p className="text-sm font-extrabold text-black dark:text-white mt-1">
-                        {formatSales(stats.salesVolume)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-
-                <CardFooter className="bg-muted/30 py-3 px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-t border-muted/20" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-                    <p className="text-[10px] text-black/70 dark:text-white/70 font-semibold">ID: {branch.id.slice(0, 8)}</p>
-                    {isCurrentlySelected ? (
-                      <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 w-full sm:w-auto">
-                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Currently Operating Branch
-                      </span>
-                    ) : (
-                      <Button size="sm" variant="outline" className="text-xs font-bold border-primary/40 text-primary hover:bg-primary hover:text-white h-8 w-full sm:w-auto" onClick={() => handleSelectBranch(branch.id)}>
-                        Switch to this Branch
+                    {!branch.isPrimary && isBusinessPlan && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full self-end sm:self-auto shrink-0"
+                        disabled={isDeleting === branch.id}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(branch.id, branch.name, branch.isPrimary); }}
+                        title="Delete branch"
+                      >
+                        {isDeleting === branch.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     )}
-                  </div>
-                  {!branch.isPrimary && (
-                    <Button 
-                       variant="ghost" 
-                       size="icon" 
-                       className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full self-end sm:self-auto shrink-0"
-                       disabled={isDeleting === branch.id}
-                       onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(branch.id, branch.name, branch.isPrimary); }}
-                       title="Delete branch"
-                    >
-                      {isDeleting === branch.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                  </CardFooter>
+                </Card>
+              );
+            })
+          )}
+        </div>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-md border-2 border-destructive/20 bg-background shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2 font-bold text-xl">
-              <AlertTriangle className="h-5 w-5" />
-              Delete Branch
-            </DialogTitle>
-            <DialogDescription className="text-sm pt-2 text-muted-foreground">
-              This action is permanent and cannot be undone. It will permanently delete the branch <strong className="text-foreground">{branchToDelete?.name}</strong> and could orphan sales or inventory records connected to it.
-              <br /><br />
-              To confirm, please type the exact name of your business: <strong className="text-foreground">{business?.name}</strong>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="confirmBusiness" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Business Name</Label>
-              <Input
-                id="confirmBusiness"
-                placeholder="Type your business name here"
-                value={confirmBusinessName}
-                onChange={(e) => setConfirmBusinessName(e.target.value)}
-                className="border-destructive/35 focus-visible:ring-destructive"
-              />
+        {deleteConfirmOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 z-40"
+            onClick={() => setDeleteConfirmOpen(false)}
+          />
+        )}
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen} modal={false}>
+          <DialogContent className="max-w-md border-2 border-destructive/20 bg-background shadow-2xl z-50">
+            <DialogHeader>
+              <DialogTitle className="text-destructive flex items-center gap-2 font-bold text-xl">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Branch
+              </DialogTitle>
+              <DialogDescription className="text-sm pt-2 text-muted-foreground">
+                This action is permanent and cannot be undone. It will permanently delete the branch <strong className="text-foreground">{branchToDelete?.name}</strong> and could orphan sales or inventory records connected to it.
+                <br /><br />
+                To confirm, please type the exact name of your business: <strong className="text-foreground">{business?.name}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="confirmBusiness" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Business Name</Label>
+                <Input
+                  id="confirmBusiness"
+                  placeholder="Type your business name here"
+                  value={confirmBusinessName}
+                  onChange={(e) => setConfirmBusinessName(e.target.value)}
+                  className="border-destructive/35 focus-visible:ring-destructive"
+                />
+              </div>
             </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleConfirmDelete} 
-              disabled={confirmBusinessName.trim() !== business?.name?.trim() || isDeleting !== null}
-            >
-              {isDeleting === branchToDelete?.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete Branch
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                disabled={confirmBusinessName.trim() !== business?.name?.trim() || isDeleting !== null}
+              >
+                {isDeleting === branchToDelete?.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete Branch
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>{/* end blur wrapper */}
+
+      {!isBusinessPlan && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] pointer-events-auto">
+          <Card className="w-full max-w-lg border-2 border-primary/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+            <CardHeader className="text-center pt-8 pb-4">
+              <div className="mx-auto mb-6 relative">
+                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 animate-pulse" />
+                <div className="relative z-10 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Store className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <CardTitle className="text-3xl font-black tracking-tight text-foreground">
+                Multi-Branch Management
+              </CardTitle>
+              <CardDescription className="text-base mt-2 px-6">
+                Scale your business across multiple locations. Assign staff, inventory, and track sales per branch — all from one dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-8 pb-8 space-y-6">
+              <div className="p-5 rounded-2xl bg-muted/40 border border-border/50">
+                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider font-mono">Business Plan Features</h4>
+                <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Unlimited Branches</strong>: Add as many store locations or warehouses as you need.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Per-Branch Inventory</strong>: Manage separate stock levels for each location.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Staff Assignment</strong>: Assign operators to specific branches for access control.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Consolidated Reports</strong>: View cross-branch analytics in one place.</span>
+                  </li>
+                </ul>
+              </div>
+              <Button asChild className="w-full h-12 shadow-lg font-bold hover:scale-[1.02] active:scale-95 transition-all duration-300">
+                <a href="/billing">
+                  Upgrade to Business Plan
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

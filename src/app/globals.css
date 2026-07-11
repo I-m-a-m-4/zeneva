@@ -636,14 +636,38 @@ body {
 /* Prevent Radix UI / react-remove-scroll scroll-lock from shifting the viewport layout */
 :root, [data-scroll-locked], body, html {
   --removed-body-scroll-width: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+html, body, #app-main-content {
+  scrollbar-gutter: stable !important;
 }
 
 body[data-scroll-locked],
-html[data-scroll-locked],
-body[style*="margin-right"],
-html[style*="margin-right"],
-body[style*="padding-right"],
-html[style*="padding-right"] {
+html[data-scroll-locked] {
   margin-right: 0px !important;
   padding-right: 0px !important;
+}
+
+/* Neutralize inline padding/margin shift on all fixed, sticky, and sidebar elements */
+body[data-scroll-locked] .fixed,
+body[data-scroll-locked] .sticky,
+body[data-scroll-locked] header,
+body[data-scroll-locked] nav,
+body[data-scroll-locked] aside,
+body[data-scroll-locked] [data-sidebar="sidebar"],
+body[data-scroll-locked] [style*="padding-right"],
+body[data-scroll-locked] [style*="margin-right"],
+html[style*="overflow: hidden"] .fixed,
+html[style*="overflow: hidden"] .sticky,
+html[style*="overflow: hidden"] header,
+html[style*="overflow: hidden"] nav,
+html[style*="overflow: hidden"] aside,
+html[style*="overflow: hidden"] [data-sidebar="sidebar"],
+html[style*="overflow: hidden"] [style*="padding-right"],
+html[style*="overflow: hidden"] [style*="margin-right"],
+[data-radix-portal] [style*="padding-right"],
+[data-radix-portal] [style*="margin-right"] {
+  padding-right: 0px !important;
+  margin-right: 0px !important;
 }

@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import html2canvas from 'html2canvas';
 import { Progress } from '@/components/ui/progress';
@@ -93,6 +94,7 @@ export default function DashboardPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
   const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange } = usePOS();
+  const { activeBranchId } = useBranch();
 
   // Date range state, defaults to today
   const [date, setDate] = React.useState<DateRange | undefined>({
@@ -320,17 +322,19 @@ export default function DashboardPage() {
     // Default to lifetime stats if no range is selected or if it's broad
     const showLifetime = !date?.from || !date?.to;
 
+    const useGlobalStats = showLifetime && (!activeBranchId || activeBranchId === 'all');
+
     return {
       totalStock,
       uniqueSkus,
       lowStockItems,
-      totalSalesValue: showLifetime ? (stats?.totalRevenue || 0) : totalSalesValue,
-      totalReceipts: showLifetime ? (stats?.totalSales || 0) : totalReceiptsCount,
+      totalSalesValue: useGlobalStats ? (stats?.totalRevenue || 0) : totalSalesValue,
+      totalReceipts: useGlobalStats ? (stats?.totalSales || 0) : totalReceiptsCount,
       totalOnlineSalesValue,
       totalOnlineOrdersCount,
-      totalRevenue: showLifetime ? (stats?.totalRevenue || 0) : totalRevenue,
-      newCustomersCount: showLifetime ? (stats?.totalCustomers || 0) : newCustomers.length,
-      totalUnitsSold: showLifetime ? (stats?.totalUnitsSold || 0) : totalUnitsSold,
+      totalRevenue: useGlobalStats ? (stats?.totalRevenue || 0) : totalRevenue,
+      newCustomersCount: useGlobalStats ? (stats?.totalCustomers || 0) : newCustomers.length,
+      totalUnitsSold: useGlobalStats ? (stats?.totalUnitsSold || 0) : totalUnitsSold,
 
       topSellingItems,
       topLoyaltyCustomers,
@@ -343,7 +347,7 @@ export default function DashboardPage() {
       serviceRevenue,
       productRevenue
     };
-  }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts]);
+  }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts, activeBranchId]);
 
   // Surgical Analytics for Date Range
   const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);

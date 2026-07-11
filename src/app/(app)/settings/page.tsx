@@ -22,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import FeatureGate from '@/components/shared/feature-gate';
@@ -85,6 +87,23 @@ const months = [
 
 const industries = [
     'Retail & E-commerce', 'Fashion & Apparel', 'Electronics', 'Food & Beverage', 'Health & Beauty', 'Home & Furniture', 'Other'
+];
+
+const GLOBAL_COUNTRIES = [
+    "Nigeria",
+    "United States",
+    "United Kingdom",
+    "Canada",
+    "Australia",
+    "Germany",
+    "France",
+    "South Africa",
+    "Kenya",
+    "Ghana",
+    "United Arab Emirates",
+    "Saudi Arabia",
+    "India",
+    "Switzerland"
 ];
 
 function SettingsPageSkeleton() {
@@ -426,7 +445,7 @@ function SettingsPageContent() {
                 "settings.timezone": timezone,
                 "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0,
                 "settings.paymentBankCode": paymentBankCode,
-                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || '',
+                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || paymentBankCode || '',
                 "settings.paymentBankAccountId": paymentBankAccountId,
                 "settings.paymentAccountName": paymentAccountName,
                 "settings.paymentInstructions": paymentInstructions,
@@ -453,14 +472,14 @@ function SettingsPageContent() {
 
         setIsVerifyingBvn(true);
         try {
+            const storeEmail = currentUserProfile?.email || `terminal-${business?.id?.substring(0, 8)}@zeneva.space`;
             const response = await fetch('/api/paystack/verify-customer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     businessId: business?.id,
                     bvn: bvn,
-                    email: currentUserProfile?.email || '',
-                    customerCode: business?.settings?.paystackSubaccountCode // Or whatever customer code they use
+                    email: storeEmail
                 })
             });
 
@@ -496,7 +515,7 @@ function SettingsPageContent() {
                 "settings.timezone": timezone,
                 "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0,
                 "settings.paymentBankCode": paymentBankCode,
-                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || '',
+                "settings.paymentBankName": NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || paymentBankCode || '',
                 "settings.paymentBankAccountId": paymentBankAccountId,
                 "settings.paymentAccountName": paymentAccountName,
                 "settings.paymentInstructions": paymentInstructions,
@@ -874,27 +893,45 @@ function SettingsPageContent() {
                         <div className="grid md:grid-cols-3 gap-4">
                             <div>
                                 <Label>Currency</Label>
-                                <Select value={currency} onValueChange={setCurrency}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="NGN">NGN (₦)</SelectItem>
-                                        <SelectItem value="USD">USD ($)</SelectItem>
-                                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                                        <SelectItem value="CAD">CAD ($)</SelectItem>
-                                        <SelectItem value="AUD">AUD ($)</SelectItem>
-                                        <SelectItem value="GHS">GHS (GH¢)</SelectItem>
-                                        <SelectItem value="ZAR">ZAR (R)</SelectItem>
-                                        <SelectItem value="KES">KES (KSh)</SelectItem>
-                                        <SelectItem value="JPY">JPY (¥)</SelectItem>
-                                        <SelectItem value="CNY">CNY (¥)</SelectItem>
-                                        <SelectItem value="INR">INR (₹)</SelectItem>
-                                        <SelectItem value="BRL">BRL (R$)</SelectItem>
-                                        <SelectItem value="CHF">CHF (Fr)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                            <span>{currency || "Select currency"}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                        <DropdownMenuItem onClick={() => setCurrency("NGN")} className="cursor-pointer">NGN (₦)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("USD")} className="cursor-pointer">USD ($)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("EUR")} className="cursor-pointer">EUR (€)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("GBP")} className="cursor-pointer">GBP (£)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("CAD")} className="cursor-pointer">CAD ($)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("AUD")} className="cursor-pointer">AUD ($)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("GHS")} className="cursor-pointer">GHS (GH¢)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("ZAR")} className="cursor-pointer">ZAR (R)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("KES")} className="cursor-pointer">KES (KSh)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("JPY")} className="cursor-pointer">JPY (¥)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("CNY")} className="cursor-pointer">CNY (¥)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("INR")} className="cursor-pointer">INR (₹)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("BRL")} className="cursor-pointer">BRL (R$)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("CHF")} className="cursor-pointer">CHF (Fr)</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
-                            <div><Label>Timezone</Label><Select value={timezone} onValueChange={setTimezone}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Africa/Lagos">Africa/Lagos</SelectItem></SelectContent></Select></div>
+                            <div>
+                                <Label>Timezone</Label>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                            <span>{timezone || "Select timezone"}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                        <DropdownMenuItem onClick={() => setTimezone("Africa/Lagos")} className="cursor-pointer">Africa/Lagos</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>
                         <Separator />
@@ -907,22 +944,69 @@ function SettingsPageContent() {
                         >
                             <div>
                                 <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
-                                <p className="text-sm text-muted-foreground mb-4">Provide bank details for "Bank Transfer" payments at checkout. This will also create a Paystack Subaccount for card payments.</p>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    Provide bank details for "Bank Transfer" payments at checkout.
+                                    {currency === 'NGN' && ' This will also create a Paystack Subaccount for card payments.'}
+                                </p>
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2 items-end">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className={cn("grid gap-4 items-end", currency === 'NGN' ? "grid-cols-1 sm:grid-cols-[2fr_1fr]" : "grid-cols-1")}>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                                             <div>
                                                 <Label>Bank Name</Label>
-                                                <Select value={paymentBankCode} onValueChange={setPaymentBankCode}>
-                                                    <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
-                                                    <SelectContent>{NIGERIAN_BANKS.map(b => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
-                                                </Select>
+                                                {currency === 'NGN' ? (
+                                                    <DropdownMenu modal={false}>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                                                <span>{NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || "Select a bank"}</span>
+                                                                <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                                            {NIGERIAN_BANKS.map(b => (
+                                                                <DropdownMenuItem key={b.value} onClick={() => setPaymentBankCode(b.value)} className="cursor-pointer">
+                                                                    {b.label}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                ) : (
+                                                    <Input 
+                                                        value={paymentBankCode} 
+                                                        onChange={e => setPaymentBankCode(e.target.value)} 
+                                                        placeholder="Enter Bank Name (e.g. Chase)" 
+                                                    />
+                                                )}
                                             </div>
-                                            <div><Label>Account Number</Label><Input value={paymentBankAccountId} onChange={e => setPaymentBankAccountId(e.target.value)} /></div>
+                                            <div>
+                                                <Label>{currency === 'NGN' ? "Account Number" : "Account Number / IBAN"}</Label>
+                                                <Input 
+                                                    value={paymentBankAccountId} 
+                                                    onChange={e => setPaymentBankAccountId(e.target.value)} 
+                                                    placeholder={currency === 'NGN' ? "10-digit number" : "e.g. US1234567890"} 
+                                                />
+                                            </div>
                                         </div>
-                                        <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying}>{isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account</Button>
+                                        {currency === 'NGN' ? (
+                                            <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying} className="w-full">
+                                                {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account
+                                            </Button>
+                                        ) : (
+                                            <div className="w-full">
+                                                <Label>Account Name</Label>
+                                                <Input 
+                                                    value={paymentAccountName} 
+                                                    onChange={e => setPaymentAccountName(e.target.value)} 
+                                                    placeholder="Enter Account Name" 
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    {paymentAccountName && <div><Label>Account Name</Label><Input value={paymentAccountName} readOnly className="bg-muted" /></div>}
+                                    {currency === 'NGN' && paymentAccountName && (
+                                        <div>
+                                            <Label>Resolved Account Name</Label>
+                                            <Input value={paymentAccountName} readOnly className="bg-muted font-bold text-emerald-600" />
+                                        </div>
+                                    )}
                                     <div>
                                         <Label htmlFor="paymentInstructions">Payment Instructions / Invoice Notes</Label>
                                         <Textarea
@@ -934,97 +1018,99 @@ function SettingsPageContent() {
                                         />
                                         <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
                                     </div>
-                                    {business?.settings?.terminalAccountNumber ? (
-                                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4 animate-fadeIn">
-                                            <div className="flex items-center justify-between">
-                                                <h5 className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
-                                                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                                                    Active Zeneva Terminal Account
-                                                </h5>
-                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Active (Live)</Badge>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
-                                            <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
-                                                <div>
-                                                    <span className="text-slate-400 block">Bank Name</span>
-                                                    <span className="font-bold text-slate-800">{business.settings.terminalBankName || 'Wema Bank'}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400 block">Account Number</span>
-                                                    <span className="font-bold text-slate-800">{business.settings.terminalAccountNumber}</span>
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <span className="text-slate-400 block">Account Name</span>
-                                                    <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
-                                                </div>
-                                            </div>
-                                            <div className="pt-2 flex items-center justify-between border-t border-emerald-100/10">
-                                                <div className="text-[11px] text-emerald-600 leading-relaxed">
-                                                    <strong>✓ Live Mode:</strong> Automated payouts and chimes are active.
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    onClick={handleDeactivateTerminal}
-                                                    disabled={isDeactivatingTerminal}
-                                                    className="text-xs h-7 px-3 flex items-center gap-1.5"
-                                                >
-                                                    {isDeactivatingTerminal ? (
-                                                        <>
-                                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                                            Deactivating...
-                                                        </>
-                                                    ) : (
-                                                        "Deactivate Terminal"
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        business?.settings?.paymentBankAccountId && (
-                                            <div className="p-4 rounded-xl border border-orange-100 bg-orange-500/5 space-y-3 mt-4">
-                                                <div>
-                                                    <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
-                                                        <Banknote className="h-4 w-4 text-orange-600" />
-                                                        Activate Zeneva Terminal
+                                    {currency === 'NGN' && (
+                                        business?.settings?.terminalAccountNumber ? (
+                                            <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4 animate-fadeIn">
+                                                <div className="flex items-center justify-between">
+                                                    <h5 className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
+                                                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                        Active Zeneva Terminal Account
                                                     </h5>
-                                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                                        Generate your permanent, static store transfer account with Paystack. This allows your operators to receive instant confirmation alerts without viewing your master account.
-                                                    </p>
+                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Active (Live)</Badge>
                                                 </div>
-                                                {!(businessPhone || business?.settings?.phone) && (
-                                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-                                                        <span className="text-base mt-0.5">⚠️</span>
-                                                        <div className="text-xs leading-relaxed">
-                                                            <strong>Phone number required</strong> — Please scroll up to the <strong>Business Profile</strong> section, add your business phone number (🇳🇬 +234...) and save before activating the terminal.
-                                                        </div>
+                                                <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
+                                                <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
+                                                    <div>
+                                                        <span className="text-slate-400 block">Bank Name</span>
+                                                        <span className="font-bold text-slate-800">{business.settings.terminalBankName || 'Wema Bank'}</span>
                                                     </div>
-                                                )}
-                                                <div className="flex flex-col gap-2 bg-muted/30 p-3 rounded-lg border border-dashed text-xs text-muted-foreground my-3">
-                                                    <div className="flex items-center gap-1.5 font-medium text-foreground">
-                                                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                                                        Transparent Processing Fees
+                                                    <div>
+                                                        <span className="text-slate-400 block">Account Number</span>
+                                                        <span className="font-bold text-slate-800">{business.settings.terminalAccountNumber}</span>
                                                     </div>
-                                                    <p>Zeneva takes <strong>0% commission</strong> on your payouts.</p>
-                                                    <p>Paystack charges a standard automated processing fee of <strong>1% (capped at ₦300)</strong> per bank transfer.</p>
+                                                    <div className="col-span-2">
+                                                        <span className="text-slate-400 block">Account Name</span>
+                                                        <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
+                                                    </div>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    onClick={handleActivateTerminal}
-                                                    disabled={isActivatingTerminal}
-                                                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium text-xs py-1.5 h-8 flex items-center justify-center gap-2"
-                                                >
-                                                    {isActivatingTerminal ? (
-                                                        <>
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            Activating Terminal & Provisioning DVA...
-                                                        </>
-                                                    ) : (
-                                                        "Activate Zeneva Terminal"
-                                                    )}
-                                                </Button>
+                                                <div className="pt-2 flex items-center justify-between border-t border-emerald-100/10">
+                                                    <div className="text-[11px] text-emerald-600 leading-relaxed">
+                                                        <strong>✓ Live Mode:</strong> Automated payouts and chimes are active.
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={handleDeactivateTerminal}
+                                                        disabled={isDeactivatingTerminal}
+                                                        className="text-xs h-7 px-3 flex items-center gap-1.5"
+                                                    >
+                                                        {isDeactivatingTerminal ? (
+                                                            <>
+                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                                Deactivating...
+                                                            </>
+                                                        ) : (
+                                                            "Deactivate Terminal"
+                                                        )}
+                                                    </Button>
+                                                </div>
                                             </div>
+                                        ) : (
+                                            business?.settings?.paymentBankAccountId && (
+                                                <div className="p-4 rounded-xl border border-orange-100 bg-orange-500/5 space-y-3 mt-4">
+                                                    <div>
+                                                        <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
+                                                            <Banknote className="h-4 w-4 text-orange-600" />
+                                                            Activate Zeneva Terminal
+                                                        </h5>
+                                                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                                            Generate your permanent, static store transfer account with Paystack. This allows your operators to receive instant confirmation alerts without viewing your master account.
+                                                        </p>
+                                                    </div>
+                                                    {!(businessPhone || business?.settings?.phone) && (
+                                                        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                                                            <span className="text-base mt-0.5">⚠️</span>
+                                                            <div className="text-xs leading-relaxed">
+                                                                <strong>Phone number required</strong> — Please scroll up to the <strong>Business Profile</strong> section, add your business phone number (🇳🇬 +234...) and save before activating the terminal.
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col gap-2 bg-muted/30 p-3 rounded-lg border border-dashed text-xs text-muted-foreground my-3">
+                                                        <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                                            Transparent Processing Fees
+                                                        </div>
+                                                        <p>Zeneva takes <strong>0% commission</strong> on your payouts.</p>
+                                                        <p>Paystack charges a standard automated processing fee of <strong>1% (capped at ₦300)</strong> per bank transfer.</p>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        onClick={handleActivateTerminal}
+                                                        disabled={isActivatingTerminal}
+                                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium text-xs py-1.5 h-8 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isActivatingTerminal ? (
+                                                            <>
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                Activating Terminal & Provisioning DVA...
+                                                            </>
+                                                        ) : (
+                                                            "Activate Zeneva Terminal"
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )
                                         )
                                     )}
                                 </div>
@@ -1032,7 +1118,7 @@ function SettingsPageContent() {
                         </FeatureGate>
                     </CardContent>
                     <CardFooter>
-                        <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label, "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>
+                        <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || paymentBankCode || '', "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>
                             {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Financials
                         </Button>
                     </CardFooter>
@@ -1101,10 +1187,61 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div><Label>Industry</Label><Select value={industry} onValueChange={setIndustry}><SelectTrigger><SelectValue placeholder="Select an industry" /></SelectTrigger><SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select></div>
-                            <div><Label>Country</Label><Select value={country} onValueChange={setCountry}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Nigeria">Nigeria</SelectItem></SelectContent></Select></div>
+                            <div>
+                                <Label>Industry</Label>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                            <span>{industry || "Select an industry"}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                        {industries.map(i => (
+                                            <DropdownMenuItem key={i} onClick={() => setIndustry(i)} className="cursor-pointer">
+                                                {i}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                            <div>
+                                <Label>Country</Label>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                            <span>{country || "Select country"}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                        {GLOBAL_COUNTRIES.map(c => (
+                                            <DropdownMenuItem key={c} onClick={() => setCountry(c)} className="cursor-pointer">
+                                                {c}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <div><Label>State/Province</Label><Input value={state} onChange={e => setState(e.target.value)} /></div>
-                            <div><Label>Fiscal Year Start</Label><Select value={fiscalYearStart} onValueChange={setFiscalYearStart}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                            <div>
+                                <Label>Fiscal Year Start</Label>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
+                                            <span>{fiscalYearStart || "Select month"}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
+                                        {months.map(m => (
+                                            <DropdownMenuItem key={m} onClick={() => setFiscalYearStart(m)} className="cursor-pointer">
+                                                {m}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
                     </CardContent>
                     <CardFooter>

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +82,7 @@ const ReportsPlaceholder = () => (
 
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange } = usePOS();
+    const { activeBranchId } = useBranch();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
@@ -198,21 +200,21 @@ export default function ReportsDashboard() {
             totalSales,
             averageOrderValue,
             inventoryValue,
-            totalCustomers: uniqueCustomerIds.size || Math.max(stats?.totalCustomers || 0, customers.length),
+            totalCustomers: uniqueCustomerIds.size || (activeBranchId && activeBranchId !== 'all' ? customers.length : Math.max(stats?.totalCustomers || 0, customers.length)),
             totalProductsSold,
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold,
             totalProductRevenue,
             totalServiceRevenue,
             uniqueProductsSold: uniqueProductIds.size,
-            catalogSize: Math.max(stats?.totalProducts || 0, products.length),
+            catalogSize: activeBranchId && activeBranchId !== 'all' ? products.length : Math.max(stats?.totalProducts || 0, products.length),
             dailyAverageSales: totalSales / activeDays,
             dailyAverageRevenue: totalRevenue / activeDays,
             totalProfit,
             totalCost
         }
 
-    }, [reportBatchReceipts, receipts, products, customers, stats]);
+    }, [reportBatchReceipts, receipts, products, customers, stats, activeBranchId]);
 
     // Surgical Analytics
     const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
@@ -521,7 +523,7 @@ export default function ReportsDashboard() {
                                     customers={customers || []} 
                                     receipts={deepReceipts} 
                                     currencySymbol={currencySymbol} 
-                                    totalBusinessCustomers={stats?.totalCustomers} 
+                                    totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers} 
                                 />
                             </FeatureGate>
 

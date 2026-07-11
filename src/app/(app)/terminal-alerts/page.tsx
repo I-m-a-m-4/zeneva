@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, where } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { safeToDate } from '@/lib/utils';
+import { safeToDate, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
@@ -45,8 +45,51 @@ interface TerminalAlert {
   accountNumber?: string;
 }
 
+const MOCK_STARTER_ALERTS: TerminalAlert[] = [
+  {
+    id: "mock-1",
+    title: "Transfer Confirmed",
+    body: "Received ₦25,000 from CHINEDU OKOYE",
+    createdAt: new Date(),
+    read: false,
+    amount: 25000,
+    bankName: "Guaranty Trust Bank",
+    reference: "PS_928172901"
+  },
+  {
+    id: "mock-2",
+    title: "Transfer Confirmed",
+    body: "Received ₦12,500 from FATIMA BELLO",
+    createdAt: new Date(Date.now() - 15 * 60000),
+    read: false,
+    amount: 12500,
+    bankName: "Access Bank",
+    reference: "PS_830182903"
+  },
+  {
+    id: "mock-3",
+    title: "Transfer Confirmed",
+    body: "Received ₦8,000 from TOBI ADEBAYO",
+    createdAt: new Date(Date.now() - 42 * 60000),
+    read: true,
+    amount: 8000,
+    bankName: "Opay",
+    reference: "PS_291028392"
+  },
+  {
+    id: "mock-4",
+    title: "Transfer Confirmed",
+    body: "Received ₦150,000 from EZEKIEL RETAILS",
+    createdAt: new Date(Date.now() - 90 * 60000),
+    read: true,
+    amount: 150000,
+    bankName: "Zenith Bank",
+    reference: "PS_738192837"
+  }
+];
+
 export default function TerminalAlertsPage() {
-  const { currentUserProfile, currencySymbol } = usePOS();
+  const { currentUserProfile, currencySymbol, business } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -185,67 +228,76 @@ export default function TerminalAlertsPage() {
     }
   };
 
+  const hasLifetimeAccess = business?.accessLevel === 'lifetime';
+  const hasAccess = business?.plan === 'business' || business?.plan === 'pro' || hasLifetimeAccess;
+
+  const displayedAlerts = hasAccess ? filteredAlerts : MOCK_STARTER_ALERTS;
+  const displayedCash = hasAccess ? dailyCash : 245000;
+  const displayedTransferExpected = hasAccess ? dailyTransferExpected : 195500;
+  const displayedTransferReceived = hasAccess ? dailyTransferReceived : 195500;
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between border-b pb-4">
-        <PageTitle title="Terminal Alerts" subtitle="Live stream of confirmed payments and transfers." />
-        <div className="flex items-center gap-3 print:hidden">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => window.print()}
-            className="flex items-center gap-2"
-          >
-            <Printer className="h-4 w-4 text-slate-500" />
-            Export PDF
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="flex items-center gap-2"
-          >
-            {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
-            {soundEnabled ? "Sound On" : "Sound Muted"}
-          </Button>
+    <div className="relative flex flex-col gap-6 min-h-[70vh]">
+      <div className={cn("flex flex-col gap-6 transition-all duration-500", !hasAccess && "blur-[3px] pointer-events-none select-none opacity-45")}>
+        <div className="flex items-center justify-between border-b pb-4">
+          <PageTitle title="Terminal Alerts" subtitle="Live stream of confirmed payments and transfers." />
+          <div className="flex items-center gap-3 print:hidden">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => window.print()}
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4 text-slate-500" />
+              Export PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="flex items-center gap-2"
+            >
+              {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+              {soundEnabled ? "Sound On" : "Sound Muted"}
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Daily Sales Summary Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
-        <Card className="bg-slate-50 border-slate-200">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-slate-500">Today's Cash Sales</CardTitle>
-            <Banknote className="h-4 w-4 text-slate-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{currencySymbol}{dailyCash.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">Total physical cash expected in drawer</p>
-          </CardContent>
-        </Card>
+        {/* Daily Sales Summary Header */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+          <Card className="bg-slate-50 border-slate-200">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium text-slate-500">Today's Cash Sales</CardTitle>
+              <Banknote className="h-4 w-4 text-slate-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">{currencySymbol}{displayedCash.toLocaleString()}</div>
+              <p className="text-xs text-slate-500 mt-1">Total physical cash expected in drawer</p>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-blue-50 border-blue-200">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-blue-600">Expected Bank Transfers</CardTitle>
-            <ArrowRightLeft className="h-4 w-4 text-blue-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-900">{currencySymbol}{dailyTransferExpected.toLocaleString()}</div>
-            <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
-          </CardContent>
-        </Card>
+          <Card className="bg-blue-50 border-blue-200">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium text-blue-600">Expected Bank Transfers</CardTitle>
+              <ArrowRightLeft className="h-4 w-4 text-blue-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-900">{currencySymbol}{displayedTransferExpected.toLocaleString()}</div>
+              <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-emerald-50 border-emerald-200">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-emerald-600">Verified Transfers</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-900">{currencySymbol}{dailyTransferReceived.toLocaleString()}</div>
-            <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing in terminal</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="bg-emerald-50 border-emerald-200">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium text-emerald-600">Verified Transfers</CardTitle>
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-900">{currencySymbol}{displayedTransferReceived.toLocaleString()}</div>
+              <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing in terminal</p>
+            </CardContent>
+          </Card>
+        </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-4 justify-between max-w-full print:hidden">
         <div className="relative flex-1 w-full max-w-md">
@@ -271,7 +323,7 @@ export default function TerminalAlertsPage() {
             <span className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
             <span className="text-sm text-muted-foreground font-medium">Connecting to live Terminal feed...</span>
           </div>
-        ) : filteredAlerts.length === 0 ? (
+        ) : displayedAlerts.length === 0 ? (
           <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
             <Bell className="h-16 w-16 text-muted-foreground/30 mb-4 animate-bounce" />
             <CardTitle className="text-lg font-semibold mb-2">No Terminal Alerts Yet</CardTitle>
@@ -295,7 +347,7 @@ export default function TerminalAlertsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAlerts.map((alert) => {
+                  {displayedAlerts.map((alert) => {
                     const alertDate = alert.createdAt ? safeToDate(alert.createdAt) : new Date();
                     const amountText = alert.amount?.toLocaleString() || alert.body.match(/₦[\d,]+/)?.[0].replace('₦', '') || 'Confirmed';
                     
@@ -361,6 +413,56 @@ export default function TerminalAlertsPage() {
           </Card>
         )}
       </div>
+      </div>
+
+      {!hasAccess && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] pointer-events-auto">
+          <Card className="w-full max-w-lg border-2 border-orange-500/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+            <CardHeader className="text-center pt-8 pb-4">
+              <div className="mx-auto mb-6 relative">
+                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 animate-pulse" />
+                <div className="relative z-10 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Bell className="h-8 w-8 text-primary animate-bounce" />
+                </div>
+              </div>
+              <CardTitle className="text-3xl font-black tracking-tight text-foreground">
+                Zeneva Terminal Alerts
+              </CardTitle>
+              <CardDescription className="text-base mt-2 px-6">
+                Never ask customers for screenshots or call your bank again. Get instant audio notifications as soon as transfers hit your accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-8 pb-8 space-y-6">
+              <div className="p-5 rounded-2xl bg-muted/40 border border-border/50">
+                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider font-mono">Premium Business Features</h4>
+                <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Real-time Chimes</strong>: Sound alerts play instantly when operator receives transfers.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Permanent Store DVAs</strong>: Customers transfer directly to your static business account.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>Auto Payout Settlement</strong>: Money lands in your local bank automatically within 24 hours.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span><strong>0% Processing Markups</strong>: Pay only standard processing gateway fees.</span>
+                  </li>
+                </ul>
+              </div>
+              <Button asChild className="w-full h-12 shadow-lg bg-orange-600 hover:bg-orange-700 text-white font-bold hover:scale-[1.02] active:scale-95 transition-all duration-300">
+                <Link href="/billing">
+                  Upgrade to Business Plan
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

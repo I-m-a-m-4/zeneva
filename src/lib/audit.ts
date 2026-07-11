@@ -38,6 +38,7 @@ export const logAuditEvent = async (
 
         const logData = {
             businessId,
+            branchId: user?.branchId || event.details?.branchId || null,
             userId: user?.id || 'unknown',
             userName: user?.name || 'Unknown User',
             userEmail: user?.email || 'N/A',

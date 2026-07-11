@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
 import { QrCode } from "lucide-react";
@@ -392,17 +392,21 @@ export default function SelectProductsPage() {
                                 </DropdownMenuRadioGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Select onValueChange={setColumnClass} defaultValue={columnClass}>
-                            <SelectTrigger className="w-[150px] h-11 hidden lg:flex">
-                                <Columns className="h-4 w-4 mr-2" />
-                                <SelectValue placeholder="Layout" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="lg:grid-cols-3">3 Columns</SelectItem>
-                                <SelectItem value="lg:grid-cols-4">4 Columns</SelectItem>
-                                <SelectItem value="lg:grid-cols-5">5 Columns</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-[150px] h-11 hidden lg:flex justify-between font-normal bg-background">
+                                    <span className="flex items-center">
+                                        <Columns className="h-4 w-4 mr-2" />
+                                        {columnClass === 'lg:grid-cols-3' ? '3 Columns' : columnClass === 'lg:grid-cols-4' ? '4 Columns' : '5 Columns'}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[150px]">
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-3')}>3 Columns</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-4')}>4 Columns</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-5')}>5 Columns</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                     {isSyncing && (
                         <div className="flex items-center gap-2 ml-1">

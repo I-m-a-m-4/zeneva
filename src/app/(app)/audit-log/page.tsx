@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link'; // Import Link
 import { usePOS } from '@/context/pos-context';
+import { useBranch } from '@/context/branch-context';
 import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs } from 'firebase/firestore';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import type { AuditLog } from '@/types';
@@ -191,6 +192,7 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 
 function AuditLogPageContent() {
     const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs } = usePOS();
+    const { activeBranchId } = useBranch();
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isAnalyzing, startTransition] = React.useTransition();
@@ -246,6 +248,16 @@ function AuditLogPageContent() {
 
     const filteredLogs = React.useMemo(() => {
         let result = auditLogs;
+
+        if (activeBranchId && activeBranchId !== 'all') {
+            result = result.filter(log => {
+                if (activeBranchId === business?.id) {
+                    return !log.branchId || log.branchId === business?.id || log.branchId === 'all' || log.details?.branchId === business?.id;
+                }
+                return log.branchId === activeBranchId || log.details?.branchId === activeBranchId;
+            });
+        }
+
         if (actionFilter !== 'all') {
             result = result.filter(log => log.action.startsWith(`${actionFilter}.`));
         }
@@ -254,12 +266,12 @@ function AuditLogPageContent() {
             result = result.filter(log => 
                 log.userName?.toLowerCase().includes(lower) || 
                 log.userEmail?.toLowerCase().includes(lower) ||
-                log.details.entityName?.toLowerCase().includes(lower) ||
+                log.details?.entityName?.toLowerCase().includes(lower) ||
                 log.id.toLowerCase().includes(lower)
             );
         }
         return result;
-    }, [auditLogs, actionFilter, searchTerm]);
+    }, [auditLogs, actionFilter, searchTerm, activeBranchId, business?.id]);
 
     const handleAnalyze = () => {
         const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';

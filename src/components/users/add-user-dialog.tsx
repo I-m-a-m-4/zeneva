@@ -12,7 +12,8 @@ import { useFirestore } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 import { sendInvitationEmail } from '@/lib/email';
 import { v4 as uuidv4 } from 'uuid';
 import { usePOS } from '@/context/pos-context';
@@ -160,8 +161,15 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
+                <DialogContent className="sm:max-w-md z-50">
                 <DialogHeader>
                     <DialogTitle>Invite New User</DialogTitle>
                     <DialogDescription>
@@ -202,17 +210,18 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Role</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a role" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="manager">Manager</SelectItem>
-                                            <SelectItem value="vendor_operator">Vendor Operator</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <DropdownMenu modal={false}>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button type="button" variant="outline" className="w-full justify-between font-normal h-10 px-3 bg-background border-input">
+                                                {field.value === 'manager' ? 'Manager' : field.value === 'vendor_operator' ? 'Vendor Operator' : 'Select a role'}
+                                                <ChevronDown className="h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                                            <DropdownMenuItem onClick={() => field.onChange('manager')}>Manager</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => field.onChange('vendor_operator')}>Vendor Operator</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -228,5 +237,6 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
                 </Form>
             </DialogContent>
         </Dialog>
+    </>
     );
 }

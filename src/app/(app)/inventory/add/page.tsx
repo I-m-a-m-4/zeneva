@@ -38,7 +38,8 @@ import Image from "next/image";
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
@@ -681,16 +682,17 @@ export default function AddProductPage() {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between font-normal h-10 px-3 bg-background border-input">
+                            {field.value || 'Select a category'}
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
                           {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
                             business.settings.productCategories.map((cat: string) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                              <DropdownMenuItem key={cat} onClick={() => field.onChange(cat)}>{cat}</DropdownMenuItem>
                             ))
                           ) : (
                             <div className="p-4 text-center text-sm text-muted-foreground">
@@ -700,8 +702,8 @@ export default function AddProductPage() {
                               </Button>
                             </div>
                           )}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <FormMessage />
                     </FormItem>
                   )}

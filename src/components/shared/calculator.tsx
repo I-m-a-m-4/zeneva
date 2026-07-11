@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Delete } from 'lucide-react';
+import { Delete, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface CalculatorProps {
   isOpen: boolean;
@@ -156,33 +157,47 @@ export default function Calculator({ isOpen, onOpenChange }: CalculatorProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[320px]">
-        <DialogHeader>
-          <DialogTitle>Calculator</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
+    <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
+      <DialogContent className="sm:max-w-[320px] bg-transparent border-0 shadow-none p-0 focus-visible:outline-none [&>button]:hidden">
+        <motion.div
+          drag
+          dragMomentum={false}
+          className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-2xl space-y-4 cursor-grab active:cursor-grabbing select-none w-full"
+        >
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <DialogTitle className="text-base font-semibold">Calculator</DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+          <div className="space-y-2">
             <div className="h-8 text-right text-muted-foreground pr-4 text-lg truncate">{fullOperation}</div>
             <Input
-                ref={inputRef}
-                type="text"
-                readOnly
-                value={formattedDisplay()}
-                className="text-right text-5xl font-mono h-24 p-4 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              ref={inputRef}
+              type="text"
+              readOnly
+              value={formattedDisplay()}
+              className="text-right text-5xl font-mono h-24 p-4 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
             />
-          <div className="grid grid-cols-4 gap-2 pt-2">
-             {buttons.map(({label, action, variant, className, icon: Icon, key}, i) => (
-              <Button
-                key={key || label || i}
-                variant={variant as any}
-                className={cn("text-2xl h-16", className)}
-                onClick={action}
-              >
-                {Icon ? <Icon className="h-6 w-6"/> : label}
-              </Button>
-            ))}
+            <div className="grid grid-cols-4 gap-2 pt-2">
+              {buttons.map(({label, action, variant, className, icon: Icon, key}, i) => (
+                <Button
+                  key={key || label || i}
+                  variant={variant as any}
+                  className={cn("text-2xl h-16 pointer-events-auto", className)}
+                  onClick={action}
+                >
+                  {Icon ? <Icon className="h-6 w-6"/> : label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );
