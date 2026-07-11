@@ -711,7 +711,15 @@ function SettingsPageContent() {
         <div className="space-y-6">
             <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
 
-            <div className="space-y-6">
+            <Tabs defaultValue="general" className="space-y-6">
+                <TabsList className="w-full flex-wrap justify-start h-auto bg-transparent p-0 gap-2 mb-4 border-b pb-4">
+                    <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">General</TabsTrigger>
+                    <TabsTrigger value="storefront" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Storefront</TabsTrigger>
+                    <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Financials & Billing</TabsTrigger>
+                    <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">System & Security</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="general" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Profile</CardTitle>
@@ -784,6 +792,9 @@ function SettingsPageContent() {
                     </Card>
                 )}
 
+                </TabsContent>
+                
+                <TabsContent value="storefront" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Loyalty Program</CardTitle>
@@ -851,6 +862,9 @@ function SettingsPageContent() {
                 </Card>
 
                 
+                </TabsContent>
+                
+                <TabsContent value="financials" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" />Payment & Financials</CardTitle>
@@ -1077,6 +1091,9 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
+                </TabsContent>
+                
+                <TabsContent value="system" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Organization</CardTitle>
@@ -1402,7 +1419,8 @@ function SettingsPageContent() {
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
