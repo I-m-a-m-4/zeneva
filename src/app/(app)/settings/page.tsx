@@ -18,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
@@ -849,6 +850,7 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
+                
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" />Payment & Financials</CardTitle>
