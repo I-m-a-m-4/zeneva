@@ -124,6 +124,9 @@ export async function POST(request: Request) {
           customer: customerCode,
           preferred_bank: 'wema-bank',
           subaccount: subaccountCode,
+          first_name: businessName,
+          last_name: 'Terminal Store',
+          phone: phone,
         }),
       });
 
