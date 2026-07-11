@@ -141,6 +141,8 @@ function SettingsPageContent() {
     // General state
     const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
     const [isVerifying, setIsVerifying] = React.useState(false);
+    const [bvn, setBvn] = React.useState('');
+    const [isVerifyingBvn, setIsVerifyingBvn] = React.useState(false);
 
     // Form fields state
     const [businessName, setBusinessName] = React.useState('');
@@ -439,6 +441,49 @@ function SettingsPageContent() {
             toast({ variant: "destructive", title: "Activation Failed", description: error.message });
         } finally {
             setIsActivatingTerminal(false);
+        }
+    };
+
+    const handleVerifyBvn = async () => {
+        if (!bvn || bvn.length !== 11) {
+            toast({ variant: "destructive", title: "Invalid BVN", description: "Please enter a valid 11-digit BVN." });
+            return;
+        }
+
+        setIsVerifyingBvn(true);
+        try {
+            const response = await fetch('/api/paystack/verify-customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    businessId: business?.id,
+                    bvn: bvn,
+                    email: currentUserProfile?.email || '',
+                    customerCode: business?.settings?.paystackSubaccountCode // Or whatever customer code they use
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || 'Verification failed.');
+            }
+
+            await handleSettingsSubmit('compliance', {
+                "settings.kycStatus": "verified",
+                "settings.bvnProvided": true
+            });
+
+            toast({
+                variant: 'success',
+                title: 'Verification Successful',
+                description: 'Your identity has been verified with Paystack.'
+            });
+            setBvn('');
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Verification Failed", description: error.message });
+        } finally {
+            setIsVerifyingBvn(false);
         }
     };
 
@@ -940,6 +985,14 @@ function SettingsPageContent() {
                                                         </div>
                                                     </div>
                                                 )}
+                                                <div className="flex flex-col gap-2 bg-muted/30 p-3 rounded-lg border border-dashed text-xs text-muted-foreground my-3">
+                                                    <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                                        Transparent Processing Fees
+                                                    </div>
+                                                    <p>Zeneva takes <strong>0% commission</strong> on your payouts.</p>
+                                                    <p>Paystack charges a standard automated processing fee of <strong>1% (capped at ₦300)</strong> per bank transfer.</p>
+                                                </div>
                                                 <Button
                                                     type="button"
                                                     onClick={handleActivateTerminal}
@@ -1227,6 +1280,57 @@ function SettingsPageContent() {
                             {isSaving["operating-hours"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Working Hours
                         </Button>
                     </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Compliance & KYC</CardTitle>
+                        <CardDescription>Verify your identity with Paystack to lift processing limits and scale your business.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                                <div className={`p-2 rounded-full ${business?.settings?.kycStatus === 'verified' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    <ShieldCheck className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">Status: {business?.settings?.kycStatus === 'verified' ? 'Verified' : 'Unverified (Starter limits apply)'}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {business?.settings?.kycStatus === 'verified' 
+                                            ? 'Your business has been verified. You can process unlimited volumes.' 
+                                            : 'Verify your BVN to lift the ₦3 million cumulative payout limit.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {business?.settings?.kycStatus !== 'verified' && (
+                                <div className="space-y-2 pt-2">
+                                    <Label htmlFor="bvn">Bank Verification Number (BVN)</Label>
+                                    <div className="flex gap-2">
+                                        <Input 
+                                            id="bvn" 
+                                            type="text" 
+                                            maxLength={11}
+                                            placeholder="Enter your 11-digit BVN" 
+                                            value={bvn}
+                                            onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
+                                        />
+                                        <Button 
+                                            type="button" 
+                                            onClick={handleVerifyBvn}
+                                            disabled={isVerifyingBvn || bvn.length !== 11}
+                                        >
+                                            {isVerifyingBvn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                            Verify BVN
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Your BVN is securely submitted directly to Paystack and is not permanently stored by Zeneva.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
                 </Card>
 
                 {isInstallable && (
