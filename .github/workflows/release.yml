@@ -76,7 +76,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Zeneva v__VERSION__'
           releaseBody: 'Zeneva Multi-Platform Release (Windows/macOS). For the best experience, use the auto-updater within the application settings.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
 
       - name: Verify Artifacts (Windows)
@@ -276,7 +276,7 @@ jobs:
             ./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab
           tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
+          draft: false
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
@@ -388,7 +388,7 @@ jobs:
             ./zeneva-v${{ env.APP_VERSION }}-ios.zip
           tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
+          draft: false
         continue-on-error: true
 
       - name: Upload iOS Artifacts
