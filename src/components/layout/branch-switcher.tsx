@@ -19,13 +19,12 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   const { state } = useSidebar();
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
 
-  const isOwnerOrAdmin = currentUserProfile && (
-    currentUserProfile.role === 'admin' ||
+  const isOwner = currentUserProfile && (
     currentUserProfile.role === 'owner' ||
     business?.ownerId === currentUserProfile.id
   );
 
-  if (!isMultiBranchEnabled || isLoadingBranches || !isOwnerOrAdmin) return null;
+  if (!isMultiBranchEnabled || isLoadingBranches) return null;
 
   const currentBranchName = activeBranchId === 'all' 
     ? 'All Branches' 
@@ -34,7 +33,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   if (variant === 'header') {
     return (
       <div className={cn("flex items-center", className)}>
-        <Select value={activeBranchId} onValueChange={setActiveBranchId} modal={false}>
+        <Select value={activeBranchId} onValueChange={setActiveBranchId} disabled={!isOwner} modal={false}>
           <SelectTrigger className="h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-muted/60 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs">
             <div className="flex items-center gap-1.5 truncate">
               {activeBranchId === 'all' ? (
@@ -62,7 +61,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     return (
       <div className={cn("w-full py-1.5", className)}>
         <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 tracking-wider px-1">Current Branch</p>
-        <Select value={activeBranchId} onValueChange={setActiveBranchId} modal={false}>
+        <Select value={activeBranchId} onValueChange={setActiveBranchId} disabled={!isOwner} modal={false}>
           <SelectTrigger className="w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 transition-all">
             <div className="flex items-center gap-2 truncate">
               {activeBranchId === 'all' ? (
@@ -88,7 +87,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
 
   return (
     <div className={cn("px-2 py-2 w-full", isCollapsed && "hidden", className)}>
-      <Select value={activeBranchId} onValueChange={setActiveBranchId} modal={false}>
+      <Select value={activeBranchId} onValueChange={setActiveBranchId} disabled={!isOwner} modal={false}>
         <SelectTrigger className="w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary">
           <div className="flex items-center gap-2 truncate">
             {activeBranchId === 'all' ? (
