@@ -93,7 +93,14 @@ export interface TopPerformingProduct {
 function ProductDetailModal({ product, isOpen, onOpenChange, currencySymbol }: { product: TopPerformingProduct | null; isOpen: boolean; onOpenChange: (open: boolean) => void; currencySymbol: string; }) {
     if (!product) return null;
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{product.name}</DialogTitle>
@@ -135,13 +142,21 @@ function ProductDetailModal({ product, isOpen, onOpenChange, currencySymbol }: {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>
     )
 }
 
 function StockRecDetailModal({ recommendation, product, isOpen, onOpenChange }: { recommendation: SmartStockRecommendation | null; product: Product | null; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
     if (!recommendation || !product) return null;
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{recommendation.name}</DialogTitle>
@@ -188,6 +203,7 @@ function StockRecDetailModal({ recommendation, product, isOpen, onOpenChange }: 
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>
     )
 }
 
@@ -215,7 +231,14 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
         .replace(/\{\{customerName\}\}/g, 'Valued Customer');
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent className="max-w-5xl flex flex-col h-[90vh]">
                 <DialogHeader>
                     <DialogTitle>{segment.segmentName}</DialogTitle>
@@ -297,6 +320,7 @@ function CustomerSegmentDetailModal({ segment, isOpen, onOpenChange, business, b
                 </div>
             </DialogContent>
         </Dialog>
+        </>
     )
 }
 
@@ -321,7 +345,14 @@ function MerchandisingDetailModal({
     );
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Smart Merchandising</DialogTitle>
@@ -389,6 +420,7 @@ function MerchandisingDetailModal({
                 </div>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
 
@@ -398,7 +430,14 @@ function OfferDetailModal({ offer, allProducts, isOpen, onOpenChange, currencySy
     const offerProducts = offer.productIds.map(id => allProducts.find(p => p.id === id)).filter((p): p is Product => !!p);
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{offer.offerName}</DialogTitle>
@@ -442,13 +481,21 @@ function OfferDetailModal({ offer, allProducts, isOpen, onOpenChange, currencySy
                 </div>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
 
 function RevenueOpportunityModal({ opportunity, product, isOpen, onOpenChange, currencySymbol }: { opportunity: RevenueOpportunity | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
     if (!opportunity || !product) return null;
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{opportunity.name}</DialogTitle>
@@ -477,13 +524,21 @@ function RevenueOpportunityModal({ opportunity, product, isOpen, onOpenChange, c
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
 
 function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currencySymbol }: { item: SlowMovingInventory | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
     if (!item || !product) return null;
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{item.name}</DialogTitle>
@@ -514,13 +569,21 @@ function SlowMovingInventoryModal({ item, product, isOpen, onOpenChange, currenc
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
 
 function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, currencySymbol }: { recommendation: PricingRecommendation | null, product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, currencySymbol: string }) {
     if (!recommendation || !product) return null;
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <>
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+                    onClick={() => onOpenChange(false)} 
+                />
+            )}
+            <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{recommendation.name}</DialogTitle>
@@ -545,6 +608,7 @@ function PricingStrategyModal({ recommendation, product, isOpen, onOpenChange, c
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>
     );
 }
 

@@ -108,6 +108,9 @@ const businessTypes = [
 ];
 
 export default function Home() {
+    const microsoftStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
+    const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
+
     const structuredData = {
         "@context": "https://schema.org",
         "@graph": [
@@ -182,12 +185,55 @@ export default function Home() {
 
                                 <HeroInputForm />
 
-                                <div className="mt-8 flex items-center justify-center lg:justify-start gap-4">
-                                    <Link href="/download" className="group flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
-                                        <Monitor className="h-4 w-4" />
-                                        Download Desktop App
-                                        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
-                                    </Link>
+                                <div className="mt-8 flex flex-nowrap items-center justify-center lg:justify-start gap-3 sm:gap-4">
+                                    <a href={microsoftStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden flex-shrink-0">
+                                        <svg className="w-[145px] h-[44px] sm:w-[180px] sm:h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            {/* Background */}
+                                            <rect width="180" height="54" rx="2" fill="#f1dfd1" />
+                                            
+                                            {/* Shopping Bag Icon */}
+                                            <g transform="translate(14, 11)">
+                                                {/* Handle */}
+                                                <path d="M12 8C12 5.23858 14.2386 3 17 3C19.7614 3 22 5.23858 22 8" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round" />
+                                                {/* Bag Body */}
+                                                <rect x="8" y="7" width="18" height="19" rx="3" fill="#F2F2F2" />
+                                                
+                                                {/* Microsoft 4-color grid */}
+                                                <g transform="translate(12, 12)">
+                                                    {/* Top Left: Red */}
+                                                    <rect x="1" y="1" width="4.2" height="4.2" fill="#F25022" />
+                                                    {/* Top Right: Green */}
+                                                    <rect x="5.8" y="1" width="4.2" height="4.2" fill="#7FBA00" />
+                                                    {/* Bottom Left: Blue */}
+                                                    <rect x="1" y="5.8" width="4.2" height="4.2" fill="#00A4EF" />
+                                                    {/* Bottom Right: Yellow */}
+                                                    <rect x="5.8" y="5.8" width="4.2" height="4.2" fill="#FFB900" />
+                                                </g>
+                                            </g>
+                                            
+                                            {/* Text */}
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">Download from the</text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">Microsoft Store</text>
+                                        </svg>
+                                    </a>
+                                    <a href={googlePlayStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden flex-shrink-0">
+                                        <svg className="w-[145px] h-[44px] sm:w-[180px] sm:h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            {/* Background */}
+                                            <rect x="0.5" y="0.5" width="179" height="53" rx="2" fill="#f1dfd1" stroke="#d8c5b7" strokeWidth="1" />
+                                            
+                                            {/* Google Play Logo */}
+                                            <g transform="translate(14, 11)">
+                                                <path d="M2.5 1.76c-.35.37-.55.94-.55 1.66v25.16c0 .72.2 1.29.55 1.66l.08.08 13.98-13.98v-.32L3.08 1.68l-.58.08z" fill="#3bccff" />
+                                                <path d="M20.61 14.18l-3.52-2.01-3.52 3.52 3.52 3.52 3.52-2.01c1.01-.58 1.01-1.52 0-2.1z" fill="#ffd300" />
+                                                <path d="M13.57 15.69l3.52-3.52L3.08 1.68c-.69-.39-1.56-.31-2.12.25l12.61 12.61v1.15z" fill="#55ea47" />
+                                                <path d="M13.57 16.31l-12.61 12.61c.56.56 1.43.64 2.12.25l13.98-8.01-3.52-3.52-3.52 3.52v-4.85z" fill="#ff3349" />
+                                            </g>
+                                            
+                                            {/* Text */}
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">GET IT ON</text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px">Google Play</text>
+                                        </svg>
+                                    </a>
                                 </div>
                             </div>
 

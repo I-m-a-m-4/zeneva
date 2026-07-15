@@ -78,8 +78,15 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+          onClick={() => onOpenChange(false)} 
+        />
+      )}
+      <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
+        <DialogContent className="sm:max-w-[500px] z-50">
         <DialogHeader>
           <DialogTitle>Edit Customer</DialogTitle>
           <DialogDescription>
@@ -114,6 +121,7 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }

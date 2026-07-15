@@ -153,6 +153,8 @@ export default function DownloadPage() {
 
   const latestReleaseUrl = "https://github.com/I-m-a-m-4/zeneva-releases/releases";
   const windowsDownloadUrl = `/api/download/windows`;
+  const microsoftStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
+  const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
   const macDownloadUrlIntel = `/api/download/macos-intel`;
   const macDownloadUrlSilicon = `/api/download/macos-silicon`;
   const androidDownloadUrl = `/api/download/android`;
@@ -371,12 +373,44 @@ export default function DownloadPage() {
                                         Zeneva is a multi-store retail platform built for high-volume transactions at busy retail locations such as supermarkets, shopping malls, and large-scale boutique outlets.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                    <a href={windowsDownloadUrl}>
-                                        Download Zeneva (113MB)
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
+                                        <a href={windowsDownloadUrl}>
+                                            Download Zeneva (113MB)
+                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        </a>
+                                    </Button>
+                                    <a href={microsoftStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden">
+                                        <svg className="w-[180px] h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            {/* Background */}
+                                            <rect width="180" height="54" rx="2" fill="#f1dfd1" />
+                                            
+                                            {/* Shopping Bag Icon */}
+                                            <g transform="translate(14, 11)">
+                                                {/* Handle */}
+                                                <path d="M12 8C12 5.23858 14.2386 3 17 3C19.7614 3 22 5.23858 22 8" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round" />
+                                                {/* Bag Body */}
+                                                <rect x="8" y="7" width="18" height="19" rx="3" fill="#F2F2F2" />
+                                                
+                                                {/* Microsoft 4-color grid */}
+                                                <g transform="translate(12, 12)">
+                                                    {/* Top Left: Red */}
+                                                    <rect x="1" y="1" width="4.2" height="4.2" fill="#F25022" />
+                                                    {/* Top Right: Green */}
+                                                    <rect x="5.8" y="1" width="4.2" height="4.2" fill="#7FBA00" />
+                                                    {/* Bottom Left: Blue */}
+                                                    <rect x="1" y="5.8" width="4.2" height="4.2" fill="#00A4EF" />
+                                                    {/* Bottom Right: Yellow */}
+                                                    <rect x="5.8" y="5.8" width="4.2" height="4.2" fill="#FFB900" />
+                                                </g>
+                                            </g>
+                                            
+                                            {/* Text */}
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">Download from the</text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">Microsoft Store</text>
+                                        </svg>
                                     </a>
-                                </Button>
+                                </div>
                             </div>
 
                             {/* Spec Table - Aligned with Image Reference */}
@@ -539,12 +573,32 @@ export default function DownloadPage() {
                                         Tactical mobile kit. Direct APK installation for smartphones and portable POS terminals. Zeneva on Android isn't just a companion app—it's the full engine in your pocket.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                    <a href={androidDownloadUrl}>
-                                        Download Zeneva (132MB)
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
+                                        <a href={androidDownloadUrl}>
+                                            Download Zeneva (132MB)
+                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        </a>
+                                    </Button>
+                                    <a href={googlePlayStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden">
+                                        <svg className="w-[180px] h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            {/* Background */}
+                                            <rect x="0.5" y="0.5" width="179" height="53" rx="2" fill="#f1dfd1" stroke="#d8c5b7" strokeWidth="1" />
+                                            
+                                            {/* Google Play Logo */}
+                                            <g transform="translate(14, 11)">
+                                                <path d="M2.5 1.76c-.35.37-.55.94-.55 1.66v25.16c0 .72.2 1.29.55 1.66l.08.08 13.98-13.98v-.32L3.08 1.68l-.58.08z" fill="#3bccff" />
+                                                <path d="M20.61 14.18l-3.52-2.01-3.52 3.52 3.52 3.52 3.52-2.01c1.01-.58 1.01-1.52 0-2.1z" fill="#ffd300" />
+                                                <path d="M13.57 15.69l3.52-3.52L3.08 1.68c-.69-.39-1.56-.31-2.12.25l12.61 12.61v1.15z" fill="#55ea47" />
+                                                <path d="M13.57 16.31l-12.61 12.61c.56.56 1.43.64 2.12.25l13.98-8.01-3.52-3.52-3.52 3.52v-4.85z" fill="#ff3349" />
+                                            </g>
+                                            
+                                            {/* Text */}
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">GET IT ON</text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px">Google Play</text>
+                                        </svg>
                                     </a>
-                                </Button>
+                                </div>
                             </div>
 
                             {/* Spec Table */}

@@ -133,8 +133,15 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200" 
+          onClick={() => handleDialogChange(false)} 
+        />
+      )}
+      <Dialog open={isOpen} onOpenChange={handleDialogChange} modal={false}>
+        <DialogContent className="sm:max-w-[500px] z-50">
         <DialogHeader>
           <DialogTitle>Add New Customer</DialogTitle>
           <DialogDescription>
@@ -169,6 +176,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }

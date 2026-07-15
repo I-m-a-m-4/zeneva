@@ -97,6 +97,12 @@ export default function TerminalAlertsPage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [soundEnabled, setSoundEnabled] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isMounted, setIsMounted] = React.useState(false);
+  
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Daily Stats State
   const [dailyCash, setDailyCash] = React.useState(0);
@@ -235,6 +241,8 @@ export default function TerminalAlertsPage() {
   const displayedCash = hasAccess ? dailyCash : 245000;
   const displayedTransferExpected = hasAccess ? dailyTransferExpected : 195500;
   const displayedTransferReceived = hasAccess ? dailyTransferReceived : 195500;
+
+  if (!isMounted) return null;
 
   return (
     <div className="relative flex flex-col gap-6 min-h-[70vh]">

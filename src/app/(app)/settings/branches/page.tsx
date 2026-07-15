@@ -73,16 +73,7 @@ export default function BranchesSettingsPage() {
     );
   }
 
-  const handleSelectBranch = (branchId: string) => {
-    setActiveBranchId(branchId);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('zeneva_active_branch', branchId);
-    }
-    toast({
-      title: "Branch Switched",
-      description: `You are now operating under the selected branch.`,
-    });
-  };
+  // handleSelectBranch is defined after state hooks below
 
   const [usersList, setUsersList] = useState<any[]>([]);
 
@@ -181,7 +172,18 @@ export default function BranchesSettingsPage() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [confirmBusinessName, setConfirmBusinessName] = useState('');
+  const [confirmBranchName, setConfirmBranchName] = useState('');
+
+  const handleSelectBranch = (branchId: string) => {
+    setActiveBranchId(branchId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('zeneva_active_branch', branchId);
+    }
+    toast({
+      title: "Branch Switched",
+      description: `You are now operating under the selected branch.`,
+    });
+  };
 
   if (!mounted) return null;
 
@@ -246,14 +248,14 @@ export default function BranchesSettingsPage() {
        return;
     }
     setBranchToDelete({ id: branchId, name: branchName });
-    setConfirmBusinessName('');
+    setConfirmBranchName('');
     setDeleteConfirmOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!branchToDelete || !business?.name) return;
-    if (confirmBusinessName.trim() !== business.name.trim()) {
-      toast({ title: "Business name mismatch", description: "Please type the exact name of your business to confirm.", variant: "destructive" });
+    if (!branchToDelete) return;
+    if (confirmBranchName.trim() !== branchToDelete.name.trim()) {
+      toast({ title: "Branch name mismatch", description: "Please type the exact name of the branch to confirm deletion.", variant: "destructive" });
       return;
     }
 
@@ -272,7 +274,7 @@ export default function BranchesSettingsPage() {
   };
 
   return (
-    <div className="relative space-y-6 w-full max-w-full overflow-hidden min-h-[70vh]">
+    <>
       <div className={cn("space-y-6 w-full max-w-full transition-all duration-500", !isBusinessPlan && "blur-[3px] pointer-events-none select-none opacity-40")}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -282,50 +284,11 @@ export default function BranchesSettingsPage() {
             </p>
           </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="shrink-0 gap-2">
-              <Plus className="h-4 w-4" />
-              Add New Branch
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a New Branch</DialogTitle>
-              <DialogDescription>
-                Add a new physical location or warehouse to your business.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateBranch} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="branchName">Branch Name *</Label>
-                <Input 
-                  id="branchName" 
-                  placeholder="e.g. Downtown Store" 
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
-                  required 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="branchAddress">Address (Optional)</Label>
-                <Input 
-                  id="branchAddress" 
-                  placeholder="e.g. 123 Main St, Lagos" 
-                  value={newBranchAddress}
-                  onChange={(e) => setNewBranchAddress(e.target.value)}
-                />
-              </div>
-              <DialogFooter className="pt-4">
-                <Button type="submit" disabled={isAdding || !newBranchName.trim()}>
-                  {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Branch
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <Button size="lg" className="shrink-0 gap-2" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add New Branch
+          </Button>
+        </div>
 
         <div className="flex flex-col gap-4 w-full">
           {isLoadingBranches && isBusinessPlan ? (
@@ -353,7 +316,7 @@ export default function BranchesSettingsPage() {
               return (
                 <Card
                   key={branch.id}
-                  onClick={() => isBusinessPlan && handleSelectBranch(branch.id)}
+                  onClick={() => { if (isBusinessPlan) handleSelectBranch(branch.id); }}
                   className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
                     isCurrentlySelected
                       ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
@@ -477,52 +440,7 @@ export default function BranchesSettingsPage() {
           )}
         </div>
 
-        {deleteConfirmOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 z-40"
-            onClick={() => setDeleteConfirmOpen(false)}
-          />
-        )}
-        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen} modal={false}>
-          <DialogContent className="max-w-md border-2 border-destructive/20 bg-background shadow-2xl z-50">
-            <DialogHeader>
-              <DialogTitle className="text-destructive flex items-center gap-2 font-bold text-xl">
-                <AlertTriangle className="h-5 w-5" />
-                Delete Branch
-              </DialogTitle>
-              <DialogDescription className="text-sm pt-2 text-muted-foreground">
-                This action is permanent and cannot be undone. It will permanently delete the branch <strong className="text-foreground">{branchToDelete?.name}</strong> and could orphan sales or inventory records connected to it.
-                <br /><br />
-                To confirm, please type the exact name of your business: <strong className="text-foreground">{business?.name}</strong>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="confirmBusiness" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Business Name</Label>
-                <Input
-                  id="confirmBusiness"
-                  placeholder="Type your business name here"
-                  value={confirmBusinessName}
-                  onChange={(e) => setConfirmBusinessName(e.target.value)}
-                  className="border-destructive/35 focus-visible:ring-destructive"
-                />
-              </div>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleConfirmDelete}
-                disabled={confirmBusinessName.trim() !== business?.name?.trim() || isDeleting !== null}
-              >
-                {isDeleting === branchToDelete?.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Delete Branch
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
       </div>{/* end blur wrapper */}
 
       {!isBusinessPlan && (
@@ -573,6 +491,99 @@ export default function BranchesSettingsPage() {
           </Card>
         </div>
       )}
-    </div>
+
+
+      {isDialogOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200"
+          onClick={() => setIsDialogOpen(false)}
+        />
+      )}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} modal={false}>
+        <DialogContent className="sm:max-w-md z-50">
+          <DialogHeader>
+            <DialogTitle>Create a New Branch</DialogTitle>
+            <DialogDescription>
+              Add a new physical location or warehouse to your business.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateBranch} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="branchName">Branch Name *</Label>
+              <Input
+                id="branchName"
+                placeholder="e.g. Downtown Store"
+                value={newBranchName}
+                onChange={(e) => setNewBranchName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branchAddress">Address (Optional)</Label>
+              <Input
+                id="branchAddress"
+                placeholder="e.g. 123 Main St, Lagos"
+                value={newBranchAddress}
+                onChange={(e) => setNewBranchAddress(e.target.value)}
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isAdding || !newBranchName.trim()}>
+                {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Branch
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {deleteConfirmOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 pointer-events-auto animate-in fade-in duration-200"
+          onClick={() => setDeleteConfirmOpen(false)}
+        />
+      )}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen} modal={false}>
+        <DialogContent className="max-w-md border-2 border-destructive/20 bg-background shadow-2xl z-50">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2 font-bold text-xl">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Branch
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-2 text-muted-foreground">
+              This action is permanent and cannot be undone. It will permanently delete the branch <strong className="text-foreground">{branchToDelete?.name}</strong> and could orphan sales or inventory records connected to it.
+              <br /><br />
+              To confirm, type the exact name of the branch: <strong className="text-foreground font-mono">{branchToDelete?.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="confirmBranch" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Branch Name</Label>
+              <Input
+                id="confirmBranch"
+                placeholder={`Type "${branchToDelete?.name}" here`}
+                value={confirmBranchName}
+                onChange={(e) => setConfirmBranchName(e.target.value)}
+                className="border-destructive/35 focus-visible:ring-destructive"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={confirmBranchName.trim() !== branchToDelete?.name?.trim() || isDeleting !== null}
+            >
+              {isDeleting === branchToDelete?.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete Branch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
