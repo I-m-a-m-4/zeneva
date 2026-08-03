@@ -248,7 +248,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-primary" />
@@ -289,7 +289,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
                 </div>
                 <div className="mt-2">
                     <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (Last 30 Days)</h4>
-                    <div className="h-60 overflow-auto border rounded-md">
+                    <div className="flex-1 overflow-auto border rounded-md">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -306,7 +306,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
                                     const standardMrr = getStandardMRR(p.plan, p.currency);
                                     return (
                                         <TableRow key={p.id || index}>
-                                            <TableCell className="font-medium">{biz?.name || 'Unknown Business'}</TableCell>
+                                            <TableCell className="font-medium max-w-[180px] truncate" title={biz?.name || 'Unknown Business'}>{biz?.name || 'Unknown Business'}</TableCell>
                                             <TableCell className="capitalize">{p.plan || 'Pro'}</TableCell>
                                             <TableCell className="uppercase">{p.currency || 'NGN'}</TableCell>
                                             <TableCell className="text-right font-mono">
@@ -346,14 +346,14 @@ function TopPerformersDialog({ open, onOpenChange, topPerformers, users }: { ope
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle>All Performers Ranking (GMV)</DialogTitle>
                     <DialogDescription>
                         A ranking of all active businesses by their total Gross Merchandise Value (converted to Naira if USD).
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="h-96 pr-4">
+                <ScrollArea className="flex-1 pr-4">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -369,8 +369,8 @@ function TopPerformersDialog({ open, onOpenChange, topPerformers, users }: { ope
                             {topPerformers.map((business, index) => (
                                 <TableRow key={business.id}>
                                     <TableCell className="font-bold text-center">#{index + 1}</TableCell>
-                                    <TableCell className="font-medium">{business.name}</TableCell>
-                                    <TableCell>{businessOwners[business.id] || 'N/A'}</TableCell>
+                                    <TableCell className="font-medium max-w-[160px] truncate" title={business.name}>{business.name}</TableCell>
+                                    <TableCell className="max-w-[120px] truncate" title={businessOwners[business.id] || 'N/A'}>{businessOwners[business.id] || 'N/A'}</TableCell>
                                     <TableCell>{business.productCount || 0}</TableCell>
                                     <TableCell className="uppercase">{business.settings?.currency || 'NGN'}</TableCell>
                                     <TableCell className="text-right font-mono font-bold">₦{business.totalRevenue.toLocaleString()}</TableCell>
@@ -417,8 +417,8 @@ function BusinessDetailDialog({ open, onOpenChange, title, description, business
                             <TableBody>
                                 {businesses.map(b => (
                                     <TableRow key={b.id}>
-                                        <TableCell className="font-medium">{b.name}</TableCell>
-                                        <TableCell>{businessOwners[b.id]}</TableCell>
+                                        <TableCell className="font-medium max-w-[160px] truncate" title={b.name}>{b.name}</TableCell>
+                                        <TableCell className="max-w-[120px] truncate" title={businessOwners[b.id]}>{businessOwners[b.id]}</TableCell>
                                         <TableCell><Badge variant="secondary" className="capitalize">{b.accessLevel === 'lifetime' ? 'Lifetime' : b.plan || 'starter'}</Badge></TableCell>
                                         <TableCell>{b.trialExpiresAt ? format(b.trialExpiresAt.toDate(), 'PPP') : 'N/A'}</TableCell>
                                     </TableRow>
@@ -457,9 +457,9 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
                                 const biz = businesses?.find(b => b.id === u.businessId);
                                 return (
                                     <TableRow key={u.id}>
-                                        <TableCell className="font-medium">{u.name}</TableCell>
-                                        <TableCell>{u.email}</TableCell>
-                                        <TableCell>{biz?.name || 'N/A'}</TableCell>
+                                        <TableCell className="font-medium max-w-[140px] truncate" title={u.name}>{u.name}</TableCell>
+                                        <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground" title={u.email}>{u.email}</TableCell>
+                                        <TableCell className="max-w-[130px] truncate" title={biz?.name || 'N/A'}>{biz?.name || 'N/A'}</TableCell>
                                         <TableCell><Badge variant={u.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">{u.status || 'active'}</Badge></TableCell>
                                     </TableRow>
                                 );
@@ -857,7 +857,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{user?.name}'s Profile</DialogTitle>
                     <DialogDescription>Detailed view of user account and associated business data.</DialogDescription>
@@ -3171,9 +3171,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             />
 
             <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
-                <DialogContent className="max-w-4xl">
+                <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between gap-2">
+                        <DialogTitle className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-2">
                                 <Activity className="h-5 w-5 text-primary" />
                                 Platform Sales Velocity
