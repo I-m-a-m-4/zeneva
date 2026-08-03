@@ -956,8 +956,238 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
     );
 }
 
+// ======================== BUSINESS DETAIL DIALOG ========================
+
+function BusinessIntelDialog({
+    business, owner, businessProducts, businessReceipts, open, onOpenChange,
+}: {
+    business: BusinessInstance | null;
+    owner: UserProfile | null;
+    businessProducts: Product[];
+    businessReceipts: Receipt[];
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+}) {
+    if (!business) return null;
+
+    const productCount = businessProducts.length;
+    const totalStock = businessProducts.reduce((s, p) => s + (p.stock || 0), 0);
+    const productsWithImages = businessProducts.filter(p => p.imageUrl);
+    const totalRevenue = businessReceipts.reduce((s, r) => s + (r.total || 0), 0);
+
+    const unitsSold = businessReceipts.reduce((s, r) =>
+        s + (r.items || []).reduce((si, item) => si + (item.quantity || 0), 0), 0);
+
+    const salesByProduct: Record<string, { name: string; qty: number }> = {};
+    businessReceipts.forEach(r => {
+        (r.items || []).forEach(item => {
+            if (!salesByProduct[item.productId]) salesByProduct[item.productId] = { name: item.name, qty: 0 };
+            salesByProduct[item.productId].qty += item.quantity || 0;
+        });
+    });
+    const topProduct = Object.values(salesByProduct).sort((a, b) => b.qty - a.qty)[0] || null;
+    const estimatedStorageMB = ((productsWithImages.length * 200) / 1024).toFixed(1);
+
+    const uploadPattern = useMemo(() => {
+        const sorted = [...businessProducts]
+            .filter(p => p.createdAt)
+            .sort((a, b) => {
+                const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                return ta - tb;
+            });
+        if (sorted.length < 2) return { type: 'manual', batches: [] as any[], avgGapMins: 0, maxGapMins: 0, minGapMins: 0 };
+
+        const gaps: number[] = [];
+        const batches: { start: Date; count: number; gapMinutes: number | null }[] = [];
+        let currentBatchStart = sorted[0].createdAt.toDate ? sorted[0].createdAt.toDate() : new Date(sorted[0].createdAt);
+        let currentBatchCount = 1;
+
+        for (let i = 1; i < sorted.length; i++) {
+            const prev = sorted[i - 1].createdAt?.toDate ? sorted[i - 1].createdAt.toDate() : new Date(sorted[i - 1].createdAt || 0);
+            const curr = sorted[i].createdAt?.toDate ? sorted[i].createdAt.toDate() : new Date(sorted[i].createdAt || 0);
+            const diffMins = (curr.getTime() - prev.getTime()) / 60000;
+            gaps.push(diffMins);
+            if (diffMins < 5) {
+                currentBatchCount++;
+            } else {
+                batches.push({ start: currentBatchStart, count: currentBatchCount, gapMinutes: diffMins });
+                currentBatchStart = curr;
+                currentBatchCount = 1;
+            }
+        }
+        batches.push({ start: currentBatchStart, count: currentBatchCount, gapMinutes: null });
+
+        const avgGapMins = gaps.length > 0 ? gaps.reduce((s, g) => s + g, 0) / gaps.length : 0;
+        const maxGapMins = gaps.length > 0 ? Math.max(...gaps) : 0;
+        const minGapMins = gaps.length > 0 ? Math.min(...gaps) : 0;
+        const bulkGaps = gaps.filter(g => g < 2).length;
+        const isBulk = gaps.length > 0 && (bulkGaps / gaps.length) > 0.6;
+        return { type: isBulk ? 'bulk' : 'manual', batches, avgGapMins, maxGapMins, minGapMins };
+    }, [businessProducts]);
+
+    const currency = business.settings?.currency === 'USD' ? '$' : '₦';
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-xl">
+                        <Store className="h-5 w-5 text-primary" />
+                        {business.name}
+                    </DialogTitle>
+                    <DialogDescription>Deep inventory &amp; sales intelligence for this business.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6 pt-2">
+                    {/* KPI Row */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                            { label: 'Products', icon: Package, value: productCount, color: 'text-foreground' },
+                            { label: 'Total Stock Units', icon: Layers, value: totalStock.toLocaleString(), color: 'text-foreground' },
+                            { label: 'Units Sold', icon: ShoppingCart, value: unitsSold.toLocaleString(), color: 'text-foreground' },
+                            { label: 'Total Revenue', icon: DollarSign, value: `${currency}${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-emerald-500' },
+                        ].map(({ label, icon: Icon, value, color }) => (
+                            <div key={label} className="rounded-xl border bg-card p-3 space-y-1">
+                                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide flex items-center gap-1">
+                                    <Icon className="h-3 w-3" />{label}
+                                </p>
+                                <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Secondary stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="rounded-xl border bg-card p-3 flex items-center gap-3">
+                            <div className="bg-blue-500/10 p-2 rounded-lg flex-shrink-0"><Database className="h-4 w-4 text-blue-500" /></div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Est. Storage Used</p>
+                                <p className="font-bold text-sm">~{estimatedStorageMB} MB</p>
+                                <p className="text-[10px] text-muted-foreground">{productsWithImages.length} images uploaded</p>
+                            </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-3 flex items-center gap-3">
+                            <div className="bg-amber-500/10 p-2 rounded-lg flex-shrink-0"><Trophy className="h-4 w-4 text-amber-500" /></div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Best-Selling Product</p>
+                                <p className="font-bold text-sm truncate" title={topProduct?.name}>{topProduct?.name || '—'}</p>
+                                <p className="text-[10px] text-muted-foreground">{topProduct ? `${topProduct.qty} units sold` : 'No sales yet'}</p>
+                            </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-3 flex items-center gap-3">
+                            <div className="bg-purple-500/10 p-2 rounded-lg flex-shrink-0"><Users className="h-4 w-4 text-purple-500" /></div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Business Owner</p>
+                                <p className="font-bold text-sm truncate">{owner?.name || '—'}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{owner?.email || '—'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Upload Pattern */}
+                    <div className="rounded-xl border p-4 space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                                <Timer className="h-4 w-4 text-primary" />
+                                Upload Pattern Analysis
+                            </h3>
+                            <Badge variant="outline" className={uploadPattern.type === 'bulk'
+                                ? 'bg-orange-500/10 text-orange-600 border-orange-500/30'
+                                : 'bg-green-500/10 text-green-600 border-green-500/30'
+                            }>
+                                {uploadPattern.type === 'bulk' ? '⚡ Bulk Import Detected' : '✋ Manual / Gradual Uploads'}
+                            </Badge>
+                        </div>
+
+                        {productCount >= 2 ? (
+                            <div className="space-y-3">
+                                <p className="text-xs text-muted-foreground">
+                                    {uploadPattern.type === 'bulk'
+                                        ? 'Most products were uploaded in rapid bursts (under 2 min apart) — likely a bulk import via CSV or rapid copy-paste.'
+                                        : 'Products were uploaded manually over time with meaningful gaps between each.'}
+                                </p>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-muted/50 rounded-lg p-2">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Avg Gap</p>
+                                        <p className="font-bold text-sm">{uploadPattern.avgGapMins < 60 ? `${uploadPattern.avgGapMins.toFixed(1)}m` : `${(uploadPattern.avgGapMins / 60).toFixed(1)}h`}</p>
+                                    </div>
+                                    <div className="bg-muted/50 rounded-lg p-2">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Fastest Upload</p>
+                                        <p className="font-bold text-sm text-orange-500">{uploadPattern.minGapMins < 1 ? `${(uploadPattern.minGapMins * 60).toFixed(0)}s` : `${uploadPattern.minGapMins.toFixed(1)}m`}</p>
+                                    </div>
+                                    <div className="bg-muted/50 rounded-lg p-2">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Longest Gap</p>
+                                        <p className="font-bold text-sm">{uploadPattern.maxGapMins < 60 ? `${uploadPattern.maxGapMins.toFixed(0)}m` : `${(uploadPattern.maxGapMins / 60).toFixed(1)}h`}</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Upload Batches ({uploadPattern.batches.length})</p>
+                                    <ScrollArea className="h-28">
+                                        <div className="space-y-1 pr-2">
+                                            {uploadPattern.batches.map((batch, i) => (
+                                                <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded-md px-3 py-1.5">
+                                                    <span className="text-muted-foreground">{format(batch.start, 'MMM d, yyyy • HH:mm')}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className="text-[10px] font-bold">{batch.count} product{batch.count !== 1 ? 's' : ''}</Badge>
+                                                        {batch.gapMinutes !== null && (
+                                                            <span className="text-muted-foreground text-[10px]">→ {batch.gapMinutes < 60 ? `${batch.gapMinutes.toFixed(0)}m gap` : `${(batch.gapMinutes / 60).toFixed(1)}h gap`} before next</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground italic">Need at least 2 products to analyse upload pattern.</p>
+                        )}
+                    </div>
+
+                    {/* Product image gallery */}
+                    {productsWithImages.length > 0 && (
+                        <div className="space-y-2">
+                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                                <Globe className="h-4 w-4 text-primary" />
+                                Product Images ({productsWithImages.length} / {productCount})
+                            </h3>
+                            <ScrollArea className="h-44">
+                                <div className="flex flex-wrap gap-2 pr-2">
+                                    {productsWithImages.map(p => (
+                                        <div key={p.id} className="relative group w-[72px] h-[72px] rounded-lg overflow-hidden border bg-muted flex-shrink-0 cursor-pointer">
+                                            <img
+                                                src={p.imageUrl}
+                                                alt={p.name}
+                                                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
+                                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = ''; (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                            />
+                                            <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1">
+                                                <p className="text-[9px] text-white leading-tight line-clamp-2">{p.name}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+
+                    {productCount === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Package className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">This business has no products yet.</p>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// =====================================================================
 
 function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grants }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grants: any[] | null }) {
+
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -1038,6 +1268,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     };
     const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
     const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+    const [selectedBusinessForIntel, setSelectedBusinessForIntel] = useState<BusinessInstance | null>(null);
+    const [isBusinessIntelOpen, setIsBusinessIntelOpen] = useState(false);
     const [isSalesVelocityOpen, setIsSalesVelocityOpen] = useState(false);
     const [velocityFilter, setVelocityFilter] = useState<'7' | '14' | '30' | '90'>('14');
     const [isCreateGrantOpen, setIsCreateGrantOpen] = useState(false);
@@ -2473,9 +2705,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                                 <UserPresence lastSeen={user.lastSeen} />
                                                             </TableCell>
                                                             <TableCell>
-                                                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleImpersonateUser(user); }} title="Inspect Data">
-                                                                    <LogIn className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                                                </Button>
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleImpersonateUser(user); }} title="Impersonate User">
+                                                                        <LogIn className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                                    </Button>
+                                                                    {business && (
+                                                                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedBusinessForIntel(business); setIsBusinessIntelOpen(true); }} title="View Business Intel">
+                                                                            <Store className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
                                                         </TableRow>
                                                     )
@@ -3168,6 +3407,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 business={businesses?.find(b => b.id === selectedUserForDetail?.businessId)}
                 open={isUserDetailOpen}
                 onOpenChange={setIsUserDetailOpen}
+            />
+
+            <BusinessIntelDialog
+                business={selectedBusinessForIntel}
+                owner={users?.find(u => u.id === selectedBusinessForIntel?.ownerId) || null}
+                businessProducts={(products || []).filter(p => p.businessId === selectedBusinessForIntel?.id)}
+                businessReceipts={(receipts || []).filter(r => r.businessId === selectedBusinessForIntel?.id)}
+                open={isBusinessIntelOpen}
+                onOpenChange={setIsBusinessIntelOpen}
             />
 
             <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
