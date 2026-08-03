@@ -1618,6 +1618,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
         const totalProductsSold = convertedReceipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
 
+        const revenueGeneratingBusinessIds = new Set((convertedReceipts || []).map(r => r.businessId));
+        const revenueGeneratingBusinessesCount = revenueGeneratingBusinessIds.size;
+
         const totalSubscriptionRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
@@ -1778,7 +1781,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             uniqueDownloaders: downloadClicks?.length || 0,
             downloadStats,
             payingBusinesses,
-            recentPurchases
+            recentPurchases,
+            revenueGeneratingBusinessesCount
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
@@ -3450,7 +3454,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} />
                             <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} />
-                            <StatCard title="Overall ARPU" value={`₦${(analyticsData.platformGmv / (analyticsData.totalBusinesses || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Users} />
+                            <StatCard title="Overall ARPU" value={`₦${(analyticsData.platformGmv / (analyticsData.revenueGeneratingBusinessesCount || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Users} />
                         </div>
                         
                         <Card>
