@@ -228,10 +228,10 @@ const PIE_CHART_COLORS = {
     Lifetime: '#10b981' // Emerald
 };
 
-function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
+function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
     open: boolean; 
     onOpenChange: (open: boolean) => void; 
-    recentPurchases: any[]; 
+    validPurchases: any[]; 
     totalSubscriptionRevenue: number; 
     payingBusinessesCount: number; 
     businesses: BusinessInstance[] | null;
@@ -288,7 +288,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
                     </Card>
                 </div>
                 <div className="mt-2">
-                    <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (Last 30 Days)</h4>
+                    <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (All Time)</h4>
                     <div className="max-h-60 overflow-auto border rounded-md">
                         <Table>
                             <TableHeader>
@@ -301,7 +301,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {recentPurchases.map((p, index) => {
+                                {validPurchases.map((p, index) => {
                                     const biz = businesses?.find(b => b.id === p.businessId);
                                     const standardMrr = getStandardMRR(p.plan, p.currency);
                                     return (
@@ -1621,11 +1621,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const revenueGeneratingBusinessIds = new Set((convertedReceipts || []).map(r => r.businessId));
         const revenueGeneratingBusinessesCount = revenueGeneratingBusinessIds.size;
 
-        const totalSubscriptionRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
+        const excludedEmails = ['belloimam431@gmail.com', 'bimex4@gmail.com'];
+        const excludedUserIds = new Set(allUsers.filter(u => u.email && excludedEmails.includes(u.email.toLowerCase())).map(u => u.id));
+        
+        const validPurchases = (purchases || []).filter(p => {
+            const biz = activeBusinesses.find(b => b.id === p.businessId);
+            if (biz && excludedUserIds.has(biz.ownerId)) return false;
+            return true;
+        });
+
+        const totalSubscriptionRevenue = validPurchases.reduce((sum, p) => sum + p.amount, 0);
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
 
-        const payingBusinessIds = new Set((purchases || []).map(p => p.businessId));
+        const payingBusinessIds = new Set(validPurchases.map(p => p.businessId));
         const payingBusinesses = activeBusinesses?.filter(b => {
             return payingBusinessIds.has(b.id);
         });
@@ -1782,6 +1791,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             downloadStats,
             payingBusinesses,
             recentPurchases,
+            validPurchases,
             revenueGeneratingBusinessesCount
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
@@ -3359,7 +3369,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             <SaaSMetricsDetailDialog
                 open={isSaaSMetricsOpen}
                 onOpenChange={setIsSaaSMetricsOpen}
-                recentPurchases={analyticsData.recentPurchases || []}
+                validPurchases={analyticsData.validPurchases || []}
                 totalSubscriptionRevenue={analyticsData.totalSubscriptionRevenue || 0}
                 payingBusinessesCount={analyticsData.payingBusinesses?.length || 0}
                 businesses={businesses}
