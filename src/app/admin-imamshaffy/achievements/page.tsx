@@ -1,384 +1,429 @@
 'use client';
 
-import * as React from 'react';
-import { useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { Trophy, Star, CheckCircle, Zap, Loader, PartyPopper, Download } from 'lucide-react';
-import type { Receipt, Product, BusinessInstance } from '@/types';
+import { Trophy, Users, DollarSign, Sparkles, ShoppingBag, Store, Star, ArrowUpRight, Flame, Heart, Loader, X } from 'lucide-react';
+import type { Receipt, Product, BusinessInstance, UserProfile } from '@/types';
+import Confetti from '@/components/shared/confetti';
 import { cn } from '@/lib/utils';
-import { usePOS } from '@/context/pos-context';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import html2canvas from 'html2canvas';
 
-interface Milestone {
-    id: string;
-    title: string;
-    description: string;
-    target: number;
-    current: number;
-    icon: React.ElementType;
-    color: string;
-    format?: (val: number) => string;
+// =================================================================
+// AchievementModal Component
+// =================================================================
+interface AchievementModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  message: string;
+  isDarkMode: boolean;
 }
 
-export default function AchievementsPage() {
-    const firestore = useFirestore();
-    const { triggerConfetti } = usePOS();
-    const { toast } = useToast();
-    const cardRef = React.useRef<HTMLDivElement>(null);
-    const [isDownloading, setIsDownloading] = React.useState(false);
+export const AchievementModal: React.FC<AchievementModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  message,
+  isDarkMode
+}) => {
+  const [showConfetti, setShowConfetti] = useState(false);
 
-    const [selectedMilestone, setSelectedMilestone] = React.useState<Milestone | null>(null);
-
-    const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
-    const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
-    const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts')), [firestore]);
-
-    const { data: businesses, isLoading: bLoading } = useCollection<BusinessInstance>(businessesQuery);
-    const { data: products, isLoading: pLoading } = useCollection<Product>(productsQuery);
-    const { data: receipts, isLoading: rLoading } = useCollection<Receipt>(receiptsQuery);
-
-    const isLoading = bLoading || pLoading || rLoading;
-
-    const milestones: Milestone[] = useMemo(() => {
-        if (!businesses || !products || !receipts) return [];
-
-        const totalSales = receipts.length;
-        const totalProducts = products.length;
-        const activeBusinesses = businesses.filter(b => b.status !== 'deleted').length;
-        const totalGMV = receipts.reduce((sum, r) => sum + r.total, 0);
-
-        return [
-            // Sales Achievements
-            {
-                id: 'sales_10',
-                title: 'First 10 Sales',
-                description: 'The platform successfully facilitated its first 10 sales.',
-                target: 10,
-                current: totalSales,
-                icon: CheckCircle,
-                color: 'text-zinc-500',
-            },
-            {
-                id: 'sales_100',
-                title: 'Century of Sales',
-                description: 'We have successfully completed 100 sales across the entire platform.',
-                target: 100,
-                current: totalSales,
-                icon: Trophy,
-                color: 'text-yellow-500',
-            },
-            {
-                id: 'sales_1000',
-                title: 'Sales Master',
-                description: 'We have breached 1,000 sales across the platform! Incredible momentum.',
-                target: 1000,
-                current: totalSales,
-                icon: Star,
-                color: 'text-purple-500',
-            },
-            {
-                id: 'sales_10000',
-                title: 'Ten Thousand Transactions',
-                description: 'We successfully completed 10,000 sales platform-wide. Unstoppable.',
-                target: 10000,
-                current: totalSales,
-                icon: Zap,
-                color: 'text-red-500',
-            },
-
-            // GMV Achievements
-            {
-                id: 'gmv_1m',
-                title: 'The First Million',
-                description: 'The platform successfully processed ₦1,000,000 in total GMV.',
-                target: 1000000,
-                current: totalGMV,
-                icon: Zap,
-                color: 'text-blue-500',
-                format: (val) => `₦${val.toLocaleString()}`
-            },
-            {
-                id: 'gmv_10m',
-                title: 'Ten Million Milestone',
-                description: 'Phenomenal growth! We processed ₦10,000,000 in total GMV.',
-                target: 10000000,
-                current: totalGMV,
-                icon: CheckCircle,
-                color: 'text-emerald-500',
-                format: (val) => `₦${val.toLocaleString()}`
-            },
-            {
-                id: 'gmv_100m',
-                title: 'One Hundred Million',
-                description: 'A colossal achievement. We processed ₦100,000,000 in total GMV.',
-                target: 100000000,
-                current: totalGMV,
-                icon: Trophy,
-                color: 'text-orange-500',
-                format: (val) => `₦${val.toLocaleString()}`
-            },
-            {
-                id: 'gmv_1b',
-                title: 'The Billionaire Club',
-                description: 'Legendary status. The platform has officially moved ₦1,000,000,000 in GMV.',
-                target: 1000000000,
-                current: totalGMV,
-                icon: Star,
-                color: 'text-yellow-400',
-                format: (val) => `₦${val.toLocaleString()}`
-            },
-
-            // Product Achievements
-            {
-                id: 'products_50',
-                title: 'Catalog Starter',
-                description: 'We reached 50 unique products listed on Zeneva.',
-                target: 50,
-                current: totalProducts,
-                icon: CheckCircle,
-                color: 'text-indigo-400',
-            },
-            {
-                id: 'products_500',
-                title: 'Inventory Builder',
-                description: 'We officially host over 500 unique products on the platform.',
-                target: 500,
-                current: totalProducts,
-                icon: CheckCircle,
-                color: 'text-orange-500',
-            },
-            {
-                id: 'products_5000',
-                title: 'Massive Marketplace',
-                description: '5,000 unique products are now available through businesses on Zeneva.',
-                target: 5000,
-                current: totalProducts,
-                icon: Zap,
-                color: 'text-pink-500',
-            },
-
-            // Business Achievements
-            {
-                id: 'businesses_10',
-                title: 'Pioneers',
-                description: 'Our first 10 active businesses trust Zeneva.',
-                target: 10,
-                current: activeBusinesses,
-                icon: Trophy,
-                color: 'text-cyan-500',
-            },
-            {
-                id: 'businesses_100',
-                title: 'A Growing Community',
-                description: 'We successfully reached 100 active businesses running on Zeneva.',
-                target: 100,
-                current: activeBusinesses,
-                icon: Trophy,
-                color: 'text-indigo-500',
-            },
-            {
-                id: 'businesses_500',
-                title: 'Enterprise Scale',
-                description: 'An army of 500 active businesses now operate via Zeneva.',
-                target: 500,
-                current: activeBusinesses,
-                icon: Star,
-                color: 'text-fuchsia-500',
-            }
-        ];
-    }, [businesses, products, receipts]);
-
-    const handleDownload = async () => {
-        if (!cardRef.current) return;
-        setIsDownloading(true);
-        try {
-            const canvas = await html2canvas(cardRef.current, {
-                useCORS: true,
-                scale: 3,
-                backgroundColor: null,
-            });
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `zeneva-platform-achievement-${selectedMilestone?.id}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            toast({ title: "Downloaded!", description: "Your platform achievement card has been saved." });
-        } catch (error) {
-            console.error("Download failed", error);
-            toast({ variant: "destructive", title: "Download Failed", description: "Could not save the image. Please try again." });
-        } finally {
-            setIsDownloading(false);
-        }
-    };
-
-    if (isLoading) {
-        return (
-            <div className="flex h-[80vh] items-center justify-center">
-                <Loader className="h-8 w-8 animate-spin text-primary" />
-                <p className="ml-4 text-lg">Loading Achievements...</p>
-            </div>
-        );
+  useEffect(() => {
+    if (isOpen) {
+      setShowConfetti(true);
+    } else {
+      setShowConfetti(false);
     }
+  }, [isOpen]);
 
-    return (
-        <div className="p-4 md:p-6 lg:p-8 space-y-6">
-            <div className="mb-2">
-                <h1 className="text-3xl font-bold flex items-center gap-2">
-                    <Trophy className="h-8 w-8 text-yellow-500" />
-                    Platform Achievements
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                    Track the collective milestones and achievements we've reached as a platform.
-                </p>
-            </div>
+  if (!isOpen) return null;
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
-                {milestones.map((milestone, index) => {
-                    const isCompleted = milestone.current >= milestone.target;
-                    const progressValue = Math.min((milestone.current / milestone.target) * 100, 100);
+  return (
+    <>
+      <Confetti trigger={showConfetti} onComplete={() => setShowConfetti(false)} />
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
+        <div className={cn(
+          "relative w-full max-w-md p-8 rounded-2xl shadow-2xl border flex flex-col items-center text-center overflow-hidden",
+          isDarkMode ? 'bg-[#0f172a] border-primary/30' : 'bg-white border-primary/20'
+        )}>
+          {/* Decorative background glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-primary/20 rounded-full blur-[60px] pointer-events-none" />
 
-                    // Determine if we need a connector line to the next card
-                    const showConnector = index < milestones.length - 1;
-
-                    return (
-                        <div key={milestone.id} className="relative group">
-                            {showConnector && (
-                                <div className="hidden lg:block absolute top-[50%] -right-[24px] w-[24px] border-t-2 border-dashed border-primary/30 z-0 animate-pulse" />
-                            )}
-                            <Card
-                                onClick={() => {
-                                    if (isCompleted) {
-                                        setSelectedMilestone(milestone);
-                                        triggerConfetti();
-                                    }
-                                }}
-                                className={cn(
-                                    "relative overflow-hidden transition-all duration-300 animate-in fade-in zoom-in",
-                                    isCompleted ? "cursor-pointer hover:-translate-y-1 shadow-md hover:shadow-xl ring-1 ring-primary/20 hover:ring-primary/50" : "opacity-80 grayscale-[30%]"
-                                )}
-                            >
-                                <div className="absolute inset-0 z-0 pointer-events-none">
-                                    <Image
-                                        src="/achievement_bg.png"
-                                        alt="Card Background"
-                                        fill
-                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                        className="object-cover opacity-10 mix-blend-multiply dark:mix-blend-lighten"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-transparent" />
-                                </div>
-
-                                <CardHeader className="relative z-10 flex flex-row items-center gap-4 pb-2">
-                                    <div className={cn("p-3 rounded-xl bg-background/80 backdrop-blur-sm border shadow-sm", milestone.color, isCompleted ? "bg-primary/10 border-primary/20 text-primary" : "text-muted-foreground")}>
-                                        <milestone.icon className="h-7 w-7" />
-                                    </div>
-                                    <div>
-                                        <CardTitle className="text-lg font-bold">{milestone.title}</CardTitle>
-                                        <CardDescription className="text-xs font-medium">{milestone.description}</CardDescription>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="relative z-10 space-y-4 pt-2">
-                                    <div>
-                                        <div className="flex justify-between text-sm mb-1.5 font-semibold">
-                                            <span>Progress</span>
-                                            <span className={isCompleted ? "text-primary font-bold" : "text-muted-foreground font-medium"}>
-                                                {milestone.format ? milestone.format(milestone.current) : milestone.current.toLocaleString()} / {milestone.format ? milestone.format(milestone.target) : milestone.target.toLocaleString()}
-                                            </span>
-                                        </div>
-                                        <Progress value={progressValue} className={cn("h-2.5 bg-muted/50 overflow-hidden", isCompleted ? "[&>div]:bg-primary shadow-inner" : "")} />
-                                    </div>
-                                    {isCompleted && (
-                                        <div className="flex items-center gap-2 text-xs text-primary font-bold bg-primary/10 p-2 rounded-lg border border-primary/20">
-                                            <PartyPopper className="h-4 w-4 animate-bounce" />
-                                            Achievement Unlocked - Click to view!
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <Dialog open={!!selectedMilestone} onOpenChange={(open) => !open && setSelectedMilestone(null)}>
-                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 gap-0">
-                    <DialogTitle className="sr-only">Platform Achievement</DialogTitle>
-                    <DialogDescription className="sr-only">Platform achievement milestone download view</DialogDescription>
-
-                    <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-background min-h-[420px] justify-center">
-                        <div className="absolute inset-0 z-0">
-                            <Image
-                                src="/achievement_bg.png"
-                                alt="Background"
-                                fill
-                                sizes="100vw"
-                                className="object-cover opacity-40"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
-                        </div>
-
-                        <div className="relative z-10 mb-4 px-3 py-1 bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 rounded-full">
-                            <p className="text-xs font-bold text-yellow-600 tracking-wide uppercase flex items-center gap-2">
-                                <Trophy className="h-3 w-3" /> Zeneva Honors
-                            </p>
-                        </div>
-
-                        <div className="relative z-10 w-32 h-32 bg-background/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl mb-6 ring-4 ring-yellow-500/20 text-yellow-500">
-                            {selectedMilestone && <selectedMilestone.icon className="h-16 w-16" />}
-                        </div>
-
-                        <div className="relative z-10 w-full mb-6">
-                            <h2 className="text-2xl font-bold text-primary mb-2 leading-tight">
-                                {selectedMilestone?.title}
-                            </h2>
-                            <p className="text-base text-foreground/80 font-medium px-4">
-                                {selectedMilestone?.description}
-                            </p>
-                        </div>
-
-                        <div className="relative z-10 grid grid-cols-1 gap-4 w-full bg-white/60 backdrop-blur-sm border border-white/20 p-4 rounded-xl shadow-sm">
-                            <div className="text-center">
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Platform Wide Goal Reached</p>
-                                <p className="text-sm font-bold mt-1 text-primary">
-                                    {selectedMilestone?.format ? selectedMilestone.format(selectedMilestone.target) : selectedMilestone?.target.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="absolute bottom-4 left-0 right-0 text-center">
-                            <p className="text-[11px] font-black tracking-[0.2em] text-primary/80 uppercase">
-                                zeneva.space
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 border-t flex flex-col gap-3">
-                        <Button className="w-full gap-2 text-base h-11 shadow-md hover:shadow-lg transition-all" onClick={() => triggerConfetti()}>
-                            <PartyPopper className="h-4 w-4" />
-                            Celebrate Again!
-                        </Button>
-                        <Button variant="outline" className="w-full gap-2 h-11 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary" onClick={handleDownload} disabled={isDownloading}>
-                            {isDownloading ? (
-                                <>Downloading...</>
-                            ) : (
-                                <>
-                                    <Download className="h-4 w-4" />
-                                    Download Certificate
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+          <button onClick={onClose} className={cn(
+            "absolute top-4 right-4 p-2 rounded-full transition-colors z-10",
+            isDarkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-800/10'
+          )}>
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="text-7xl mb-6 animate-bounce">🎉</div>
+          
+          <h2 className={cn(
+            "text-3xl font-black tracking-tight mb-3 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
+          )}>
+            {title}
+          </h2>
+          
+          <p className={cn(
+            "text-sm font-medium mb-8 leading-relaxed",
+            isDarkMode ? 'text-slate-300' : 'text-slate-600'
+          )}>
+            {message}
+          </p>
+          
+          <button 
+            onClick={onClose} 
+            className="px-8 py-3 bg-primary hover:bg-primary/90 text-slate-950 font-black tracking-wider uppercase text-sm rounded-xl shadow-lg shadow-primary/30 transition-all transform hover:scale-105 active:scale-95"
+          >
+            Awesome!
+          </button>
         </div>
+      </div>
+    </>
+  );
+};
+
+// =================================================================
+// AchievementsPage Component
+// =================================================================
+export default function AchievementsPage() {
+  const { resolvedTheme } = useTheme();
+  const isDarkMode = resolvedTheme === 'dark';
+  const firestore = useFirestore();
+
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [selectedAchievement, setSelectedAchievement] = useState<any>(null);
+
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+  };
+
+  // Queries to compute active stats
+  const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
+  const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
+  const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts')), [firestore]);
+  const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
+
+  const { data: businesses, isLoading: bLoading } = useCollection<BusinessInstance>(businessesQuery);
+  const { data: products, isLoading: pLoading } = useCollection<Product>(productsQuery);
+  const { data: receipts, isLoading: rLoading } = useCollection<Receipt>(receiptsQuery);
+  const { data: users, isLoading: uLoading } = useCollection<UserProfile>(usersQuery);
+
+  const isLoading = bLoading || pLoading || rLoading || uLoading;
+
+  const stats = useMemo(() => {
+    if (!businesses || !products || !receipts || !users) return null;
+
+    const totalSales = receipts.length;
+    const totalProducts = products.length;
+    const activeSellers = businesses.filter(b => b.status !== 'deleted').length;
+    const totalGmv = receipts.reduce((sum, r) => sum + (r.total || 0), 0);
+    const totalUsers = users.length;
+    
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const dailyActiveUsers = users.filter(u => {
+      if (!u.lastSeen) return false;
+      const date = u.lastSeen.toDate ? u.lastSeen.toDate() : new Date(u.lastSeen);
+      return date > oneDayAgo;
+    }).length;
+    
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const activeWithin7Days = users.filter(u => {
+      if (!u.lastSeen) return false;
+      const date = u.lastSeen.toDate ? u.lastSeen.toDate() : new Date(u.lastSeen);
+      return date > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    }).length;
+    const totalOldUsers = users.filter(u => {
+      const date = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt || Date.now());
+      return date < thirtyDaysAgo;
+    }).length;
+    const retentionPercentage = totalOldUsers > 0 ? Math.round((activeWithin7Days / totalOldUsers) * 100) : 100;
+
+    return {
+      totalGmv,
+      totalUsers,
+      totalSuccessfulOrders: totalSales,
+      activeSellers,
+      totalProducts,
+      dailyActiveUsers,
+      retentionPercentage
+    };
+  }, [businesses, products, receipts, users]);
+
+  const achievements = useMemo(() => {
+    return [
+      // GMV Milestones
+      {
+        id: "achievement_100k_gmv",
+        title: "₦100K GMV Milestone",
+        description: "Zeneva successfully crossed ₦100,000 in Gross Merchandise Value.",
+        icon: DollarSign,
+        color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+        unlocked: stats ? stats.totalGmv >= 100000 : false,
+      },
+      {
+        id: "achievement_1m_gmv",
+        title: "₦1M GMV Milestone",
+        description: "Zeneva crosses ₦1,000,000 in Gross Merchandise Value.",
+        icon: DollarSign,
+        color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+        unlocked: stats ? stats.totalGmv >= 1000000 : false,
+      },
+      {
+        id: "achievement_10m_gmv",
+        title: "₦10M GMV Milestone",
+        description: "Zeneva crosses ₦10,000,000 in Gross Merchandise Value.",
+        icon: Trophy,
+        color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+        unlocked: stats ? stats.totalGmv >= 10000000 : false,
+      },
+      {
+        id: "achievement_50m_gmv",
+        title: "₦50M GMV Milestone",
+        description: "Zeneva crosses ₦50,000,000 in Gross Merchandise Value.",
+        icon: Flame,
+        color: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+        unlocked: stats ? stats.totalGmv >= 50000000 : false,
+      },
+      {
+        id: "achievement_100m_gmv",
+        title: "₦100M GMV Milestone",
+        description: "Zeneva crosses ₦100,000,000 in Gross Merchandise Value.",
+        icon: Flame,
+        color: "bg-red-500/10 text-red-500 border-red-500/20",
+        unlocked: stats ? stats.totalGmv >= 100000000 : false,
+      },
+      // User Milestones
+      {
+        id: "achievement_500_users",
+        title: "500 Users Milestone",
+        description: "Zeneva crossed 500 registered users.",
+        icon: Users,
+        color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+        unlocked: stats ? stats.totalUsers >= 500 : false,
+      },
+      {
+        id: "achievement_1k_users",
+        title: "1,000 Users",
+        description: "Zeneva crossed 1,000 registered users.",
+        icon: Users,
+        color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+        unlocked: stats ? stats.totalUsers >= 1000 : false,
+      },
+      {
+        id: "achievement_10k_users",
+        title: "10,000 Users",
+        description: "Zeneva crossed 10,000 registered users.",
+        icon: Users,
+        color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+        unlocked: stats ? stats.totalUsers >= 10000 : false,
+      },
+      {
+        id: "achievement_50k_users",
+        title: "50,000 Users",
+        description: "Zeneva crossed 50,000 registered users.",
+        icon: Users,
+        color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+        unlocked: stats ? stats.totalUsers >= 50000 : false,
+      },
+      {
+        id: "achievement_100k_users",
+        title: "100,000 Users",
+        description: "Zeneva crossed 100,000 registered users.",
+        icon: Star,
+        color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+        unlocked: stats ? stats.totalUsers >= 100000 : false,
+      },
+      // Order Milestones
+      {
+        id: "achievement_100_orders",
+        title: "100 Successful Orders",
+        description: "100 orders successfully delivered and completed.",
+        icon: ShoppingBag,
+        color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+        unlocked: stats ? stats.totalSuccessfulOrders >= 100 : false,
+      },
+      {
+        id: "achievement_1k_orders",
+        title: "1,000 Successful Orders",
+        description: "1,000 orders successfully delivered and completed.",
+        icon: ShoppingBag,
+        color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+        unlocked: stats ? stats.totalSuccessfulOrders >= 1000 : false,
+      },
+      {
+        id: "achievement_10k_orders",
+        title: "10,000 Successful Orders",
+        description: "10,000 orders successfully delivered and completed.",
+        icon: ShoppingBag,
+        color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+        unlocked: stats ? stats.totalSuccessfulOrders >= 10000 : false,
+      },
+      // Seller & Listing Milestones
+      {
+        id: "achievement_100_sellers",
+        title: "100 Active Sellers",
+        description: "100 sellers with at least one active listing.",
+        icon: Store,
+        color: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+        unlocked: stats ? stats.activeSellers >= 100 : false,
+      },
+      {
+        id: "achievement_1k_sellers",
+        title: "1,000 Active Sellers",
+        description: "1,000 sellers with at least one active listing.",
+        icon: Store,
+        color: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+        unlocked: stats ? stats.activeSellers >= 1000 : false,
+      },
+      {
+        id: "achievement_1k_listings",
+        title: "1,000 Active Listings",
+        description: "1,000 products currently listed on the platform.",
+        icon: Store,
+        color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+        unlocked: stats ? stats.totalProducts >= 1000 : false,
+      },
+      // Retention & Activity
+      {
+        id: "achievement_100_daily_active",
+        title: "100 Daily Active Users",
+        description: "Reached 100 daily active users (DAU).",
+        icon: ArrowUpRight,
+        color: "bg-pink-500/10 text-pink-500 border-pink-500/20",
+        unlocked: stats ? stats.dailyActiveUsers >= 100 : false,
+      },
+      {
+        id: "achievement_high_retention",
+        title: "Super Retention",
+        description: "Over 30% user retention month-over-month.",
+        icon: Heart,
+        color: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+        unlocked: stats ? stats.retentionPercentage >= 30 : false,
+      }
+    ];
+  }, [stats]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Loading Achievements...</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="p-4 md:p-6 lg:p-8 min-h-[calc(100vh-140px)] flex flex-col space-y-6 animate-in fade-in zoom-in duration-300">
+      <Confetti trigger={showConfetti} onComplete={() => setShowConfetti(false)} />
+
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0 px-1">
+        <div>
+          <h2 className={cn(
+            "text-2xl font-black tracking-tight flex items-center gap-2",
+            isDarkMode ? 'text-white' : 'text-slate-900'
+          )}>
+            <Trophy className="w-6 h-6 text-yellow-500" />
+            Platform Achievements
+          </h2>
+          <p className={cn(
+            "text-sm mt-1",
+            isDarkMode ? 'text-slate-400' : 'text-slate-500'
+          )}>
+            Track and celebrate major milestones reached by the platform.
+          </p>
+        </div>
+        <button 
+          onClick={triggerConfetti}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-purple-500 text-white font-bold rounded-lg shadow-lg hover:opacity-90 transition-opacity"
+        >
+          <Sparkles className="w-4 h-4" />
+          Celebrate!
+        </button>
+      </div>
+
+      {/* Scrollable grid area */}
+      <div className="flex-1 overflow-y-auto pr-2 pb-12 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex flex-col gap-6 max-w-3xl mx-auto">
+          {achievements.map((achievement, idx) => {
+            const Icon = achievement.icon;
+            const isUnlocked = achievement.unlocked;
+            return (
+              <div key={achievement.id} className="relative group">
+                {/* Connecting dashed line to the next card */}
+                {idx !== achievements.length - 1 && (
+                  <div className={cn(
+                    "absolute left-[41px] top-1/2 w-px h-[calc(100%+24px)] border-l-2 border-dashed group-hover:border-primary/40 transition-colors -ml-px z-0",
+                    isDarkMode ? 'border-slate-800' : 'border-slate-300'
+                  )} />
+                )}
+                
+                <div 
+                  onClick={() => {
+                    if (isUnlocked) {
+                      setSelectedAchievement(achievement);
+                    }
+                  }}
+                  className={cn(
+                    "relative z-10 p-5 rounded-lg border cursor-pointer transition-all",
+                    isUnlocked 
+                      ? isDarkMode ? 'bg-[#0f172a] border-primary/30 hover:border-primary/60 shadow-md shadow-primary/5' : 'bg-white border-primary/30 hover:border-primary/60 shadow-sm'
+                      : isDarkMode ? 'bg-[#0a0f1d] border-slate-800 opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500' : 'bg-slate-50 border-slate-200 opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500'
+                  )}
+                >
+                  <div className="flex items-center gap-6">
+                    <div className={cn(
+                      "relative z-20 p-3 rounded-lg border shrink-0",
+                      achievement.color,
+                      isDarkMode ? 'bg-[#0f172a]' : 'bg-white'
+                    )}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={cn(
+                        "text-base font-bold leading-tight mb-1",
+                        isDarkMode ? 'text-white' : 'text-slate-900'
+                      )}>
+                        {achievement.title}
+                      </h3>
+                      <p className={cn(
+                        "text-[11px] leading-snug",
+                        isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                      )}>
+                        {achievement.description}
+                      </p>
+                    </div>
+                    <div className="shrink-0">
+                      {isUnlocked ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20">
+                          <Trophy className="w-3 h-3" /> Unlocked
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 px-3 py-1.5 rounded-lg border",
+                          isDarkMode ? 'text-slate-600 border-slate-800 bg-slate-900/50' : 'text-slate-400 border-slate-200 bg-slate-100/50'
+                        )}>
+                          Locked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <AchievementModal
+        isOpen={!!selectedAchievement}
+        onClose={() => setSelectedAchievement(null)}
+        title={selectedAchievement?.title || ''}
+        message={selectedAchievement?.description || ''}
+        isDarkMode={isDarkMode}
+      />
+    </div>
+  );
 }
