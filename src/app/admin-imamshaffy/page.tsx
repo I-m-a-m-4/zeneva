@@ -86,6 +86,7 @@ import {
     Laptop,
     Smartphone,
     Timer,
+    RefreshCw,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1186,7 +1187,7 @@ function BusinessIntelDialog({
 
 // =====================================================================
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grants }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grants: any[] | null }) {
+function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grants, onRefresh, isRefreshing }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grants: any[] | null, onRefresh?: () => void, isRefreshing?: boolean }) {
 
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -2116,6 +2117,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </p>
                 </div>
                 <div className="no-capture flex items-center gap-2">
+                    {onRefresh && (
+                        <Button onClick={onRefresh} disabled={isRefreshing} variant="outline" className="gap-2">
+                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+                        </Button>
+                    )}
                     <Button onClick={handleDownloadReport} disabled={isDownloading} variant="outline">
                         <Download className="mr-2 h-4 w-4" /> {isDownloading ? "Downloading..." : "Download Report"}
                     </Button>
@@ -3501,28 +3508,68 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     );
 }
 
+// Helper to convert Firebase Admin timestamp objects `{ _seconds, _nanoseconds }`
+// back into Firestore client Timestamp-like objects with a `.toDate()` method.
+const reviveTimestamps = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (obj instanceof Date) return obj;
+    if (Array.isArray(obj)) return obj.map(reviveTimestamps);
+    
+    if (typeof obj === 'object') {
+        if ('_seconds' in obj && '_nanoseconds' in obj) {
+            const ms = obj._seconds * 1000 + obj._nanoseconds / 1000000;
+            const d = new Date(ms);
+            return {
+                seconds: obj._seconds,
+                nanoseconds: obj._nanoseconds,
+                toDate: () => d
+            };
+        }
+        
+        const newObj: any = {};
+        for (const key in obj) {
+            newObj[key] = reviveTimestamps(obj[key]);
+        }
+        return newObj;
+    }
+    return obj;
+};
+
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
 
-    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
-    const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
-    const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
-    const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
-    const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc')), [firestore]);
-    const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
-    const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
-    const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
 
-    const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
-    const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
-    const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
-    const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
-    const { data: grants, isLoading: grantsLoading } = useCollection<any>(grantsQuery);
-    const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
-    const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
-    const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
+    const [adminData, setAdminData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading;
+    const fetchAdminData = async () => {
+        setIsRefreshing(true);
+        try {
+            const res = await fetch('/api/admin/metrics');
+            const data = await res.json();
+            const revivedData = reviveTimestamps(data);
+            setAdminData(revivedData);
+        } catch (error) {
+            console.error('Failed to fetch admin data:', error);
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAdminData();
+    }, []);
+
+    const users = adminData?.users;
+    const businesses = adminData?.businesses;
+    const products = adminData?.products;
+    const applications = adminData?.applications;
+    const grants = adminData?.grants;
+    const receipts = adminData?.receipts;
+    const purchases = adminData?.purchases;
+    const downloadClicks = adminData?.downloadClicks;
 
     if (isLoading) {
         return (
@@ -3533,5 +3580,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} />
+    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} onRefresh={fetchAdminData} isRefreshing={isRefreshing} />
 }
