@@ -99,7 +99,6 @@ jobs:
 
       - name: Upload Built App Artifacts (Windows/macOS)
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: zeneva-${{ matrix.platform }}-bundle
           path: |
@@ -281,7 +280,6 @@ jobs:
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: zeneva-android-artifacts
           path: |
@@ -395,7 +393,6 @@ jobs:
 
       - name: Upload iOS Artifacts
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: zeneva-ios-artifacts
           path: |

@@ -63,20 +63,24 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             let fetchedBranches = branchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Branch));
             
             // Ensure a primary branch exists with ID = businessId
-            const correctPrimary = fetchedBranches.find(b => b.id === businessId && b.isPrimary);
+            let correctPrimary = fetchedBranches.find(b => b.id === businessId && b.isPrimary);
+            
+            // Fetch the business instance info to get its name & address
+            let businessName = 'Main Store (Primary)';
+            let businessAddress = '';
+            try {
+              const businessDocRef = doc(firestore, 'businessInstances', businessId);
+              const businessDocSnap = await getDoc(businessDocRef);
+              if (businessDocSnap.exists()) {
+                businessName = businessDocSnap.data().name || businessName;
+                businessAddress = businessDocSnap.data().address || '';
+              }
+            } catch (err) {
+              console.error("Failed to fetch business info for primary branch sync", err);
+            }
             
             if (!correctPrimary) {
               try {
-                // Fetch the business instance info to get its name & address
-                const businessDocRef = doc(firestore, 'businessInstances', businessId);
-                const businessDocSnap = await getDoc(businessDocRef);
-                let businessName = 'Main Store (Primary)';
-                let businessAddress = '';
-                if (businessDocSnap.exists()) {
-                  businessName = businessDocSnap.data().name || businessName;
-                  businessAddress = businessDocSnap.data().address || '';
-                }
-
                 // Write the correct primary branch with ID = businessId
                 const { setDoc, serverTimestamp } = await import('firebase/firestore');
                 const primaryBranchRef = doc(firestore, 'branches', businessId);
@@ -104,6 +108,19 @@ export function BranchProvider({ children }: { children: ReactNode }) {
                 fetchedBranches = [createdBranch, ...fetchedBranches.filter(b => b.id !== businessId)];
               } catch (createErr) {
                 console.error("Failed to write primary branch", createErr);
+              }
+            } else if (correctPrimary.name !== businessName || correctPrimary.address !== businessAddress) {
+              try {
+                const { updateDoc } = await import('firebase/firestore');
+                const primaryBranchRef = doc(firestore, 'branches', businessId);
+                await updateDoc(primaryBranchRef, {
+                  name: businessName,
+                  address: businessAddress
+                });
+                correctPrimary.name = businessName;
+                correctPrimary.address = businessAddress;
+              } catch (updateErr) {
+                console.error("Failed to update primary branch name/address in sync with business", updateErr);
               }
             }
 
