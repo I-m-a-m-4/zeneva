@@ -248,7 +248,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-primary" />
@@ -289,7 +289,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSub
                 </div>
                 <div className="mt-2">
                     <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (Last 30 Days)</h4>
-                    <div className="flex-1 overflow-auto border rounded-md">
+                    <div className="max-h-60 overflow-auto border rounded-md">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -346,14 +346,14 @@ function TopPerformersDialog({ open, onOpenChange, topPerformers, users }: { ope
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
                 <DialogHeader>
                     <DialogTitle>All Performers Ranking (GMV)</DialogTitle>
                     <DialogDescription>
                         A ranking of all active businesses by their total Gross Merchandise Value (converted to Naira if USD).
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-1 pr-4">
+                <ScrollArea className="max-h-[400px]">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -857,7 +857,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw]">
                 <DialogHeader>
                     <DialogTitle>{user?.name}'s Profile</DialogTitle>
                     <DialogDescription>Detailed view of user account and associated business data.</DialogDescription>
@@ -1030,7 +1030,7 @@ function BusinessIntelDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <Store className="h-5 w-5 text-primary" />
@@ -3419,7 +3419,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             />
 
             <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
-                <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-4xl w-[95vw]">
                     <DialogHeader>
                         <DialogTitle className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-2">
