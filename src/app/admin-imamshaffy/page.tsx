@@ -686,8 +686,8 @@ function formatDuration(seconds: number): string {
 }
 
 function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; businesses: BusinessInstance[] }) {
-    const [sortField, setSortField] = React.useState<'usage' | 'name' | 'lastSeen'>('usage');
-    const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+    const [sortField, setSortField] = useState<'usage' | 'name' | 'lastSeen'>('usage');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
     const todayStart = startOfDay(new Date());
 
