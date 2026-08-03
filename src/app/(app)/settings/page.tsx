@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import FeatureGate from '@/components/shared/feature-gate';
 import { BusinessInstance, UserProfile } from '@/types';
+import { ALL_CURRENCIES } from '@/lib/constants';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -901,22 +902,11 @@ function SettingsPageContent() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
-                                        <DropdownMenuItem onClick={() => setCurrency("NGN")} className="cursor-pointer">NGN (₦)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("USD")} className="cursor-pointer">USD ($)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("EUR")} className="cursor-pointer">EUR (€)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("GBP")} className="cursor-pointer">GBP (£)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("CAD")} className="cursor-pointer">CAD ($)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("AUD")} className="cursor-pointer">AUD ($)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("GHS")} className="cursor-pointer">GHS (GH¢)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("ZAR")} className="cursor-pointer">ZAR (R)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("KES")} className="cursor-pointer">KES (KSh)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("JPY")} className="cursor-pointer">JPY (¥)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("CNY")} className="cursor-pointer">CNY (¥)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("INR")} className="cursor-pointer">INR (₹)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("BRL")} className="cursor-pointer">BRL (R$)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("CHF")} className="cursor-pointer">CHF (Fr)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("MUR")} className="cursor-pointer">MUR (Rs)</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setCurrency("PKR")} className="cursor-pointer">PKR (₨)</DropdownMenuItem>
+                                        {ALL_CURRENCIES.map(curr => (
+                                            <DropdownMenuItem key={curr.value} onClick={() => setCurrency(curr.value)} className="cursor-pointer">
+                                                {curr.label}
+                                            </DropdownMenuItem>
+                                        ))}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>

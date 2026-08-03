@@ -22,6 +22,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Loader2, CalendarIcon, ArrowRight, ArrowLeft, Building, MapPin, Globe, CalendarDays, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { ALL_CURRENCIES } from '@/lib/constants';
 
 const onboardingSchema = z.object({
   organizationName: z.string().min(3, 'Organization name is required.'),
@@ -115,24 +116,7 @@ export default function OnboardingPage() {
     { value: 'United Kingdom', label: 'United Kingdom' }
   ]);
 
-  const [currencies, setCurrencies] = React.useState([
-    { value: 'NGN', label: 'NGN (₦)' },
-    { value: 'USD', label: 'USD ($)' },
-    { value: 'EUR', label: 'EUR (€)' },
-    { value: 'GBP', label: 'GBP (£)' },
-    { value: 'CAD', label: 'CAD ($)' },
-    { value: 'AUD', label: 'AUD ($)' },
-    { value: 'GHS', label: 'GHS (GH¢)' },
-    { value: 'ZAR', label: 'ZAR (R)' },
-    { value: 'KES', label: 'KES (KSh)' },
-    { value: 'JPY', label: 'JPY (¥)' },
-    { value: 'CNY', label: 'CNY (¥)' },
-    { value: 'INR', label: 'INR (₹)' },
-    { value: 'BRL', label: 'BRL (R$)' },
-    { value: 'CHF', label: 'CHF (Fr)' },
-    { value: 'MUR', label: 'MUR (Rs)' },
-    { value: 'PKR', label: 'PKR (₨)' }
-  ]);
+  const [currencies, setCurrencies] = React.useState(ALL_CURRENCIES);
 
   const [timezones, setTimezones] = React.useState([
     { value: 'Africa/Lagos', label: '(GMT+1) West Africa Time' },
