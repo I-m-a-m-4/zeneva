@@ -318,10 +318,10 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, totalSubs
                                         </TableRow>
                                     );
                                 })}
-                                {recentPurchases.length === 0 && (
+                                {validPurchases.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center text-muted-foreground py-6 text-sm">
-                                            No active transactions recorded in the last 30 days.
+                                            No active transactions recorded.
                                         </TableCell>
                                     </TableRow>
                                 )}
