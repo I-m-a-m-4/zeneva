@@ -16,35 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/types';
 import { cn } from '@/lib/utils';
 
-const MOCK_BRANCHES: Branch[] = [
-  {
-    id: "mock-branch-1",
-    businessId: "mock-biz-id",
-    name: "Main Store (Downtown)",
-    address: "Plot 12, Broad Street, Lagos",
-    isPrimary: true,
-    isActive: true,
-    createdAt: null
-  },
-  {
-    id: "mock-branch-2",
-    businessId: "mock-biz-id",
-    name: "Lekki Phase 1 Outlet",
-    address: "Block 8, Admiralty Way, Lekki",
-    isPrimary: false,
-    isActive: true,
-    createdAt: null
-  },
-  {
-    id: "mock-branch-3",
-    businessId: "mock-biz-id",
-    name: "Main Warehouse (Storage)",
-    address: "Ikeja Industrial Estate, Lagos",
-    isPrimary: false,
-    isActive: true,
-    createdAt: null
-  }
-];
+
 
 export default function BranchesSettingsPage() {
   const router = useRouter();
@@ -132,19 +104,10 @@ export default function BranchesSettingsPage() {
 
   const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
 
-  const displayedBranches = isBusinessPlan ? branches : MOCK_BRANCHES;
-  const displayedActiveBranchId = isBusinessPlan ? activeBranchId : 'mock-branch-1';
+  const displayedBranches = branches;
+  const displayedActiveBranchId = activeBranchId;
 
   const getBranchStatsOverride = (branchId: string, isPrimary: boolean) => {
-    if (!isBusinessPlan) {
-      if (branchId === 'mock-branch-1') {
-        return { usersCount: 5, activeUsersCount: 4, productsCount: 1240, lowStockCount: 12, salesCount: 890, salesVolume: 45000000 };
-      }
-      if (branchId === 'mock-branch-2') {
-        return { usersCount: 3, activeUsersCount: 2, productsCount: 820, lowStockCount: 5, salesCount: 340, salesVolume: 18500000 };
-      }
-      return { usersCount: 2, activeUsersCount: 1, productsCount: 2500, lowStockCount: 0, salesCount: 0, salesVolume: 0 };
-    }
     return getBranchStats(branchId, isPrimary);
   };
 
@@ -189,7 +152,12 @@ export default function BranchesSettingsPage() {
 
   const handleCreateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!business?.id || !firestore || !newBranchName.trim()) return;
+    const isValidBusinessId = business?.id && 
+                              business.id !== 'undefined' && 
+                              business.id !== 'null' && 
+                              business.id !== 'none' && 
+                              business.id.trim() !== '';
+    if (!isValidBusinessId || !firestore || !newBranchName.trim()) return;
 
     try {
       setIsAdding(true);

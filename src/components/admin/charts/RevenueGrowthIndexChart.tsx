@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ResponsiveContainer, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip } from 'recharts';
 import { Activity } from 'lucide-react';
 import { TimeframePicker, type Timeframe } from '@/components/reports/timeframe-picker';
 import { subDays, startOfDay, format, eachDayOfInterval } from 'date-fns';
@@ -55,15 +55,21 @@ export default function RevenueGrowthIndexChart({ purchases }: RevenueGrowthInde
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <ReBarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="revenueColor" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4}/>
+                <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.15} />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 11 }} />
             <ReTooltip 
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
             />
-            <Bar dataKey="Revenue" fill="#ec4899" radius={[4, 4, 0, 0]} />
-          </ReBarChart>
+            <Area type="monotone" dataKey="Revenue" stroke="#ec4899" strokeWidth={2} fillOpacity={1} fill="url(#revenueColor)" />
+          </AreaChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

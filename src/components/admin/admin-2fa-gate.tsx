@@ -70,7 +70,8 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
     };
 
     const generateNewSecret = () => {
-        const newSecret = new OTPAuth.Secret().base32;
+        const newSecretObj = new OTPAuth.Secret();
+        const newSecret = newSecretObj.base32;
         setSecret(newSecret);
         
         const totp = new OTPAuth.TOTP({
@@ -79,7 +80,7 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
             algorithm: 'SHA1',
             digits: 6,
             period: 30,
-            secret: newSecret,
+            secret: newSecretObj,
         });
         
         setQrCodeUrl(totp.toString());
@@ -94,7 +95,7 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
                 algorithm: 'SHA1',
                 digits: 6,
                 period: 30,
-                secret: secret,
+                secret: OTPAuth.Secret.fromBase32(secret),
             });
 
             const delta = totpInstance.validate({

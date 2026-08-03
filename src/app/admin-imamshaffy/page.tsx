@@ -227,6 +227,162 @@ const PIE_CHART_COLORS = {
     Lifetime: '#10b981' // Emerald
 };
 
+function SaaSMetricsDetailDialog({ open, onOpenChange, recentPurchases, totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
+    open: boolean; 
+    onOpenChange: (open: boolean) => void; 
+    recentPurchases: any[]; 
+    totalSubscriptionRevenue: number; 
+    payingBusinessesCount: number; 
+    businesses: BusinessInstance[] | null;
+}) {
+    const getStandardMRR = (planName: string, pCurrency: string) => {
+        const name = (planName || '').toLowerCase();
+        const isUSD = pCurrency === 'USD';
+        if (name.includes('business')) {
+            return isUSD ? 20 * 1500 : 30000;
+        } else {
+            return isUSD ? 7 * 1500 : 10000;
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-primary" />
+                        SaaS Financial Metrics Overview
+                    </DialogTitle>
+                    <DialogDescription>
+                        Detailed breakdown of active subscriptions, MRR contributions, ARR target, and Customer Lifetime Value (LTV).
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Paying Customers</CardDescription>
+                            <CardTitle className="text-2xl font-bold">{payingBusinessesCount}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Active businesses with purchase history.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Total Revenue</CardDescription>
+                            <CardTitle className="text-2xl font-bold">₦{totalSubscriptionRevenue.toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Gross subscription fees collected to date.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Average LTV</CardDescription>
+                            <CardTitle className="text-2xl font-bold">₦{(payingBusinessesCount > 0 ? Math.round(totalSubscriptionRevenue / payingBusinessesCount) : 0).toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Calculated as: Total Revenue / Paying Customers</p>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="mt-2">
+                    <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (Last 30 Days)</h4>
+                    <div className="h-60 overflow-auto border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Business Name</TableHead>
+                                    <TableHead>Plan</TableHead>
+                                    <TableHead>Currency</TableHead>
+                                    <TableHead className="text-right">Paid Amount</TableHead>
+                                    <TableHead className="text-right">Standard MRR</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {recentPurchases.map((p, index) => {
+                                    const biz = businesses?.find(b => b.id === p.businessId);
+                                    const standardMrr = getStandardMRR(p.plan, p.currency);
+                                    return (
+                                        <TableRow key={p.id || index}>
+                                            <TableCell className="font-medium">{biz?.name || 'Unknown Business'}</TableCell>
+                                            <TableCell className="capitalize">{p.plan || 'Pro'}</TableCell>
+                                            <TableCell className="uppercase">{p.currency || 'NGN'}</TableCell>
+                                            <TableCell className="text-right font-mono">
+                                                {p.currency === 'USD' ? '$' : '₦'}{p.amount.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono font-semibold text-emerald-500">
+                                                ₦{standardMrr.toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {recentPurchases.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-6 text-sm">
+                                            No active transactions recorded in the last 30 days.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function TopPerformersDialog({ open, onOpenChange, topPerformers, users }: { open: boolean, onOpenChange: (open: boolean) => void, topPerformers: any[], users: UserProfile[] | null }) {
+    const businessOwners = useMemo(() => {
+        if (!users) return {};
+        return topPerformers.reduce((acc, b) => {
+            const owner = users.find(u => u.id === b.ownerId);
+            acc[b.id] = owner?.name || 'N/A';
+            return acc;
+        }, {} as Record<string, string>);
+    }, [topPerformers, users]);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+                <DialogHeader>
+                    <DialogTitle>All Performers Ranking (GMV)</DialogTitle>
+                    <DialogDescription>
+                        A ranking of all active businesses by their total Gross Merchandise Value (converted to Naira if USD).
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96 pr-4">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-16">Rank</TableHead>
+                                <TableHead>Business Name</TableHead>
+                                <TableHead>Owner</TableHead>
+                                <TableHead>Products</TableHead>
+                                <TableHead>Currency</TableHead>
+                                <TableHead className="text-right">Total GMV (₦)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {topPerformers.map((business, index) => (
+                                <TableRow key={business.id}>
+                                    <TableCell className="font-bold text-center">#{index + 1}</TableCell>
+                                    <TableCell className="font-medium">{business.name}</TableCell>
+                                    <TableCell>{businessOwners[business.id] || 'N/A'}</TableCell>
+                                    <TableCell>{business.productCount || 0}</TableCell>
+                                    <TableCell className="uppercase">{business.settings?.currency || 'NGN'}</TableCell>
+                                    <TableCell className="text-right font-mono font-bold">₦{business.totalRevenue.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function BusinessDetailDialog({ open, onOpenChange, title, description, businesses, users, isInfoOnly }: { open: boolean, onOpenChange: (open: boolean) => void, title: string, description: string, businesses: BusinessInstance[], users: UserProfile[] | null, isInfoOnly?: boolean }) {
     const businessOwners = useMemo(() => {
         if (!users || isInfoOnly) return {};
@@ -625,6 +781,26 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    const convertedReceipts = useMemo(() => {
+        if (!receipts) return [];
+        return receipts.map(r => {
+            const biz = businesses?.find(b => b.id === r.businessId);
+            const isUSD = biz?.settings?.currency === 'USD';
+            if (isUSD) {
+                const rate = biz?.settings?.usdToNgnRate || 1500;
+                return {
+                    ...r,
+                    total: r.total * rate,
+                    subtotal: r.subtotal * rate,
+                    tax: (r.tax || 0) * rate,
+                    discount: (r.discount || 0) * rate,
+                    profit: r.profit ? r.profit * rate : undefined,
+                };
+            }
+            return r;
+        });
+    }, [receipts, businesses]);
+
     const systemBroadcastsQuery = useMemoFirebase(() => query(collection(firestore, 'system_broadcasts'), orderBy('createdAt', 'desc')), [firestore]);
     const { data: systemBroadcasts } = useCollection<any>(systemBroadcastsQuery);
 
@@ -646,6 +822,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
     const [userListModalState, setUserListModalState] = useState<{ open: boolean; title: string; description: string; users: UserProfile[] }>({ open: false, title: '', description: '', users: [] });
     const [isAgeMilestoneOpen, setIsAgeMilestoneOpen] = useState(false);
+    const [isTopPerformersOpen, setIsTopPerformersOpen] = useState(false);
+    const [isSaaSMetricsOpen, setIsSaaSMetricsOpen] = useState(false);
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -857,7 +1035,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return acc;
         }, {} as Record<string, Product[]>);
 
-        const receiptsByBusiness = (receipts || []).reduce((acc, r) => {
+        const receiptsByBusiness = (convertedReceipts || []).reduce((acc, r) => {
             if (!acc[r.businessId]) acc[r.businessId] = [];
             acc[r.businessId].push(r);
             return acc;
@@ -871,15 +1049,13 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
         const fourteenDaysAgo = subDays(new Date(), 14);
         const businessesWithRecentSales = new Set(
-            (receipts || []).filter(r => r.createdAt.toDate() > fourteenDaysAgo).map(r => r.businessId)
+            (convertedReceipts || []).filter(r => r.createdAt.toDate() > fourteenDaysAgo).map(r => r.businessId)
         );
         const atRiskBusinesses = activeBusinesses.filter(b => !businessesWithRecentSales.has(b.id));
 
+        const payingBusinessIds = new Set((purchases || []).map(p => p.businessId));
         const payingBusinessesList = activeBusinesses.filter(b => {
-            if (b.accessLevel === 'lifetime') return false;
-            if (b.plan !== 'pro' && b.plan !== 'business') return false;
-            if (b.trialExpiresAt && b.trialExpiresAt.toDate() > new Date()) return false;
-            return true;
+            return payingBusinessIds.has(b.id);
         });
 
         const healthScores = activeBusinesses.map(b => (b.settings?.businessAnalysis as any)?.health?.score ?? -1);
@@ -1012,7 +1188,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             businessesWithProductsList,
             businessesWithSalesList
         }
-    }, [businesses, products, receipts, users]);
+    }, [businesses, products, convertedReceipts, users, purchases]);
     const analyticsData = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
         const allUsers = users || [];
@@ -1023,22 +1199,20 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
         const totalBusinesses = activeBusinesses.length;
 
         const totalProducts = products?.length || 0;
-        const totalReceipts = receipts?.length || 0;
+        const totalReceipts = convertedReceipts?.length || 0;
         const now = new Date();
 
-        const platformGmv = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
+        const platformGmv = convertedReceipts?.reduce((sum, r) => sum + r.total, 0) || 0;
 
-        const totalProductsSold = receipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
+        const totalProductsSold = convertedReceipts?.reduce((sum, r) => sum + r.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0) || 0;
 
         const totalSubscriptionRevenue = purchases?.reduce((sum, p) => sum + p.amount, 0) || 0;
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
 
+        const payingBusinessIds = new Set((purchases || []).map(p => p.businessId));
         const payingBusinesses = activeBusinesses?.filter(b => {
-            if (b.accessLevel === 'lifetime') return false;
-            if (b.plan !== 'pro' && b.plan !== 'business') return false;
-            if (b.trialExpiresAt && b.trialExpiresAt.toDate() > now) return false;
-            return true;
+            return payingBusinessIds.has(b.id);
         });
 
         const thirtyDaysAgo = subDays(new Date(), 30);
@@ -1047,7 +1221,19 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return pDate > thirtyDaysAgo;
         });
 
-        const mrr = recentPurchases.reduce((sum, p) => sum + p.amount, 0);
+        const getStandardMRR = (planName: string, pCurrency: string) => {
+            const name = (planName || '').toLowerCase();
+            const isUSD = pCurrency === 'USD';
+            if (name.includes('business')) {
+                return isUSD ? 20 * 1500 : 30000;
+            } else {
+                return isUSD ? 7 * 1500 : 10000;
+            }
+        };
+
+        const mrr = recentPurchases.reduce((sum, p) => {
+            return sum + getStandardMRR(p.plan, p.currency);
+        }, 0);
         const arr = mrr * 12;
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
@@ -1097,24 +1283,31 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             return acc;
         }, {} as Record<string, number>);
 
-        const businessRevenues = (receipts || []).reduce((acc, r) => {
+        const businessRevenues = (convertedReceipts || []).reduce((acc, r) => {
             if (r.businessId) {
                 acc[r.businessId] = (acc[r.businessId] || 0) + r.total;
             }
             return acc;
         }, {} as Record<string, number>);
 
+        activeBusinesses.forEach(b => {
+            if (businessRevenues[b.id] === undefined) {
+                businessRevenues[b.id] = 0;
+            }
+        });
+
         const sortedBusinessRevenues = Object.entries(businessRevenues)
             .sort(([, a], [, b]) => b - a)
-            .slice(0, 3)
             .map(([bId, rev]) => {
                 const business = businesses?.find(b => b.id === bId);
-                return business ? { ...business, totalRevenue: rev } : null;
+                const productCount = products ? products.filter(p => p.businessId === bId).length : 0;
+                return business ? { ...business, totalRevenue: rev, productCount } : null;
             })
             .filter((b): b is any => b !== null);
 
         const richestBusiness = sortedBusinessRevenues[0] || null;
-        const topPerformers = sortedBusinessRevenues;
+        const allPerformers = sortedBusinessRevenues;
+        const topPerformers = sortedBusinessRevenues.slice(0, 3);
 
         // --- New Daily Metrics ---
         const launchDate = new Date(2026, 1, 17); // February 17, 2026
@@ -1132,7 +1325,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             const dateStr = format(d, 'MMM d');
             const dayStart = startOfDay(d);
             const dayEnd = endOfDay(d);
-            const dayReceipts = receipts?.filter(r => {
+            const dayReceipts = convertedReceipts?.filter(r => {
                 const rDate = r.createdAt.toDate();
                 return rDate >= dayStart && rDate <= dayEnd;
             }) || [];
@@ -1147,8 +1340,9 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             });
         }
 
-        // LTV = Total Subscription Revenue / Total Customers
-        const ltv = totalBusinesses > 0 ? totalSubscriptionRevenue / totalBusinesses : 0;
+        // LTV = Total Subscription Revenue / Total Paying Customers
+        const payingBusinessesCount = payingBusinesses?.length || 0;
+        const ltv = payingBusinessesCount > 0 ? totalSubscriptionRevenue / payingBusinessesCount : 0;
 
         // --- DOWNLOAD TELEMETRY INTELLIGENCE ---
         const downloadStats = (downloadClicks || []).reduce((acc, d) => {
@@ -1167,12 +1361,14 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
             totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
-            richestBusiness, topPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
+            richestBusiness, topPerformers, allPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
             earliestBusiness, daysActive,
             uniqueDownloaders: downloadClicks?.length || 0,
-            downloadStats
+            downloadStats,
+            payingBusinesses,
+            recentPurchases
         };
-    }, [users, businesses, products, receipts, purchases, downloadClicks, velocityFilter]);
+    }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
 
     const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers') => {
@@ -1572,7 +1768,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     ? `${(analyticsData.daysActive / 365).toFixed(1)} Years` 
                                     : `${analyticsData.daysActive} Days`} 
                                 icon={Clock} 
-                                description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')}`}
+                                description={`Launched ${format(analyticsData.earliestBusiness, 'MMM yyyy')} (${Math.floor(analyticsData.daysActive / 30)} months, ${Math.floor((analyticsData.daysActive % 30) / 7)} weeks)`}
                             />
                         </button>
                         <button 
@@ -1592,7 +1788,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         <button onClick={() => handleOpenDetailModal('active')} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="Active Stores" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Currently active businesses" />
                         </button>
-                        <button onClick={() => handleOpenDetailModal('paying')} className="text-left w-full h-full transition-transform active:scale-95" disabled={platformAnalytics.payingBusinessesList.length === 0}>
+                        <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="Monthly Recurring" />
                         </button>
                         <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
@@ -1607,8 +1803,12 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 mt-4">
-                        <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="Annual Target" />
-                        <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
+                        <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="Annual Target" />
+                        </button>
+                        <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
+                        </button>
                         <StatCard title="Sub Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`} icon={ShieldCheck} description="Total Software Sales" />
                         <StatCard title="Platform AOV" value={`₦${analyticsData.platformAOV.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} description="Avg. Receipt Value" />
                     </div>
@@ -1632,11 +1832,16 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
 
                         <Card className="border-yellow-500/20 overflow-hidden relative">
                             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none" />
-                            <CardHeader className="pb-3 relative z-10">
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <Trophy className="h-5 w-5 text-yellow-500" /> Platform Performer Spotlight
-                                </CardTitle>
-                                <CardDescription>Top 3 businesses driving the most GMV.</CardDescription>
+                            <CardHeader className="flex flex-row items-center justify-between pb-3 relative z-10 space-y-0">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <Trophy className="h-5 w-5 text-yellow-500" /> Platform Performer Spotlight
+                                    </CardTitle>
+                                    <CardDescription>Top 3 businesses driving the most GMV.</CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => setIsTopPerformersOpen(true)}>
+                                    View All
+                                </Button>
                             </CardHeader>
                             <CardContent className="relative z-10 space-y-3">
                                 {analyticsData.topPerformers && analyticsData.topPerformers.length > 0 ? (
@@ -1654,7 +1859,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold leading-none">{business.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground mt-1">Platform Partner</p>
+                                                    <p className="text-[10px] text-muted-foreground mt-1">Platform Partner • {business.productCount || 0} Products</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
@@ -1876,15 +2081,29 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                         {platformAnalytics.countryData.map((item, i) => {
                                             const getFlag = (c: string) => {
                                                 const normalized = c.toLowerCase();
-                                                if (normalized.includes('nigeria')) return '🇳🇬';
-                                                if (normalized.includes('united states') || normalized === 'usa') return '🇺🇸';
-                                                if (normalized.includes('united kingdom') || normalized === 'uk') return '🇬🇧';
-                                                if (normalized.includes('ghana')) return '🇬🇭';
-                                                if (normalized.includes('canada')) return '🇨🇦';
-                                                if (normalized.includes('south africa')) return '🇿🇦';
-                                                if (normalized.includes('kenya')) return '🇰🇪';
-                                                if (normalized.includes('onboarding')) return '⏳';
-                                                return '🌐';
+                                                if (normalized.includes('nigeria')) {
+                                                    return <img src="https://flagcdn.com/w40/ng.png" alt="Nigeria" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('united states') || normalized === 'usa') {
+                                                    return <img src="https://flagcdn.com/w40/us.png" alt="USA" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('united kingdom') || normalized === 'uk') {
+                                                    return <img src="https://flagcdn.com/w40/gb.png" alt="UK" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('ghana')) {
+                                                    return <img src="https://flagcdn.com/w40/gh.png" alt="Ghana" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('canada')) {
+                                                    return <img src="https://flagcdn.com/w40/ca.png" alt="Canada" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('south africa')) {
+                                                    return <img src="https://flagcdn.com/w40/za.png" alt="South Africa" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('kenya')) {
+                                                    return <img src="https://flagcdn.com/w40/ke.png" alt="Kenya" className="w-6 h-4 rounded-sm object-cover inline-block" />;
+                                                }
+                                                if (normalized.includes('onboarding')) return <span className="text-xl">⏳</span>;
+                                                return <span className="text-xl">🌐</span>;
                                             };
                                             return (
                                                 <div 
@@ -1898,7 +2117,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                                     })}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-2xl drop-shadow-sm group-hover:scale-110 transition-transform">{getFlag(item.name)}</span>
+                                                        <span className="flex items-center justify-center w-6 h-6 group-hover:scale-110 transition-transform">{getFlag(item.name)}</span>
                                                         <span className="font-semibold text-sm">{item.name}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -1955,15 +2174,15 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
-                        <PlatformRevenueChart receipts={receipts || []} />
+                        <PlatformRevenueChart receipts={convertedReceipts || []} />
                         <UserGrowthChart users={users || []} />
-                        <TransactionVolumeChart receipts={receipts || []} />
+                        <TransactionVolumeChart receipts={convertedReceipts || []} />
                         <PlanDistributionChart businesses={businesses || []} />
                         <div className="lg:col-span-2">
                             <RevenueGrowthIndexChart purchases={purchases || []} />
                         </div>
                         <div className="lg:col-span-2">
-                            <RetentionCohortChart users={users || []} receipts={receipts || []} />
+                            <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} />
                         </div>
                         <div className="lg:col-span-2">
                             <FeatureStickinessChart businesses={businesses || []} products={products || []} />
@@ -2705,6 +2924,22 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </DialogContent>
             </Dialog>
 
+            <SaaSMetricsDetailDialog
+                open={isSaaSMetricsOpen}
+                onOpenChange={setIsSaaSMetricsOpen}
+                recentPurchases={analyticsData.recentPurchases || []}
+                totalSubscriptionRevenue={analyticsData.totalSubscriptionRevenue || 0}
+                payingBusinessesCount={analyticsData.payingBusinesses?.length || 0}
+                businesses={businesses}
+            />
+
+            <TopPerformersDialog
+                open={isTopPerformersOpen}
+                onOpenChange={setIsTopPerformersOpen}
+                topPerformers={analyticsData.allPerformers || []}
+                users={users}
+            />
+
             <BusinessDetailDialog
                 open={detailModalState.open}
                 onOpenChange={(open) => setDetailModalState(prev => ({ ...prev, open }))}
@@ -2728,7 +2963,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 open={isAgeMilestoneOpen}
                 onOpenChange={setIsAgeMilestoneOpen}
                 daysActive={analyticsData.daysActive}
-                totalSales={receipts?.length || 0}
+                totalSales={convertedReceipts?.length || 0}
                 totalBusinesses={platformAnalytics.totalActiveBusinesses}
                 totalUsers={analyticsData.totalUsers}
                 launchDate={analyticsData.earliestBusiness}

@@ -46,8 +46,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         
         if (userDocSnap.exists()) {
           const businessId = userDocSnap.data().businessId;
+          const isValidBusinessId = businessId && 
+                                    businessId !== 'undefined' && 
+                                    businessId !== 'null' && 
+                                    businessId !== 'none' && 
+                                    businessId.trim() !== '';
           
-          if (businessId) {
+          if (isValidBusinessId) {
             const branchesQuery = query(
               collection(firestore, 'branches'),
               where('businessId', '==', businessId),
@@ -124,10 +129,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
                  setActiveBranchId('all');
                }
             }
+          } else {
+            setBranches([]);
           }
         }
       } catch (err) {
         console.error("Failed to load branches", err);
+        setBranches([]);
       } finally {
         setIsLoadingBranches(false);
       }
