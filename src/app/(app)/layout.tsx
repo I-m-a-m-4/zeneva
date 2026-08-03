@@ -51,6 +51,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
 import { History } from 'lucide-react';
 import { BranchSwitcher } from '@/components/layout/branch-switcher';
+import { useSessionTracker } from '@/hooks/use-session-tracker';
 
 
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -173,6 +174,9 @@ export default function AuthenticatedLayout({
     isSubscriptionActive,
     onlineOrders
   } = usePOS();
+
+  // Track how long this user is actively using the app
+  useSessionTracker(user?.uid);
 
   const { notify } = useNativeNotifications();
   const { requestPermission: handleRequestFcmPermission } = useFCM();

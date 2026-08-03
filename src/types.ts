@@ -72,7 +72,9 @@ export interface UserProfile {
     lastSeen?: any;
     permissions?: Record<string, boolean>;
     branchId?: string;
+    totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
 }
+
 
 export interface CustomerInsightsOutput {
     summary: string;

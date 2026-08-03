@@ -85,6 +85,7 @@ import {
     Zap,
     Laptop,
     Smartphone,
+    Timer,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -671,6 +672,185 @@ function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, tot
         </Dialog>
     );
 }
+
+// ======================== USAGE ANALYTICS TAB COMPONENT ========================
+
+function formatDuration(seconds: number): string {
+    if (!seconds || seconds < 1) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
+function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; businesses: BusinessInstance[] }) {
+    const [sortField, setSortField] = React.useState<'usage' | 'name' | 'lastSeen'>('usage');
+    const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+
+    const todayStart = startOfDay(new Date());
+
+    // KPIs
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const activeNow = useMemo(() =>
+        users.filter(u => u.lastSeen?.toDate && u.lastSeen.toDate() > fiveMinAgo).length,
+        [users]
+    );
+
+    const usersWithUsage = users.filter(u => (u.totalUsageSeconds ?? 0) > 0);
+    const totalUsageSeconds = usersWithUsage.reduce((sum, u) => sum + (u.totalUsageSeconds ?? 0), 0);
+    const avgSessionSeconds = usersWithUsage.length > 0 ? Math.round(totalUsageSeconds / usersWithUsage.length) : 0;
+    const totalHours = Math.round(totalUsageSeconds / 3600);
+
+    // Per-user rows
+    const sortedUsers = useMemo(() => {
+        return [...users].sort((a, b) => {
+            let valA: number, valB: number;
+            if (sortField === 'usage') {
+                valA = a.totalUsageSeconds ?? 0;
+                valB = b.totalUsageSeconds ?? 0;
+            } else if (sortField === 'lastSeen') {
+                valA = a.lastSeen?.toDate ? a.lastSeen.toDate().getTime() : 0;
+                valB = b.lastSeen?.toDate ? b.lastSeen.toDate().getTime() : 0;
+            } else {
+                return sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+            }
+            return sortDir === 'asc' ? valA - valB : valB - valA;
+        });
+    }, [users, sortField, sortDir]);
+
+    const toggleSort = (field: typeof sortField) => {
+        if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortDir('desc'); }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Active Right Now</CardTitle>
+                        <Activity className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-green-500">{activeNow}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Users seen in last 5 min</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Avg. Usage / User</CardTitle>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{formatDuration(avgSessionSeconds)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Across {usersWithUsage.length} tracked users</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Usage Hours</CardTitle>
+                        <Timer className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{totalHours.toLocaleString()}h</div>
+                        <p className="text-xs text-muted-foreground mt-1">Cumulative all-time platform usage</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Per-User Table */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Timer className="h-5 w-5 text-primary" />
+                        Per-User Usage Breakdown
+                    </CardTitle>
+                    <CardDescription>
+                        Cumulative app usage time per user. Tracked since v3.0.0. Click a column header to sort.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="rounded-md border overflow-auto max-h-[500px]">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                                <TableRow>
+                                    <TableHead>
+                                        <button onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-foreground">
+                                            Name <ArrowUpDown className="h-3 w-3" />
+                                        </button>
+                                    </TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Business</TableHead>
+                                    <TableHead>
+                                        <button onClick={() => toggleSort('usage')} className="flex items-center gap-1 hover:text-foreground">
+                                            Total Usage <ArrowUpDown className="h-3 w-3" />
+                                        </button>
+                                    </TableHead>
+                                    <TableHead>
+                                        <button onClick={() => toggleSort('lastSeen')} className="flex items-center gap-1 hover:text-foreground">
+                                            Last Seen <ArrowUpDown className="h-3 w-3" />
+                                        </button>
+                                    </TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {sortedUsers.length > 0 ? sortedUsers.map(u => {
+                                    const biz = businesses.find(b => b.id === u.businessId);
+                                    const lastSeenDate = u.lastSeen?.toDate ? u.lastSeen.toDate() : null;
+                                    const isOnline = lastSeenDate && lastSeenDate > fiveMinAgo;
+                                    const totalSec = u.totalUsageSeconds ?? 0;
+                                    return (
+                                        <TableRow key={u.id}>
+                                            <TableCell className="font-medium">{u.name}</TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
+                                            <TableCell className="text-sm">{biz?.name ?? '—'}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono font-semibold text-sm">
+                                                        {totalSec > 0 ? formatDuration(totalSec) : <span className="text-muted-foreground text-xs">No data yet</span>}
+                                                    </span>
+                                                    {totalSec > 3600 && <Badge variant="outline" className="text-xs text-primary border-primary/40">Power User</Badge>}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {lastSeenDate ? formatDistanceToNow(lastSeenDate, { addSuffix: true }) : 'Never'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {isOnline ? (
+                                                    <span className="flex items-center gap-1.5 text-green-500 text-xs font-semibold">
+                                                        <span className="relative flex h-2 w-2">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                                                        </span>
+                                                        Online
+                                                    </span>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-xs text-muted-foreground">Offline</Badge>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                }) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                                            No users found. Usage data will appear here once users log in after v3.0.0.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// ==============================================================================
 
 function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserProfile | null, business: BusinessInstance | undefined, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
@@ -1717,6 +1897,10 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                     <TabsTrigger value="security" className="gap-2">
                         <ShieldCheck className="h-4 w-4" />
                         Cyber Shield
+                    </TabsTrigger>
+                    <TabsTrigger value="usage" className="gap-2">
+                        <Timer className="h-4 w-4" />
+                        Usage Analytics
                     </TabsTrigger>
                 </TabsList>
 
@@ -2787,6 +2971,11 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                         allUsers={users} 
                         isLoadingBusinesses={false} 
                     />
+                </TabsContent>
+
+                {/* ======================== USAGE ANALYTICS TAB ======================== */}
+                <TabsContent value="usage" className="space-y-6">
+                    <UsageAnalyticsTab users={users || []} businesses={businesses || []} />
                 </TabsContent>
             </Tabs>
 
