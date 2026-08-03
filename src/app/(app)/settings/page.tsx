@@ -915,6 +915,8 @@ function SettingsPageContent() {
                                         <DropdownMenuItem onClick={() => setCurrency("INR")} className="cursor-pointer">INR (₹)</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setCurrency("BRL")} className="cursor-pointer">BRL (R$)</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setCurrency("CHF")} className="cursor-pointer">CHF (Fr)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("MUR")} className="cursor-pointer">MUR (Rs)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setCurrency("PKR")} className="cursor-pointer">PKR (₨)</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>

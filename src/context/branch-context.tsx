@@ -24,6 +24,28 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [activeBranchId, setActiveBranchId] = useState<string>('all');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const [impersonationTrigger, setImpersonationTrigger] = useState(0);
+  const lastLoadedUserIdRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    const handleImpersonationChange = () => {
+      setImpersonationTrigger(prev => prev + 1);
+    };
+    window.addEventListener('zeneva_impersonation_change', handleImpersonationChange);
+    
+    const interval = setInterval(() => {
+      const currentImpersonatedId = typeof window !== 'undefined' ? sessionStorage.getItem('zeneva_impersonated_user_id') : null;
+      const targetUserId = currentImpersonatedId || (user?.uid || null);
+      if (lastLoadedUserIdRef.current !== targetUserId) {
+        setImpersonationTrigger(prev => prev + 1);
+      }
+    }, 1500);
+    
+    return () => {
+      window.removeEventListener('zeneva_impersonation_change', handleImpersonationChange);
+      clearInterval(interval);
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user || !firestore) {
@@ -41,7 +63,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     const loadBranches = async () => {
       try {
         setIsLoadingBranches(true);
-        const userDocRef = doc(firestore, 'users', user.uid);
+        const impersonatedId = typeof window !== 'undefined' ? sessionStorage.getItem('zeneva_impersonated_user_id') : null;
+        const targetUserId = impersonatedId || user.uid;
+        lastLoadedUserIdRef.current = targetUserId;
+
+        const userDocRef = doc(firestore, 'users', targetUserId);
         const userDocSnap = await getDoc(userDocRef);
         
         if (userDocSnap.exists()) {
@@ -159,7 +185,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     };
 
     loadBranches();
-  }, [user, firestore]);
+  }, [user, firestore, impersonationTrigger]);
 
   const handleSetActiveBranch = (id: string) => {
     setActiveBranchId(id);

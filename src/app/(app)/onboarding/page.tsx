@@ -117,7 +117,21 @@ export default function OnboardingPage() {
 
   const [currencies, setCurrencies] = React.useState([
     { value: 'NGN', label: 'NGN (₦)' },
-    { value: 'USD', label: 'USD ($)' }
+    { value: 'USD', label: 'USD ($)' },
+    { value: 'EUR', label: 'EUR (€)' },
+    { value: 'GBP', label: 'GBP (£)' },
+    { value: 'CAD', label: 'CAD ($)' },
+    { value: 'AUD', label: 'AUD ($)' },
+    { value: 'GHS', label: 'GHS (GH¢)' },
+    { value: 'ZAR', label: 'ZAR (R)' },
+    { value: 'KES', label: 'KES (KSh)' },
+    { value: 'JPY', label: 'JPY (¥)' },
+    { value: 'CNY', label: 'CNY (¥)' },
+    { value: 'INR', label: 'INR (₹)' },
+    { value: 'BRL', label: 'BRL (R$)' },
+    { value: 'CHF', label: 'CHF (Fr)' },
+    { value: 'MUR', label: 'MUR (Rs)' },
+    { value: 'PKR', label: 'PKR (₨)' }
   ]);
 
   const [timezones, setTimezones] = React.useState([

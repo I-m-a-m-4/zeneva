@@ -4,6 +4,18 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   'USD': '$',
   'EUR': '€',
   'GBP': '£',
+  'CAD': '$',
+  'AUD': '$',
+  'GHS': 'GH¢',
+  'ZAR': 'R',
+  'KES': 'KSh',
+  'JPY': '¥',
+  'CNY': '¥',
+  'INR': '₹',
+  'BRL': 'R$',
+  'CHF': 'Fr',
+  'MUR': 'Rs',
+  'PKR': '₨',
 };
 
 export const POS_CART_KEY = 'zeneva_pos_cart';
