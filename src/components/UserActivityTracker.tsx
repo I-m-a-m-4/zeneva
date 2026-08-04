@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { getCountryFromIP } from '@/lib/utils';
 import { useAuth, useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -63,64 +64,7 @@ export function UserActivityTracker() {
                     // Detect country from IP once per session
                     let country = sessionStorage.getItem('zeneva_session_country') || '';
                     if (!country) {
-                        // Try Service 1: ipapi.co
-                        try {
-                            const res = await fetch('https://ipapi.co/json/');
-                            if (res.ok) {
-                                const ipData = await res.json();
-                                if (ipData && ipData.country_name) {
-                                    country = ipData.country_name;
-                                }
-                            }
-                        } catch (e) {
-                            // Silently fail to prevent console clutter
-                        }
-
-                        // Try Service 2: freeipapi.com
-                        if (!country) {
-                            try {
-                                const res = await fetch('https://freeipapi.com/api/json');
-                                if (res.ok) {
-                                    const ipData = await res.json();
-                                    if (ipData && ipData.countryName) {
-                                        country = ipData.countryName;
-                                    }
-                                }
-                            } catch (e) {
-                                // Silently fail
-                            }
-                        }
-
-                        // Try Service 3: ipwho.is
-                        if (!country) {
-                            try {
-                                const res = await fetch('https://ipwho.is/');
-                                if (res.ok) {
-                                    const ipData = await res.json();
-                                    if (ipData && ipData.success && ipData.country) {
-                                        country = ipData.country;
-                                    }
-                                }
-                            } catch (e) {
-                                // Silently fail
-                            }
-                        }
-
-                        // Try Service 4: db-ip.com
-                        if (!country) {
-                            try {
-                                const res = await fetch('https://api.db-ip.com/v2/free/self');
-                                if (res.ok) {
-                                    const ipData = await res.json();
-                                    if (ipData && ipData.countryName) {
-                                        country = ipData.countryName;
-                                    }
-                                }
-                            } catch (e) {
-                                // Silently fail
-                            }
-                        }
-
+                        country = await getCountryFromIP();
                         if (country) {
                             sessionStorage.setItem('zeneva_session_country', country);
                         }

@@ -5,9 +5,21 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { track } from '@vercel/analytics';
 
 export function PricingPlans() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+
+    const handlePlanClick = (planName: string) => {
+        try {
+            track('pricing_plan_clicked', {
+                plan: planName,
+                cycle: billingCycle,
+            });
+        } catch (err) {
+            console.error('Tracking failed:', err);
+        }
+    };
 
     return (
         <div className="w-full">
@@ -48,17 +60,17 @@ export function PricingPlans() {
                     </ul>
                     <div className="mt-auto pt-6">
                         <Button asChild size="lg" className="w-full">
-                            <Link href="/signup">Get Started for Free</Link>
+                            <Link href="/signup" onClick={() => handlePlanClick('Starter')}>Get Started for Free</Link>
                         </Button>
                     </div>
                 </div>
-
+ 
                 {/* Pro Plan */}
                 <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-primary rounded-lg shadow-2xl shadow-primary/10">
                     <p className="absolute top-0 -translate-y-1/2 bg-primary text-white px-3 py-1 text-sm font-semibold tracking-wide rounded-full">Most Popular</p>
                     <h3 className="text-lg font-semibold leading-5">Pro</h3>
                     <p className="mt-4 text-slate-600 text-sm">For growing businesses that need advanced tools and an online presence.</p>
-
+ 
                     <div className="mt-4">
                         <span className="text-4xl font-bold tracking-tight text-slate-900">
                             {billingCycle === 'monthly' ? '₦10,000' : '₦100,000'}
@@ -82,16 +94,16 @@ export function PricingPlans() {
                     </ul>
                     <div className="mt-auto pt-6">
                         <Button asChild size="lg" className="w-full">
-                            <Link href="/signup">Start Your Pro Trial</Link>
+                            <Link href="/signup" onClick={() => handlePlanClick('Pro')}>Start Your Pro Trial</Link>
                         </Button>
                     </div>
                 </div>
-
+ 
                 {/* Business Plan */}
                 <div className="relative flex flex-col p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg shadow-sm">
                     <h3 className="text-lg font-semibold leading-5 text-slate-900">Business</h3>
                     <p className="mt-4 text-slate-600 text-sm">For established businesses that require our most powerful AI tools and support.</p>
-
+ 
                     <div className="mt-4">
                         <span className="text-4xl font-bold tracking-tight text-slate-900">
                             {billingCycle === 'monthly' ? '₦30,000' : '₦300,000'}
@@ -113,7 +125,7 @@ export function PricingPlans() {
                     </ul>
                     <div className="mt-auto pt-6">
                         <Button asChild size="lg" className="w-full">
-                            <Link href="/signup">Start Your Business Trial</Link>
+                            <Link href="/signup" onClick={() => handlePlanClick('Business')}>Start Your Business Trial</Link>
                         </Button>
                     </div>
                 </div>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useUser } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ const navLinks = [
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin-imamshaffy/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare },
+  { href: '/admin-imamshaffy/developer-logs', label: 'Developer Logs', icon: Bug },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

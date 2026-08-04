@@ -12,7 +12,7 @@ import TopProductsChart from '@/components/reports/top-products-chart';
 import TopServicesChart from '@/components/reports/top-services-chart';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { subDays } from 'date-fns';
+import { subDays, isSameDay } from 'date-fns';
 import TopCustomersList from '@/components/reports/top-customers-list';
 import { safeToDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -306,6 +306,14 @@ export default function ReportsDashboard() {
 
 
 
+    const isTodayOnlyRange = React.useMemo(() => {
+        if (!date?.from) return false;
+        const today = new Date();
+        const fromIsToday = isSameDay(date.from, today);
+        const toIsToday = !date.to || isSameDay(date.to, today);
+        return fromIsToday && toIsToday;
+    }, [date]);
+
     const finalReportData = React.useMemo(() => {
         if (!reportData) return null;
         return reportData;
@@ -343,6 +351,7 @@ export default function ReportsDashboard() {
                 requiredPlan="pro"
                 currentPlan={business?.plan}
                 hasLifetimeAccess={hasLifetimeAccess}
+                bypass={isTodayOnlyRange}
                 featureName="Advanced Reports"
                 featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
                 className="flex-grow flex flex-col"
@@ -477,65 +486,65 @@ export default function ReportsDashboard() {
                                 />
                             </div>
 
-                             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                 <div className="lg:col-span-5">
-                                     <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                             <FeatureGate
+                                 requiredPlan="pro"
+                                 currentPlan={business?.plan}
+                                 hasLifetimeAccess={hasLifetimeAccess}
+                                 featureName="Advanced Visual Analytics"
+                                 featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
+                             >
+                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                     <div className="lg:col-span-5">
+                                         <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                     </div>
                                  </div>
-                             </div>
 
-                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                 <TopProductsChart receipts={deepReceipts} />
-                                 <TopServicesChart receipts={deepReceipts} />
-                             </div>
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                     <TopProductsChart receipts={deepReceipts} />
+                                     <TopServicesChart receipts={deepReceipts} />
+                                 </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                <div className="lg:col-span-3">
-                                    <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                    <div className="lg:col-span-3">
+                                        <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                    </div>
+                                    <div className="lg:col-span-2">
+                                        <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
                                 </div>
-                                <div className="lg:col-span-2">
-                                    <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                    <div className="lg:col-span-3">
+                                        <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
+                                    <div className="lg:col-span-2">
+                                        <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                <div className="lg:col-span-3">
-                                    <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                <div className="grid grid-cols-1 gap-6 mt-6">
+                                    <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
+                                    <HourlySalesHeatmap receipts={deepReceipts} />
+                                    <BasketAnalysis receipts={deepReceipts} />
                                 </div>
-                                <div className="lg:col-span-2">
-                                    <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-6">
-                                <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
-                                <HourlySalesHeatmap receipts={deepReceipts} />
-                                <BasketAnalysis receipts={deepReceipts} />
-                            </div>
-
-                            <FeatureGate
-                                requiredPlan="business"
-                                currentPlan={business?.plan}
-                                hasLifetimeAccess={hasLifetimeAccess}
-                                featureName="Customer Intelligence"
-                                featureDescription="Unlock advanced CRM analytics like customer lifetime value, purchase frequency, and churn risk."
-                            >
-                                <CustomerAnalytics 
-                                    customers={customers || []} 
-                                    receipts={deepReceipts} 
-                                    currencySymbol={currencySymbol} 
-                                    totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers} 
-                                />
-                            </FeatureGate>
-
-                            <FeatureGate
-                                requiredPlan="business"
-                                currentPlan={business?.plan}
-                                hasLifetimeAccess={hasLifetimeAccess}
-                                featureName="Inventory Velocity"
-                                featureDescription="Identify your fastest-moving products and optimize stock levels with data-driven ABC analysis."
-                            >
-                                <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
-                            </FeatureGate>
+                                <FeatureGate
+                                    requiredPlan="business"
+                                    currentPlan={business?.plan}
+                                    hasLifetimeAccess={hasLifetimeAccess}
+                                    featureName="Customer Intelligence & Inventory Velocity"
+                                    featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
+                                >
+                                    <div className="grid grid-cols-1 gap-6 mt-6">
+                                        <CustomerAnalytics 
+                                            customers={customers || []} 
+                                            receipts={deepReceipts} 
+                                            currencySymbol={currencySymbol} 
+                                            totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers} 
+                                        />
+                                        <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                                    </div>
+                                </FeatureGate>
+                             </FeatureGate>
                         </TabsContent>
                         <TabsContent value="daily-sales" className="mt-0">
                             <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />

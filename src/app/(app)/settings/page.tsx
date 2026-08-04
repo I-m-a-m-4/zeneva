@@ -198,6 +198,17 @@ function SettingsPageContent() {
     const [isActivatingTerminal, setIsActivatingTerminal] = React.useState(false);
     const [isDeactivatingTerminal, setIsDeactivatingTerminal] = React.useState(false);
 
+    const [ipCountry, setIpCountry] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        const checkIp = () => {
+            const cached = sessionStorage.getItem('zeneva_ip_country');
+            if (cached) setIpCountry(cached);
+            else setTimeout(checkIp, 1000);
+        };
+        checkIp();
+    }, []);
+
     // Loyalty state
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
     const [pointsPerUnit, setPointsPerUnit] = React.useState('1');
@@ -1010,7 +1021,7 @@ function SettingsPageContent() {
                                         />
                                         <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
                                     </div>
-                                    {currency === 'NGN' && (
+                                    {currency === 'NGN' && ipCountry === 'Nigeria' && (
                                         business?.settings?.terminalAccountNumber ? (
                                             <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-500/5 space-y-2 mt-4 animate-fadeIn">
                                                 <div className="flex items-center justify-between">

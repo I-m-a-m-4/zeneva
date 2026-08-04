@@ -1,23 +1,25 @@
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
-import { redis } from '@/lib/redis';
+// import { redis } from '@/lib/redis';  // Redis disabled — using direct Firestore for real-time data
 
-const CACHE_KEY = 'admin:dashboard_data:v2';
-const CACHE_TTL = 300; // 5 minutes in seconds
+// const CACHE_KEY = 'admin:dashboard_data:v2';
+// const CACHE_TTL = 300; // 5 minutes — re-enable below to turn caching back on
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
     try {
-        // 1. Check Redis Cache
-        const cachedData = await redis.get(CACHE_KEY);
-        if (cachedData) {
-            console.log('Serving admin data from Redis cache');
-            return NextResponse.json(cachedData);
-        }
-
-        console.log('Cache miss. Fetching admin data from Firestore...');
         const db = adminFirestore;
 
-        // 2. Fetch all collections in parallel
+        // --- Redis cache check (disabled) ---
+        // const cachedData = await redis.get(CACHE_KEY);
+        // if (cachedData) {
+        //     console.log('Serving admin data from Redis cache');
+        //     return NextResponse.json(cachedData);
+        // }
+
+        // Fetch all collections in parallel directly from Firestore (real-time)
         const [
             usersSnap,
             businessesSnap,
@@ -26,7 +28,9 @@ export async function GET() {
             purchasesSnap,
             downloadClicksSnap,
             applicationsSnap,
-            grantsSnap
+            grantsSnap,
+            checkoutAttemptsSnap,
+            branchesSnap
         ] = await Promise.all([
             db.collection('users').orderBy('name').get(),
             db.collection('businessInstances').get(),
@@ -35,7 +39,9 @@ export async function GET() {
             db.collection('purchases').get(),
             db.collection('download_clicks').get(),
             db.collection('job_applications').get(),
-            db.collection('grants').get()
+            db.collection('grants').get(),
+            db.collection('checkout_attempts').orderBy('timestamp', 'desc').get(),
+            db.collectionGroup('branches').get()
         ]);
 
         const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -46,6 +52,8 @@ export async function GET() {
         const receipts = receiptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const purchases = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const downloadClicks = downloadClicksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const checkoutAttempts = checkoutAttemptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const branches = branchesSnap.docs.map(doc => ({ id: doc.id, businessId: doc.ref.parent.parent?.id, ...doc.data() }));
 
         const payload = {
             users,
@@ -55,11 +63,13 @@ export async function GET() {
             grants,
             receipts,
             purchases,
-            downloadClicks
+            downloadClicks,
+            checkoutAttempts,
+            branches
         };
 
-        // 3. Save to Redis
-        await redis.set(CACHE_KEY, payload, { ex: CACHE_TTL });
+        // --- Redis cache save (disabled) ---
+        // await redis.set(CACHE_KEY, payload, { ex: CACHE_TTL });
 
         return NextResponse.json(payload);
 

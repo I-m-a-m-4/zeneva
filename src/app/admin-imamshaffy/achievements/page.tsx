@@ -87,58 +87,111 @@ export const AchievementModal: React.FC<AchievementModalProps> = ({
 // =================================================================
 // AchievementsPage Component
 // =================================================================
+// Helper to convert Firebase Admin timestamp objects
+const reviveTimestamps = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (obj instanceof Date) return obj;
+    if (Array.isArray(obj)) return obj.map(reviveTimestamps);
+    
+    if (typeof obj === 'object') {
+        if ('_seconds' in obj && '_nanoseconds' in obj) {
+            const ms = obj._seconds * 1000 + obj._nanoseconds / 1000000;
+            const d = new Date(ms);
+            return {
+                seconds: obj._seconds,
+                nanoseconds: obj._nanoseconds,
+                toDate: () => d
+            };
+        }
+        
+        const newObj: any = {};
+        for (const key in obj) {
+            newObj[key] = reviveTimestamps(obj[key]);
+        }
+        return newObj;
+    }
+    return obj;
+};
+
 export default function AchievementsPage() {
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === 'dark';
-  const firestore = useFirestore();
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [selectedAchievement, setSelectedAchievement] = useState<any>(null);
+
+  const [adminData, setAdminData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAdminData = async () => {
+      try {
+          const res = await fetch('/api/admin/metrics');
+          const data = await res.json();
+          const revivedData = reviveTimestamps(data);
+          setAdminData(revivedData);
+      } catch (error) {
+          console.error('Failed to fetch admin data:', error);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  useEffect(() => {
+      fetchAdminData();
+  }, []);
 
   const triggerConfetti = () => {
     setShowConfetti(true);
   };
 
-  // Queries to compute active stats
-  const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
-  const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
-  const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts')), [firestore]);
-  const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
-
-  const { data: businesses, isLoading: bLoading } = useCollection<BusinessInstance>(businessesQuery);
-  const { data: products, isLoading: pLoading } = useCollection<Product>(productsQuery);
-  const { data: receipts, isLoading: rLoading } = useCollection<Receipt>(receiptsQuery);
-  const { data: users, isLoading: uLoading } = useCollection<UserProfile>(usersQuery);
-
-  const isLoading = bLoading || pLoading || rLoading || uLoading;
-
   const stats = useMemo(() => {
-    if (!businesses || !products || !receipts || !users) return null;
+    if (!adminData) return null;
 
-    const totalSales = receipts.length;
-    const totalProducts = products.length;
-    const activeSellers = businesses.filter(b => b.status !== 'deleted').length;
-    const totalGmv = receipts.reduce((sum, r) => sum + (r.total || 0), 0);
-    const totalUsers = users.length;
+    const { businesses, products, receipts, users, purchases } = adminData;
+
+    const totalSales = (receipts || []).length;
+    const totalProducts = (products || []).length;
+    const activeSellers = (businesses || []).filter((b: any) => b.status !== 'deleted').length;
+    const totalGmv = (receipts || []).reduce((sum: number, r: any) => sum + (r.total || 0), 0);
+    const totalUsers = (users || []).length;
     
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const dailyActiveUsers = users.filter(u => {
+    const dailyActiveUsers = (users || []).filter((u: any) => {
       if (!u.lastSeen) return false;
       const date = u.lastSeen.toDate ? u.lastSeen.toDate() : new Date(u.lastSeen);
       return date > oneDayAgo;
     }).length;
     
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const activeWithin7Days = users.filter(u => {
+    const activeWithin7Days = (users || []).filter((u: any) => {
       if (!u.lastSeen) return false;
       const date = u.lastSeen.toDate ? u.lastSeen.toDate() : new Date(u.lastSeen);
       return date > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     }).length;
-    const totalOldUsers = users.filter(u => {
+    const totalOldUsers = (users || []).filter((u: any) => {
       const date = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt || Date.now());
       return date < thirtyDaysAgo;
     }).length;
     const retentionPercentage = totalOldUsers > 0 ? Math.round((activeWithin7Days / totalOldUsers) * 100) : 100;
+
+    // Calculate MRR and ARR
+    const recentPurchases = (purchases || []).filter((p: any) => {
+        const pDate = p.timestamp?.toDate ? p.timestamp.toDate() : (p.timestamp?.seconds ? new Date(p.timestamp.seconds * 1000) : new Date(0));
+        return pDate > thirtyDaysAgo;
+    });
+
+    const getStandardMRR = (planName: string, pCurrency: string) => {
+        const name = (planName || '').toLowerCase();
+        const isUSD = pCurrency === 'USD';
+        if (name.includes('business')) {
+            return isUSD ? 20 * 1500 : 30000;
+        } else {
+            return isUSD ? 7 * 1500 : 10000;
+        }
+    };
+
+    const mrr = recentPurchases.reduce((sum: number, p: any) => sum + getStandardMRR(p.plan, p.currency), 0);
+    const arr = mrr * 12;
 
     return {
       totalGmv,
@@ -147,9 +200,11 @@ export default function AchievementsPage() {
       activeSellers,
       totalProducts,
       dailyActiveUsers,
-      retentionPercentage
+      retentionPercentage,
+      mrr,
+      arr
     };
-  }, [businesses, products, receipts, users]);
+  }, [adminData]);
 
   const achievements = useMemo(() => {
     return [
@@ -193,6 +248,56 @@ export default function AchievementsPage() {
         icon: Flame,
         color: "bg-red-500/10 text-red-500 border-red-500/20",
         unlocked: stats ? stats.totalGmv >= 100000000 : false,
+      },
+      // Revenue Milestones (MRR)
+      {
+        id: "achievement_10k_mrr",
+        title: "₦10K MRR",
+        description: "Zeneva crossed ₦10,000 in Monthly Recurring Revenue.",
+        icon: DollarSign,
+        color: "bg-green-500/10 text-green-500 border-green-500/20",
+        unlocked: stats ? stats.mrr >= 10000 : false,
+      },
+      {
+        id: "achievement_100k_mrr",
+        title: "₦100K MRR",
+        description: "Zeneva crossed ₦100,000 in Monthly Recurring Revenue.",
+        icon: Trophy,
+        color: "bg-green-500/10 text-green-500 border-green-500/20",
+        unlocked: stats ? stats.mrr >= 100000 : false,
+      },
+      {
+        id: "achievement_1m_mrr",
+        title: "₦1M MRR",
+        description: "Zeneva crossed ₦1,000,000 in Monthly Recurring Revenue.",
+        icon: Sparkles,
+        color: "bg-green-500/10 text-green-500 border-green-500/20",
+        unlocked: stats ? stats.mrr >= 1000000 : false,
+      },
+      // Revenue Milestones (ARR)
+      {
+        id: "achievement_120k_arr",
+        title: "₦120K ARR",
+        description: "Zeneva crossed ₦120,000 in Annual Recurring Revenue.",
+        icon: DollarSign,
+        color: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+        unlocked: stats ? stats.arr >= 120000 : false,
+      },
+      {
+        id: "achievement_1_2m_arr",
+        title: "₦1.2M ARR",
+        description: "Zeneva crossed ₦1,200,000 in Annual Recurring Revenue.",
+        icon: Trophy,
+        color: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+        unlocked: stats ? stats.arr >= 1200000 : false,
+      },
+      {
+        id: "achievement_12m_arr",
+        title: "₦12M ARR",
+        description: "Zeneva crossed ₦12,000,000 in Annual Recurring Revenue.",
+        icon: Sparkles,
+        color: "bg-teal-500/10 text-teal-500 border-teal-500/20",
+        unlocked: stats ? stats.arr >= 12000000 : false,
       },
       // User Milestones
       {

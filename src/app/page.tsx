@@ -115,28 +115,58 @@ export default function Home() {
         "@context": "https://schema.org",
         "@graph": [
             {
-                "@type": "SoftwareApplication",
+                "@type": "Organization",
+                "@id": "https://zeneva.space/#organization",
                 "name": "Zeneva",
+                "url": "https://zeneva.space",
+                "logo": "https://zeneva.space/logo.png",
+                "sameAs": [
+                    "https://twitter.com/zenevahq",
+                    "https://linkedin.com/company/zeneva"
+                ]
+            },
+            {
+                "@type": "SoftwareApplication",
+                "@id": "https://zeneva.space/#software",
+                "name": "Zeneva Retail OS",
                 "applicationCategory": "BusinessApplication",
-                "operatingSystem": "Web",
-                "description": "The all-in-one platform for inventory management, point of sale, sales analytics, and customer relationships for Nigerian businesses.",
+                "operatingSystem": "Windows, Web",
+                "description": "The borderless retail operating system unifying inventory management, offline-capable POS, sales analytics, and multi-currency (USD/NGN) payments.",
+                "publisher": {
+                    "@id": "https://zeneva.space/#organization"
+                },
+                "featureList": [
+                    "Offline-capable Point of Sale (POS)",
+                    "AI-driven Inventory Management and Forecasting",
+                    "Multi-location Store Management",
+                    "Multi-currency Checkout (USD, NGN)",
+                    "Real-time Sales Analytics",
+                    "Customizable Online Storefront"
+                ],
                 "offers": {
                     "@type": "Offer",
                     "price": "10000",
-                    "priceCurrency": "NGN"
+                    "priceCurrency": "NGN",
+                    "category": "Subscription"
                 },
                 "aggregateRating": {
                     "@type": "AggregateRating",
                     "ratingValue": "4.8",
-                    "reviewCount": "22000"
+                    "reviewCount": "220"
                 }
             },
             {
                 "@type": "WebPage",
-                "@id": "https://zeneva.space"
+                "@id": "https://zeneva.space/#webpage",
+                "url": "https://zeneva.space",
+                "name": "Zeneva | Advanced Retail POS & Inventory Management System",
+                "about": {
+                    "@id": "https://zeneva.space/#software"
+                }
             },
             {
                 "@type": "FAQPage",
+                "@id": "https://zeneva.space/#faq",
                 "mainEntity": faqItems.map(item => ({
                     "@type": "Question",
                     "name": item.question,

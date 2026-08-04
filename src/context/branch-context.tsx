@@ -176,9 +176,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             setBranches([]);
           }
         }
-      } catch (err) {
-        console.error("Failed to load branches", err);
-        setBranches([]);
+      } catch (err: any) {
+        if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+          setBranches([]);
+        } else {
+          console.error("Failed to load branches", err);
+        }
       } finally {
         setIsLoadingBranches(false);
       }

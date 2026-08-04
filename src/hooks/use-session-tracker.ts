@@ -106,7 +106,7 @@ export function useSessionTracker(userId: string | null | undefined) {
     const startHeartbeat = () => {
       heartbeatRef.current = setInterval(() => {
         flush('heartbeat');
-      }, 60_000); // every 60 seconds
+      }, 30_000); // every 30 seconds
     };
 
     const stopHeartbeat = () => {
@@ -145,8 +145,19 @@ export function useSessionTracker(userId: string | null | undefined) {
 
     // ---------- boot ----------
 
-    startSession();
-    startHeartbeat();
+    const initTracker = async () => {
+      startSession();
+      startHeartbeat();
+      try {
+        await updateDoc(userDocRef, {
+          lastSeen: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn("Failed to mark user online on boot:", err);
+      }
+    };
+
+    initTracker();
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);

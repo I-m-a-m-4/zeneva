@@ -92,11 +92,14 @@ export const createUserProfileDocument = async (
       phone: phone || '',
       createdAt: serverTimestamp(),
       businessId: businessId,
-      branchId: branchId,
       role: userRole,
       surveyCompleted: surveyCompleted,
       status: 'active',
     };
+
+    if (branchId) {
+      userProfile.branchId = branchId;
+    }
     batch.set(userDocRef, userProfile);
 
     await batch.commit();

@@ -13,6 +13,19 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Bot } from 'lucide-react';
+
+interface AISupportLog {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail?: string;
+    businessId: string;
+    query: string;
+    response: string;
+    createdAt: any;
+}
 
 function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: UserProfile }) {
     const firestore = useFirestore();
@@ -138,11 +151,26 @@ export default function AdminSupportPage() {
     );
     const { data: threads, isLoading } = useCollection<SupportThread>(threadsQuery);
 
+    const aiLogsQuery = useMemoFirebase(
+        () => query(collection(firestore, 'ai_support_logs'), orderBy('createdAt', 'desc')),
+        [firestore]
+    );
+    const { data: aiLogs, isLoading: isAiLogsLoading } = useCollection<AISupportLog>(aiLogsQuery);
+    const [selectedAiLog, setSelectedAiLog] = React.useState<AISupportLog | null>(null);
+
     return (
-        <div className="h-[calc(100vh_-_10rem)] grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <div className="col-span-1 h-full">
-                 <h1 className="text-2xl font-bold mb-4">Support Inbox</h1>
-                <ScrollArea className="h-full border rounded-lg">
+        <div className="h-[calc(100vh_-_10rem)] flex flex-col">
+            <h1 className="text-2xl font-bold mb-4">Support Center</h1>
+            <Tabs defaultValue="inbox" className="flex-1 flex flex-col min-h-0">
+                <TabsList className="mb-4 self-start">
+                    <TabsTrigger value="inbox" className="flex gap-2"><MessageSquare className="h-4 w-4" /> Human Inbox</TabsTrigger>
+                    <TabsTrigger value="ai-logs" className="flex gap-2"><Bot className="h-4 w-4" /> AI Chat Logs</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="inbox" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+                    <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="col-span-1 h-full flex flex-col">
+                            <ScrollArea className="flex-1 border rounded-lg bg-card">
                     {isLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
                     {threads && threads.length > 0 ? (
                         threads.map(thread => (
@@ -185,8 +213,79 @@ export default function AdminSupportPage() {
                         <MessageSquare className="h-16 w-16 opacity-50"/>
                         <p className="mt-4 text-lg font-medium">Select a conversation to view</p>
                     </div>
-                )}
-            </div>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="ai-logs" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+                     <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="col-span-1 h-full flex flex-col">
+                            <ScrollArea className="flex-1 border rounded-lg bg-card">
+                                {isAiLogsLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
+                                {aiLogs && aiLogs.length > 0 ? (
+                                    aiLogs.map(log => (
+                                        <button
+                                            key={log.id}
+                                            onClick={() => setSelectedAiLog(log)}
+                                            className={cn(
+                                                "w-full text-left p-3 border-b last:border-b-0 hover:bg-muted transition-colors",
+                                                selectedAiLog?.id === log.id && 'bg-muted'
+                                            )}
+                                        >
+                                            <p className="font-semibold text-sm truncate">{log.query}</p>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <p className="text-xs text-muted-foreground truncate max-w-[120px]">{log.userName}</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    {log.createdAt && typeof log.createdAt.toDate === 'function' 
+                                                        ? formatDistanceToNowStrict(log.createdAt.toDate(), {addSuffix: true}) 
+                                                        : ''}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    !isAiLogsLoading && <div className="p-4 text-center text-muted-foreground">No AI logs found.</div>
+                                )}
+                            </ScrollArea>
+                        </div>
+                        <div className="h-full md:col-span-2 lg:col-span-3">
+                            {selectedAiLog ? (
+                                <div className="h-full bg-card border rounded-lg flex flex-col">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-lg">AI Interaction Details</h3>
+                                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                                            <p><strong>User:</strong> {selectedAiLog.userName} ({selectedAiLog.userEmail || 'No email'})</p>
+                                            <p><strong>Business ID:</strong> {selectedAiLog.businessId}</p>
+                                        </div>
+                                    </div>
+                                    <ScrollArea className="flex-1 p-6">
+                                        <div className="space-y-6">
+                                            <div className="flex flex-col gap-2">
+                                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">User Query</span>
+                                                <div className="bg-primary/10 text-primary p-4 rounded-xl rounded-tl-sm w-fit max-w-[80%] whitespace-pre-wrap">
+                                                    {selectedAiLog.query}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 items-end">
+                                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Zen AI Response</span>
+                                                <div className="bg-muted p-4 rounded-xl rounded-tr-sm w-fit max-w-[80%] whitespace-pre-wrap text-sm">
+                                                    {selectedAiLog.response}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </ScrollArea>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center bg-card border rounded-lg text-muted-foreground">
+                                    <Bot className="h-16 w-16 opacity-50"/>
+                                    <p className="mt-4 text-lg font-medium">Select an AI log to review</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

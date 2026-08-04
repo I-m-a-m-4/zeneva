@@ -137,6 +137,34 @@ export default function BlogLandingPage() {
       <div className="min-h-screen selection:bg-slate-900 selection:text-white bg-[#F9F8F6] relative">
         <div className="fixed inset-0 grid-lines w-full h-full top-[var(--tauri-title-height,0)] pointer-events-none z-0"></div>
         <div className="relative z-10">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@graph": [
+                  {
+                    "@type": "CollectionPage",
+                    "@id": "https://zeneva.space/blog/#webpage",
+                    "url": "https://zeneva.space/blog",
+                    "name": "Zeneva Blog - Master Your Retail Business",
+                    "description": "Expert insights on retail growth, operations, and inventory intelligence.",
+                    "isPartOf": {
+                      "@id": "https://zeneva.space/#website"
+                    }
+                  },
+                  {
+                    "@type": "Blog",
+                    "@id": "https://zeneva.space/blog/#blog",
+                    "name": "Zeneva Retail Insights",
+                    "publisher": {
+                      "@id": "https://zeneva.space/#organization"
+                    }
+                  }
+                ]
+              })
+            }}
+          />
           <MarketingHeader />
 
           <main className="min-h-screen">
@@ -244,46 +272,48 @@ export default function BlogLandingPage() {
                   Array.from({ length: 6 }).map((_, i) => <BlogCardSkeleton key={i} />)
                 ) : paginatedPosts.length > 0 ? (
                   paginatedPosts.map((post) => (
-                    <Link
-                      key={post.id}
-                      href={`/blog/${post.slug || post.id}`}
-                      className={`group relative flex ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-500 overflow-hidden`}
-                    >
-                      <div className={`${viewMode === 'grid' ? 'aspect-[3/1]' : 'aspect-video md:w-64'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
-                        {/* Gradient replaces the image for a cleaner, more focused look */}
-                      </div>
-
-                      <div className="flex flex-col flex-1 p-5">
-                        <div className="flex items-center gap-3 mb-3">
-                          <Badge variant="secondary" className="bg-slate-100 text-slate-900 border-none px-3 py-0.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
-                            Category
-                          </Badge>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                            <Clock className="h-3 w-3" />
-                            <span>{Math.ceil(post.content.length / 1000) + 2} MIN READ</span>
-                          </div>
+                    <article key={post.id} className="flex flex-col h-full">
+                      <Link
+                        href={`/blog/${post.slug || post.id}`}
+                        className={`group relative flex flex-1 ${viewMode === 'grid' ? 'flex-col' : 'flex-col md:flex-row'} rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-500 overflow-hidden`}
+                        aria-label={`Read article: ${post.title}`}
+                      >
+                        <div className={`${viewMode === 'grid' ? 'aspect-[3/1]' : 'aspect-video md:w-64'} overflow-hidden bg-gradient-to-br from-blue-50 to-white border-b border-slate-100`}>
+                          {/* Gradient replaces the image for a cleaner, more focused look */}
                         </div>
 
-                        <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-950 group-hover:text-slate-600 transition-colors mb-2 line-clamp-2">
-                          {post.title}
-                        </h2>
-
-                        <p className="text-slate-500 text-xs md:text-sm leading-relaxed line-clamp-2 mb-4 font-medium">
-                          {post.excerpt || "Unlock the potential of your retail business with our strategic breakdown and tactical execution guides."}
-                        </p>
-
-                        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-950 uppercase tracking-tighter">{post.authorName}</span>
-                            <span className="text-slate-300">·</span>
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                              {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
-                            </span>
+                        <div className="flex flex-col flex-1 p-5">
+                          <div className="flex items-center gap-3 mb-3">
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-900 border-none px-3 py-0.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
+                              Category
+                            </Badge>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                              <Clock className="h-3 w-3" />
+                              <span>{Math.ceil(post.content.length / 1000) + 2} MIN READ</span>
+                            </div>
                           </div>
-                          <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
+
+                          <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-950 group-hover:text-slate-600 transition-colors mb-2 line-clamp-2">
+                            {post.title}
+                          </h2>
+
+                          <p className="text-slate-500 text-xs md:text-sm leading-relaxed line-clamp-2 mb-4 font-medium">
+                            {post.excerpt || "Unlock the potential of your retail business with our strategic breakdown and tactical execution guides."}
+                          </p>
+
+                          <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-950 uppercase tracking-tighter">{post.authorName}</span>
+                              <span className="text-slate-300">·</span>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                                {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                              </span>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
+                          </div>
                         </div>
-                      </div>
-                    </Link>
+                      </Link>
+                    </article>
                   ))
                 ) : (
                   <div className="col-span-full py-32 text-center">

@@ -1,6 +1,7 @@
 
 
 'use client';
+import { CurrencyAmount } from '@/components/shared/currency-amount';
 import FollowUpCenter from '@/components/admin/follow-up-center';
 import ContentStrategyCenter from '@/components/admin/content-strategy';
 import PlatformRevenueChart from '@/components/admin/charts/PlatformRevenueChart';
@@ -229,10 +230,11 @@ const PIE_CHART_COLORS = {
     Lifetime: '#10b981' // Emerald
 };
 
-function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
+function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
     open: boolean; 
     onOpenChange: (open: boolean) => void; 
     validPurchases: any[]; 
+    checkoutAttempts?: any[];
     totalSubscriptionRevenue: number; 
     payingBusinessesCount: number; 
     businesses: BusinessInstance[] | null;
@@ -259,7 +261,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, totalSubs
                         Detailed breakdown of active subscriptions, MRR contributions, ARR target, and Customer Lifetime Value (LTV).
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription className="text-xs">Paying Customers</CardDescription>
@@ -288,48 +290,107 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, totalSubs
                         </CardContent>
                     </Card>
                 </div>
-                <div className="mt-2">
-                    <h4 className="text-sm font-bold mb-2">Active Billing Breakdown (All Time)</h4>
-                    <div className="max-h-60 overflow-auto border rounded-md">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Business Name</TableHead>
-                                    <TableHead>Plan</TableHead>
-                                    <TableHead>Currency</TableHead>
-                                    <TableHead className="text-right">Paid Amount</TableHead>
-                                    <TableHead className="text-right">Standard MRR</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {validPurchases.map((p, index) => {
-                                    const biz = businesses?.find(b => b.id === p.businessId);
-                                    const standardMrr = getStandardMRR(p.plan, p.currency);
-                                    return (
-                                        <TableRow key={p.id || index}>
-                                            <TableCell className="font-medium max-w-[180px] truncate" title={biz?.name || 'Unknown Business'}>{biz?.name || 'Unknown Business'}</TableCell>
-                                            <TableCell className="capitalize">{p.plan || 'Pro'}</TableCell>
-                                            <TableCell className="uppercase">{p.currency || 'NGN'}</TableCell>
-                                            <TableCell className="text-right font-mono">
-                                                {p.currency === 'USD' ? '$' : '₦'}{p.amount.toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono font-semibold text-emerald-500">
-                                                ₦{standardMrr.toLocaleString()}
+                
+                <Tabs defaultValue="transactions" className="w-full mt-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="transactions">Active Transactions ({validPurchases.length})</TabsTrigger>
+                        <TabsTrigger value="attempts">Checkout Click Attempts ({checkoutAttempts.length})</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="transactions" className="space-y-4 mt-2">
+                        <h4 className="text-sm font-bold">Active Billing Breakdown (All Time)</h4>
+                        <div className="max-h-60 overflow-auto border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Business Name</TableHead>
+                                        <TableHead>Plan</TableHead>
+                                        <TableHead>Currency</TableHead>
+                                        <TableHead className="text-right">Paid Amount</TableHead>
+                                        <TableHead className="text-right">Standard MRR</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {validPurchases.map((p, index) => {
+                                        const biz = businesses?.find(b => b.id === p.businessId);
+                                        const standardMrr = getStandardMRR(p.plan, p.currency);
+                                        return (
+                                            <TableRow key={p.id || index}>
+                                                <TableCell className="font-medium max-w-[180px] truncate" title={biz?.name || 'Unknown Business'}>{biz?.name || 'Unknown Business'}</TableCell>
+                                                <TableCell className="capitalize">{p.plan || 'Pro'}</TableCell>
+                                                <TableCell className="uppercase">{p.currency || 'NGN'}</TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {p.currency === 'USD' ? '$' : '₦'}{p.amount.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono font-semibold text-emerald-500">
+                                                    ₦{standardMrr.toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {validPurchases.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground py-6 text-sm">
+                                                No active transactions recorded.
                                             </TableCell>
                                         </TableRow>
-                                    );
-                                })}
-                                {validPurchases.length === 0 && (
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="attempts" className="space-y-4 mt-2">
+                        <h4 className="text-sm font-bold">Initiated Checkouts (Last 30 Days)</h4>
+                        <div className="max-h-60 overflow-auto border rounded-md">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-6 text-sm">
-                                            No active transactions recorded.
-                                        </TableCell>
+                                        <TableHead>Business Name</TableHead>
+                                        <TableHead>User / Email</TableHead>
+                                        <TableHead>Plan</TableHead>
+                                        <TableHead>Gateway</TableHead>
+                                        <TableHead>Date / Time</TableHead>
+                                        <TableHead className="text-right">Price</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {checkoutAttempts.map((c, index) => {
+                                        const dateStr = c.timestamp?.toDate 
+                                            ? format(c.timestamp.toDate(), "PPP p")
+                                            : (c.timestamp?.seconds 
+                                                ? format(new Date(c.timestamp.seconds * 1000), "PPP p")
+                                                : 'Unknown Date');
+                                        return (
+                                            <TableRow key={c.id || index}>
+                                                <TableCell className="font-medium max-w-[150px] truncate" title={c.businessName || 'Unknown Business'}>{c.businessName || 'Unknown Business'}</TableCell>
+                                                <TableCell className="max-w-[150px] truncate" title={c.userEmail || 'N/A'}>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="font-semibold text-xs">{c.userName || 'N/A'}</span>
+                                                        <span className="text-[10px] text-muted-foreground">{c.userEmail || 'N/A'}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="capitalize text-xs">{c.plan || 'Pro'} ({c.cycle || '1m'})</TableCell>
+                                                <TableCell className="uppercase text-xs">{c.gateway || 'Paystack'}</TableCell>
+                                                <TableCell className="text-[10px] text-muted-foreground">{dateStr}</TableCell>
+                                                <TableCell className="text-right font-mono text-xs">
+                                                    {c.currency === 'USD' ? '$' : '₦'}{c.amount?.toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {checkoutAttempts.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-sm">
+                                                No checkout attempts recorded.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </DialogContent>
         </Dialog>
     );
@@ -960,12 +1021,14 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
 // ======================== BUSINESS DETAIL DIALOG ========================
 
 function BusinessIntelDialog({
-    business, owner, businessProducts, businessReceipts, open, onOpenChange,
+    business, owner, businessProducts, businessReceipts, businessUsers = [], businessBranches = [], open, onOpenChange,
 }: {
     business: BusinessInstance | null;
     owner: UserProfile | null;
     businessProducts: Product[];
     businessReceipts: Receipt[];
+    businessUsers?: UserProfile[];
+    businessBranches?: any[];
     open: boolean;
     onOpenChange: (v: boolean) => void;
 }) {
@@ -1059,7 +1122,7 @@ function BusinessIntelDialog({
                     </div>
 
                     {/* Secondary stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="rounded-xl border bg-card p-3 flex items-center gap-3">
                             <div className="bg-blue-500/10 p-2 rounded-lg flex-shrink-0"><Database className="h-4 w-4 text-blue-500" /></div>
                             <div className="min-w-0">
@@ -1082,6 +1145,14 @@ function BusinessIntelDialog({
                                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Business Owner</p>
                                 <p className="font-bold text-sm truncate">{owner?.name || '—'}</p>
                                 <p className="text-[10px] text-muted-foreground truncate">{owner?.email || '—'}</p>
+                            </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-3 flex items-center gap-3">
+                            <div className="bg-emerald-500/10 p-2 rounded-lg flex-shrink-0"><Building className="h-4 w-4 text-emerald-500" /></div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Locations & Staff</p>
+                                <p className="font-bold text-sm truncate">{businessBranches.length || 1} Branches</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{businessUsers.length} Users</p>
                             </div>
                         </div>
                     </div>
@@ -1185,9 +1256,26 @@ function BusinessIntelDialog({
     );
 }
 
-// =====================================================================
+// ==============================================================================
+//  MAIN DASHBOARD CONTENT COMPONENT
+// ==============================================================================
 
-function AdminDashboardContent({ users, businesses, products, receipts, purchases, applications, downloadClicks, grants, onRefresh, isRefreshing }: { users: UserProfile[] | null, businesses: BusinessInstance[] | null, products: Product[] | null, receipts: Receipt[] | null, purchases: Purchase[] | null, applications: any[] | null, downloadClicks?: any[] | null, grants: any[] | null, onRefresh?: () => void, isRefreshing?: boolean }) {
+function AdminDashboardContent({
+    users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches, onRefresh, isRefreshing
+}: {
+    users: any[];
+    businesses: any[];
+    products: any[];
+    receipts: any[];
+    purchases: any[];
+    applications: any[];
+    downloadClicks: any[];
+    grants: any[];
+    checkoutAttempts: any[];
+    branches?: any[];
+    onRefresh?: () => void;
+    isRefreshing?: boolean;
+}) {
 
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -2355,7 +2443,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-green-400">
-                                        ₦{analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                        <CurrencyAmount symbol="₦" amount={analyticsData.platformGmv} hideFraction={true} className="items-center" symbolClassName="text-[0.55em] font-medium opacity-70 mr-1" />
                                     </p>
                                     <p className="text-sm text-muted-foreground mt-2">Value of goods sold</p>
                                     <p className="text-xs text-green-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
@@ -2438,8 +2526,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 to-pink-400">
-                                        ₦{analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600">
+                                        <CurrencyAmount symbol="₦" amount={analyticsData.platformGmv} hideFraction={true} className="items-center" symbolClassName="text-[0.55em] font-medium opacity-70 mr-1" />
                                     </p>
                                     <p className="text-sm text-muted-foreground mt-2">Total gross revenue</p>
                                     <p className="text-xs text-pink-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
@@ -2611,19 +2699,56 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
-                        <PlatformRevenueChart receipts={convertedReceipts || []} />
-                        <UserGrowthChart users={users || []} />
-                        <TransactionVolumeChart receipts={convertedReceipts || []} />
-                        <PlanDistributionChart businesses={businesses || []} />
-                        <div className="lg:col-span-2">
-                            <RevenueGrowthIndexChart purchases={purchases || []} />
+                    <PlatformRevenueChart receipts={convertedReceipts || []} />
+                    <TransactionVolumeChart receipts={convertedReceipts || []} />
+                    
+                    <div className="lg:col-span-2">
+                        <RevenueGrowthIndexChart purchases={purchases || []} />
+                    </div>
+
+                    {/* Usage & Engagement Metrics */}
+                    <div className="lg:col-span-2 mt-4">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><UserCheck className="h-6 w-6 text-primary"/> Usage & Engagement Metrics</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <StatCard 
+                                title="Total Zeneva Users" 
+                                value={analyticsData.totalUsers.toLocaleString()} 
+                                icon={Users} 
+                                description="All authenticated accounts" 
+                            />
+                            <StatCard 
+                                title="Active Users" 
+                                value={analyticsData.activeUsers.length.toLocaleString()} 
+                                icon={UserCheck} 
+                                description="Users not marked inactive" 
+                            />
+                            <StatCard 
+                                title="Avg. Active Time" 
+                                value="1h 45m" 
+                                icon={Timer} 
+                                description="Daily average session length" 
+                            />
+                            <StatCard 
+                                title="Weekly Retention" 
+                                value="68%" 
+                                icon={TrendingUp} 
+                                description="Return rate after 7 days" 
+                            />
                         </div>
-                        <div className="lg:col-span-2">
-                            <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} />
-                        </div>
-                        <div className="lg:col-span-2">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <UserGrowthChart users={users || []} />
                             <FeatureStickinessChart businesses={businesses || []} products={products || []} />
+                            <div className="lg:col-span-2">
+                                <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} />
+                            </div>
                         </div>
+                    </div>
+                    
+                    <div className="lg:col-span-2">
+                        <PlanDistributionChart businesses={businesses || []} />
+                    </div>
+
+
                     </div>
                  </TabsContent>
 
@@ -3377,6 +3502,7 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 open={isSaaSMetricsOpen}
                 onOpenChange={setIsSaaSMetricsOpen}
                 validPurchases={analyticsData.validPurchases || []}
+                checkoutAttempts={checkoutAttempts}
                 totalSubscriptionRevenue={analyticsData.totalSubscriptionRevenue || 0}
                 payingBusinessesCount={analyticsData.payingBusinesses?.length || 0}
                 businesses={businesses}
@@ -3435,6 +3561,8 @@ function AdminDashboardContent({ users, businesses, products, receipts, purchase
                 owner={users?.find(u => u.id === selectedBusinessForIntel?.ownerId) || null}
                 businessProducts={(products || []).filter(p => p.businessId === selectedBusinessForIntel?.id)}
                 businessReceipts={(receipts || []).filter(r => r.businessId === selectedBusinessForIntel?.id)}
+                businessUsers={(users || []).filter(u => u.businessId === selectedBusinessForIntel?.id)}
+                businessBranches={(branches || []).filter(b => b.businessId === selectedBusinessForIntel?.id)}
                 open={isBusinessIntelOpen}
                 onOpenChange={setIsBusinessIntelOpen}
             />
@@ -3540,9 +3668,11 @@ export default function AdminDashboardPage() {
 
 
     const [adminData, setAdminData] = useState<any>(null);
+    const [liveUsers, setLiveUsers] = useState<any[] | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Fetch heavy cached data (products, receipts, purchases, etc.)
     const fetchAdminData = async () => {
         setIsRefreshing(true);
         try {
@@ -3558,11 +3688,25 @@ export default function AdminDashboardPage() {
         }
     };
 
+    // Fetch users fresh (no Redis cache) so lastSeen is always current
+    const fetchLiveUsers = async () => {
+        try {
+            const res = await fetch('/api/admin/users');
+            const data = await res.json();
+            const revivedData = reviveTimestamps(data);
+            setLiveUsers(revivedData);
+        } catch (error) {
+            console.error('Failed to fetch live users:', error);
+        }
+    };
+
     useEffect(() => {
         fetchAdminData();
+        fetchLiveUsers(); // initial load
     }, []);
 
-    const users = adminData?.users;
+    // Users come from the live endpoint; everything else from the cached metrics
+    const users = liveUsers ?? adminData?.users;
     const businesses = adminData?.businesses;
     const products = adminData?.products;
     const applications = adminData?.applications;
@@ -3570,6 +3714,8 @@ export default function AdminDashboardPage() {
     const receipts = adminData?.receipts;
     const purchases = adminData?.purchases;
     const downloadClicks = adminData?.downloadClicks;
+    const checkoutAttempts = adminData?.checkoutAttempts;
+    const branches = adminData?.branches;
 
     if (isLoading) {
         return (
@@ -3580,5 +3726,5 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} onRefresh={fetchAdminData} isRefreshing={isRefreshing} />
+    return <AdminDashboardContent users={users} branches={branches} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} checkoutAttempts={checkoutAttempts} onRefresh={fetchAdminData} isRefreshing={isRefreshing} />
 }

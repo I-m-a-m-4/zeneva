@@ -23,61 +23,6 @@ import { zenevaSupportChat, type ZenevaSupportChatInput } from '@/ai/flows/suppo
 import AIChat from '@/components/support/ai-chat';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: string[] }[] = [
-  // --- CATEGORY: INSTALLATION & DESKTOP (5) ---
-  {
-    id: "windows-protection",
-    question: "Windows protected your PC? How to install Zeneva",
-    tags: ["install", "windows", "security", "defender", "unrecognized"],
-    answer: (
-        <div className="space-y-4">
-            <p className="leading-relaxed text-sm">This purple warning screen occurs because Zeneva is a new, high-performance desktop suite that hasn't yet built a "reputation" with Microsoft's SmartScreen filters. It does **not** indicate a threat.</p>
-            <div className="my-6 border rounded-xl overflow-hidden shadow-2xl ring-1 ring-border/20">
-                <img src="/images/support/windows-protected.jpg" alt="Windows protected your PC" className="w-full object-cover" />
-            </div>
-            <div className="bg-muted/30 p-4 rounded-xl border border-border/50">
-                <h4 className="font-bold text-sm mb-3 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                    Quick Installation Fix:
-                </h4>
-                <ol className="space-y-3">
-                    <li className="flex gap-3 items-start text-sm">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs font-mono">1</span>
-                        <span>Click the <strong className="text-foreground">"More info"</strong> link inside the warning window.</span>
-                    </li>
-                    <li className="flex gap-3 items-start text-sm">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs font-mono">2</span>
-                        <span>The window will expand to show a <strong className="text-foreground">"Run anyway"</strong> button.</span>
-                    </li>
-                    <li className="flex gap-3 items-start text-sm">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs font-mono">3</span>
-                        <span>Click it, and the Zeneva installer will launch immediately.</span>
-                    </li>
-                </ol>
-            </div>
-        </div>
-    )
-  },
-  {
-      question: "What are the minimum system requirements for Zeneva Desktop?",
-      tags: ["system", "requirements", "windows", "mac", "linux"],
-      answer: <p className="text-sm">Zeneva is optimized to run on modest hardware. Minimum: Windows 10/11 (64-bit), 4GB RAM, and 500MB disk space. For the best experience with Zen AI local processing, we recommend 8GB RAM and an SSD.</p>
-  },
-  {
-      question: "How do I update the desktop application to the latest version?",
-      tags: ["update", "version", "download", "auto-update"],
-      answer: <p className="text-sm">Zeneva checks for updates every time it launches. If a new version (e.g., v0.5.8) is available, you will see a "New Version Available" button in the Top Title Bar. Simply click it to download and relaunch with the latest features.</p>
-  },
-  {
-      question: "Can I run Zeneva on multiple computers at the same time?",
-      tags: ["multi-device", "login", "synced"],
-      answer: <p className="text-sm">Yes. Your subscription allows you to log in on multiple terminals. Every sale made on one computer will synchronize with the others as soon as they are online, giving you a real-time view of your entire store.</p>
-  },
-  {
-      question: "How to fix 'Database Initialization Error' on startup?",
-      tags: ["error", "database", "sqlite", "fix"],
-      answer: <p className="text-sm">This usually happens if the application is prevented from writing to its data folder. Try running Zeneva as an Administrator, or ensure that your Antivirus isn't blocking the `zeneva.db` file in your AppData directory.</p>
-  },
-
   // --- CATEGORY: OFFLINE & SYNC (5) ---
   {
     question: "How exactly does the Offline-First synchronization work?",
@@ -148,12 +93,54 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
   {
       question: "Can I save a cart and recall it later (On-Hold Orders)?",
       tags: ["pos", "hold", "save-cart", "orders"],
-      answer: <p className="text-sm">Yes. Click the **"Pause"** icon in the POS cart. This saves the current items as a 'Pending' order, allowing you to serve the next customer. You can recall it anytime from the 'On-Hold' tab.</p>
+      answer: <p className="text-sm">Yes. If a customer forgets their wallet, click the "Hold" button. You can serve the next customer, and then recall the held order when the first customer returns.</p>
   },
   {
-      question: "How do I print a duplicate receipt for a past sale?",
-      tags: ["print", "receipt", "history", "duplicate"],
-      answer: <p className="text-sm">Navigate to **Sales History**, locate the transaction, and click the three-dot menu. Select **"Re-print"** to send the receipt back to your thermal printer or download it as a PDF.</p>
+      question: "How do I issue a refund for a returned item?",
+      tags: ["refund", "return", "pos", "receipt"],
+      answer: <p className="text-sm">Go to **Sales History**, find the receipt, and click "Process Refund". You can choose to refund the entire receipt or select specific items that were returned.</p>
+  },
+  {
+      question: "Can I reprint a receipt from yesterday?",
+      tags: ["receipt", "reprint", "history"],
+      answer: <p className="text-sm">Yes. Navigate to the **Sales History** tab, locate the transaction by date, receipt number, or customer name, and click the "Print Receipt" icon.</p>
+  },
+  {
+      question: "How do I sell an item with variable weight (e.g., meat, vegetables)?",
+      tags: ["weight", "variable", "scale", "products"],
+      answer: <p className="text-sm">When adding the product to your inventory, set its unit to 'kg' or 'lbs'. When adding it to the cart in the POS, you will be prompted to enter the exact weight, and Zeneva will calculate the price automatically.</p>
+  },
+  {
+      question: "Does Zeneva support thermal printers and cash drawers?",
+      tags: ["printer", "thermal", "cash-drawer", "hardware"],
+      answer: <p className="text-sm">Yes. Zeneva communicates directly with your operating system's print spooler. Any ESC/POS thermal printer (58mm or 80mm) installed on your OS will work perfectly. Cash drawers connected via the printer's RJ11 port will kick open automatically on cash sales.</p>
+  },
+  {
+      question: "How do I apply a discount to the entire order?",
+      tags: ["discount", "pos", "checkout", "cart"],
+      answer: <p className="text-sm">In the POS interface, click the "Discount" button below the subtotal. You can apply either a percentage (%) discount or a fixed amount discount to the entire cart.</p>
+  },
+
+  // --- CATEGORY: INSTALLATION & DESKTOP (4) ---
+  {
+      question: "What are the minimum system requirements for Zeneva Desktop?",
+      tags: ["system", "requirements", "windows", "mac", "linux"],
+      answer: <p className="text-sm">Zeneva is optimized to run on modest hardware. Minimum: Windows 10/11 (64-bit), 4GB RAM, and 500MB disk space. For the best experience with Zen AI local processing, we recommend 8GB RAM and an SSD.</p>
+  },
+  {
+      question: "How do I update the desktop application to the latest version?",
+      tags: ["update", "version", "download", "auto-update"],
+      answer: <p className="text-sm">Zeneva checks for updates every time it launches. If a new version (e.g., v0.5.8) is available, you will see a "New Version Available" button in the Top Title Bar. Simply click it to download and relaunch with the latest features.</p>
+  },
+  {
+      question: "Can I run Zeneva on multiple computers at the same time?",
+      tags: ["multi-device", "login", "synced"],
+      answer: <p className="text-sm">Yes. Your subscription allows you to log in on multiple terminals. Every sale made on one computer will synchronize with the others as soon as they are online, giving you a real-time view of your entire store.</p>
+  },
+  {
+      question: "How to fix 'Database Initialization Error' on startup?",
+      tags: ["error", "database", "sqlite", "fix"],
+      answer: <p className="text-sm">This usually happens if the application is prevented from writing to its data folder. Try running Zeneva as an Administrator, or ensure that your Antivirus isn't blocking the `zeneva.db` file in your AppData directory.</p>
   },
   {
       question: "What thermal printers and hardware are supported?",
@@ -352,7 +339,8 @@ type Message = {
     text: string;
 };
 
-function ZenAIChatBot() {
+function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
+    const firestore = useFirestore();
     const [messages, setMessages] = React.useState<Message[]>([]);
     const [input, setInput] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
@@ -372,6 +360,23 @@ function ZenAIChatBot() {
             const aiText = response.answer || (response as any).response || "I'm sorry, I couldn't process that request.";
             const aiMessage: Message = { sender: 'ai', text: aiText };
             setMessages(prev => [...prev, aiMessage]);
+
+            // Log to Firestore for admin review
+            if (firestore && userProfile) {
+                try {
+                    await addDoc(collection(firestore, 'ai_support_logs'), {
+                        userId: userProfile.id,
+                        userName: userProfile.name,
+                        userEmail: userProfile.email,
+                        businessId: userProfile.currentBusinessId || 'none',
+                        query: input,
+                        response: aiText,
+                        createdAt: serverTimestamp()
+                    });
+                } catch (logError) {
+                    console.error("Failed to log AI chat to Firestore:", logError);
+                }
+            }
         } catch (error) {
             console.error("AI chat error:", error);
             toast({
@@ -592,6 +597,29 @@ export default function SupportPage() {
     const isLoading = isUserLoading || isProfileLoading;
     const [faqSearch, setFaqSearch] = React.useState('');
 
+    // Track FAQ searches to understand user intent
+    React.useEffect(() => {
+        if (!faqSearch.trim() || faqSearch.trim().length < 3) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                if (firestore && userProfile) {
+                    await addDoc(collection(firestore, 'faq_search_logs'), {
+                        query: faqSearch.trim().toLowerCase(),
+                        userId: userProfile.id,
+                        userName: userProfile.name,
+                        businessId: userProfile.currentBusinessId || 'none',
+                        createdAt: serverTimestamp()
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to log FAQ search:", error);
+            }
+        }, 1000); // Wait 1 second after user stops typing before logging
+
+        return () => clearTimeout(timer);
+    }, [faqSearch, firestore, userProfile]);
+
     const filteredFaqs = React.useMemo(() => {
         if (!faqSearch.trim()) return faqItems;
         const search = faqSearch.toLowerCase();
@@ -620,7 +648,7 @@ export default function SupportPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="p-6 pt-0">
-                            <ZenAIChatBot />
+                            <ZenAIChatBot userProfile={userProfile || undefined} />
                         </AccordionContent>
                     </Card>
                 </AccordionItem>

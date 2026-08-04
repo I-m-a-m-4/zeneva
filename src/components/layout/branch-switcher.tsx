@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Store, Building2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface BranchSwitcherProps {
   variant?: 'sidebar' | 'header' | 'sheet';
@@ -25,7 +26,30 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     business?.ownerId === currentUserProfile.id
   );
 
-  if (!isMultiBranchEnabled || isLoadingBranches) return null;
+  if (isLoadingBranches) {
+    if (variant === 'header') {
+      return (
+        <div className={cn("flex items-center", className)}>
+          <Skeleton className="h-8 md:h-9 w-[130px] xs:w-[170px] sm:w-[220px] rounded-lg" />
+        </div>
+      );
+    }
+    if (variant === 'sheet') {
+      return (
+        <div className={cn("w-full py-1.5", className)}>
+          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 tracking-wider px-1">Current Branch</p>
+          <Skeleton className="w-full h-11 rounded-xl" />
+        </div>
+      );
+    }
+    return (
+      <div className={cn("px-2 py-2 w-full", isCollapsed && "hidden", className)}>
+        <Skeleton className="w-full h-9 rounded-md" />
+      </div>
+    );
+  }
+
+  if (!isMultiBranchEnabled) return null;
 
   const currentBranchName = activeBranchId === 'all' 
     ? 'All Branches' 

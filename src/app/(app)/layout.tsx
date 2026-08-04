@@ -14,10 +14,11 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProductTour } from '@/components/ProductTour';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,7 +34,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
-import { cn, safeToDate } from '@/lib/utils';
+import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
@@ -52,8 +53,8 @@ import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
 import { History } from 'lucide-react';
 import { BranchSwitcher } from '@/components/layout/branch-switcher';
 import { useSessionTracker } from '@/hooks/use-session-tracker';
-
-
+import { logErrorToFirestore } from '@/lib/error-logger';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     width="20"
@@ -178,6 +179,14 @@ export default function AuthenticatedLayout({
   // Track how long this user is actively using the app
   useSessionTracker(user?.uid);
 
+  const [ipCountry, setIpCountry] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    getCountryFromIP().then(country => {
+      setIpCountry(country);
+    });
+  }, []);
+
   const { notify } = useNativeNotifications();
   const { requestPermission: handleRequestFcmPermission } = useFCM();
 
@@ -223,6 +232,24 @@ export default function AuthenticatedLayout({
     errorEmitter.on('permission-error', handlePermissionError);
     return () => errorEmitter.off('permission-error', handlePermissionError);
   }, [toast]);
+
+  React.useEffect(() => {
+    const handleWindowError = (event: ErrorEvent) => {
+      logErrorToFirestore(event.error || new Error(event.message), 'window', { userId: user?.uid, businessId: businessInstance?.id });
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logErrorToFirestore(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), 'unhandledrejection', { userId: user?.uid, businessId: businessInstance?.id });
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [user?.uid, businessInstance?.id]);
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
@@ -355,8 +382,22 @@ export default function AuthenticatedLayout({
   }, [isUserLoading, user, router]);
 
   React.useEffect(() => {
+    // If the Firebase user is logged in, but their Firestore 'users' document doesn't exist
+    // and we are fully loaded, it means the account was deleted by an admin.
+    if (!isUserLoading && !isLoading && user && currentUserProfile === null && !isLoggingOut) {
+      setIsLoggingOut(true);
+      signOut(getAuth()).catch(() => setIsLoggingOut(false));
+    }
+  }, [isUserLoading, isLoading, user, currentUserProfile, isLoggingOut]);
+
+  React.useEffect(() => {
     const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
-    if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding' && !isSuperAdmin) {
+    const justCompletedOnboarding = typeof window !== 'undefined' && sessionStorage.getItem('zeneva_onboarding_complete') === 'true';
+    // Clear the bypass flag once Firestore has caught up and surveyCompleted is true
+    if (justCompletedOnboarding && currentUserProfile?.surveyCompleted) {
+      sessionStorage.removeItem('zeneva_onboarding_complete');
+    }
+    if (!isLoading && currentUserProfile && !currentUserProfile.surveyCompleted && pathname !== '/onboarding' && !isSuperAdmin && !justCompletedOnboarding) {
       router.replace('/onboarding');
     }
   }, [isLoading, currentUserProfile, pathname, router]);
@@ -556,7 +597,8 @@ export default function AuthenticatedLayout({
 
   // --- Start of Checks for Active/Valid Accounts ---
 
-  if (currentUserProfile && currentUserProfile.surveyCompleted === false && pathname !== '/onboarding') {
+  const justCompletedOnboarding = typeof window !== 'undefined' && sessionStorage.getItem('zeneva_onboarding_complete') === 'true';
+  if (currentUserProfile && currentUserProfile.surveyCompleted === false && pathname !== '/onboarding' && !justCompletedOnboarding) {
     return <AppLoader text="Finalizing your setup..." />;
   }
 
@@ -620,9 +662,11 @@ export default function AuthenticatedLayout({
   }
   // --- End of Checks ---
 
-  if (pathname === '/onboarding') {
-    return <main className="p-4 sm:p-6">{children}</main>;
-  }
+  // Allow the full layout to render behind the onboarding modal
+  // if (pathname === '/onboarding') {
+  //   return <main className="p-4 sm:p-6">{children}</main>;
+  // }
+
 
   // --- Subscription Guard Configuration ---
   const restrictedRoutes = ['/sales', '/storefront', '/ai-insights', '/customers', '/inventory', '/reports', '/receipts', '/online-orders', '/audit-log'];
@@ -659,10 +703,10 @@ export default function AuthenticatedLayout({
       if (item.href === '/audit-log' && permissions.view_audit_logs === false) return false;
       if (item.href === '/online-orders' && permissions.manage_online_orders === false) return false;
 
-      // 4. Zeneva Terminal Activation Check
+      // 4. Zeneva Terminal Feature Availability (Only for Nigeria)
       if (item.href === '/terminal-alerts') {
-        const hasActiveTerminal = !!businessInstance?.settings?.paymentBankAccountId && !!businessInstance?.settings?.paymentBankCode;
-        if (!hasActiveTerminal) return false;
+        const isNigerian = ipCountry === 'Nigeria';
+        if (!isNigerian) return false;
       }
 
       return true;
@@ -739,8 +783,8 @@ export default function AuthenticatedLayout({
     
     // Extra Route Guard for Terminal Alerts
     if (protectedRoute === '/terminal-alerts') {
-      const hasActiveTerminal = !!businessInstance?.settings?.paymentBankAccountId && !!businessInstance?.settings?.paymentBankCode;
-      if (!hasActiveTerminal) hasRouteAccess = false;
+      const isNigerian = ipCountry === 'Nigeria';
+      if (!isNigerian) hasRouteAccess = false;
     }
   }
 
@@ -755,7 +799,8 @@ export default function AuthenticatedLayout({
     });
   };
   return (
-    <>
+    <ErrorBoundary>
+      <>
       <TooltipProvider>
         <SidebarProvider defaultOpen={true} className="h-full">
           <div
@@ -797,7 +842,7 @@ export default function AuthenticatedLayout({
                       ))
                     ) : (
                       visibleNavItems.map((link) => (
-                        <SidebarMenuItem key={link.href}>
+                        <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
                           <SidebarMenuButton
                             asChild
                             tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
@@ -822,7 +867,7 @@ export default function AuthenticatedLayout({
               <SidebarFooter className="p-2 pb-12 md:pb-8">
                 <SidebarMenu>
                   {isMounted && visibleBottomLinks.map((link) => (
-                    <SidebarMenuItem key={link.href}>
+                    <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
                       <SidebarMenuButton
                         asChild
                         tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
@@ -1156,6 +1201,7 @@ export default function AuthenticatedLayout({
           />
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
         </SidebarProvider>
+        <ProductTour />
       </TooltipProvider>
 
       <Dialog open={isNotificationsExpanded} onOpenChange={setIsNotificationsExpanded}>
@@ -1256,5 +1302,6 @@ export default function AuthenticatedLayout({
         </DialogContent>
       </Dialog>
     </>
+    </ErrorBoundary>
   );
 }

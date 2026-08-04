@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 
 interface SummaryCardProps {
   title: string;
-  value: string | number;
+  value: React.ReactNode;
   description?: string;
   icon: LucideIcon | string;
   trend?: string;

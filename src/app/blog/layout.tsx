@@ -3,6 +3,16 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Blog | Retail Insights & Business Growth | Zeneva',
   description: 'Stay updated with the latest retail trends, inventory management tips, and success stories from the Zeneva community. Expert advice for Nigerian businesses.',
+  keywords: [
+    'retail case studies nigeria',
+    'how to manage boutique inventory',
+    'pos system tutorials',
+    'business growth tactics for mini-marts',
+    'reducing inventory shrinkage',
+    'zeneva retail insights',
+    'offline point of sale guide',
+    'multi-currency retail billing'
+  ],
   alternates: {
     canonical: '/blog'
   },

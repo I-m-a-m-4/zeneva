@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -23,6 +24,7 @@ import { Loader2, CalendarIcon, ArrowRight, ArrowLeft, Building, MapPin, Globe, 
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ALL_CURRENCIES } from '@/lib/constants';
+import { Combobox } from '@/components/ui/combobox';
 
 const onboardingSchema = z.object({
   organizationName: z.string().min(3, 'Organization name is required.'),
@@ -31,10 +33,6 @@ const onboardingSchema = z.object({
   state: z.string().min(2, 'State is required.'),
   country: z.string().min(2, 'Country is required.'),
   currency: z.string().min(1, 'Currency is required.'),
-  language: z.string().min(1, 'Language is required.'),
-  timezone: z.string().min(1, 'Time zone is required.'),
-  inventoryStartDate: z.date({ required_error: 'Please select a date.' }),
-  fiscalYearStart: z.string().min(1, 'Please select a fiscal year start.'),
 });
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
@@ -46,50 +44,143 @@ const months = [
   'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// Map of country name -> ISO 3166-1 alpha-2 code for emoji flag generation
+const COUNTRY_CODES: Record<string, string> = {
+  "Afghanistan": "AF", "Albania": "AL", "Algeria": "DZ", "Andorra": "AD", "Angola": "AO",
+  "Antigua & Barbuda": "AG", "Argentina": "AR", "Armenia": "AM", "Australia": "AU", "Austria": "AT",
+  "Azerbaijan": "AZ", "Bahamas": "BS", "Bahrain": "BH", "Bangladesh": "BD", "Barbados": "BB",
+  "Belarus": "BY", "Belgium": "BE", "Belize": "BZ", "Benin": "BJ", "Bhutan": "BT",
+  "Bolivia": "BO", "Bosnia & Herzegovina": "BA", "Botswana": "BW", "Brazil": "BR", "Brunei": "BN",
+  "Bulgaria": "BG", "Burkina Faso": "BF", "Burundi": "BI", "Cabo Verde": "CV", "Cambodia": "KH",
+  "Cameroon": "CM", "Canada": "CA", "Central African Republic": "CF", "Chad": "TD", "Chile": "CL",
+  "China": "CN", "Colombia": "CO", "Comoros": "KM", "Congo": "CG", "Costa Rica": "CR",
+  "Croatia": "HR", "Cuba": "CU", "Cyprus": "CY", "Czechia": "CZ", "DR Congo": "CD",
+  "Denmark": "DK", "Djibouti": "DJ", "Dominica": "DM", "Dominican Republic": "DO", "Ecuador": "EC",
+  "Egypt": "EG", "El Salvador": "SV", "Equatorial Guinea": "GQ", "Eritrea": "ER", "Estonia": "EE",
+  "Eswatini": "SZ", "Ethiopia": "ET", "Fiji": "FJ", "Finland": "FI", "France": "FR",
+  "Gabon": "GA", "Gambia": "GM", "Georgia": "GE", "Germany": "DE", "Ghana": "GH",
+  "Greece": "GR", "Grenada": "GD", "Guatemala": "GT", "Guinea": "GN", "Guinea-Bissau": "GW",
+  "Guyana": "GY", "Haiti": "HT", "Honduras": "HN", "Hungary": "HU", "Iceland": "IS",
+  "India": "IN", "Indonesia": "ID", "Iran": "IR", "Iraq": "IQ", "Ireland": "IE",
+  "Israel": "IL", "Italy": "IT", "Jamaica": "JM", "Japan": "JP", "Jordan": "JO",
+  "Kazakhstan": "KZ", "Kenya": "KE", "Kiribati": "KI", "Kuwait": "KW", "Kyrgyzstan": "KG",
+  "Laos": "LA", "Latvia": "LV", "Lebanon": "LB", "Lesotho": "LS", "Liberia": "LR",
+  "Libya": "LY", "Liechtenstein": "LI", "Lithuania": "LT", "Luxembourg": "LU", "Madagascar": "MG",
+  "Malawi": "MW", "Malaysia": "MY", "Maldives": "MV", "Mali": "ML", "Malta": "MT",
+  "Mauritania": "MR", "Mauritius": "MU", "Mexico": "MX", "Moldova": "MD", "Monaco": "MC",
+  "Mongolia": "MN", "Montenegro": "ME", "Morocco": "MA", "Mozambique": "MZ", "Myanmar": "MM",
+  "Namibia": "NA", "Nepal": "NP", "Netherlands": "NL", "New Zealand": "NZ", "Nicaragua": "NI",
+  "Niger": "NE", "Nigeria": "NG", "North Korea": "KP", "North Macedonia": "MK", "Norway": "NO",
+  "Oman": "OM", "Pakistan": "PK", "Palestine": "PS", "Panama": "PA", "Papua New Guinea": "PG",
+  "Paraguay": "PY", "Peru": "PE", "Philippines": "PH", "Poland": "PL", "Portugal": "PT",
+  "Qatar": "QA", "Romania": "RO", "Russia": "RU", "Rwanda": "RW", "Saudi Arabia": "SA",
+  "Senegal": "SN", "Serbia": "RS", "Seychelles": "SC", "Sierra Leone": "SL", "Singapore": "SG",
+  "Slovakia": "SK", "Slovenia": "SI", "Solomon Islands": "SB", "Somalia": "SO", "South Africa": "ZA",
+  "South Korea": "KR", "South Sudan": "SS", "Spain": "ES", "Sri Lanka": "LK", "Sudan": "SD",
+  "Sweden": "SE", "Switzerland": "CH", "Syria": "SY", "Tajikistan": "TJ", "Tanzania": "TZ",
+  "Thailand": "TH", "Togo": "TG", "Trinidad & Tobago": "TT", "Tunisia": "TN", "Turkey": "TR",
+  "Turkmenistan": "TM", "Uganda": "UG", "Ukraine": "UA", "United Arab Emirates": "AE",
+  "United Kingdom": "GB", "United States": "US", "Uruguay": "UY", "Uzbekistan": "UZ",
+  "Venezuela": "VE", "Vietnam": "VN", "Yemen": "YE", "Zambia": "ZM", "Zimbabwe": "ZW",
+};
+
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  "Afghanistan": "AFN", "Albania": "ALL", "Algeria": "DZD", "Andorra": "EUR", "Angola": "AOA",
+  "Antigua & Barbuda": "XCD", "Argentina": "ARS", "Armenia": "AMD", "Australia": "AUD", "Austria": "EUR",
+  "Azerbaijan": "AZN", "Bahamas": "BSD", "Bahrain": "BHD", "Bangladesh": "BDT", "Barbados": "BBD",
+  "Belarus": "BYN", "Belgium": "EUR", "Belize": "BZD", "Benin": "XOF", "Bhutan": "BTN",
+  "Bolivia": "BOB", "Bosnia & Herzegovina": "BAM", "Botswana": "BWP", "Brazil": "BRL", "Brunei": "BND",
+  "Bulgaria": "BGN", "Burkina Faso": "XOF", "Burundi": "BIF", "Cabo Verde": "CVE", "Cambodia": "KHR",
+  "Cameroon": "XAF", "Canada": "CAD", "Central African Republic": "XAF", "Chad": "XAF", "Chile": "CLP",
+  "China": "CNY", "Colombia": "COP", "Comoros": "KMF", "Congo": "XAF", "Costa Rica": "CRC",
+  "Croatia": "EUR", "Cuba": "CUP", "Cyprus": "EUR", "Czechia": "CZK", "DR Congo": "CDF",
+  "Denmark": "DKK", "Djibouti": "DJF", "Dominica": "XCD", "Dominican Republic": "DOP", "Ecuador": "USD",
+  "Egypt": "EGP", "El Salvador": "USD", "Equatorial Guinea": "XAF", "Eritrea": "ERN", "Estonia": "EUR",
+  "Eswatini": "SZL", "Ethiopia": "ETB", "Fiji": "FJD", "Finland": "EUR", "France": "EUR",
+  "Gabon": "XAF", "Gambia": "GMD", "Georgia": "GEL", "Germany": "EUR", "Ghana": "GHS",
+  "Greece": "EUR", "Grenada": "XCD", "Guatemala": "GTQ", "Guinea": "GNF", "Guinea-Bissau": "XOF",
+  "Guyana": "GYD", "Haiti": "HTG", "Honduras": "HNL", "Hungary": "HUF", "Iceland": "ISK",
+  "India": "INR", "Indonesia": "IDR", "Iran": "IRR", "Iraq": "IQD", "Ireland": "EUR",
+  "Israel": "ILS", "Italy": "EUR", "Jamaica": "JMD", "Japan": "JPY", "Jordan": "JOD",
+  "Kazakhstan": "KZT", "Kenya": "KES", "Kiribati": "AUD", "Kuwait": "KWD", "Kyrgyzstan": "KGS",
+  "Laos": "LAK", "Latvia": "EUR", "Lebanon": "LBP", "Lesotho": "LSL", "Liberia": "LRD",
+  "Libya": "LYD", "Liechtenstein": "CHF", "Lithuania": "EUR", "Luxembourg": "EUR", "Madagascar": "MGA",
+  "Malawi": "MWK", "Malaysia": "MYR", "Maldives": "MVR", "Mali": "XOF", "Malta": "EUR",
+  "Mauritania": "MRU", "Mauritius": "MUR", "Mexico": "MXN", "Moldova": "MDL", "Monaco": "EUR",
+  "Mongolia": "MNT", "Montenegro": "EUR", "Morocco": "MAD", "Mozambique": "MZN", "Myanmar": "MMK",
+  "Namibia": "NAD", "Nepal": "NPR", "Netherlands": "EUR", "New Zealand": "NZD", "Nicaragua": "NIO",
+  "Niger": "XOF", "Nigeria": "NGN", "North Korea": "KPW", "North Macedonia": "MKD", "Norway": "NOK",
+  "Oman": "OMR", "Pakistan": "PKR", "Palestine": "ILS", "Panama": "PAB", "Papua New Guinea": "PGK",
+  "Paraguay": "PYG", "Peru": "PEN", "Philippines": "PHP", "Poland": "PLN", "Portugal": "EUR",
+  "Qatar": "QAR", "Romania": "RON", "Russia": "RUB", "Rwanda": "RWF", "Saudi Arabia": "SAR",
+  "Senegal": "XOF", "Serbia": "RSD", "Seychelles": "SCR", "Sierra Leone": "SLL", "Singapore": "SGD",
+  "Slovakia": "EUR", "Slovenia": "EUR", "Solomon Islands": "SBD", "Somalia": "SOS", "South Africa": "ZAR",
+  "South Korea": "KRW", "South Sudan": "SSP", "Spain": "EUR", "Sri Lanka": "LKR", "Sudan": "SDG",
+  "Sweden": "SEK", "Switzerland": "CHF", "Syria": "SYP", "Tajikistan": "TJS", "Tanzania": "TZS",
+  "Thailand": "THB", "Togo": "XOF", "Trinidad & Tobago": "TTD", "Tunisia": "TND", "Turkey": "TRY",
+  "Turkmenistan": "TMT", "Uganda": "UGX", "Ukraine": "UAH", "United Arab Emirates": "AED",
+  "United Kingdom": "GBP", "United States": "USD", "Uruguay": "UYU", "Uzbekistan": "UZS",
+  "Venezuela": "VES", "Vietnam": "VND", "Yemen": "YER", "Zambia": "ZMW", "Zimbabwe": "ZWL",
+};
+
+// Convert ISO code to flag emoji (uses regional indicator symbols)
+// Generate flagcdn.com URL from ISO code (same approach used in the admin dashboard)
+const getFlagUrl = (code: string) =>
+  `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
+
+const COUNTRY_OPTIONS = Object.keys(COUNTRY_CODES).map((name) => ({
+  label: name,
+  value: name,
+  flag: getFlagUrl(COUNTRY_CODES[name]),
+}));
+
 const steps = [
-  { name: 'Organization', icon: Building, fields: ['organizationName', 'industry'] },
+  { name: 'Profile', icon: Building, fields: ['organizationName', 'industry'] },
   { name: 'Location', icon: MapPin, fields: ['address', 'state', 'country'] },
-  { name: 'Regional', icon: Globe, fields: ['currency', 'language', 'timezone'] },
-  { name: 'Financials', icon: CalendarDays, fields: ['inventoryStartDate', 'fiscalYearStart'] },
+  { name: 'Currency', icon: Landmark, fields: ['currency'] },
 ];
 
 const OnboardingStepper = ({ currentStep }: { currentStep: number }) => (
-  <nav aria-label="Progress" className="w-full max-w-lg mx-auto">
-    <ol role="list" className="flex items-center">
-      {steps.map((step, stepIdx) => (
-        <li key={step.name} className={cn("relative", stepIdx !== steps.length - 1 ? "flex-1" : "")}>
-          {stepIdx < currentStep - 1 ? (
-            <>
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="h-0.5 w-full bg-primary" />
-              </div>
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all duration-300">
+  <nav aria-label="Progress" className="w-full max-w-xl mx-auto px-4 relative mb-12">
+    <ol role="list" className="flex items-center justify-between w-full relative">
+      {/* Background connecting line */}
+      <div className="absolute top-5 left-4 right-4 h-0.5 bg-muted z-0" />
+      
+      {/* Active progress line */}
+      <div 
+        className="absolute top-5 left-4 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0" 
+        style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 96}%` }}
+      />
+
+      {steps.map((step, stepIdx) => {
+        const isCompleted = stepIdx < currentStep - 1;
+        const isActive = stepIdx === currentStep - 1;
+        
+        return (
+          <li key={step.name} className="relative flex flex-col items-center flex-1 z-10">
+            {isCompleted ? (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all duration-300 shadow-md">
                 <step.icon className="h-5 w-5" />
               </div>
-            </>
-          ) : stepIdx === currentStep - 1 ? (
-            <>
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="h-px w-full border-t-2 border-dashed border-border" />
-              </div>
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-background ring-4 ring-primary/20 transition-all duration-300">
+            ) : isActive ? (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary bg-background ring-4 ring-primary/20 transition-all duration-300 shadow-md">
                 <step.icon className="h-5 w-5 text-primary" />
               </div>
-              <p className="absolute -bottom-7 text-xs text-primary font-semibold left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
-            </>
-          ) : (
-            <>
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="h-px w-full border-t-2 border-dashed border-border" />
-              </div>
-              <div className="group relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-border bg-background transition-all duration-300">
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border bg-background transition-all duration-300">
                 <step.icon className="h-5 w-5 text-muted-foreground" />
               </div>
-              <p className="absolute -bottom-7 text-xs text-muted-foreground left-1/2 -translate-x-1/2 whitespace-nowrap">{step.name}</p>
-            </>
-          )}
-        </li>
-      ))}
+            )}
+            
+            <span className={cn(
+              "mt-3 text-xs font-semibold whitespace-nowrap transition-colors duration-300",
+              isActive ? "text-primary font-bold" : "text-muted-foreground"
+            )}>
+              {step.name}
+            </span>
+          </li>
+        );
+      })}
     </ol>
   </nav>
 );
@@ -108,20 +199,9 @@ export default function OnboardingPage() {
     setMounted(true);
   }, []);
 
-  const [countries, setCountries] = React.useState([
-    { value: 'Nigeria', label: 'Nigeria' },
-    { value: 'Ghana', label: 'Ghana' },
-    { value: 'Kenya', label: 'Kenya' },
-    { value: 'United States', label: 'United States' },
-    { value: 'United Kingdom', label: 'United Kingdom' }
-  ]);
+
 
   const [currencies, setCurrencies] = React.useState(ALL_CURRENCIES);
-
-  const [timezones, setTimezones] = React.useState([
-    { value: 'Africa/Lagos', label: '(GMT+1) West Africa Time' },
-    { value: 'America/New_York', label: '(GMT-4) Eastern Time' }
-  ]);
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
@@ -130,59 +210,19 @@ export default function OnboardingPage() {
       industry: '',
       address: '',
       state: '',
-      country: 'Nigeria',
+      country: '',
       currency: 'NGN',
-      language: 'English',
-      timezone: 'Africa/Lagos',
-      inventoryStartDate: new Date(),
-      fiscalYearStart: 'January',
     },
   });
 
+  const selectedCountry = form.watch('country');
+
   React.useEffect(() => {
-    const detectLocation = async () => {
-      try {
-        const response = await fetch('https://ipapi.co/json/').catch(() => null);
-        if (response && response.ok) {
-          const data = await response.json().catch(() => null);
-          if (!data) return;
-          if (data.country_name) {
-            setCountries(prev => {
-              if (!prev.some(c => c.value === data.country_name)) {
-                return [...prev, { value: data.country_name, label: data.country_name }];
-              }
-              return prev;
-            });
-            form.setValue('country', data.country_name);
-          }
-          if (data.region) {
-            form.setValue('state', data.region);
-          }
-          if (data.currency) {
-            setCurrencies(prev => {
-              if (!prev.some(c => c.value === data.currency)) {
-                return [...prev, { value: data.currency, label: `${data.currency} (${data.currency})` }];
-              }
-              return prev;
-            });
-            form.setValue('currency', data.currency);
-          }
-          if (data.timezone) {
-            setTimezones(prev => {
-              if (!prev.some(t => t.value === data.timezone)) {
-                return [...prev, { value: data.timezone, label: data.timezone }];
-              }
-              return prev;
-            });
-            form.setValue('timezone', data.timezone);
-          }
-        }
-      } catch (error) {
-        console.warn('Error auto-detecting location:', error);
-      }
-    };
-    detectLocation();
-  }, [form]);
+    if (selectedCountry && COUNTRY_TO_CURRENCY[selectedCountry]) {
+      form.setValue('currency', COUNTRY_TO_CURRENCY[selectedCountry], { shouldValidate: true });
+    }
+  }, [selectedCountry, form]);
+
 
   const onSubmit = async (data: OnboardingFormValues) => {
     const authUser = getAuth().currentUser;
@@ -206,10 +246,10 @@ export default function OnboardingPage() {
         'settings.state': data.state,
         'settings.country': data.country,
         'settings.currency': data.currency,
-        'settings.language': data.language,
-        'settings.timezone': data.timezone,
-        'settings.inventoryStartDate': data.inventoryStartDate,
-        'settings.fiscalYearStart': data.fiscalYearStart,
+        'settings.language': 'English',
+        'settings.timezone': 'Africa/Lagos',
+        'settings.inventoryStartDate': new Date(),
+        'settings.fiscalYearStart': 'January',
       });
 
       // 2. Update User Profile
@@ -231,11 +271,18 @@ export default function OnboardingPage() {
 
       await batch.commit();
 
+      // Set a bypass flag so the layout guard doesn't block the redirect
+      // while the Firestore real-time listener catches up with the surveyCompleted change
+      sessionStorage.setItem('zeneva_onboarding_complete', 'true');
+
+      // Tell the ProductTour to launch when the user lands on the dashboard
+      localStorage.setItem('zeneva_needs_tour', 'true');
+
       // Trigger a local context refresh
       triggerRefresh();
 
-      // Small delay to allow the auth/profile listener to pick up the changes
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Wait for the Firestore listener to propagate the surveyCompleted: true update
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       router.push('/dashboard');
@@ -263,117 +310,118 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="onboarding-bg w-full flex flex-col items-center md:justify-center min-h-screen py-8 px-4 sm:p-6">
-      <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
-        <div className="text-center">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-2 sm:mb-3">
-            Initialize Your Business Galaxy, {currentUserProfile?.name ? currentUserProfile.name.split(' ')[0] : 'Merchant'}
+    <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 overflow-y-auto backdrop-blur-sm">
+      
+      <div className="w-full max-w-2xl space-y-5 sm:space-y-6 bg-white/95 backdrop-blur-xl border border-white/60 p-6 sm:p-8 rounded-xl my-auto shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
+            Set Up Your Zeneva Store, {currentUserProfile?.name ? currentUserProfile.name.split(' ')[0] : 'Merchant'}
           </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm md:text-base max-w-xl mx-auto">
-            You're entering an ecosystem built for exponential growth. Let's configure your Zeneva intelligence profile.
+          <p className="text-muted-foreground text-xs sm:text-sm max-w-xl mx-auto">
+            Quick setup — you can always edit these details later in Settings.
           </p>
         </div>
 
         <OnboardingStepper currentStep={step} />
 
-        <Card className="shadow-xl shadow-slate-200/50 mt-16 sm:mt-20">
+        <Card className="mt-4 sm:mt-6 bg-transparent border-0 shadow-none">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
-              {step === 1 && (
-                <CardContent className="pt-6 space-y-4 sm:space-y-6">
-                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Building className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Strategic Identity</CardTitle>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Define your organization's core identity to calibrate our intelligence models.</p>
-                  <FormField control={form.control} name="organizationName" render={({ field }) => (
-                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Organization Name</FormLabel><FormControl><Input placeholder="e.g. Zenith Global" className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="industry" render={({ field }) => (
-                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Industry</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue placeholder="Select an industry" /></SelectTrigger></FormControl>
-                        <SelectContent>{industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
-                      </Select><FormMessage className="text-[11px]" /></FormItem>
-                  )} />
-                </CardContent>
-              )}
-              {step === 2 && (
-                <CardContent className="pt-6 space-y-4 sm:space-y-6">
-                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><MapPin className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Organization Location</CardTitle>
-                  <FormField control={form.control} name="address" render={({ field }) => (
-                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Organization Address</FormLabel><FormControl><Input className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
-                  )} />
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <FormField control={form.control} name="state" render={({ field }) => (
-                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">State/Province</FormLabel><FormControl><Input className="h-9 sm:h-10 text-sm" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="country" render={({ field }) => (
-                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Country</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>{countries.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage className="text-[11px]" /></FormItem>
-                    )} />
-                  </div>
-                </CardContent>
-              )}
-              {step === 3 && (
-                <CardContent className="pt-6 space-y-4 sm:space-y-6">
-                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Globe className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Regional Settings</CardTitle>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <FormField control={form.control} name="currency" render={({ field }) => (
-                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Currency</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>{currencies.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage className="text-[11px]" /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="language" render={({ field }) => (
-                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Language</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="English">English</SelectItem></SelectContent>
-                        </Select><FormMessage className="text-[11px]" /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="timezone" render={({ field }) => (
-                      <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Time Zone</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>{timezones.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage className="text-[11px]" /></FormItem>
-                    )} />
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-muted-foreground p-2 sm:p-3 bg-muted/50 rounded-lg">
-                    <strong>Note:</strong> The language you select will be the default for email templates and other customizations.
-                  </div>
-                </CardContent>
-              )}
-              {step === 4 && (
-                <CardContent className="pt-6 space-y-4 sm:space-y-6">
-                  <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Landmark className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Financial Year</CardTitle>
-                  <FormField control={form.control} name="inventoryStartDate" render={({ field }) => (
-                    <FormItem className="flex flex-col space-y-1"><FormLabel className="text-xs sm:text-sm">Inventory Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  {step === 1 && (
+                    <CardContent className="pt-2 pb-2 space-y-5">
+                      <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Building className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Business Profile</CardTitle>
+                      <FormField control={form.control} name="organizationName" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Store / Business Name <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="e.g. Zenith Supermarket" className="h-10 sm:h-12 text-sm shadow-none" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="industry" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Business Industry <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal h-9 sm:h-10 text-sm", !field.value && "text-muted-foreground")}>
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
+                            <Combobox
+                              options={industries.map(i => ({ label: i, value: i }))}
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select an industry"
+                              searchPlaceholder="Search industries..."
+                              triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full"
+                              avoidCollisions={false}
+                            />
                           </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
-                        </PopoverContent>
-                      </Popover><FormMessage className="text-[11px]" /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="fiscalYearStart" render={({ field }) => (
-                    <FormItem className="space-y-1"><FormLabel className="text-xs sm:text-sm">Fiscal Year Starts In</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="h-9 sm:h-10 text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                      </Select><FormMessage className="text-[11px]" /></FormItem>
-                  )} />
-                </CardContent>
-              )}
+                          <FormMessage className="text-[11px]" /></FormItem>
+                      )} />
+                    </CardContent>
+                  )}
+                  {step === 2 && (
+                    <CardContent className="pt-2 pb-2 space-y-5">
+                      <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><MapPin className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Store Location</CardTitle>
+                      <FormField control={form.control} name="address" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Business Address <span className="text-destructive">*</span></FormLabel><FormControl><Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="Street Address" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                      )} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                        <FormField control={form.control} name="state" render={({ field }) => (
+                          <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">State/Province <span className="text-destructive">*</span></FormLabel><FormControl><Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="State" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="country" render={({ field }) => (
+                          <FormItem className="space-y-2 flex flex-col justify-end"><FormLabel className="text-xs sm:text-sm font-semibold">Country <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Combobox
+                                options={COUNTRY_OPTIONS}
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Select Country"
+                                searchPlaceholder="Search countries..."
+                                triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full"
+                                avoidCollisions={false}
+                                renderSelected={(opt) => (
+                                  <span className="flex items-center gap-2">
+                                    <img src={opt.flag} alt={opt.label} className="w-5 h-3.5 rounded-sm object-cover shrink-0" />
+                                    <span>{opt.label}</span>
+                                  </span>
+                                )}
+                                renderItem={(opt) => (
+                                  <span className="flex items-center gap-2">
+                                    <img src={opt.flag} alt={opt.label} className="w-5 h-3.5 rounded-sm object-cover shrink-0" />
+                                    <span>{opt.label}</span>
+                                  </span>
+                                )}
+                              />
+                            </FormControl>
+                            <FormMessage className="text-[11px]" /></FormItem>
+                        )} />
+                      </div>
+                    </CardContent>
+                  )}
+                  {step === 3 && (
+                    <CardContent className="pt-2 pb-2 space-y-5">
+                      <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Landmark className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Store Currency</CardTitle>
+                      <FormField control={form.control} name="currency" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Store Currency <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Combobox
+                              options={currencies}
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select Currency"
+                              searchPlaceholder="Search currencies..."
+                              triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[11px]" /></FormItem>
+                      )} />
+                      <div className="text-[10px] sm:text-xs text-muted-foreground p-3 sm:p-4 bg-muted/50 rounded-xl border border-muted">
+                        <strong>Note:</strong> The currency you select will be used for all register sales, receipt printing, and invoices.
+                      </div>
+                    </CardContent>
+                  )}
+                </motion.div>
+              </AnimatePresence>
               <CardContent className="flex justify-between pt-4 sm:pt-6">
                 {step > 1 ? (<Button type="button" variant="outline" size="sm" className="sm:size-default" onClick={handlePrevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>) : (<div />)}
                 {step < steps.length ? (<Button type="button" size="sm" className="sm:size-default" onClick={handleNextStep}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>) : (

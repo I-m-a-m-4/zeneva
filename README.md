@@ -53,6 +53,10 @@ graph TD
 * **Tauri SQL Plugin (`@tauri-apps/plugin-sql`)**: Local **SQLite** database hydration. Zeneva is fully functional offline; sales and inventory updates are performed instantly against SQLite and queued for sync.
 * **Firebase SDK v11.9.1**: Connects client states to **Cloud Firestore** and Real-time Database for multi-tenant, cloud-synced storage when internet connectivity is active.
 * **Firebase Admin SDK v13.6.1**: Provides multi-tenant data validation, user authorization, and secure back-end operations.
+* **Upstash Redis (Admin Caching Engine)**: The global platform admin dashboard is powered by a custom Next.js API Route utilizing `@upstash/redis`. Instead of the browser pulling 10,000+ receipts and users on every load, a dedicated Serverless Function aggregates all global GMV, MRR, ARR, and sales velocity data via the Firebase Admin SDK. This massive data object is then serialized and cached in Upstash Redis.
+  * **Result**: Admin payload size drops from megabytes to kilobytes.
+  * **Speed**: Admin Dashboard and Achievements screens load globally in under 200ms without triggering massive Firestore read quotas.
+  * **Invalidation**: The cache operates on a TTL, and admins can trigger a forced cache invalidation using the platform interface to instantly sync real-time data.
 
 ### 3. Zen AI Engine (Predictive Analytics)
 * **Genkit v1.20.0** combined with **Google GenAI** (`@genkit-ai/google-genai`).

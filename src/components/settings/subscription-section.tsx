@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import * as React from 'react';
@@ -9,15 +7,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Check, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import type { UserProfile, BusinessInstance } from '@/types';
 import { useFirestore, auth } from '@/firebase';
-import { writeBatch, doc, serverTimestamp, collection } from 'firebase/firestore';
+import { writeBatch, doc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { add, format } from 'date-fns';
 import { Badge } from '../ui/badge';
-import { safeToDate } from '@/lib/utils';
-import { useCallback, useState } from 'react';
+import { safeToDate, getCountryFromIP } from '@/lib/utils';
+import { useCallback, useState, useEffect } from 'react';
 import usePaystack from '@/hooks/use-paystack';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import useDodoPayments from '@/hooks/use-dodopayments';
+import { track } from '@vercel/analytics';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
@@ -25,7 +24,7 @@ const plans = [
     {
         name: 'Pro',
         price: 10000,
-        priceUSD: 7,
+        priceUSD: 10,
         features: [
             'Up to 1,500 products & 5 staff accounts',
             'Advanced Point of Sale (POS)',
@@ -39,7 +38,7 @@ const plans = [
     {
         name: 'Business',
         price: 30000,
-        priceUSD: 20,
+        priceUSD: 30,
         features: [
             'Everything in Pro',
             'Unlimited products & staff accounts',
@@ -155,6 +154,19 @@ const PaystackSubscriptionButton = ({
 
             await batch.commit();
 
+            try {
+                track('billing_checkout_success', {
+                    plan: plan.name,
+                    cycle: cycle.label,
+                    amount: finalAmount,
+                    currency: currency,
+                    gateway: 'Paystack',
+                    businessId: businessInstance.id
+                });
+            } catch (trackErr) {
+                console.warn("Failed to track checkout success event:", trackErr);
+            }
+
             toast({
                 variant: 'success',
                 title: 'Subscription Successful!',
@@ -195,6 +207,39 @@ const PaystackSubscriptionButton = ({
         }
 
         setProcessingPlan(plan.planId);
+
+        try {
+            track('billing_checkout_initiated', {
+                plan: plan.name,
+                cycle: cycle.label,
+                amount: finalAmount,
+                currency: currency,
+                gateway: 'Paystack',
+                businessId: businessInstance.id
+            });
+        } catch (trackErr) {
+            console.warn("Failed to track checkout start event:", trackErr);
+        }
+
+        // Log checkout attempt to Firestore for Admin Dashboard visibility
+        try {
+            addDoc(collection(firestore, 'checkout_attempts'), {
+                userId: userProfile.id,
+                userEmail: userProfile.email || '',
+                userName: userProfile.name || '',
+                businessId: businessInstance.id,
+                businessName: businessInstance.name || '',
+                plan: plan.name,
+                cycle: cycle.label,
+                amount: finalAmount,
+                currency: currency,
+                gateway: 'Paystack',
+                timestamp: serverTimestamp(),
+                status: 'initiated'
+            });
+        } catch (dbErr) {
+            console.error("Failed to log checkout attempt to Firestore:", dbErr);
+        }
         
         initializePayment({
             key: PAYSTACK_PUBLIC_KEY,
@@ -269,6 +314,39 @@ const DodoSubscriptionButton = ({
         setProcessingPlan(plan.planId);
 
         try {
+            track('billing_checkout_initiated', {
+                plan: plan.name,
+                cycle: cycle.label,
+                amount: finalAmount,
+                currency: 'USD',
+                gateway: 'Dodo',
+                businessId: businessInstance.id
+            });
+        } catch (trackErr) {
+            console.warn("Failed to track Dodo checkout start:", trackErr);
+        }
+
+        // Log checkout attempt to Firestore for Admin Dashboard visibility
+        try {
+            addDoc(collection(firestore, 'checkout_attempts'), {
+                userId: userProfile.id,
+                userEmail: userProfile.email || '',
+                userName: userProfile.name || '',
+                businessId: businessInstance.id,
+                businessName: businessInstance.name || '',
+                plan: plan.name,
+                cycle: cycle.label,
+                amount: finalAmount,
+                currency: 'USD',
+                gateway: 'Dodo',
+                timestamp: serverTimestamp(),
+                status: 'initiated'
+            });
+        } catch (dbErr) {
+            console.error("Failed to log checkout attempt to Firestore:", dbErr);
+        }
+
+        try {
             const response = await fetch('https://zeneva.space/api/dodo/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -304,7 +382,7 @@ const DodoSubscriptionButton = ({
     return (
         <Button
             onClick={handleSubscribe}
-            className="w-full bg-blue-600 hover:bg-blue-700"
+            className="w-full"
             disabled={isProcessing || !isScriptLoaded}
         >
             {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4" />}
@@ -316,15 +394,26 @@ const DodoSubscriptionButton = ({
 // Main component that uses the button
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
     const [processingPlan, setProcessingPlan] = useState<string | null>(null);
-    const [selectedCycles, setSelectedCycles] = useState({ pro: '1m', business: '1m' });
-    const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+    const [globalCycleId, setGlobalCycleId] = useState('1m');
+    const [activeSelection, setActiveSelection] = useState<{ planId: string, cycleId: string }>({ planId: 'pro', cycleId: '1m' });
+    const [currency, setCurrency] = useState<'NGN' | 'USD'>('USD');
+
+    useEffect(() => {
+        getCountryFromIP().then((country) => {
+            if (country === 'Nigeria') {
+                setCurrency('NGN');
+            } else {
+                setCurrency('USD');
+            }
+        });
+    }, []);
 
     const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
     const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isMobileApp = isTauri && isMobile;
 
     const handleCycleChange = (planId: string, cycleId: string) => {
-        setSelectedCycles(prev => ({ ...prev, [planId]: cycleId }));
+        setActiveSelection({ planId, cycleId });
     };
 
     if (businessInstance.accessLevel === 'lifetime') {
@@ -396,16 +485,6 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
             <div className="flex justify-center border-b pb-6">
                 <div className="inline-flex p-1 bg-muted rounded-lg">
                     <button
-                        onClick={() => setCurrency('NGN')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                            currency === 'NGN'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                        Naira (₦)
-                    </button>
-                    <button
                         onClick={() => setCurrency('USD')}
                         className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                             currency === 'USD'
@@ -415,13 +494,26 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                     >
                         USD ($)
                     </button>
+                    <button
+                        onClick={() => setCurrency('NGN')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            currency === 'NGN'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        Naira (₦)
+                    </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {plans.map((plan) => {
-                    const selectedCycleId = selectedCycles[plan.planId as keyof typeof selectedCycles];
-                    const selectedCycle = billingCycles.find(c => c.id === selectedCycleId)!;
+                    const isSelectedPlan = activeSelection.planId === plan.planId;
+                    const visualCycleId = isSelectedPlan ? activeSelection.cycleId : '';
+                    const computationCycleId = isSelectedPlan ? activeSelection.cycleId : '1m';
+                    
+                    const selectedCycle = billingCycles.find(c => c.id === computationCycleId)!;
                     
                     const displayBasePrice = currency === 'NGN' ? plan.price : (plan as any).priceUSD;
                     const finalAmount = displayBasePrice * selectedCycle.months * (1 - selectedCycle.discount / 100);
@@ -440,11 +532,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                         {currency === 'NGN' ? '₦' : '$'}{displayBasePrice.toLocaleString()}
                                     </span>
                                     <span className="text-muted-foreground ml-1">/ month</span>
-                                    {currency === 'USD' && (
-                                        <div className="text-[10px] text-muted-foreground mt-1 uppercase">
-                                            ≃ ₦{plan.price.toLocaleString()} Monthly
-                                        </div>
-                                    )}
+
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex-grow space-y-6">
@@ -460,7 +548,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 <div className="space-y-3 pt-4 border-t">
                                     <Label className="text-xs font-semibold text-muted-foreground uppercase">Billing Cycle</Label>
                                     <RadioGroup 
-                                        defaultValue={selectedCycleId}
+                                        value={visualCycleId}
                                         onValueChange={(value) => handleCycleChange(plan.planId, value)}
                                         className="grid gap-2"
                                     >
@@ -474,11 +562,11 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                                     key={cycle.id}
                                                     htmlFor={`${plan.planId}-${cycle.id}`}
                                                     className={`flex items-center justify-between p-3 border rounded-md cursor-pointer transition-colors ${
-                                                        selectedCycleId === cycle.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                                                        visualCycleId === cycle.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
                                                     }`}
                                                 >
                                                     <div className="flex items-center space-x-2">
-                                                        <RadioGroupItem value={cycle.id} id={`${plan.planId}-${cycle.id}`} className="sr-only" />
+                                                        <RadioGroupItem value={cycle.id} id={`${plan.planId}-${cycle.id}`} className="mt-0.5 shrink-0" />
                                                         <div className="flex flex-col">
                                                             <span className="text-sm font-medium">{cycle.label}</span>
                                                             {cycle.discount > 0 && <span className="text-[10px] text-green-600 font-bold">-{cycle.discount}% OFF</span>}
@@ -488,11 +576,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                                         <span className="text-sm font-bold">
                                                             {currency === 'NGN' ? '₦' : '$'}{currency === 'NGN' ? discountedPriceNGN.toLocaleString() : discountedPriceUSD.toLocaleString()}
                                                         </span>
-                                                        {currency === 'USD' && (
-                                                            <div className="text-[9px] text-muted-foreground">
-                                                                ≃ ₦{discountedPriceNGN.toLocaleString()}
-                                                            </div>
-                                                        )}
+
                                                     </div>
                                                 </Label>
                                             )

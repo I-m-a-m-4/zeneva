@@ -1,8 +1,8 @@
-
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Zap, Barcode, Package, Box, Tag, Receipt } from "lucide-react";
+import { getCountryFromIP } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import MarketingHeader from "@/components/layout/marketing-header";
 import MarketingFooter from "@/components/layout/marketing-footer";
@@ -47,9 +47,34 @@ const faqItems = [
     }
   ];
 
+const PRO_MONTHLY_NGN = 10000;
+const PRO_YEARLY_NGN = 100000;
+const PRO_MONTHLY_USD = 10;
+const PRO_YEARLY_USD = 100;
+
+const BIZ_MONTHLY_NGN = 30000;
+const BIZ_YEARLY_NGN = 300000;
+const BIZ_MONTHLY_USD = 30;
+const BIZ_YEARLY_USD = 300;
+
 export default function PricingContent() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-    const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+    const [currency, setCurrency] = useState<'NGN' | 'USD'>('USD');
+
+    useEffect(() => {
+        getCountryFromIP().then((country) => {
+            if (country === 'Nigeria') {
+                setCurrency('NGN');
+            } else {
+                setCurrency('USD');
+            }
+        });
+    }, []);
+
+    const proSavingsNGN = (PRO_MONTHLY_NGN * 12) - PRO_YEARLY_NGN;
+    const proSavingsUSD = (PRO_MONTHLY_USD * 12) - PRO_YEARLY_USD;
+    const bizSavingsNGN = (BIZ_MONTHLY_NGN * 12) - BIZ_YEARLY_NGN;
+    const bizSavingsUSD = (BIZ_MONTHLY_USD * 12) - BIZ_YEARLY_USD;
 
     return (
         <div className="min-h-screen bg-white">
@@ -188,8 +213,8 @@ export default function PricingContent() {
                                 <div className="mt-4">
                                     <span className="text-4xl font-bold tracking-tight text-slate-900">
                                         {currency === 'NGN' 
-                                            ? (billingCycle === 'monthly' ? '₦10,000' : '₦100,000')
-                                            : (billingCycle === 'monthly' ? '$7' : '$70')
+                                            ? (billingCycle === 'monthly' ? `₦${PRO_MONTHLY_NGN.toLocaleString()}` : `₦${PRO_YEARLY_NGN.toLocaleString()}`)
+                                            : (billingCycle === 'monthly' ? `$${PRO_MONTHLY_USD}` : `$${PRO_YEARLY_USD}`)
                                         }
                                     </span>
                                     <span className="text-base font-medium text-slate-500">
@@ -197,7 +222,7 @@ export default function PricingContent() {
                                     </span>
                                     {billingCycle === 'yearly' && (
                                         <div className="text-xs text-emerald-600 font-bold mt-1 block animate-pulse">
-                                            Save {currency === 'NGN' ? '₦20,000!' : '$14!'}
+                                            Save {currency === 'NGN' ? `₦${proSavingsNGN.toLocaleString()}!` : `$${proSavingsUSD}!`}
                                         </div>
                                     )}
                                 </div>
@@ -226,8 +251,8 @@ export default function PricingContent() {
                                 <div className="mt-4">
                                     <span className="text-4xl font-bold tracking-tight text-slate-900">
                                         {currency === 'NGN'
-                                            ? (billingCycle === 'monthly' ? '₦30,000' : '₦300,000')
-                                            : (billingCycle === 'monthly' ? '$20' : '$200')
+                                            ? (billingCycle === 'monthly' ? `₦${BIZ_MONTHLY_NGN.toLocaleString()}` : `₦${BIZ_YEARLY_NGN.toLocaleString()}`)
+                                            : (billingCycle === 'monthly' ? `$${BIZ_MONTHLY_USD}` : `$${BIZ_YEARLY_USD}`)
                                         }
                                     </span>
                                     <span className="text-base font-medium text-slate-500">
@@ -235,7 +260,7 @@ export default function PricingContent() {
                                     </span>
                                     {billingCycle === 'yearly' && (
                                         <div className="text-xs text-emerald-600 font-bold mt-1 block">
-                                            Save {currency === 'NGN' ? '₦60,000!' : '$40!'}
+                                            Save {currency === 'NGN' ? `₦${bizSavingsNGN.toLocaleString()}!` : `$${bizSavingsUSD}!`}
                                         </div>
                                     )}
                                 </div>

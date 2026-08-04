@@ -569,7 +569,7 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
             }, 2000);
 
         } catch (error: any) {
-            console.error("Termination failed:", error);
+            console.warn("Termination aborted (handled):", error.message);
             toast({ 
                 variant: 'destructive', 
                 title: "Termination Aborted", 

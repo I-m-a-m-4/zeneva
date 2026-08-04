@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     default: 'Zeneva - Advanced Inventory Management & Global POS Operating System',
     template: '%s | Zeneva'
   },
-  description: 'Zeneva is a borderless retail operating system unifying inventory, POS, analytics, and USD/NGN payments into a powerful platform for modern retailers.',
+  description: 'Zeneva is a borderless retail operating system unifying inventory, offline-capable POS, analytics, and USD/NGN payments into a powerful platform for modern retailers and mini-marts.',
   keywords: [
     'inventory management software', 
     'retail pos system', 
@@ -49,7 +49,12 @@ export const metadata: Metadata = {
     'pharmacy inventory software', 
     'boutique management system', 
     'business analytics dashboard', 
-    'global retail OS'
+    'global retail OS',
+    'pos for mini-marts',
+    'offline capable point of sale',
+    'inventory system with no subscription options',
+    'zeneva vs quickbooks pos',
+    'pos for open markets'
   ],
   applicationName: 'Zeneva',
   authors: [{ name: 'Zeneva Team' }],

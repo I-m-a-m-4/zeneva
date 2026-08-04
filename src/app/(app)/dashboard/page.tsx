@@ -48,6 +48,7 @@ import { isWithinInterval, startOfDay, endOfDay, format, formatDistanceToNow } f
 import { safeToDate } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CachedImage } from '@/components/shared/cached-image';
+import { CurrencyAmount } from '@/components/shared/currency-amount';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -497,7 +498,7 @@ export default function DashboardPage() {
         {!isRestricted && (
           <SummaryCard
             title="Total Revenue"
-            value={`${currencySymbol}${(totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={<CurrencyAmount symbol={currencySymbol} amount={totalRevenue || 0} />}
             icon={currencySymbol}
             description={`${(totalReceipts || 0) + (totalOnlineOrdersCount || 0)} total transactions`}
             href="/reports"
@@ -506,7 +507,7 @@ export default function DashboardPage() {
         {!isRestricted && (
           <SummaryCard
             title="Product Revenue"
-            value={`${currencySymbol}${(productRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={<CurrencyAmount symbol={currencySymbol} amount={productRevenue || 0} />}
             icon={Package}
             description={`${(productUnitsSold || 0).toLocaleString()} products sold`}
             href="/reports"
@@ -515,7 +516,7 @@ export default function DashboardPage() {
         {!isRestricted && (
           <SummaryCard
             title="Service Revenue"
-            value={`${currencySymbol}${(serviceRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={<CurrencyAmount symbol={currencySymbol} amount={serviceRevenue || 0} />}
             icon={Activity}
             description={`${(serviceUnitsSold || 0).toLocaleString()} services rendered`}
             href="/reports"
@@ -538,7 +539,7 @@ export default function DashboardPage() {
         {!isRestricted && (
           <SummaryCard
             title="POS Sales"
-            value={`${currencySymbol}${(totalSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={<CurrencyAmount symbol={currencySymbol} amount={totalSalesValue || 0} />}
             icon={currencySymbol}
             description={`${(totalReceipts || 0)} transactions`}
             href="/receipts"
@@ -547,7 +548,7 @@ export default function DashboardPage() {
         {!isRestricted && (
           <SummaryCard
             title="Online Sales"
-            value={`${currencySymbol}${(totalOnlineSalesValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={<CurrencyAmount symbol={currencySymbol} amount={totalOnlineSalesValue || 0} />}
             icon={currencySymbol}
             description={`${(totalOnlineOrdersCount || 0)} online orders`}
             href="/online-orders"

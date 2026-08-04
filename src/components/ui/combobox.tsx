@@ -19,8 +19,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
+type ComboboxOption = { label: string; value: string; flag?: string }
+
 type ComboboxProps = {
-  options: { label: string; value: string }[]
+  options: ComboboxOption[]
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -28,6 +30,11 @@ type ComboboxProps = {
   emptyPlaceholder?: string
   triggerClassName?: string
   disabled?: boolean
+  avoidCollisions?: boolean
+  sideOffset?: number
+  modal?: boolean
+  renderSelected?: (option: ComboboxOption) => React.ReactNode
+  renderItem?: (option: ComboboxOption) => React.ReactNode
 }
 
 export function Combobox({
@@ -39,11 +46,17 @@ export function Combobox({
   emptyPlaceholder = "No results found.",
   triggerClassName,
   disabled = false,
+  avoidCollisions = true,
+  sideOffset = 4,
+  modal = false,
+  renderSelected,
+  renderItem,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  const selectedOption = options.find((option) => option.value === value)
 
   return (
-    <Popover open={open} onOpenChange={!disabled ? setOpen : undefined}>
+    <Popover open={open} onOpenChange={!disabled ? setOpen : undefined} modal={modal}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -52,13 +65,20 @@ export function Combobox({
           className={cn("w-full justify-between", triggerClassName)}
           disabled={disabled}
         >
-          {value
-            ? options.find((option) => option.value === value)?.label
+          {selectedOption
+            ? (renderSelected ? renderSelected(selectedOption) : selectedOption.label)
             : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" style={{ width: "var(--radix-popover-trigger-width)" }}>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        avoidCollisions={avoidCollisions}
+        sideOffset={sideOffset}
+        className="w-full p-0"
+        style={{ width: "var(--radix-popover-trigger-width)" }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -67,20 +87,20 @@ export function Combobox({
               {options.map((option, index) => (
                 <CommandItem
                   key={`${option.value}-${index}`}
-                  value={option.value}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue)
+                  value={option.label}
+                  onSelect={() => {
+                    onChange(option.value === value ? "" : option.value)
                     setOpen(false)
                   }}
                   className="cursor-pointer"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-4 w-4 shrink-0",
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option.label}
+                  {renderItem ? renderItem(option) : option.label}
                 </CommandItem>
               ))}
             </CommandGroup>
