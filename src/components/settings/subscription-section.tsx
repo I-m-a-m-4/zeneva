@@ -287,6 +287,7 @@ const PaystackSubscriptionButton = ({
 const DodoSubscriptionButton = ({ 
     plan, 
     cycle,
+    finalAmount,
     userProfile, 
     businessInstance, 
     isCurrentPlan, 
@@ -295,6 +296,7 @@ const DodoSubscriptionButton = ({
 }: { 
     plan: typeof plans[0], 
     cycle: typeof billingCycles[0],
+    finalAmount: number,
     userProfile: UserProfile, 
     businessInstance: BusinessInstance,
     isCurrentPlan: boolean,
@@ -302,6 +304,7 @@ const DodoSubscriptionButton = ({
     setProcessingPlan: (planId: string | null) => void;
 }) => {
     const { toast } = useToast();
+    const firestore = useFirestore();
     const { initializeCheckout, isScriptLoaded } = useDodoPayments();
 
     const handleSubscribe = useCallback(async () => {
@@ -375,7 +378,7 @@ const DodoSubscriptionButton = ({
         } finally {
             setProcessingPlan(null);
         }
-    }, [isScriptLoaded, isProcessing, plan, userProfile, businessInstance, cycle, initializeCheckout, toast, setProcessingPlan]);
+    }, [isScriptLoaded, isProcessing, plan, userProfile, businessInstance, cycle, finalAmount, initializeCheckout, toast, setProcessingPlan, firestore]);
 
     const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
 
@@ -394,8 +397,8 @@ const DodoSubscriptionButton = ({
 // Main component that uses the button
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
     const [processingPlan, setProcessingPlan] = useState<string | null>(null);
-    const [globalCycleId, setGlobalCycleId] = useState('1m');
-    const [activeSelection, setActiveSelection] = useState<{ planId: string, cycleId: string }>({ planId: 'pro', cycleId: '1m' });
+    const [globalCycleId, setGlobalCycleId] = useState('12m');
+    const [activeSelection, setActiveSelection] = useState<{ planId: string, cycleId: string }>({ planId: 'pro', cycleId: '12m' });
     const [currency, setCurrency] = useState<'NGN' | 'USD'>('USD');
 
     useEffect(() => {
@@ -601,6 +604,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                     <DodoSubscriptionButton
                                         plan={plan}
                                         cycle={selectedCycle}
+                                        finalAmount={finalAmount}
                                         userProfile={userProfile}
                                         businessInstance={businessInstance}
                                         isCurrentPlan={isCurrentPlan}

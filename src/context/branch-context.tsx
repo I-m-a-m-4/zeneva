@@ -58,6 +58,17 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       if (cached) {
         setActiveBranchId(cached);
       }
+      const cachedBranchesStr = localStorage.getItem('zeneva_cached_branches');
+      if (cachedBranchesStr) {
+        try {
+          const cachedBranches = JSON.parse(cachedBranchesStr);
+          if (cachedBranches && cachedBranches.length > 0) {
+            setBranches(cachedBranches);
+          }
+        } catch (e) {
+          console.error("Failed to parse cached branches", e);
+        }
+      }
     }
 
     const loadBranches = async () => {
@@ -79,6 +90,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
                                     businessId.trim() !== '';
           
           if (isValidBusinessId) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('zeneva_cached_business_id', businessId);
+            }
+
             const branchesQuery = query(
               collection(firestore, 'branches'),
               where('businessId', '==', businessId),
@@ -100,6 +115,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
               if (businessDocSnap.exists()) {
                 businessName = businessDocSnap.data().name || businessName;
                 businessAddress = businessDocSnap.data().address || '';
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('zeneva_cached_business_name', businessName);
+                  localStorage.setItem('zeneva_cached_business_address', businessAddress);
+                }
               }
             } catch (err) {
               console.error("Failed to fetch business info for primary branch sync", err);
@@ -165,6 +184,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             }
 
             setBranches(fetchedBranches);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('zeneva_cached_branches', JSON.stringify(fetchedBranches));
+            }
             
             if (fetchedBranches.length > 0 && activeBranchId !== 'all') {
                const isValid = fetchedBranches.find(b => b.id === activeBranchId);
@@ -181,6 +203,32 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           setBranches([]);
         } else {
           console.error("Failed to load branches", err);
+          // Network or offline error: keep cached branches if they exist, or fall back to single primary branch
+          if (typeof window !== 'undefined') {
+            const cachedBusinessId = localStorage.getItem('zeneva_cached_business_id');
+            const cachedBranchesStr = localStorage.getItem('zeneva_cached_branches');
+            if (cachedBranchesStr) {
+              try {
+                const cachedBranches = JSON.parse(cachedBranchesStr);
+                if (cachedBranches && cachedBranches.length > 0) {
+                  setBranches(cachedBranches);
+                  return;
+                }
+              } catch (parseErr) {}
+            }
+            if (cachedBusinessId) {
+              const fallbackBranch = {
+                id: cachedBusinessId,
+                businessId: cachedBusinessId,
+                name: localStorage.getItem('zeneva_cached_business_name') || 'Main Store (Primary)',
+                address: localStorage.getItem('zeneva_cached_business_address') || '',
+                isPrimary: true,
+                isActive: true,
+                createdAt: new Date(),
+              } as Branch;
+              setBranches([fallbackBranch]);
+            }
+          }
         }
       } finally {
         setIsLoadingBranches(false);

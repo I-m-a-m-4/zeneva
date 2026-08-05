@@ -494,7 +494,7 @@ export default function AuditLogPage() {
         <div className="space-y-6">
             <PageTitle title="Audit Log" subtitle="Track important actions taken in your business." />
             <FeatureGate
-                requiredPlan="pro"
+                requiredPlan="business"
                 currentPlan={business?.plan}
                 hasLifetimeAccess={business?.accessLevel === 'lifetime'}
                 featureName="Audit Log"

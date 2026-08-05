@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -28,7 +28,28 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import FeatureGate from '@/components/shared/feature-gate';
 import { BusinessInstance, UserProfile } from '@/types';
-import { ALL_CURRENCIES } from '@/lib/constants';
+import { ALL_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/constants';
+import { Combobox } from '@/components/ui/combobox';
+
+const CURRENCY_COUNTRY_CODES: Record<string, string> = {
+  USD: 'us', EUR: 'eu', GBP: 'gb', NGN: 'ng', PKR: 'pk', MUR: 'mu', GHS: 'gh', KES: 'ke', ZAR: 'za',
+  CAD: 'ca', AUD: 'au', INR: 'in', AED: 'ae', SAR: 'sa', JPY: 'jp', CNY: 'cn', BRL: 'br', CHF: 'ch',
+  AFN: 'af', ALL: 'al', AMD: 'am', ANG: 'an', AOA: 'ao', ARS: 'ar', AWG: 'aw', AZN: 'az', BAM: 'ba',
+  BBD: 'bb', BDT: 'bd', BGN: 'bg', BHD: 'bh', BIF: 'bi', BMD: 'bm', BND: 'bn', BOB: 'bo', BSD: 'bs',
+  BTN: 'bt', BWP: 'bw', BYN: 'by', BZD: 'bz', CDF: 'cd', CLP: 'cl', COP: 'co', CRC: 'cr', CUP: 'cu',
+  CVE: 'cv', CZK: 'cz', DJF: 'dj', DKK: 'dk', DOP: 'do', DZD: 'dz', EGP: 'eg', ERN: 'er', ETB: 'et',
+  FJD: 'fj', FKP: 'fk', GEL: 'ge', GIP: 'gi', GMD: 'gm', GNF: 'gn', GTQ: 'gt', GYD: 'gy', HKD: 'hk',
+  HNL: 'hn', HRK: 'hr', HTG: 'ht', HUF: 'hu', IDR: 'id', ILS: 'il', IQD: 'iq', IRR: 'ir', ISK: 'is',
+  JMD: 'jm', JOD: 'jo', KGS: 'kg', KHR: 'kh', KMF: 'km', KPW: 'kp', KRW: 'kr', KWD: 'kw', KYD: 'ky',
+  KZT: 'kz', LAK: 'la', LBP: 'lb', LKR: 'lk', LRD: 'lr', LSL: 'ls', LYD: 'ly', MAD: 'ma', MDL: 'md',
+  MGA: 'mg', MKD: 'mk', MMK: 'mm', MNT: 'mn', MOP: 'mo', MRU: 'mr', MUR: 'mu', MVR: 'mv', MWK: 'mw',
+  MXN: 'mx', MYR: 'my', MZN: 'mz', NAD: 'na', NOK: 'no', NPR: 'np', NZD: 'nz', OMR: 'om', PAB: 'pa',
+  PEN: 'pe', PGK: 'pg', PHP: 'ph', PLN: 'pl', PYG: 'py', QAR: 'qa', RON: 'ro', RSD: 'rs', RUB: 'ru',
+  RWF: 'rw', SGD: 'sg', SHP: 'sh', SLL: 'sl', SOS: 'so', SRD: 'sr', SSP: 'ss', STN: 'st', SYP: 'sy',
+  SZL: 'sz', THB: 'th', TJS: 'tj', TMT: 'tm', TND: 'tn', TOP: 'to', TRY: 'tr', TTD: 'tt', TWD: 'tw',
+  TZS: 'tz', UAH: 'ua', UGX: 'ug', UYU: 'uy', UZS: 'uz', VES: 've', VND: 'vn', VUV: 'vu', WST: 'ws',
+  XAF: 'cm', XCD: 'ag', XOF: 'sn', XPF: 'pf', YER: 'ye', ZMW: 'zm', ZWL: 'zw'
+};
 import {
     AlertDialog,
     AlertDialogAction,
@@ -823,6 +844,29 @@ function SettingsPageContent() {
                     </Card>
                 )}
 
+                <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary fill-primary" />Rate & Review</CardTitle>
+                        <CardDescription>Love using Zeneva? Help us grow by leaving a review on the Microsoft Store!</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button 
+                            variant="outline" 
+                            className="w-full border-primary text-primary hover:bg-primary hover:text-white"
+                            onClick={() => {
+                                // Try opening MS Store protocol first, then fallback to web detail link
+                                window.open('ms-windows-store://review/?ProductId=9nvn0f8njwmj', '_blank');
+                                setTimeout(() => {
+                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
+                                }, 800);
+                            }}
+                        >
+                            <Star className="mr-2 h-4 w-4" />
+                            Write a Review
+                        </Button>
+                    </CardContent>
+                </Card>
+
                 </TabsContent>
                 
                 <TabsContent value="storefront" className="space-y-6 mt-0">
@@ -903,48 +947,66 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-4">
-                            <div>
+                            <div className="flex flex-col gap-1.5">
                                 <Label>Currency</Label>
-                                <DropdownMenu modal={false}>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                            <span>{currency || "Select currency"}</span>
-                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
-                                        {ALL_CURRENCIES.map(curr => (
-                                            <DropdownMenuItem key={curr.value} onClick={() => setCurrency(curr.value)} className="cursor-pointer">
-                                                {curr.label}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                <Combobox
+                                    options={ALL_CURRENCIES.map(curr => ({
+                                        value: curr.value,
+                                        label: curr.label
+                                    }))}
+                                    value={currency}
+                                    onChange={(val) => setCurrency(val)}
+                                    placeholder="Select currency"
+                                    searchPlaceholder="Search currency..."
+                                    renderSelected={(opt) => (
+                                        <div className="flex items-center gap-2">
+                                            <img 
+                                                src={`https://flagcdn.com/16x12/${CURRENCY_COUNTRY_CODES[opt.value] || 'un'}.png`} 
+                                                alt="" 
+                                                className="w-4 h-3 object-cover rounded-sm shrink-0" 
+                                            />
+                                            <span>{opt.value}</span>
+                                        </div>
+                                    )}
+                                    renderItem={(opt) => (
+                                        <div className="flex items-center gap-2 w-full">
+                                            <img 
+                                                src={`https://flagcdn.com/16x12/${CURRENCY_COUNTRY_CODES[opt.value] || 'un'}.png`} 
+                                                alt="" 
+                                                className="w-4 h-3 object-cover rounded-sm shrink-0" 
+                                            />
+                                            <span className="truncate">{opt.label}</span>
+                                        </div>
+                                    )}
+                                    triggerClassName="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md"
+                                />
                             </div>
-                            <div>
+                            <div className="flex flex-col gap-1.5">
                                 <Label>Timezone</Label>
-                                <DropdownMenu modal={false}>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                            <span>{timezone || "Select timezone"}</span>
-                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
-                                        <DropdownMenuItem onClick={() => setTimezone("Africa/Lagos")} className="cursor-pointer">Africa/Lagos</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                <Combobox
+                                    options={typeof Intl !== 'undefined' && Intl.supportedValuesOf 
+                                      ? Intl.supportedValuesOf('timeZone').map(tz => ({ value: tz, label: tz }))
+                                      : [{ value: 'Africa/Lagos', label: 'Africa/Lagos' }]}
+                                    value={timezone}
+                                    onChange={(val) => setTimezone(val)}
+                                    placeholder="Select timezone"
+                                    searchPlaceholder="Search timezone..."
+                                    triggerClassName="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md"
+                                />
                             </div>
                             <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>
-                        <Separator />
-                        <FeatureGate
-                            requiredPlan="business"
-                            currentPlan={business?.plan}
-                            hasLifetimeAccess={hasLifetimeAccess}
-                            featureName="Zeneva Terminal Integration"
-                            featureDescription="Enable direct Paystack subaccount creation and automated payout routing with the Zeneva Terminal."
-                        >
+                        {(ipCountry === 'Nigeria' || currency === 'NGN') && (
+                            <>
+                                <Separator />
+                                <FeatureGate
+                                    requiredPlan="business"
+                                    currentPlan={business?.plan}
+                                    hasLifetimeAccess={hasLifetimeAccess}
+                                    featureName="Zeneva Terminal Integration"
+                                    featureDescription="Enable direct Paystack subaccount creation and automated payout routing with the Zeneva Terminal."
+                                    variant="rich"
+                                >
                             <div>
                                 <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
                                 <p className="text-sm text-muted-foreground mb-4">
@@ -1119,6 +1181,8 @@ function SettingsPageContent() {
                                 </div>
                             </div>
                         </FeatureGate>
+                            </>
+                        )}
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || paymentBankCode || '', "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>

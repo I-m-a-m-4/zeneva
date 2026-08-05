@@ -348,7 +348,7 @@ export default function ReportsDashboard() {
             <PageTitle title="Reports" subtitle="Deep dive into your business performance." />
 
             <FeatureGate
-                requiredPlan="pro"
+                requiredPlan="business"
                 currentPlan={business?.plan}
                 hasLifetimeAccess={hasLifetimeAccess}
                 bypass={isTodayOnlyRange}
@@ -487,7 +487,7 @@ export default function ReportsDashboard() {
                             </div>
 
                              <FeatureGate
-                                 requiredPlan="pro"
+                                 requiredPlan="business"
                                  currentPlan={business?.plan}
                                  hasLifetimeAccess={hasLifetimeAccess}
                                  featureName="Advanced Visual Analytics"
