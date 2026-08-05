@@ -154,7 +154,7 @@ export default function DownloadPage() {
   const latestReleaseUrl = "https://github.com/I-m-a-m-4/zeneva-releases/releases";
   const windowsDownloadUrl = `/api/download/windows`;
   const microsoftStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
-  const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
+  const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app";
   const macDownloadUrlIntel = `/api/download/macos-intel`;
   const macDownloadUrlSilicon = `/api/download/macos-silicon`;
   const androidDownloadUrl = `/api/download/android`;
@@ -786,7 +786,7 @@ export default function DownloadPage() {
 
                         {/* Google Play Store Badge */}
                         <a
-                            href="https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY"
+                            href="https://play.google.com/store/apps/details?id=com.zeneva.app"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="group flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 px-8 py-5 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] min-w-[260px]"
