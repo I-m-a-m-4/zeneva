@@ -1318,6 +1318,19 @@ function AdminDashboardContent({
     const [planUserEmail, setPlanUserEmail] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'business'>('starter');
     const [isAssigningPlan, setIsAssigningPlan] = useState(false);
+    const [haltUserEmail, setHaltUserEmail] = useState('');
+    const [isHalting, setIsHalting] = useState(false);
+
+    // Compute whether the selected user's business is halted
+    const selectedHaltBusiness = useMemo(() => {
+        if (!haltUserEmail || !users || !businesses) return null;
+        const u = users.find(u => u.email === haltUserEmail);
+        if (!u || !u.businessId) return null;
+        return businesses.find(b => b.id === u.businessId);
+    }, [haltUserEmail, users, businesses]);
+
+    const isSelectedBusinessHalted = !!(selectedHaltBusiness && (selectedHaltBusiness.status === 'halted' || (selectedHaltBusiness as any).isHalted === true));
+
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
     const [userListModalState, setUserListModalState] = useState<{ open: boolean; title: string; description: string; users: UserProfile[] }>({ open: false, title: '', description: '', users: [] });
     const [isAgeMilestoneOpen, setIsAgeMilestoneOpen] = useState(false);
@@ -2079,6 +2092,47 @@ function AdminDashboardContent({
             toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
             setIsUpdatingStatus(false);
+        }
+    };
+    const handleToggleHaltBusiness = async () => {
+        if (!haltUserEmail) {
+            toast({ variant: 'destructive', title: 'Missing User', description: 'Please select a user to manage freeze state.' });
+            return;
+        }
+        setIsHalting(true);
+        try {
+            const u = users?.find(u => u.email === haltUserEmail);
+            if (!u || !u.businessId) throw new Error("User or business association not found.");
+
+            const businessDocRef = doc(firestore, 'businessInstances', u.businessId);
+            const newHaltedState = !isSelectedBusinessHalted;
+
+            await updateDoc(businessDocRef, {
+                status: newHaltedState ? 'halted' : 'active',
+                isHalted: newHaltedState
+            });
+
+            // Log event to audit logs
+            await addDoc(collection(firestore, 'follow_up_logs'), {
+                timestamp: serverTimestamp(),
+                userId: u.id,
+                userEmail: u.email,
+                businessId: u.businessId,
+                businessName: selectedHaltBusiness?.name || '',
+                action: newHaltedState ? 'business_halted' : 'business_resumed',
+                details: `Admin toggled halt state to: ${newHaltedState ? 'Halted' : 'Active'}.`
+            });
+
+            toast({ 
+                variant: 'success', 
+                title: newHaltedState ? 'Business Halted' : 'Business Resumed', 
+                description: `Successfully ${newHaltedState ? 'suspended' : 're-activated'} operations for ${selectedHaltBusiness?.name || 'this business'}.` 
+            });
+            setHaltUserEmail('');
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Action Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsHalting(false);
         }
     };
 
@@ -2954,6 +3008,34 @@ function AdminDashboardContent({
                                             </Button>
                                         )
                                     )}
+                            </Card>
+                            <Card className="border-red-500/20">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-5 w-5" />Emergency Control</CardTitle>
+                                    <CardDescription>Halt / freeze any business instance instantly to block all actions.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="halt-email">User Email</Label>
+                                        <Combobox options={userOptions} value={haltUserEmail} onChange={setHaltUserEmail} placeholder="Select a user..." />
+                                    </div>
+                                    {selectedHaltBusiness && (
+                                        <div className="p-3 rounded-lg bg-muted/50 border text-xs space-y-1">
+                                            <div><strong>Business:</strong> {selectedHaltBusiness.name}</div>
+                                            <div><strong>Current Status:</strong> <span className={isSelectedBusinessHalted ? "text-destructive font-bold" : "text-green-600 font-bold"}>{isSelectedBusinessHalted ? "Halted / Frozen" : "Active"}</span></div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <CardFooter>
+                                    <Button 
+                                        onClick={handleToggleHaltBusiness} 
+                                        disabled={isHalting || !haltUserEmail} 
+                                        variant={isSelectedBusinessHalted ? "default" : "destructive"}
+                                        className="w-full font-bold"
+                                    >
+                                        {isHalting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isSelectedBusinessHalted ? "Resume Operations" : "Halt & Lock Business"}
+                                    </Button>
                                 </CardFooter>
                             </Card>
                         </div>

@@ -798,6 +798,47 @@ export default function AuthenticatedLayout({
       return part;
     });
   };
+  const isBusinessHalted = (businessInstance?.status === 'halted' || (businessInstance as any)?.isHalted === true) && currentUserProfile?.email !== 'belloimam431@gmail.com';
+
+  if (isBusinessHalted) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-destructive/5 blur-3xl rounded-full scale-150 animate-pulse pointer-events-none" />
+        <Card className="w-full max-w-lg border border-destructive/20 shadow-xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-8 duration-500">
+          <CardHeader className="pt-12 pb-6 text-center">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
+              <ShieldAlert className="h-10 w-10 animate-pulse" />
+            </div>
+            <CardTitle className="text-3xl font-black tracking-tight text-foreground">
+              Account Suspended
+            </CardTitle>
+            <CardDescription className="text-base mt-3 px-4">
+              Your business instance <span className="font-bold text-foreground">{businessInstance?.name || 'Zeneva Store'}</span> has been temporarily locked by system administrators.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-8 pb-8 text-center space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              To protect your business data and security, we have halted all operations for this business. 
+              Please reset your owner/admin password immediately or contact our support team to verify your identity and unlock your account.
+            </p>
+            <div className="rounded-xl bg-muted/50 p-4 border text-left text-xs font-mono space-y-1">
+              <div className="text-muted-foreground">Reason: Security Hold / Suspicious Activity</div>
+              <div className="text-muted-foreground">Reference ID: H-{businessInstance?.id?.substring(0, 8).toUpperCase()}</div>
+            </div>
+          </CardContent>
+          <CardFooter className="px-8 pb-10 flex flex-col sm:flex-row gap-3">
+            <Button asChild className="w-full h-11 bg-primary hover:bg-primary/90 font-bold">
+              <a href="https://wa.me/2349064233805" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">Contact Support</a>
+            </Button>
+            <Button variant="outline" onClick={handleLogout} className="w-full h-11 border-destructive text-destructive hover:bg-destructive/5 font-semibold">
+              Log Out
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <>
