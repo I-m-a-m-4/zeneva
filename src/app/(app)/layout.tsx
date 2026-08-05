@@ -798,7 +798,7 @@ export default function AuthenticatedLayout({
       return part;
     });
   };
-  const isBusinessHalted = (businessInstance?.status === 'halted' || (businessInstance as any)?.isHalted === true) && currentUserProfile?.email !== 'belloimam431@gmail.com';
+  const isBusinessHalted = isMounted && (businessInstance?.status === 'halted' || (businessInstance as any)?.isHalted === true) && currentUserProfile?.email !== 'belloimam431@gmail.com';
 
   if (isBusinessHalted) {
     return (

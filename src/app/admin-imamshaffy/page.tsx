@@ -108,6 +108,7 @@ import {
     collectionGroup,
     getDoc,
     deleteDoc,
+    onSnapshot,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays, startOfDay, endOfDay } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -1321,6 +1322,30 @@ function AdminDashboardContent({
     const [haltUserEmail, setHaltUserEmail] = useState('');
     const [isHalting, setIsHalting] = useState(false);
 
+    const [liveBusinessStatus, setLiveBusinessStatus] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!haltUserEmail || !users || !firestore) {
+            setLiveBusinessStatus(null);
+            return;
+        }
+        const u = users.find(u => u.email === haltUserEmail);
+        if (!u || !u.businessId) {
+            setLiveBusinessStatus(null);
+            return;
+        }
+
+        const unsubscribe = onSnapshot(doc(firestore, 'businessInstances', u.businessId), (docSnap) => {
+            if (docSnap.exists()) {
+                const status = docSnap.data().status || 'active';
+                const isH = docSnap.data().isHalted === true;
+                setLiveBusinessStatus(isH || status === 'halted' ? 'halted' : 'active');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [haltUserEmail, users, firestore]);
+
     // Compute whether the selected user's business is halted
     const selectedHaltBusiness = useMemo(() => {
         if (!haltUserEmail || !users || !businesses) return null;
@@ -1329,7 +1354,7 @@ function AdminDashboardContent({
         return businesses.find(b => b.id === u.businessId);
     }, [haltUserEmail, users, businesses]);
 
-    const isSelectedBusinessHalted = !!(selectedHaltBusiness && (selectedHaltBusiness.status === 'halted' || (selectedHaltBusiness as any).isHalted === true));
+    const isSelectedBusinessHalted = liveBusinessStatus === 'halted';
 
     const [detailModalState, setDetailModalState] = useState<{ open: boolean; title: string; description: string; businesses: BusinessInstance[]; isInfoOnly?: boolean }>({ open: false, title: '', description: '', businesses: [], isInfoOnly: false });
     const [userListModalState, setUserListModalState] = useState<{ open: boolean; title: string; description: string; users: UserProfile[] }>({ open: false, title: '', description: '', users: [] });
