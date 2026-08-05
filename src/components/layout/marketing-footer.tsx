@@ -169,6 +169,7 @@ export default function MarketingFooter() {
                   <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">Blog</Link></li>
                   <li><a href="#faq" className="transition text-neutral-300 hover:text-white">FAQ</a></li>
                   <li><Link href="/help-center" className="transition text-neutral-300 hover:text-white">Help Center</Link></li>
+                  <li><a href="https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare" target="_blank" rel="noopener noreferrer" className="transition text-neutral-300 hover:text-white">Write a Review</a></li>
                 </ul>
               </div>
               <div className="mt-6">
