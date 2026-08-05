@@ -847,18 +847,34 @@ function SettingsPageContent() {
                 <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary fill-primary" />Rate & Review</CardTitle>
-                        <CardDescription>Love using Zeneva? Help us grow by leaving a review on the Microsoft Store!</CardDescription>
+                        <CardDescription>Love using Zeneva? Help us grow by leaving a review on your app store!</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Button 
                             variant="outline" 
                             className="w-full border-primary text-primary hover:bg-primary hover:text-white"
                             onClick={() => {
-                                // Try opening MS Store protocol first, then fallback to web detail link
-                                window.open('ms-windows-store://review/?ProductId=9nvn0f8njwmj', '_blank');
-                                setTimeout(() => {
-                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
-                                }, 800);
+                                const ua = navigator.userAgent.toLowerCase();
+                                const isAndroid = ua.includes('android');
+                                const isMobile = isAndroid || ua.includes('iphone') || ua.includes('ipad');
+                                const isDesktopApp = (window as any).__TAURI__ || ua.includes('tauri');
+
+                                if (isAndroid) {
+                                    // Android — open Play Store review page directly
+                                    window.open('market://details?id=com.zeneva.app', '_blank');
+                                    setTimeout(() => {
+                                        window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
+                                    }, 800);
+                                } else if (isDesktopApp || !isMobile) {
+                                    // Windows desktop app or desktop browser — open Microsoft Store
+                                    window.open('ms-windows-store://review/?ProductId=9nvn0f8njwmj', '_blank');
+                                    setTimeout(() => {
+                                        window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
+                                    }, 800);
+                                } else {
+                                    // Fallback (iOS etc.)
+                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
+                                }
                             }}
                         >
                             <Star className="mr-2 h-4 w-4" />
