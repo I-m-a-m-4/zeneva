@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddUserDialog from '@/components/users/add-user-dialog';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import pkg from '../../../../package.json';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -104,8 +105,8 @@ export default function UsersPage() {
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
   const usersQuery = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore || currentUser.role !== 'admin') return null;
-    return query(collection(firestore, "users"), where("businessId", "==", currentUser.businessId));
+    if (!firestore || currentUser?.role !== 'imamshaffy') return null;
+    return query(collection(firestore, "users"));
   }, [currentUser, firestore]);
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
@@ -133,7 +134,7 @@ export default function UsersPage() {
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
 
   const isLoading = isProfileLoading || areUsersLoading || areInvitationsLoading || isBusinessLoading;
-  const canManageUsers = currentUser?.role === 'admin';
+  const canManageUsers = currentUser?.role === 'imamshaffy';
 
   const handleRevokeInvitation = async () => {
     if (!invitationToRevoke || !firestore) return;
@@ -229,6 +230,7 @@ export default function UsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Last Active</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>App Version</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -246,6 +248,7 @@ export default function UsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Last Active</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>App Version</TableHead>
                     <TableHead><span className='sr-only'>Actions</span></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -268,6 +271,15 @@ export default function UsersPage() {
                         <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
                           {user.status || 'active'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.appVersion ? (
+                          <Badge variant={user.appVersion === pkg.version ? 'default' : 'destructive'} className="font-mono text-[10px]">
+                            v{user.appVersion} {user.appVersion !== pkg.version && '(Outdated)'}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">Unknown</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

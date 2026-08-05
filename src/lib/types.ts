@@ -40,6 +40,7 @@ export interface UserProfile {
     surveyCompleted?: boolean;
     status?: 'active' | 'inactive' | 'deleted';
     lastSeen?: any;
+    appVersion?: string;
 }
 
 

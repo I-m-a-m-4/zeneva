@@ -73,6 +73,7 @@ export interface UserProfile {
     permissions?: Record<string, boolean>;
     branchId?: string;
     totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
+    appVersion?: string; // Latest app version used by the user
 }
 
 

@@ -6,6 +6,7 @@ import { useAuth, useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { usePathname } from 'next/navigation';
+import pkg from '../../package.json';
 
 export function UserActivityTracker() {
     const auth = useAuth();
@@ -75,7 +76,8 @@ export function UserActivityTracker() {
                         status: 'active',
                         deviceType,
                         userAgent: navigator.userAgent,
-                        country: country || 'Unknown'
+                        country: country || 'Unknown',
+                        appVersion: pkg.version || 'unknown'
                     }, { merge: true });
 
                     batch.set(sessionRef, {

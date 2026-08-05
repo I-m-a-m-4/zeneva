@@ -20,6 +20,7 @@ const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
 const navLinks = [
   { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin-imamshaffy/users', label: 'System Users', icon: Users },
   { href: '/admin-imamshaffy/achievements', label: 'Achievements', icon: Crown },
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin-imamshaffy/notifications', label: 'Notifications', icon: Bell },

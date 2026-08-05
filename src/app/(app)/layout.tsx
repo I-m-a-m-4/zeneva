@@ -235,35 +235,10 @@ export default function AuthenticatedLayout({
 
   React.useEffect(() => {
     const handleWindowError = (event: ErrorEvent) => {
-      const errorMsg = event.message || '';
-      
-      // Ignore harmless or third-party noise errors
-      if (
-        errorMsg.includes('ResizeObserver') ||
-        errorMsg.includes('Script error.') || 
-        errorMsg.includes('ChunkLoadError') ||
-        errorMsg.includes('Failed to fetch dynamically imported module')
-      ) {
-        return; 
-      }
-      
       logErrorToFirestore(event.error || new Error(event.message), 'window', { userId: user?.uid, businessId: businessInstance?.id });
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const reasonMsg = String(event.reason);
-      const reasonName = event.reason instanceof Error ? event.reason.name : '';
-      
-      // Ignore harmless or third-party noise errors
-      if (
-        reasonMsg.includes('ResizeObserver') ||
-        reasonMsg.includes('ChunkLoadError') ||
-        reasonName === 'ChunkLoadError' ||
-        reasonMsg.includes('Failed to fetch dynamically imported module')
-      ) {
-        return;
-      }
-      
       logErrorToFirestore(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), 'unhandledrejection', { userId: user?.uid, businessId: businessInstance?.id });
     };
 
