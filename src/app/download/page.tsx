@@ -741,6 +741,105 @@ export default function DownloadPage() {
 
 
 
+            {/* STORE BADGES - DOWNLOAD FROM YOUR STORE */}
+            <section id="downloads" className="py-24 px-6 bg-slate-950 relative overflow-hidden">
+                {/* Background texture */}
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+                     style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+                <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-orange-600/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
+
+                <div className="max-w-5xl mx-auto relative z-10 text-center">
+                    <span className="block text-[10px] font-bold text-slate-400 tracking-[0.4em] mb-6 font-display uppercase">Available On All Platforms</span>
+                    <h2 className="text-4xl md:text-6xl font-medium tracking-tighter text-white leading-tight mb-6 font-display">
+                        Download Zeneva Today
+                    </h2>
+                    <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto mb-16 leading-relaxed">
+                        Available on the Microsoft Store for Windows desktops and Google Play Store for Android devices. Start your free trial instantly — no credit card required.
+                    </p>
+
+                    {/* Store Badges */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+
+                        {/* Microsoft Store Badge */}
+                        <a
+                            href="https://apps.microsoft.com/store/detail/9NVN0F8NJWMJ?cid=DevShareMCLPCS"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 px-8 py-5 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] min-w-[260px]"
+                        >
+                            {/* Microsoft Logo */}
+                            <div className="flex-shrink-0">
+                                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="0" y="0" width="15" height="15" fill="#F25022" />
+                                    <rect x="17" y="0" width="15" height="15" fill="#7FBA00" />
+                                    <rect x="0" y="17" width="15" height="15" fill="#00A4EF" />
+                                    <rect x="17" y="17" width="15" height="15" fill="#FFB900" />
+                                </svg>
+                            </div>
+                            <div className="text-left">
+                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">Download from the</div>
+                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">Microsoft Store</div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all ml-auto" />
+                        </a>
+
+                        {/* Google Play Store Badge */}
+                        <a
+                            href="https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 px-8 py-5 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] min-w-[260px]"
+                        >
+                            {/* Google Play Logo */}
+                            <div className="flex-shrink-0">
+                                <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1.5 0.5C0.7 0.9 0 1.8 0 3V29C0 30.2 0.7 31.1 1.5 31.5L15.5 17.5L1.5 0.5Z" fill="#EA4335"/>
+                                    <path d="M24 12L20 9.8L15.5 14L20 18.2L24 16C25.5 15.2 25.5 12.8 24 12Z" fill="#FBBC04"/>
+                                    <path d="M1.5 31.5C2.4 31.9 3.5 31.7 4.5 31.1L20 18.2L15.5 13.7L1.5 31.5Z" fill="#34A853"/>
+                                    <path d="M4.5 0.9C3.5 0.3 2.4 0.1 1.5 0.5L15.5 16.3L20 11.8L4.5 0.9Z" fill="#4285F4"/>
+                                </svg>
+                            </div>
+                            <div className="text-left">
+                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">Get it on</div>
+                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">Google Play</div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all ml-auto" />
+                        </a>
+
+                        {/* Direct Windows Download */}
+                        <a
+                            href="/api/download/windows"
+                            className="group flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 px-8 py-5 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] min-w-[260px]"
+                        >
+                            <div className="flex-shrink-0 w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                                <Monitor className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="text-left">
+                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">Direct Installer</div>
+                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">Windows .exe</div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all ml-auto" />
+                        </a>
+                    </div>
+
+                    {/* Trust Indicators */}
+                    <div className="mt-16 pt-12 border-t border-white/10 flex flex-wrap items-center justify-center gap-8 text-slate-500">
+                        {[
+                            { icon: ShieldCheck, label: "Verified Publisher" },
+                            { icon: Zap, label: "Instant Activation" },
+                            { icon: Globe, label: "Works Offline" },
+                            { icon: Cloud, label: "Auto Updates" },
+                        ].map((item, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <item.icon className="w-4 h-4" />
+                                <span className="text-xs font-medium tracking-widest uppercase">{item.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             <MarketingFooter />
           </main>
         </div>
