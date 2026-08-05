@@ -818,8 +818,7 @@ export default function AuthenticatedLayout({
           </CardHeader>
           <CardContent className="px-8 pb-8 text-center space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              To protect your business data and security, we have halted all operations for this business. 
-              Please reset your owner/admin password immediately or contact our support team to verify your identity and unlock your account.
+              To protect your business data and security, we have halted all operations for this business.
             </p>
             <div className="rounded-xl bg-muted/50 p-4 border text-left text-xs font-mono space-y-1">
               <div className="text-muted-foreground">Reason: Security Hold / Suspicious Activity</div>
