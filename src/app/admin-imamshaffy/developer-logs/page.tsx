@@ -47,6 +47,11 @@ export default function DeveloperLogsPage() {
       limit(50)
     );
 
+    // Reset the last read timestamp when developer logs are viewed
+    if (typeof window !== 'undefined' && isSuperAdmin) {
+      localStorage.setItem('zeneva_last_viewed_errors', Date.now().toString());
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLogs = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -61,6 +66,14 @@ export default function DeveloperLogsPage() {
 
     return () => unsubscribe();
   }, [isSuperAdmin, firestore]);
+
+  const getDeviceTypeFromUserAgent = (userAgent?: string) => {
+    if (!userAgent) return 'Unknown';
+    const ua = userAgent.toLowerCase();
+    if (ua.includes('tauri')) return 'Desktop App';
+    if (ua.includes('android') || ua.includes('iphone') || ua.includes('ipad')) return 'Mobile';
+    return 'Web / Browser';
+  };
 
   const copyStack = (stack: string, id: string) => {
     navigator.clipboard.writeText(stack);
@@ -83,7 +96,7 @@ export default function DeveloperLogsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 lg:p-8 w-full max-w-none px-4 md:px-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Developer Logs</h1>
@@ -140,9 +153,13 @@ export default function DeveloperLogsPage() {
                       </TableCell>
                       <TableCell className="align-top pt-4 max-w-md">
                         <div className="font-semibold text-destructive text-sm mb-1">{log.message}</div>
-                        <div className="text-[10px] text-muted-foreground truncate mb-2" title={log.url}>
-                          {log.url}
-                        </div>
+                        {log.url && (
+                          <div className="text-[10px] text-primary hover:underline truncate mb-2" title={log.url}>
+                            <a href={log.url} target="_blank" rel="noopener noreferrer">
+                              {log.url}
+                            </a>
+                          </div>
+                        )}
                         {log.stack && (
                           <div className="bg-muted/50 p-2 rounded-md text-[10px] font-mono text-muted-foreground max-h-24 overflow-y-auto whitespace-pre-wrap">
                             {log.stack}
@@ -150,14 +167,23 @@ export default function DeveloperLogsPage() {
                         )}
                       </TableCell>
                       <TableCell className="align-top pt-4">
-                        <div className="space-y-1">
+                        <div className="space-y-2">
+                          <div className="text-[10px] text-muted-foreground">
+                            <span className="font-semibold block mb-0.5">Device / Agent:</span>
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal capitalize">
+                              {getDeviceTypeFromUserAgent(log.userAgent)}
+                            </Badge>
+                            <span className="block text-[8px] text-muted-foreground/60 truncate max-w-[150px] mt-1" title={log.userAgent}>
+                              {log.userAgent}
+                            </span>
+                          </div>
                           <div className="text-[10px] text-muted-foreground" title="User ID">
                             <span className="font-semibold block">User:</span>
-                            {log.userId}
+                            <span className="font-mono text-[9px]">{log.userId || 'Guest'}</span>
                           </div>
                           <div className="text-[10px] text-muted-foreground" title="Business ID">
                             <span className="font-semibold block">Business:</span>
-                            {log.businessId}
+                            <span className="font-mono text-[9px]">{log.businessId || 'N/A'}</span>
                           </div>
                         </div>
                       </TableCell>

@@ -2,9 +2,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
@@ -13,6 +13,8 @@ import Confetti from '@/components/shared/confetti';
 import { usePOS } from '@/context/pos-context';
 import Admin2FAGate from '@/components/admin/admin-2fa-gate';
 import { useTheme } from 'next-themes';
+import { Badge } from '@/components/ui/badge';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
@@ -27,12 +29,52 @@ const navLinks = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const { isConfettiActive, setIsConfettiActive } = usePOS();
   const router = useRouter();
   const pathname = usePathname();
 
   const { theme, setTheme, resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === 'dark';
+
+  const [unreadErrorCount, setUnreadErrorCount] = useState(0);
+
+  useEffect(() => {
+    if (!firestore || !user || user.email !== ADMIN_EMAIL) return;
+    
+    const q = query(
+      collection(firestore, 'error_logs'),
+      orderBy('createdAt', 'desc'),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (typeof window === 'undefined') return;
+      const lastViewedTimeStr = localStorage.getItem('zeneva_last_viewed_errors');
+      const lastViewedTime = lastViewedTimeStr ? parseInt(lastViewedTimeStr) : 0;
+      
+      let count = 0;
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.createdAt) {
+          const time = data.createdAt.toDate().getTime();
+          if (time > lastViewedTime) {
+            count++;
+          }
+        }
+      });
+      setUnreadErrorCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [firestore, user, pathname]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && pathname === '/admin-imamshaffy/developer-logs') {
+      localStorage.setItem('zeneva_last_viewed_errors', Date.now().toString());
+      setUnreadErrorCount(0);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (isUserLoading) {
@@ -98,11 +140,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "text-muted-foreground transition-colors hover:text-foreground py-1",
+                  "text-muted-foreground transition-colors hover:text-foreground py-1 flex items-center gap-1.5",
                   pathname.startsWith(link.href) && "text-foreground font-bold border-b-2 border-primary"
                 )}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.label === 'Developer Logs' && unreadErrorCount > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 py-0 flex items-center justify-center text-[10px] font-black rounded-full animate-pulse bg-red-600 hover:bg-red-700 text-white border-0">
+                    {unreadErrorCount}
+                  </Badge>
+                )}
               </Link>
             ))}
           </nav>
