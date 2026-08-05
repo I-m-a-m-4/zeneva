@@ -30,6 +30,8 @@ export default function DeveloperLogsPage() {
   const [logs, setLogs] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [usersMap, setUsersMap] = useState<Record<string, { name: string, email: string }>>({});
+  const [businessesMap, setBusinessesMap] = useState<Record<string, string>>({});
 
   // Super admin check
   const isSuperAdmin = 
@@ -65,6 +67,40 @@ export default function DeveloperLogsPage() {
     });
 
     return () => unsubscribe();
+  }, [isSuperAdmin, firestore]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !firestore) return;
+
+    const fetchMappings = async () => {
+      try {
+        const [usersSnap, businessSnap] = await Promise.all([
+          getDocs(collection(firestore, 'users')),
+          getDocs(collection(firestore, 'businessInstances'))
+        ]);
+
+        const uMap: Record<string, { name: string, email: string }> = {};
+        usersSnap.forEach(doc => {
+          const data = doc.data();
+          uMap[doc.id] = {
+            name: data.name || 'Unknown User',
+            email: data.email || 'No Email'
+          };
+        });
+        setUsersMap(uMap);
+
+        const bMap: Record<string, string> = {};
+        businessSnap.forEach(doc => {
+          const data = doc.data();
+          bMap[doc.id] = data.name || 'Unnamed Business';
+        });
+        setBusinessesMap(bMap);
+      } catch (err) {
+        console.error("Error loading mapping details for logs page:", err);
+      }
+    };
+
+    fetchMappings();
   }, [isSuperAdmin, firestore]);
 
   const getDeviceTypeFromUserAgent = (userAgent?: string) => {
@@ -179,11 +215,24 @@ export default function DeveloperLogsPage() {
                           </div>
                           <div className="text-[10px] text-muted-foreground" title="User ID">
                             <span className="font-semibold block">User:</span>
-                            <span className="font-mono text-[9px]">{log.userId || 'Guest'}</span>
+                            {usersMap[log.userId] ? (
+                              <div className="bg-muted/50 p-1 rounded border mt-0.5 space-y-0.5 max-w-[150px]">
+                                <div className="font-bold text-foreground truncate">{usersMap[log.userId].name}</div>
+                                <div className="text-[8px] text-muted-foreground truncate">{usersMap[log.userId].email}</div>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-[9px]">{log.userId || 'Guest'}</span>
+                            )}
                           </div>
                           <div className="text-[10px] text-muted-foreground" title="Business ID">
                             <span className="font-semibold block">Business:</span>
-                            <span className="font-mono text-[9px]">{log.businessId || 'N/A'}</span>
+                            {businessesMap[log.businessId] ? (
+                              <span className="font-semibold text-foreground text-[9px] block truncate max-w-[150px]" title={businessesMap[log.businessId]}>
+                                {businessesMap[log.businessId]}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[9px]">{log.businessId || 'N/A'}</span>
+                            )}
                           </div>
                         </div>
                       </TableCell>
