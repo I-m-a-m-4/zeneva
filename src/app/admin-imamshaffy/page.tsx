@@ -3027,15 +3027,23 @@ function AdminDashboardContent({
                                         </div>
                                     )}
                                 </CardContent>
-                                <CardFooter>
+                                <CardFooter className="flex gap-2">
                                     <Button 
                                         onClick={handleToggleHaltBusiness} 
-                                        disabled={isHalting || !haltUserEmail} 
-                                        variant={isSelectedBusinessHalted ? "default" : "destructive"}
-                                        className="w-full font-bold"
+                                        disabled={isHalting || !haltUserEmail || isSelectedBusinessHalted} 
+                                        variant="destructive"
+                                        className="flex-1 font-bold"
                                     >
-                                        {isHalting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isSelectedBusinessHalted ? "Resume Operations" : "Halt & Lock Business"}
+                                        {isHalting && !isSelectedBusinessHalted && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                        Halt Business
+                                    </Button>
+                                    <Button 
+                                        onClick={handleToggleHaltBusiness} 
+                                        disabled={isHalting || !haltUserEmail || !isSelectedBusinessHalted} 
+                                        className="flex-1 font-bold bg-green-600 hover:bg-green-700 text-white disabled:bg-muted"
+                                    >
+                                        {isHalting && isSelectedBusinessHalted && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                        Resume Business
                                     </Button>
                                 </CardFooter>
                             </Card>
