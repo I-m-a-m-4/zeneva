@@ -3008,6 +3008,7 @@ function AdminDashboardContent({
                                             </Button>
                                         )
                                     )}
+                                </CardFooter>
                             </Card>
                             <Card className="border-red-500/20">
                                 <CardHeader>
