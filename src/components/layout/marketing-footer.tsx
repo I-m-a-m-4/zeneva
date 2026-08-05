@@ -239,10 +239,17 @@ export default function MarketingFooter() {
               </div>
               <div className="mt-5 pt-3 border-t border-white/5">
                 <a 
-                  href={microsoftStoreUrl} 
+                  href="https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300 hover:text-amber-400 transition"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.open('ms-windows-store://review/?ProductId=9nvn0f8njwmj', '_blank');
+                    setTimeout(() => {
+                      window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
+                    }, 800);
+                  }}
                 >
                   <span>★ Write a Microsoft Store Review</span>
                 </a>
