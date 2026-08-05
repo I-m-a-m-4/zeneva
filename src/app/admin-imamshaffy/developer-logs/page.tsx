@@ -25,14 +25,18 @@ interface ErrorLog {
 }
 
 export default function DeveloperLogsPage() {
-  const { currentUserProfile, isLoading } = usePOS();
+  const { currentUserProfile, isLoading, user } = usePOS();
   const firestore = useFirestore();
   const [logs, setLogs] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Super admin check
-  const isSuperAdmin = currentUserProfile?.email === 'belloimam431@gmail.com';
+  const isSuperAdmin = 
+    currentUserProfile?.email === 'belloimam431@gmail.com' || 
+    currentUserProfile?.email === 'bimex4@gmail.com' ||
+    user?.email === 'belloimam431@gmail.com' ||
+    user?.email === 'bimex4@gmail.com';
 
   useEffect(() => {
     if (!isSuperAdmin || !firestore) return;
