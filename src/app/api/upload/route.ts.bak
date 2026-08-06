@@ -1,5 +1,6 @@
-﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
+﻿import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   // In a real application, you would handle the file upload here.
@@ -26,4 +27,5 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, url: mockUrl });
 }
+
 

@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
+﻿import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
-// import { redis } from '@/lib/redis';  // Redis disabled — using direct Firestore for real-time data
+// import { redis } from '@/lib/redis';  // Redis disabled â€” using direct Firestore for real-time data
 
 // const CACHE_KEY = 'admin:dashboard_data:v2';
-// const CACHE_TTL = 300; // 5 minutes — re-enable below to turn caching back on
+// const CACHE_TTL = 300; // 5 minutes â€” re-enable below to turn caching back on
 
-export const dynamic = 'force-dynamic';
+// [TAURI_HIDDEN] export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
@@ -78,3 +80,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch admin data' }, { status: 500 });
     }
 }
+

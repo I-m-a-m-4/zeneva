@@ -1,5 +1,6 @@
-﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 
 const TRANSPARENT_PIXEL = Buffer.from(
@@ -40,4 +41,5 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
 

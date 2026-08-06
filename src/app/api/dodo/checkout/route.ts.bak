@@ -1,5 +1,6 @@
-﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
-
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
+﻿
 import { NextRequest, NextResponse } from 'next/server';
 
 const DODO_API_KEY = process.env.DODO_SECRET_KEY;
@@ -98,4 +99,5 @@ export async function POST(req: NextRequest) {
     }, { status: 500 });
   }
 }
+
 

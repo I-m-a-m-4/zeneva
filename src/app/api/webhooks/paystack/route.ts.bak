@@ -1,5 +1,6 @@
-﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
+﻿import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 import crypto from 'crypto';
 
@@ -142,4 +143,5 @@ export async function POST(request: Request) {
     return new NextResponse(`Internal webhook error: ${error.message}`, { status: 500 });
   }
 }
+
 

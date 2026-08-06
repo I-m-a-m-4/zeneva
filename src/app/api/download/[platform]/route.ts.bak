@@ -1,3 +1,5 @@
+export const dynamic = 'force-static'; // [TAURI_INJECTED]
+// [TAURI_HIDDEN] export const dynamic = 'force-static';
 import { NextRequest, NextResponse } from 'next/server';
 import { AppConfig } from '@/lib/config';
 import { adminFirestore } from '@/firebase/admin';
