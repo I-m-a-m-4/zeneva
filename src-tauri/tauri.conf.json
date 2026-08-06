@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:9007",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build && node scripts/post-build-cleanup.mjs"
+    "beforeBuildCommand": "node scripts/tauri-prebuild.mjs && npm run build && node scripts/tauri-postbuild.mjs && node scripts/post-build-cleanup.mjs"
   },
   "app": {
     "windows": [
