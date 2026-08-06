@@ -8,27 +8,27 @@ import { AppConfig } from '@/lib/config';
 
 const slides = [
   {
-    video: '/signup%20video%206.mp4',
+    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053655/zeneva/zeneva_welcome_signup_video_6.mp4',
     poster: '/signup-video-6-poster.jpg',
     headline: <>Welcome to the future<br />of smart retail</>,
   },
   {
-    video: '/signup%20video%205.mp4',
+    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053651/zeneva/zeneva_welcome_signup_video_5.mp4',
     poster: '/signup-video-5-poster.jpg',
     headline: <>Empower your business<br />to scale endlessly</>,
   },
   {
-    video: '/signup%20video%203.mp4',
+    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053636/zeneva/zeneva_welcome_signup_video_3.mp4',
     poster: '/signup-video-3-poster.jpg',
     headline: <>Get detailed insights,<br />in real-time</>,
   },
   {
-    video: '/signup%20video%202.mp4',
+    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053621/zeneva/zeneva_welcome_signup_video_2.mp4',
     poster: '/signup-video-2-poster.jpg',
     headline: <>Manage your inventory<br />with absolute ease</>,
   },
   {
-    video: '/signup%20video%201.mp4',
+    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053615/zeneva/zeneva_welcome_signup_video_1.mp4',
     poster: '/signup-video-1-poster.jpg',
     headline: <>One point of sale,<br />wherever you grow</>,
   },
