@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 import crypto from 'crypto';
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     const event = payload.event;
     const data = payload.data;
 
-    console.log(`✅ Paystack Webhook Received & Verified: ${event}`);
+    console.log(`âœ… Paystack Webhook Received & Verified: ${event}`);
 
     if (event === 'charge.success') {
       const subaccountCode = data.subaccount?.subaccount_code;
@@ -98,8 +99,8 @@ export async function POST(request: Request) {
             .doc(doc.id)
             .collection('notifications')
             .add({
-              title: 'Payment Received ₦' + amountInNaira.toLocaleString(),
-              body: `₦${amountInNaira.toLocaleString()} successfully received via Bank Transfer.`,
+              title: 'Payment Received â‚¦' + amountInNaira.toLocaleString(),
+              body: `â‚¦${amountInNaira.toLocaleString()} successfully received via Bank Transfer.`,
               createdAt: new Date(),
               read: false,
               type: 'payment',
@@ -141,3 +142,4 @@ export async function POST(request: Request) {
     return new NextResponse(`Internal webhook error: ${error.message}`, { status: 500 });
   }
 }
+

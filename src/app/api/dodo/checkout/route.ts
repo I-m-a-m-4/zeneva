@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -97,3 +98,4 @@ export async function POST(req: NextRequest) {
     }, { status: 500 });
   }
 }
+

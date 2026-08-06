@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 
@@ -39,3 +40,4 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+

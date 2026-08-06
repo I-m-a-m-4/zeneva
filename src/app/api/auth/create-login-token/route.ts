@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/firebase/admin';
 
@@ -28,3 +29,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication failed', details: error.message }, { status: 500 });
   }
 }
+

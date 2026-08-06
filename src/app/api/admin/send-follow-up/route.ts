@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/firebase/admin';
 import { sendEmail } from '@/lib/server/resend';
@@ -60,3 +61,4 @@ export async function POST(req: NextRequest) {
     }, { status: 500, headers: corsHeaders });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 
@@ -28,3 +29,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 }
+

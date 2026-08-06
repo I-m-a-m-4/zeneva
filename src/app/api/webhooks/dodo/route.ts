@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { adminFirestore } from '@/firebase/admin';
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     const event = JSON.parse(body);
-    console.log('✅ Dodo Webhook Verified:', event.type);
+    console.log('âœ… Dodo Webhook Verified:', event.type);
 
     // --- Handle different event types ---
     switch (event.type) {
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
               });
 
               await batch.commit();
-              console.log(`✅ Server Successfully applied Dodo update to Business: ${businessId}`);
+              console.log(`âœ… Server Successfully applied Dodo update to Business: ${businessId}`);
             } else {
               console.error(`Business record NOT FOUND in Firestore: ${businessId}`);
             }
@@ -169,3 +170,4 @@ export async function POST(req: Request) {
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
+

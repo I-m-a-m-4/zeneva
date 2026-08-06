@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
               const tokenData = doc.data();
               // Note: sending to user ID, not directly to token here, helper handles token lookup
               return sendNotificationToUser(doc.id, {
-                title: 'New Online Order! 🛍️',
+                title: 'New Online Order! ðŸ›ï¸',
                 body: `Received payment of ${data.data.currency} ${(data.data.amount / 100).toLocaleString()}`,
                 url: '/dashboard/online-orders'
               });
@@ -91,3 +92,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'An internal server error occurred during verification.' }, { status: 500 });
   }
 }
+

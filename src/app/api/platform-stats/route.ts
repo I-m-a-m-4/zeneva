@@ -1,3 +1,4 @@
+﻿export const dynamic = process.env.IS_TAURI ? 'force-static' : 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getCachedPlatformAnalytics } from '@/lib/server/analytics-cache';
 
@@ -36,3 +37,4 @@ export async function GET() {
     });
   }
 }
+
