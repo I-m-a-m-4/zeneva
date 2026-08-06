@@ -10,7 +10,7 @@ function walk(dir) {
     const stat = fs.statSync(file);
     if (stat && stat.isDirectory()) { 
         results = results.concat(walk(file));
-    } else if (file.endsWith('route.ts')) { 
+    } else if (file.endsWith('route.ts') || file.endsWith('route.js')) { 
         results.push(file);
     }
   });
@@ -21,8 +21,21 @@ const apiFiles = walk(path.join(process.cwd(), 'src/app/api'));
 
 apiFiles.forEach(file => {
   let content = fs.readFileSync(file, 'utf8');
-  if (content.startsWith("export const dynamic = 'force-static';\n")) {
-    content = content.replace("export const dynamic = 'force-static';\n", "");
+  let modified = false;
+
+  // Remove our injected line
+  if (content.includes("export const dynamic = 'force-static'; // [TAURI_INJECTED]\n")) {
+    content = content.replace("export const dynamic = 'force-static'; // [TAURI_INJECTED]\n", "");
+    modified = true;
+  }
+
+  // Restore any hidden lines
+  if (content.match(/^\/\/ \[TAURI_HIDDEN\] export const dynamic/m)) {
+    content = content.replace(/^\/\/ \[TAURI_HIDDEN\] (export const dynamic.*)$/gm, '$1');
+    modified = true;
+  }
+
+  if (modified) {
     fs.writeFileSync(file, content, 'utf8');
   }
 });

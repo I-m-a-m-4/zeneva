@@ -10,7 +10,7 @@ function walk(dir) {
     const stat = fs.statSync(file);
     if (stat && stat.isDirectory()) { 
         results = results.concat(walk(file));
-    } else if (file.endsWith('route.ts')) { 
+    } else if (file.endsWith('route.ts') || file.endsWith('route.js')) { 
         results.push(file);
     }
   });
@@ -21,9 +21,21 @@ const apiFiles = walk(path.join(process.cwd(), 'src/app/api'));
 
 apiFiles.forEach(file => {
   let content = fs.readFileSync(file, 'utf8');
+  let modified = false;
+
+  // Comment out existing dynamic exports to avoid duplicate declarations
+  if (content.match(/^export const dynamic\s*=/m)) {
+    content = content.replace(/^(export const dynamic\s*=.*)$/gm, '// [TAURI_HIDDEN] $1');
+    modified = true;
+  }
+
   // Inject literal string to trick Next.js AST parser
-  if (!content.includes("export const dynamic = 'force-static';")) {
-    content = "export const dynamic = 'force-static';\n" + content;
+  if (!content.includes("export const dynamic = 'force-static'; // [TAURI_INJECTED]")) {
+    content = "export const dynamic = 'force-static'; // [TAURI_INJECTED]\n" + content;
+    modified = true;
+  }
+
+  if (modified) {
     fs.writeFileSync(file, content, 'utf8');
   }
 });
