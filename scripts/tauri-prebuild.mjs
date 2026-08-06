@@ -19,25 +19,15 @@ function walk(dir) {
 
 const apiFiles = walk(path.join(process.cwd(), 'src/app/api'));
 
-apiFiles.forEach(file => {
-  let content = fs.readFileSync(file, 'utf8');
-  let modified = false;
-
-  // Comment out existing dynamic exports to avoid duplicate declarations
-  if (content.match(/^export const dynamic\s*=/m)) {
-    content = content.replace(/^(export const dynamic\s*=.*)$/gm, '// [TAURI_HIDDEN] $1');
-    modified = true;
-  }
-
-  // Inject literal string to trick Next.js AST parser
-  if (!content.includes("export const dynamic = 'force-static'; // [TAURI_INJECTED]")) {
-    content = "export const dynamic = 'force-static'; // [TAURI_INJECTED]\n" + content;
-    modified = true;
-  }
-
-  if (modified) {
-    fs.writeFileSync(file, content, 'utf8');
+const specialFiles = ['src/app/robots.ts', 'src/app/sitemap.ts'];
+specialFiles.forEach(file => {
+  if (fs.existsSync(path.join(process.cwd(), file))) {
+    apiFiles.push(path.join(process.cwd(), file));
   }
 });
 
-console.log('Successfully injected force-static into API routes to bypass Next.js export errors.');
+apiFiles.forEach(file => {
+  fs.renameSync(file, file + '.bak');
+});
+
+console.log('Successfully renamed API routes to .bak to bypass Next.js static export errors completely.');

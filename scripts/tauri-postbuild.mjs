@@ -10,7 +10,7 @@ function walk(dir) {
     const stat = fs.statSync(file);
     if (stat && stat.isDirectory()) { 
         results = results.concat(walk(file));
-    } else if (file.endsWith('route.ts') || file.endsWith('route.js')) { 
+    } else if (file.endsWith('route.ts.bak') || file.endsWith('route.js.bak')) { 
         results.push(file);
     }
   });
@@ -19,25 +19,15 @@ function walk(dir) {
 
 const apiFiles = walk(path.join(process.cwd(), 'src/app/api'));
 
-apiFiles.forEach(file => {
-  let content = fs.readFileSync(file, 'utf8');
-  let modified = false;
-
-  // Remove our injected line
-  if (content.includes("export const dynamic = 'force-static'; // [TAURI_INJECTED]\n")) {
-    content = content.replace("export const dynamic = 'force-static'; // [TAURI_INJECTED]\n", "");
-    modified = true;
-  }
-
-  // Restore any hidden lines
-  if (content.match(/^\/\/ \[TAURI_HIDDEN\] export const dynamic/m)) {
-    content = content.replace(/^\/\/ \[TAURI_HIDDEN\] (export const dynamic.*)$/gm, '$1');
-    modified = true;
-  }
-
-  if (modified) {
-    fs.writeFileSync(file, content, 'utf8');
+const specialFiles = ['src/app/robots.ts.bak', 'src/app/sitemap.ts.bak'];
+specialFiles.forEach(file => {
+  if (fs.existsSync(path.join(process.cwd(), file))) {
+    apiFiles.push(path.join(process.cwd(), file));
   }
 });
 
-console.log('Successfully cleaned up force-static injections from API routes.');
+apiFiles.forEach(file => {
+  fs.renameSync(file, file.replace(/\.bak$/, ''));
+});
+
+console.log('Successfully restored API routes from .bak files.');
