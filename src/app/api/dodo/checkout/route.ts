@@ -8,16 +8,16 @@ const DODO_API_URL = `https://${DODO_MODE}.dodopayments.com/checkouts`;
 // Product IDs from Dodo Dashboard mapped by planId and cycleMonths
 const DODO_PRODUCT_IDS: Record<string, Record<string, string>> = {
   'pro': {
-    '1': process.env.DODO_PRO_PRODUCT_ID || 'pdt_0Na8DxFd4qtNiJdum8xaB',
-    '3': process.env.DODO_PRO_3M_PRODUCT_ID || 'pdt_0NkpBsjzk7VlSGUeFz7DI',
-    '6': process.env.DODO_PRO_6M_PRODUCT_ID || 'pdt_0NkpBzjP8l3uXSgyPeP8C',
+    '1': process.env.DODO_PRO_PRODUCT_ID || 'pdt_0Ne8DxFd4qtNIJdum6kaB',
+    '3': process.env.DODO_PRO_3M_PRODUCT_ID || 'pdt_0NkpBsjzk7VlSGUeFz7Dl',
+    '6': process.env.DODO_PRO_6M_PRODUCT_ID || 'pdt_0NkpBzjP613uXSgyPeP6C',
     '12': process.env.DODO_PRO_1Y_PRODUCT_ID || 'pdt_0NkpC3pkoA6FLfvUDr9Yq',
   },
   'business': {
-    '1': process.env.DODO_BUSINESS_PRODUCT_ID || 'pdt_0Na8FzxfnfO0Q55dQ2QuK',
+    '1': process.env.DODO_BUSINESS_PRODUCT_ID || 'pdt_0Ne8FzxfnfO0Q55dQ2QuK',
     '3': process.env.DODO_BUSINESS_3M_PRODUCT_ID || 'pdt_0NkpBVh9ldI3byXk8hTQW',
-    '6': process.env.DODO_BUSINESS_6M_PRODUCT_ID || 'pdt_0NkpBa3yuk1XV4RsvtPfb',
-    '12': process.env.DODO_BUSINESS_1Y_PRODUCT_ID || 'pdt_0NkpBlN8u6xuhe4pDa9BY',
+    '6': process.env.DODO_BUSINESS_6M_PRODUCT_ID || 'pdt_0NkpBe3yuk1XV4RsVtPfb',
+    '12': process.env.DODO_BUSINESS_1Y_PRODUCT_ID || 'pdt_0NkpBlN8u6xuhe4pDa8BY',
   }
 };
 
