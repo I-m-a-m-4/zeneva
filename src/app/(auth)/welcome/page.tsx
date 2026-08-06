@@ -9,22 +9,27 @@ import { AppConfig } from '@/lib/config';
 const slides = [
   {
     video: '/signup%20video%206.mp4',
+    poster: '/signup-video-6-poster.jpg',
     headline: <>Welcome to the future<br />of smart retail</>,
   },
   {
     video: '/signup%20video%205.mp4',
+    poster: '/signup-video-5-poster.jpg',
     headline: <>Empower your business<br />to scale endlessly</>,
   },
   {
     video: '/signup%20video%203.mp4',
+    poster: '/signup-video-3-poster.jpg',
     headline: <>Get detailed insights,<br />in real-time</>,
   },
   {
     video: '/signup%20video%202.mp4',
+    poster: '/signup-video-2-poster.jpg',
     headline: <>Manage your inventory<br />with absolute ease</>,
   },
   {
     video: '/signup%20video%201.mp4',
+    poster: '/signup-video-1-poster.jpg',
     headline: <>One point of sale,<br />wherever you grow</>,
   },
 ];
@@ -87,6 +92,7 @@ export default function WelcomePage() {
           muted
           playsInline
           preload="auto"
+          poster={slide.poster}
           onEnded={() => handleEnded(index)}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
             index === currentIndex ? 'opacity-80 z-[0]' : 'opacity-0 z-[-1]'
