@@ -7,8 +7,7 @@ import { adminFirestore } from '@/firebase/admin';
 // const CACHE_KEY = 'admin:dashboard_data:v2';
 // const CACHE_TTL = 300; // 5 minutes â€” re-enable below to turn caching back on
 
-// [TAURI_HIDDEN] export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// [TAURI_HIDDEN] export const revalidate = 0;
 
 export async function GET() {
     try {
