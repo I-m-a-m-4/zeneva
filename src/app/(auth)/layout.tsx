@@ -36,7 +36,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   }, [user, isUserLoading, router, pathname]);
 
   // While the initial authentication state is being determined, show a loader.
-  if (isUserLoading) {
+  // Exception: For the /welcome page, we want it to render immediately so the video starts playing
+  // and the user doesn't see a flash of a white loading screen.
+  if (isUserLoading && pathname !== '/welcome') {
     return <FullScreenLoader text="Authenticating..." />;
   }
 

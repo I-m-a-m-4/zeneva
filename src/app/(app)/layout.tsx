@@ -295,7 +295,6 @@ export default function AuthenticatedLayout({
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
-  const [isNotificationsExpanded, setIsNotificationsExpanded] = React.useState(false);
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -444,7 +443,6 @@ export default function AuthenticatedLayout({
       }
     }
 
-    setIsNotificationsExpanded(false);
     if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
       window.open(targetLink, '_blank');
     } else {
@@ -1237,15 +1235,15 @@ export default function AuthenticatedLayout({
                                       </div>
                                     );
                                   })}
-                                <Button
-                                  variant="ghost"
-                                  className="w-full text-xs font-bold py-3 rounded-none border-t hover:bg-black hover:text-white transition-all duration-200"
-                                  onClick={() => setIsNotificationsExpanded(true)}
-                                >
-                                  View all ({allNotifications.length})
-                                </Button>
-                              </div>
-                            ) : (
+                                  <Button
+                                    asChild
+                                    variant="ghost"
+                                    className="w-full text-xs font-bold py-3 rounded-none border-t hover:bg-black hover:text-white transition-all duration-200"
+                                  >
+                                    <Link href="/notifications">View all ({allNotifications.length})</Link>
+                                  </Button>
+                                </div>
+                              ) : (
                               <div className="flex flex-col items-center justify-center h-[200px] text-center p-4">
                                 <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
                                 <p className="text-sm text-muted-foreground">All caught up!</p>
@@ -1424,90 +1422,6 @@ export default function AuthenticatedLayout({
         </SidebarProvider>
         <ProductTour />
       </TooltipProvider>
-
-      <Dialog open={isNotificationsExpanded} onOpenChange={setIsNotificationsExpanded}>
-        <DialogContent className="max-w-3xl h-[85vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 sm:p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1 text-left">
-              <DialogTitle className="text-xl sm:text-2xl font-bold">Notifications Center</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm max-w-md">
-                Stay updated with your business performance, inventory alerts, and system updates.
-              </DialogDescription>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={handleMarkAsRead} disabled={unreadCount === 0}>
-                Mark all read
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9 text-destructive hover:bg-destructive/5" onClick={handleClearAll} disabled={allNotifications.length === 0}>
-                Clear All
-              </Button>
-            </div>
-          </DialogHeader>
-          <ScrollArea className="flex-1">
-            <div className="p-4 sm:p-6">
-              {allNotifications.length > 0 ? (
-                <div className="space-y-3 sm:space-y-4">
-                  {allNotifications.map((notif) => (
-                    <Card 
-                      key={notif.id} 
-                      className={cn(
-                        "overflow-hidden border-none shadow-sm transition-all hover:shadow-md cursor-pointer group hover:bg-muted/30", 
-                        !notif.isGlobal && !notif.read ? 'bg-primary/5 border-l-4 border-l-primary' : 'bg-muted/10'
-                      )}
-                      onClick={() => handleNotificationClick(notif)}
-                    >
-                      <CardContent className="p-3 sm:p-4 flex gap-3 sm:gap-4">
-                        <div className={cn("h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-full flex items-center justify-center", notif.isGlobal ? 'bg-blue-500/10 text-blue-500' : 'bg-primary/10 text-primary')}>
-                          {notif.isGlobal ? <Globe className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bell className="h-4 w-4 sm:h-5 sm:w-5" />}
-                        </div>
-                        <div className="flex-1 space-y-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                            <h4 className="font-bold text-sm sm:text-base truncate sm:whitespace-normal group-hover:text-primary transition-colors">{notif.title}</h4>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
-                              {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
-                            </span>
-                          </div>
-                          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">
-                            {notif.body}
-                          </p>
-                          <div className="pt-1.5 flex items-center gap-3">
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px] font-mono py-0 px-1.5 h-5 flex items-center">
-                              {notif.isGlobal ? 'SYSTEM' : 'BUSINESS'}
-                            </Badge>
-                            {!notif.isGlobal && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-1.5 text-[11px] sm:text-xs text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteNotification(notif.id, false);
-                                }}
-                              >
-                                Remove
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-[40vh] flex flex-col items-center justify-center text-center">
-                  <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Bell className="h-10 w-10 text-muted-foreground/20" />
-                  </div>
-                  <h3 className="text-lg font-semibold">No notifications found</h3>
-                  <p className="text-muted-foreground max-w-xs mx-auto">
-                    When you have new inventory alerts or sales activity, they will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {/* Permission Update Popup */}
       <Dialog open={!!permissionPopup} onOpenChange={(open) => {
