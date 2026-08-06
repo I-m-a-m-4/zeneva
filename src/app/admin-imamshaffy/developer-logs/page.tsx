@@ -187,8 +187,8 @@ export default function DeveloperLogsPage() {
                           {log.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="align-top pt-4 max-w-md">
-                        <div className="font-semibold text-destructive text-sm mb-1">{log.message}</div>
+                      <TableCell className="align-top pt-4 max-w-[200px] sm:max-w-md break-words whitespace-normal">
+                        <div className="font-semibold text-destructive text-sm mb-1 break-words whitespace-normal">{log.message}</div>
                         {log.url && (
                           <div className="text-[10px] text-primary hover:underline truncate mb-2" title={log.url}>
                             <a href={log.url} target="_blank" rel="noopener noreferrer">
@@ -197,7 +197,7 @@ export default function DeveloperLogsPage() {
                           </div>
                         )}
                         {log.stack && (
-                          <div className="bg-muted/50 p-2 rounded-md text-[10px] font-mono text-muted-foreground max-h-24 overflow-y-auto whitespace-pre-wrap">
+                          <div className="bg-muted/50 p-2 rounded-md text-[10px] font-mono text-muted-foreground max-h-24 overflow-y-auto whitespace-pre-wrap break-words">
                             {log.stack}
                           </div>
                         )}

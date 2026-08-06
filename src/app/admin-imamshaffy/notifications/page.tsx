@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, Send, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Combobox } from '@/components/ui/combobox';
 import { format } from 'date-fns';
 import type { AdminNotification } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -126,6 +127,13 @@ export default function AdminNotificationsPage() {
         [firestore]
     );
     const { data: notifications, isLoading } = useCollection<AdminNotification>(notificationsQuery);
+
+    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
+    const { data: usersData } = useCollection<any>(usersQuery);
+    const userOptions = React.useMemo(() => {
+        if (!usersData) return [];
+        return usersData.map(u => ({ label: `${u.name || 'Unknown'} (${u.email})`, value: u.email || '' })).filter(u => u.value);
+    }, [usersData]);
 
     const onSubmit = async (values: NotificationFormValues) => {
         if (!firestore || !user) {
@@ -244,9 +252,15 @@ export default function AdminNotificationsPage() {
                                             </FormItem>
                                         )}/>
                                         <FormField control={form.control} name="targetEmail" render={({ field }) => (
-                                            <FormItem>
+                                            <FormItem className="flex flex-col">
                                                 <FormLabel>Target Email (Optional)</FormLabel>
-                                                <FormControl><Input placeholder="e.g., user@example.com (leave blank for all users)" {...field} /></FormControl>
+                                                <Combobox 
+                                                    options={userOptions} 
+                                                    value={field.value || ""} 
+                                                    onChange={field.onChange} 
+                                                    placeholder="Select a user (leave blank for all)" 
+                                                    emptyPlaceholder="No users found"
+                                                />
                                                 <FormMessage />
                                             </FormItem>
                                         )}/>
@@ -289,9 +303,9 @@ export default function AdminNotificationsPage() {
                                                             </Badge>
                                                         )}
                                                     </div>
-                                                    <p className={`text-xs ${(notif as any).deleted ? 'line-through text-muted-foreground/70' : 'text-muted-foreground'} line-clamp-1`}>{notif.body}</p>
+                                                    <p className={`text-xs ${(notif as any).deleted ? 'line-through text-muted-foreground/70' : 'text-muted-foreground'} whitespace-normal break-words max-w-[200px] sm:max-w-md`}>{notif.body}</p>
                                                     {(notif as any).deleted && (
-                                                        <p className="text-[10px] text-destructive italic mt-1 2-full truncate max-w-[300px]">
+                                                        <p className="text-[10px] text-destructive italic mt-1 w-full break-words whitespace-normal max-w-[200px] sm:max-w-md">
                                                             🚫 This message was deleted. But admins can still see the original content.
                                                         </p>
                                                     )}

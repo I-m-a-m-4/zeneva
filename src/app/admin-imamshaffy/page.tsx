@@ -295,9 +295,9 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                 </div>
                 
                 <Tabs defaultValue="transactions" className="w-full mt-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="transactions">Active Transactions ({validPurchases.length})</TabsTrigger>
-                        <TabsTrigger value="attempts">Checkout Click Attempts ({checkoutAttempts.length})</TabsTrigger>
+                    <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
+                        <TabsTrigger value="transactions" className="snap-start shrink-0">Active Transactions ({validPurchases.length})</TabsTrigger>
+                        <TabsTrigger value="attempts" className="snap-start shrink-0">Checkout Click Attempts ({checkoutAttempts.length})</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="transactions" className="space-y-4 mt-2">
@@ -2337,32 +2337,32 @@ function AdminDashboardContent({
             </div>
 
             <Tabs defaultValue="overview" className="space-y-4">
-                <TabsList className="no-capture">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="users">User Management</TabsTrigger>
-                    <TabsTrigger value="broadcasts">Comms Center</TabsTrigger>
-                    <TabsTrigger value="followups">Strategic Outreach</TabsTrigger>
-                    <TabsTrigger value="content" className="gap-2">
+                <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
+                    <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
+                    <TabsTrigger value="users" className="snap-start shrink-0">User Management</TabsTrigger>
+                    <TabsTrigger value="broadcasts" className="snap-start shrink-0">Comms Center</TabsTrigger>
+                    <TabsTrigger value="followups" className="snap-start shrink-0">Strategic Outreach</TabsTrigger>
+                    <TabsTrigger value="content" className="gap-2 snap-start shrink-0">
                         <Newspaper className="h-4 w-4" />
                         Content Strategy
                     </TabsTrigger>
-                    <TabsTrigger value="recruitment" className="gap-2">
+                    <TabsTrigger value="recruitment" className="gap-2 snap-start shrink-0">
                         <Briefcase className="h-4 w-4" />
                         Recruitment
                     </TabsTrigger>
-                    <TabsTrigger value="grants" className="gap-2">
+                    <TabsTrigger value="grants" className="gap-2 snap-start shrink-0">
                         <Trophy className="h-4 w-4" />
                         Business Grants
                     </TabsTrigger>
-                    <TabsTrigger value="security" className="gap-2">
+                    <TabsTrigger value="security" className="gap-2 snap-start shrink-0">
                         <ShieldCheck className="h-4 w-4" />
                         Cyber Shield
                     </TabsTrigger>
-                    <TabsTrigger value="storefront-orders" className="gap-2">
+                    <TabsTrigger value="storefront-orders" className="gap-2 snap-start shrink-0">
                         <Store className="h-4 w-4" />
                         Storefronts & Orders ({onlineOrders.length})
                     </TabsTrigger>
-                    <TabsTrigger value="usage" className="gap-2">
+                    <TabsTrigger value="usage" className="gap-2 snap-start shrink-0">
                         <Timer className="h-4 w-4" />
                         Usage Analytics
                     </TabsTrigger>
