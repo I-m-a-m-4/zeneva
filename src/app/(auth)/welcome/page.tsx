@@ -103,7 +103,7 @@ export default function WelcomePage() {
       ))}
 
       {/* Orangish filter overlay */}
-      <div className="absolute inset-0 bg-orange-500/40 mix-blend-overlay z-[1] pointer-events-none" />
+      <div className="absolute inset-0 bg-orange-600/60 mix-blend-multiply z-[1] pointer-events-none" />
 
       {/* Dark overlay gradient for better text readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
