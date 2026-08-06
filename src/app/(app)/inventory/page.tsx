@@ -466,9 +466,9 @@ function InventoryPageContent() {
               </>
             )}
 
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-1">
+                <Button variant="outline" size="sm" className="h-9 gap-1" suppressHydrationWarning>
                   <ListFilter className="h-3.5 w-3.5" />
                   <span>Filter</span>
                   {activeFilterCount > 0 && (
@@ -559,7 +559,7 @@ function InventoryPageContent() {
           {/* Mobile Actions Modal/Menu */}
           <div className="flex md:hidden items-center gap-2">
             {selectedProductIds.length > 0 && canManageStock && (
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="default" size="sm" className="h-9 px-3 gap-2">
                     <Activity className="h-4 w-4" />
@@ -577,7 +577,7 @@ function InventoryPageContent() {
               </DropdownMenu>
             )}
 
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
                   <MoreHorizontal className="h-5 w-5" />
@@ -801,7 +801,7 @@ function InventoryPageContent() {
                         </TableCell>
                       )}
                       <TableCell className="text-right pr-6">
-                        <DropdownMenu 
+                        <DropdownMenu modal={false}
                           open={openMenuId === product.id} 
                           onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
                         >

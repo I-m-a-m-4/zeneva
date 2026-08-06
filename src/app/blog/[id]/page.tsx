@@ -53,6 +53,10 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function Page() {
-  return <BlogPostClient />;
+export default async function Page({ params }: Props) {
+  const resolvedParams = await params;
+  const id = resolvedParams.id;
+  const staticPost = allBlogPosts.find(p => p.slug === id);
+
+  return <BlogPostClient initialPostData={staticPost} />;
 }

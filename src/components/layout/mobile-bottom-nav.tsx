@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, ShoppingCart, Users, Menu, FileText, LifeBuoy, Settings } from 'lucide-react';
+import { Home, Package, ShoppingCart, Users, Menu, FileText, LifeBuoy, Settings, Bug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 import {
@@ -27,9 +27,10 @@ interface MobileBottomNavProps {
     navItems: NavItem[];
     moreNavItems: NavItem[];
     isLoading?: boolean;
+    userEmail?: string;
 }
 
-export default function MobileBottomNav({ navItems, moreNavItems, isLoading }: MobileBottomNavProps) {
+export default function MobileBottomNav({ navItems, moreNavItems, isLoading, userEmail }: MobileBottomNavProps) {
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
@@ -47,7 +48,12 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading }: M
           navItems.map((item) => {
             const isActive = (item.href === '/dashboard' && pathname === item.href) || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} className="flex flex-col items-center justify-center flex-1 h-full">
+              <Link 
+                key={item.href} 
+                href={item.href} 
+                id={`tour-nav-mobile-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className="flex flex-col items-center justify-center flex-1 h-full"
+              >
                 <item.icon className={cn('h-6 w-6 mb-1', isActive ? 'text-primary' : 'text-muted-foreground')} />
                 <span className={cn('text-xs', isActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>
                   {item.label}
@@ -69,29 +75,41 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading }: M
               <SheetHeader className="pb-2 text-left">
                 <SheetTitle>More Options</SheetTitle>
               </SheetHeader>
-              <div className="flex-1 overflow-y-auto">
-                  <BranchSwitcher variant="sheet" className="mb-2 border-b border-border/60 pb-3" />
-                  <ul className="space-y-1 py-2">
-                      {moreNavItems.map(item => {
-                          const isActive = pathname.startsWith(item.href);
-                          return (
-                              <li key={item.href}>
-                                  <Link
-                                      href={item.href}
-                                      onClick={() => setIsSheetOpen(false)}
-                                      className={cn(
-                                          "flex items-center gap-4 p-3 rounded-lg text-base",
-                                          isActive ? "bg-muted text-primary font-semibold" : "text-foreground"
-                                      )}
-                                  >
-                                      <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
-                                      <span>{item.label}</span>
-                                  </Link>
-                              </li>
-                          )
-                      })}
-                  </ul>
-              </div>
+                <div className="flex-1 overflow-y-auto">
+                    <BranchSwitcher variant="sheet" className="mb-2 border-b border-border/60 pb-3" />
+                    <ul className="space-y-1 py-2">
+                        {moreNavItems.map(item => {
+                            const isActive = pathname.startsWith(item.href);
+                            return (
+                                <li key={item.href}>
+                                    <Link
+                                        href={item.href}
+                                        onClick={() => setIsSheetOpen(false)}
+                                        className={cn(
+                                            "flex items-center gap-4 p-3 rounded-lg text-base",
+                                            isActive ? "bg-muted text-primary font-semibold" : "text-foreground"
+                                        )}
+                                    >
+                                        <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
+                                        <span>{item.label}</span>
+                                    </Link>
+                                </li>
+                            )
+                        })}
+                        {userEmail === 'belloimam431@gmail.com' && (
+                          <li>
+                            <Link
+                              href="/admin-imamshaffy"
+                              onClick={() => setIsSheetOpen(false)}
+                              className="flex items-center gap-4 p-3 rounded-lg text-base text-orange-600 dark:text-orange-400 font-semibold"
+                            >
+                              <Bug className="h-5 w-5" />
+                              <span>Admin Panel</span>
+                            </Link>
+                          </li>
+                        )}
+                    </ul>
+                </div>
             </SheetContent>
           </Sheet>
         )}

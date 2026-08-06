@@ -268,9 +268,7 @@ export default function BlogLandingPage() {
 
               {/* Posts Grid/List */}
               <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'flex flex-col gap-6'}`}>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => <BlogCardSkeleton key={i} />)
-                ) : paginatedPosts.length > 0 ? (
+                {paginatedPosts.length > 0 ? (
                   paginatedPosts.map((post) => (
                     <article key={post.id} className="flex flex-col h-full">
                       <Link
@@ -315,6 +313,8 @@ export default function BlogLandingPage() {
                       </Link>
                     </article>
                   ))
+                ) : isLoading ? (
+                  Array.from({ length: 6 }).map((_, i) => <BlogCardSkeleton key={i} />)
                 ) : (
                   <div className="col-span-full py-32 text-center">
                     <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 mb-6">

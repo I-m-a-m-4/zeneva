@@ -58,15 +58,35 @@ import { useToast } from '@/hooks/use-toast';
 import { ThemeProvider } from '@/components/theme-provider';
 import { allBlogPosts, StaticBlogPost } from '@/lib/blog-data';
 
-export default function BlogPostClient() {
+export default function BlogPostClient({ initialPostData }: { initialPostData?: any }) {
   const params = useParams();
-  const id = params.id as string;
+  const id = params?.id as string || (initialPostData ? initialPostData.slug : '');
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
 
-  const [post, setPost] = React.useState<BlogPost | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const getInitialPost = () => {
+    if (!initialPostData) return null;
+    return {
+      id: initialPostData.slug,
+      title: initialPostData.title,
+      slug: initialPostData.slug,
+      content: initialPostData.content || `## ${initialPostData.title}\n\n${initialPostData.excerpt}\n\n${initialPostData.directAnswer || ''}`,
+      excerpt: initialPostData.excerpt,
+      imageUrl: initialPostData.imageUrl,
+      authorId: 'admin',
+      authorName: 'Zeneva Editorial',
+      published: true,
+      category: initialPostData.category,
+      faq: initialPostData.faq,
+      tableData: initialPostData.tableData,
+      createdAt: { toDate: () => new Date('2026-04-19') },
+      updatedAt: { toDate: () => new Date('2026-04-19') }
+    } as any;
+  };
+
+  const [post, setPost] = React.useState<BlogPost | null>(getInitialPost());
+  const [isLoading, setIsLoading] = React.useState(!initialPostData);
   const [activeSection, setActiveSection] = React.useState<string>('');
 
   const headings = React.useMemo(() => {
@@ -111,6 +131,7 @@ export default function BlogPostClient() {
 
   React.useEffect(() => {
     if (!firestore || !id) return;
+    if (initialPostData && initialPostData.slug === id) return;
 
     const fetchPost = async () => {
       setIsLoading(true);

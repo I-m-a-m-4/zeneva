@@ -104,17 +104,19 @@ function InvoiceContent() {
     };
 
     const handleShare = async () => {
+        if (!invoice) return;
+        const publicUrl = `https://zeneva.space/invoice/details?id=${invoice.id}`;
         const shareData = {
             title: `Invoice ${invoice.id.substring(0, 8)}`,
             text: `View your invoice from ${business?.name || 'Zeneva POS'}: ${currencySymbol}${invoice.total.toLocaleString()}`,
-            url: window.location.href,
+            url: publicUrl,
         };
 
         try {
             if (navigator.share) {
                 await navigator.share(shareData);
             } else {
-                await navigator.clipboard.writeText(window.location.href);
+                await navigator.clipboard.writeText(publicUrl);
                 toast({ title: "Link Copied", description: "Sharing link copied to clipboard." });
             }
         } catch (err) {

@@ -41,29 +41,29 @@ export function ProductTour() {
             }
           },
           {
-            ...(isMobile ? {} : { element: "#tour-nav-inventory" }),
+            element: isMobile ? "#tour-nav-mobile-inventory" : "#tour-nav-inventory",
             popover: {
               title: "1. Manage Inventory",
               description: "This is where you'll add your products, track stock levels, and organize categories.",
-              side: "right",
+              side: isMobile ? "top" : "right",
               align: "start"
             }
           },
           {
-            ...(isMobile ? {} : { element: "#tour-nav-pos" }),
+            element: isMobile ? "#tour-nav-mobile-pos" : "#tour-nav-pos",
             popover: {
               title: "2. Point of Sale (POS)",
               description: "Ready to sell? Use the POS to quickly ring up customers and print digital receipts.",
-              side: "right",
+              side: isMobile ? "top" : "right",
               align: "start"
             }
           },
           {
-            ...(isMobile ? {} : { element: "#tour-nav-dashboard" }),
+            element: isMobile ? "#tour-nav-mobile-dashboard" : "#tour-nav-dashboard",
             popover: {
               title: "3. Track Analytics",
               description: "Head back here anytime to see your daily sales, revenue growth, and store insights.",
-              side: "right",
+              side: isMobile ? "top" : "right",
               align: "start"
             }
           }

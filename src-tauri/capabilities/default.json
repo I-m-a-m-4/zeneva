@@ -23,7 +23,6 @@
     "core:event:default",
     "fs:default",
     "sql:default",
-    "stronghold:default",
     "updater:default",
     "shell:default",
     "log:default",

@@ -11,6 +11,7 @@ import RevenueGrowthIndexChart from '@/components/admin/charts/RevenueGrowthInde
 import PlanDistributionChart from '@/components/admin/charts/PlanDistributionChart';
 import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
+import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
 import {
     Card,
     CardContent,
@@ -88,6 +89,7 @@ import {
     Smartphone,
     Timer,
     RefreshCw,
+    Share2,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1262,7 +1264,8 @@ function BusinessIntelDialog({
 // ==============================================================================
 
 function AdminDashboardContent({
-    users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches, onRefresh, isRefreshing
+    users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches, onRefresh, isRefreshing,
+    storefrontShares = [], receiptShares = [], onlineOrders = []
 }: {
     users: any[];
     businesses: any[];
@@ -1276,28 +1279,45 @@ function AdminDashboardContent({
     branches?: any[];
     onRefresh?: () => void;
     isRefreshing?: boolean;
+    storefrontShares?: any[];
+    receiptShares?: any[];
+    onlineOrders?: any[];
 }) {
 
     const firestore = useFirestore();
     const { toast } = useToast();
+
+    const normalizeTimestamp = (ts: any) => {
+        if (!ts) return { toDate: () => new Date() };
+        if (typeof ts.toDate === 'function') return ts;
+        if (ts.seconds) return { toDate: () => new Date(ts.seconds * 1000) };
+        if (ts instanceof Date) return { toDate: () => ts };
+        if (typeof ts === 'string' || typeof ts === 'number') return { toDate: () => new Date(ts) };
+        return { toDate: () => new Date() };
+    };
 
     const convertedReceipts = useMemo(() => {
         if (!receipts) return [];
         return receipts.map(r => {
             const biz = businesses?.find(b => b.id === r.businessId);
             const isUSD = biz?.settings?.currency === 'USD';
+            const normalizedR = {
+                ...r,
+                createdAt: normalizeTimestamp(r.createdAt),
+            };
             if (isUSD) {
                 const rate = biz?.settings?.usdToNgnRate || 1500;
                 return {
-                    ...r,
-                    total: r.total * rate,
-                    subtotal: r.subtotal * rate,
-                    tax: (r.tax || 0) * rate,
-                    discount: (r.discount || 0) * rate,
-                    profit: r.profit ? r.profit * rate : undefined,
+                    ...normalizedR,
+                    total: normalizedR.total * rate,
+                    subtotal: normalizedR.subtotal * rate,
+                    tax: (normalizedR.tax || 0) * rate,
+                    discount: (normalizedR.discount || 0) * rate,
+                    profit: normalizedR.profit ? normalizedR.profit * rate : undefined,
+                    items: normalizedR.items?.map(i => ({ ...i, price: i.price * rate, total: i.total * rate })) || []
                 };
             }
-            return r;
+            return normalizedR;
         });
     }, [receipts, businesses]);
 
@@ -1907,6 +1927,22 @@ function AdminDashboardContent({
             return acc;
         }, { windows: 0, macos: 0, android: 0, totalClicks: 0 });
 
+        // --- NEW METRICS ---
+        const todayStart = startOfDay(new Date());
+        const transactionsToday = (convertedReceipts || []).filter(r => {
+            if (!r.createdAt || !r.createdAt.toDate) return false;
+            return r.createdAt.toDate() >= todayStart;
+        }).length;
+        
+        const offlineReceiptsCount = (convertedReceipts || []).filter(r => r.isOffline).length;
+        const offlineSyncRate = totalReceipts > 0 ? (offlineReceiptsCount / totalReceipts) * 100 : 0;
+
+        const barcodeReceiptsCount = (convertedReceipts || []).filter(r => r.wasScanned).length;
+        const featureAdoptionBarcode = totalReceipts > 0 ? (barcodeReceiptsCount / totalReceipts) * 100 : 0;
+
+        const digitalReceiptsCount = (convertedReceipts || []).filter(r => r.receiptMethod === 'digital').length;
+        const featureAdoptionDigitalReceipt = totalReceipts > 0 ? (digitalReceiptsCount / totalReceipts) * 100 : 0;
+
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, 
             totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
@@ -1919,7 +1955,11 @@ function AdminDashboardContent({
             payingBusinesses,
             recentPurchases,
             validPurchases,
-            revenueGeneratingBusinessesCount
+            revenueGeneratingBusinessesCount,
+            transactionsToday,
+            offlineSyncRate,
+            featureAdoptionBarcode,
+            featureAdoptionDigitalReceipt
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
@@ -2318,6 +2358,10 @@ function AdminDashboardContent({
                         <ShieldCheck className="h-4 w-4" />
                         Cyber Shield
                     </TabsTrigger>
+                    <TabsTrigger value="storefront-orders" className="gap-2">
+                        <Store className="h-4 w-4" />
+                        Storefronts & Orders ({onlineOrders.length})
+                    </TabsTrigger>
                     <TabsTrigger value="usage" className="gap-2">
                         <Timer className="h-4 w-4" />
                         Usage Analytics
@@ -2416,6 +2460,54 @@ function AdminDashboardContent({
                         <StatCard title="Sub Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`} icon={ShieldCheck} description="Total Software Sales" />
                         <StatCard title="Platform AOV" value={`₦${analyticsData.platformAOV.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} description="Avg. Receipt Value" />
                     </div>
+                    </Card>
+
+                    {/* NEW METRICS: Feature Adoption & Operations */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Activity className="h-5 w-5 text-primary" />
+                                Operations & Feature Adoption
+                            </CardTitle>
+                        </CardHeader>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4">
+                            <StatCard 
+                                title="Today's Transactions" 
+                                value={analyticsData.transactionsToday.toLocaleString()} 
+                                icon={ShoppingCart} 
+                                description="Sales processed today" 
+                            />
+                            <StatCard 
+                                title="Offline Sync Rate" 
+                                value={`${analyticsData.offlineSyncRate.toFixed(1)}%`} 
+                                icon={Layers} 
+                                description="Sales created offline" 
+                            />
+                            <StatCard 
+                                title="Scanner Adoption" 
+                                value={`${analyticsData.featureAdoptionBarcode.toFixed(1)}%`} 
+                                icon={Check} 
+                                description="Receipts using barcode scanner" 
+                            />
+                            <StatCard 
+                                title="Digital Receipts" 
+                                value={`${analyticsData.featureAdoptionDigitalReceipt.toFixed(1)}%`} 
+                                icon={FileText} 
+                                description="Shared via Email/WhatsApp" 
+                            />
+                            <StatCard 
+                                title="Storefront Shares" 
+                                value={storefrontShares.length} 
+                                icon={Globe} 
+                                description="Store links clicked/shared" 
+                            />
+                            <StatCard 
+                                title="Receipt Link Shares" 
+                                value={receiptShares.length} 
+                                icon={Share2} 
+                                description="Receipt links shared" 
+                            />
+                        </div>
                     </Card>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2816,6 +2908,7 @@ function AdminDashboardContent({
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <UserGrowthChart users={users || []} />
+                            <DailyActiveUsersChart users={users || []} receipts={convertedReceipts || []} />
                             <FeatureStickinessChart businesses={businesses || []} products={products || []} />
                             <div className="lg:col-span-2">
                                 <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} />
@@ -3478,6 +3571,153 @@ function AdminDashboardContent({
                 <TabsContent value="usage" className="space-y-6">
                     <UsageAnalyticsTab users={users || []} businesses={businesses || []} />
                 </TabsContent>
+
+                {/* ======================== STOREFRONT & ORDERS TAB ======================== */}
+                <TabsContent value="storefront-orders" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Store className="h-5 w-5 text-primary" />
+                                Storefront & Receipt Engagement Center
+                            </CardTitle>
+                            <CardDescription>
+                                Track shared public storefronts, customer traffic links, and incoming online orders.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-6 md:grid-cols-2">
+                                {/* Left Side: Storefront Shares & Traffic */}
+                                <Card className="p-4 space-y-4">
+                                    <h3 className="font-bold text-base flex items-center gap-2">
+                                        <Globe className="h-4 w-4 text-primary" />
+                                        Storefront Link Shares ({storefrontShares.length})
+                                    </h3>
+                                    <div className="max-h-[350px] overflow-y-auto border rounded-md">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Business</TableHead>
+                                                    <TableHead>Type</TableHead>
+                                                    <TableHead>Date</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {storefrontShares.length > 0 ? (
+                                                    storefrontShares.map((share, idx) => (
+                                                        <TableRow key={idx}>
+                                                            <TableCell className="font-medium text-xs">{share.businessName}</TableCell>
+                                                            <TableCell className="text-xs capitalize">
+                                                                <Badge variant="secondary">{share.type}</Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-[10px] text-muted-foreground">
+                                                                {share.timestamp?.toDate ? format(share.timestamp.toDate(), 'PP p') : 'N/A'}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={3} className="text-center text-xs py-8 text-muted-foreground">
+                                                            No storefront link shares logged yet.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </Card>
+
+                                {/* Right Side: Receipt link shares */}
+                                <Card className="p-4 space-y-4">
+                                    <h3 className="font-bold text-base flex items-center gap-2">
+                                        <Share2 className="h-4 w-4 text-primary" />
+                                        Receipt Shares ({receiptShares.length})
+                                    </h3>
+                                    <div className="max-h-[350px] overflow-y-auto border rounded-md">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Receipt #</TableHead>
+                                                    <TableHead>Business</TableHead>
+                                                    <TableHead>Amount</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {receiptShares.length > 0 ? (
+                                                    receiptShares.map((share, idx) => (
+                                                        <TableRow key={idx}>
+                                                            <TableCell className="font-mono text-xs">{share.receiptNumber}</TableCell>
+                                                            <TableCell className="text-xs">{share.businessName}</TableCell>
+                                                            <TableCell className="text-xs font-bold">₦{share.totalAmount?.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={3} className="text-center text-xs py-8 text-muted-foreground">
+                                                            No receipt link shares logged yet.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Bottom: Online orders across all stores */}
+                            <div className="mt-8 space-y-4">
+                                <h3 className="font-bold text-base flex items-center gap-2">
+                                    <ShoppingCart className="h-4 w-4 text-primary" />
+                                    Incoming Storefront Online Orders ({onlineOrders.length})
+                                </h3>
+                                <div className="border rounded-md overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Order ID</TableHead>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Items</TableHead>
+                                                <TableHead className="text-right">Total</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {onlineOrders.length > 0 ? (
+                                                onlineOrders.map((order, idx) => (
+                                                    <TableRow key={idx}>
+                                                        <TableCell className="font-mono text-xs">
+                                                            {order.id?.substring(0, 8) || 'N/A'}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs">
+                                                            <div>{order.customerName || 'Guest'}</div>
+                                                            <div className="text-[10px] text-muted-foreground">{order.customerPhone || ''}</div>
+                                                        </TableCell>
+                                                        <TableCell className="text-xs capitalize">
+                                                            <Badge variant={order.status === 'paid' ? 'default' : 'secondary'}>
+                                                                {order.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-xs max-w-[200px] truncate">
+                                                            {order.items?.map((item: any) => `${item.name} (x${item.quantity})`).join(', ') || 'N/A'}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-xs font-bold">
+                                                            ₦{order.total?.toLocaleString()}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="text-center text-xs py-8 text-muted-foreground">
+                                                        No storefront orders placed yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
 
             <Dialog open={certificateModalState?.open || false} onOpenChange={(open) => !open && setCertificateModalState(null)}>
@@ -3782,56 +4022,35 @@ const reviveTimestamps = (obj: any): any => {
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
 
+    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
+    const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
+    const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
+    const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
+    const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc')), [firestore]);
+    const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
+    const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
+    const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
+    const branchesQuery = useMemoFirebase(() => query(collection(firestore, 'branches')), [firestore]);
+    const checkoutAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'checkout_attempts')), [firestore]);
+    const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares')), [firestore]);
+    const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares')), [firestore]);
+    const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders')), [firestore]);
 
-    const [adminData, setAdminData] = useState<any>(null);
-    const [liveUsers, setLiveUsers] = useState<any[] | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+    const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
+    const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+    const { data: applications, isLoading: applicationsLoading } = useCollection<any>(applicationsQuery);
+    const { data: grants, isLoading: grantsLoading } = useCollection<any>(grantsQuery);
+    const { data: receipts, isLoading: receiptsLoading } = useCollection<Receipt>(receiptsQuery);
+    const { data: purchases, isLoading: purchasesLoading } = useCollection<Purchase>(purchasesQuery);
+    const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
+    const { data: branches, isLoading: branchesLoading } = useCollection<any>(branchesQuery);
+    const { data: checkoutAttempts, isLoading: checkoutAttemptsLoading } = useCollection<any>(checkoutAttemptsQuery);
+    const { data: storefrontShares, isLoading: storefrontSharesLoading } = useCollection<any>(storefrontSharesQuery);
+    const { data: receiptShares, isLoading: receiptSharesLoading } = useCollection<any>(receiptSharesQuery);
+    const { data: onlineOrders, isLoading: onlineOrdersLoading } = useCollection<any>(onlineOrdersQuery);
 
-    // Fetch heavy cached data (products, receipts, purchases, etc.)
-    const fetchAdminData = async () => {
-        setIsRefreshing(true);
-        try {
-            const res = await fetch('/api/admin/metrics');
-            const data = await res.json();
-            const revivedData = reviveTimestamps(data);
-            setAdminData(revivedData);
-        } catch (error) {
-            console.error('Failed to fetch admin data:', error);
-        } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
-        }
-    };
-
-    // Fetch users fresh (no Redis cache) so lastSeen is always current
-    const fetchLiveUsers = async () => {
-        try {
-            const res = await fetch('/api/admin/users');
-            const data = await res.json();
-            const revivedData = reviveTimestamps(data);
-            setLiveUsers(revivedData);
-        } catch (error) {
-            console.error('Failed to fetch live users:', error);
-        }
-    };
-
-    useEffect(() => {
-        fetchAdminData();
-        fetchLiveUsers(); // initial load
-    }, []);
-
-    // Users come from the live endpoint; everything else from the cached metrics
-    const users = liveUsers ?? adminData?.users;
-    const businesses = adminData?.businesses;
-    const products = adminData?.products;
-    const applications = adminData?.applications;
-    const grants = adminData?.grants;
-    const receipts = adminData?.receipts;
-    const purchases = adminData?.purchases;
-    const downloadClicks = adminData?.downloadClicks;
-    const checkoutAttempts = adminData?.checkoutAttempts;
-    const branches = adminData?.branches;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading;
 
     if (isLoading) {
         return (
@@ -3842,5 +4061,19 @@ export default function AdminDashboardPage() {
         );
     }
 
-    return <AdminDashboardContent users={users} branches={branches} businesses={businesses} products={products} receipts={receipts} purchases={purchases} applications={applications} downloadClicks={downloadClicks} grants={grants} checkoutAttempts={checkoutAttempts} onRefresh={fetchAdminData} isRefreshing={isRefreshing} />
+    return <AdminDashboardContent 
+        users={users} 
+        branches={branches} 
+        businesses={businesses} 
+        products={products} 
+        receipts={receipts} 
+        purchases={purchases} 
+        applications={applications} 
+        downloadClicks={downloadClicks} 
+        grants={grants} 
+        checkoutAttempts={checkoutAttempts} 
+        storefrontShares={storefrontShares}
+        receiptShares={receiptShares}
+        onlineOrders={onlineOrders}
+    />
 }

@@ -86,7 +86,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                 </div>
 
                 {product.uomConversions && product.uomConversions.length > 0 ? (
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center">
                                 <PlusCircle className="h-6 w-6 text-foreground dark:text-white" />
@@ -373,7 +373,7 @@ export default function SelectProductsPage() {
                         >
                             <QrCode className="h-6 w-6" />
                         </Button>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-11 gap-1.5 min-w-[44px]">
                                     <ListFilter className="h-4 w-4" />
@@ -392,7 +392,7 @@ export default function SelectProductsPage() {
                                 </DropdownMenuRadioGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" className="w-[150px] h-11 hidden lg:flex justify-between font-normal bg-background">
                                     <span className="flex items-center">

@@ -3,24 +3,29 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { Bot, HelpCircle, Loader2, Send, MessageSquare, Search as SearchIcon, ShieldCheck, Monitor, Cloud, Github, Zap, Lock, CreditCard, Users, History, Settings, TrendingUp, Info } from 'lucide-react';
+import { Bot, HelpCircle, Loader2, Send, MessageSquare, Search as SearchIcon, ShieldCheck, Monitor, Cloud, Github, Zap, Lock, CreditCard, Users, History, Settings, TrendingUp, Info, Paperclip, Mic, Image as ImageIcon, Play, Pause, Trash2, X, Check, CheckCheck, Clock, Reply, ChevronDown } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, setDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, setDoc, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { zenevaSupportChat, type ZenevaSupportChatInput } from '@/ai/flows/support-chat-flow';
 import AIChat from '@/components/support/ai-chat';
+import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { MoreVertical, Edit2, Maximize2, Minimize2 } from 'lucide-react';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: string[] }[] = [
   // --- CATEGORY: OFFLINE & SYNC (5) ---
@@ -403,15 +408,150 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
 }
 
 
+
+
+function getCleanAudioSource(voiceUrl: string): string {
+    if (!voiceUrl) return '';
+    if (voiceUrl.startsWith('http://') || voiceUrl.startsWith('https://') || voiceUrl.startsWith('blob:')) {
+        return voiceUrl;
+    }
+    if (voiceUrl.startsWith('data:')) {
+        try {
+            const parts = voiceUrl.split(',');
+            const header = parts[0];
+            const mimeMatch = header.match(/:(.*?);/);
+            let mime = mimeMatch ? mimeMatch[1] : 'audio/webm';
+            if (!mime.includes('audio')) mime = 'audio/webm';
+            
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: mime });
+            return URL.createObjectURL(blob);
+        } catch (e) {
+            console.error("Base64 audio conversion error:", e);
+            return voiceUrl;
+        }
+    }
+    return voiceUrl;
+}
+
+function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceDuration?: number }) {
+    const [isPlaying, setIsPlaying] = React.useState(false);
+    const [progress, setProgress] = React.useState(0);
+    const [audioSrc, setAudioSrc] = React.useState<string>('');
+    const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+    React.useEffect(() => {
+        if (voiceUrl) {
+            const src = getCleanAudioSource(voiceUrl);
+            setAudioSrc(src);
+            return () => {
+                if (src && src.startsWith('blob:')) {
+                    URL.revokeObjectURL(src);
+                }
+            };
+        }
+    }, [voiceUrl]);
+
+    const togglePlay = () => {
+        if (!audioRef.current || !audioSrc) return;
+        if (isPlaying) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            audioRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
+                console.warn("Audio playback error:", err);
+            });
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-3 p-2 min-w-[220px] bg-slate-100/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+            {audioSrc && (
+                <audio 
+                    ref={audioRef} 
+                    src={audioSrc} 
+                    preload="auto"
+                    onTimeUpdate={() => {
+                        if (audioRef.current) {
+                            const current = audioRef.current.currentTime;
+                            const duration = audioRef.current.duration || voiceDuration || 1;
+                            setProgress((current / duration) * 100);
+                        }
+                    }}
+                    onEnded={() => {
+                        setIsPlaying(false);
+                        setProgress(0);
+                    }}
+                    onError={(e) => console.warn("Audio element load error:", e)}
+                />
+            )}
+            <button 
+                type="button"
+                onClick={togglePlay}
+                className="h-9 w-9 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shadow-md transition-transform hover:scale-105 active:scale-95 shrink-0"
+            >
+                {isPlaying ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white ml-0.5" />}
+            </button>
+            <div className="flex-1 min-w-0 space-y-1">
+                <div 
+                    className="h-2 w-full bg-slate-300 dark:bg-slate-700 rounded-full overflow-hidden relative cursor-pointer"
+                    onClick={(e) => {
+                        if (!audioRef.current) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const pct = clickX / rect.width;
+                        const duration = audioRef.current.duration || voiceDuration || 1;
+                        audioRef.current.currentTime = pct * duration;
+                        setProgress(pct * 100);
+                    }}
+                >
+                    <div 
+                        className="h-full bg-orange-500 transition-all duration-100 rounded-full"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                    <span>🎙️ Voice Note</span>
+                    <span>{voiceDuration ? `${voiceDuration}s` : 'Audio'}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
     const [thread, setThread] = React.useState<SupportThread | null>(null);
     const [message, setMessage] = React.useState('');
-    const [subject, setSubject] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(true);
     const [isSending, setIsSending] = React.useState(false);
+
+    // Media & Voice states
+    const [editModalOpen, setEditModalOpen] = React.useState(false);
+    const [editMessageText, setEditMessageText] = React.useState('');
+    const [editMessageId, setEditMessageId] = React.useState<string | null>(null);
+    const [isRecording, setIsRecording] = React.useState(false);
+    const [recordingSeconds, setRecordingSeconds] = React.useState(0);
+    const recTimerRef = React.useRef<any>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Audio Playback & Media recorder references
+    const [playingAudioId, setPlayingAudioId] = React.useState<string | null>(null);
+    const [optimisticMessages, setOptimisticMessages] = React.useState<any[]>([]);
+    const [previewFile, setPreviewFile] = React.useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+    const [caption, setCaption] = React.useState('');
+    const [activeLightboxUrl, setActiveLightboxUrl] = React.useState<string | null>(null);
+    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+    const audioChunksRef = React.useRef<Blob[]>([]);
+    const prevMessageCountRef = React.useRef(0);
 
     const threadQuery = useMemoFirebase(
         () => (firestore && userProfile?.id) ? query(collection(firestore, 'supportThreads'), where('userId', '==', userProfile.id)) : null,
@@ -423,7 +563,16 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     React.useEffect(() => {
         if (!isLoadingThreads) {
             if (threads && threads.length > 0) {
-                setThread(threads[0]);
+                const sorted = [...threads].sort((a, b) => {
+                    const getMs = (t: any) => {
+                        if (!t) return 0;
+                        if (typeof t.toMillis === 'function') return t.toMillis();
+                        if (t.seconds) return t.seconds * 1000;
+                        return new Date(t).getTime() || 0;
+                    };
+                    return getMs(b.lastMessageAt || b.createdAt) - getMs(a.lastMessageAt || a.createdAt);
+                });
+                setThread(sorted[0]);
             }
             setIsLoading(false);
         }
@@ -434,13 +583,11 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         [firestore, thread]
     );
 
-    const safeFormatDate = (val: any) => {
+    const safeFormatTime = (val: any) => {
         if (!val) return '';
         try {
-            if (val instanceof Date) return formatDistanceToNow(val, { addSuffix: true });
-            if (typeof val.toDate === 'function') return formatDistanceToNow(val.toDate(), { addSuffix: true });
-            if (val.seconds) return formatDistanceToNow(new Date(val.seconds * 1000), { addSuffix: true });
-            return '';
+            const date = val.toDate ? val.toDate() : new Date(val);
+            return format(date, 'h:mm a');
         } catch (e) {
             return '';
         }
@@ -448,15 +595,163 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
 
     const { data: messages, isLoading: isLoadingMessages } = useCollection<SupportMessage>(messagesQuery);
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+    const chatContainerRef = React.useRef<HTMLDivElement>(null);
 
-     React.useEffect(() => {
+    React.useEffect(() => {
+        if (previewUrl && chatContainerRef.current) {
+            // Wait a tick for layout then smooth scroll into view
+            setTimeout(() => {
+                chatContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
+        }
+    }, [previewUrl]);
+
+    const allMessages = React.useMemo(() => {
+        return [...(messages || []), ...optimisticMessages];
+    }, [messages, optimisticMessages]);
+
+    const scrollToBottom = React.useCallback((behavior: ScrollBehavior = 'smooth') => {
         if (scrollAreaRef.current) {
             const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
             if (scrollContainer) {
-                scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior });
             }
         }
-    }, [messages]);
+    }, []);
+
+    React.useEffect(() => {
+        if (allMessages && allMessages.length > 0) {
+            if (prevMessageCountRef.current === 0) {
+                scrollToBottom('auto');
+                setTimeout(() => scrollToBottom('auto'), 50);
+            } else if (allMessages.length > prevMessageCountRef.current) {
+                scrollToBottom('smooth');
+            }
+            prevMessageCountRef.current = allMessages.length;
+        }
+    }, [allMessages, scrollToBottom]);
+
+    React.useEffect(() => {
+        if (thread && firestore && messages) {
+            messages.forEach((msg: any) => {
+                if (msg.senderId === 'admin' && !msg.isSeen) {
+                    const msgRef = doc(firestore, `supportThreads/${thread.id}/messages`, msg.id);
+                    updateDoc(msgRef, { isSeen: true }).catch(err => {
+                        console.warn("Failed to mark message as seen:", err);
+                    });
+                }
+            });
+        }
+    }, [thread, firestore, messages]);
+
+    const uploadImageToImgBB = async (file: File): Promise<string> => {
+        const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '2ec1d17c7ad748bbb605eda60a54a896';
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to upload image to ImgBB');
+        }
+        
+        const resData = await response.json();
+        return resData.data.url;
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Generate local Object URL for immediate preview display
+        const localUrl = URL.createObjectURL(file);
+        setPreviewFile(file);
+        setPreviewUrl(localUrl);
+        setCaption(''); // Clear previous caption
+    };
+
+    const handleSendPreview = async () => {
+        if (!previewFile || !firestore) return;
+
+        const fileToUpload = previewFile;
+        const localUrl = previewUrl;
+        const typedCaption = caption;
+
+        // Instantly close the preview screen
+        setPreviewFile(null);
+        setPreviewUrl(null);
+        setCaption('');
+
+        const tempId = 'temp_' + Date.now();
+
+        // Add optimistic temporary message to the local state
+        const tempMessage = {
+            id: tempId,
+            senderId: userProfile.id,
+            senderName: userProfile.name,
+            createdAt: new Date(),
+            mediaUrl: localUrl,
+            isUploading: true,
+            text: typedCaption || '📷 Sent an image'
+        };
+        setOptimisticMessages(prev => [...prev, tempMessage]);
+
+        try {
+            // Upload to ImgBB
+            const remoteUrl = await uploadImageToImgBB(fileToUpload);
+
+            // Ensure support thread exists
+            let currentThread = thread;
+            if (!currentThread) {
+                const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
+                const newThreadData: Omit<SupportThread, 'id'> = {
+                    userId: userProfile.id,
+                    userName: userProfile.name,
+                    userEmail: userProfile.email,
+                    subject: 'Direct CEO Chat',
+                    status: 'open',
+                    lastMessageAt: serverTimestamp(),
+                    lastMessageSnippet: typedCaption || '📷 Sent an image',
+                    isReadByAdmin: false,
+                    createdAt: serverTimestamp(),
+                };
+                await setDoc(newThreadRef, newThreadData);
+                currentThread = { ...newThreadData, id: newThreadRef.id, createdAt: new Date(), lastMessageAt: new Date() };
+                setThread(currentThread);
+            }
+
+            // Write real message record to Firestore
+            const messageRef = collection(firestore, 'supportThreads', currentThread.id, 'messages');
+            await addDoc(messageRef, {
+                senderId: userProfile.id,
+                senderName: userProfile.name,
+                createdAt: serverTimestamp(),
+                mediaUrl: remoteUrl,
+                text: typedCaption || '📷 Sent an image'
+            });
+
+            // Update thread snippet metadata
+            const threadRef = doc(firestore, 'supportThreads', currentThread.id);
+            await setDoc(threadRef, {
+                lastMessageAt: serverTimestamp(),
+                lastMessageSnippet: typedCaption || '📷 Sent an image',
+                isReadByAdmin: false,
+                status: 'open'
+            }, { merge: true });
+
+        } catch (err) {
+            console.error("Failed to upload/send image:", err);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not send the image.' });
+        } finally {
+            // Remove optimistic message and free local Object URL memory
+            setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
+            if (localUrl) URL.revokeObjectURL(localUrl);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const handleSendMessage = async () => {
         if (!message.trim() || !firestore) return;
@@ -466,17 +761,13 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         
         try {
             if (!currentThread) {
-                if (!subject.trim()) {
-                    toast({ variant: 'destructive', title: 'Subject Required', description: 'Please provide a subject to start a new conversation.' });
-                    setIsSending(false);
-                    return;
-                }
-                const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_${Math.random().toString(36).substring(2, 15)}`);
+                // Auto-create thread with subject "Direct CEO Chat"
+                const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
                 const newThreadData: Omit<SupportThread, 'id'> = {
                     userId: userProfile.id,
                     userName: userProfile.name,
                     userEmail: userProfile.email,
-                    subject: subject,
+                    subject: 'Direct CEO Chat',
                     status: 'open',
                     lastMessageAt: serverTimestamp(),
                     lastMessageSnippet: message,
@@ -489,12 +780,14 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             }
 
             const messageRef = collection(firestore, 'supportThreads', currentThread.id, 'messages');
-            await addDoc(messageRef, {
+            const payload: any = {
                 senderId: userProfile.id,
                 senderName: userProfile.name,
-                text: message,
                 createdAt: serverTimestamp(),
-            });
+                text: message
+            };
+
+            await addDoc(messageRef, payload);
 
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
             await setDoc(threadRef, {
@@ -505,7 +798,6 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             }, { merge: true });
 
             setMessage('');
-            if (!thread) setSubject('');
             toast({ variant: 'success', title: 'Message Sent!' });
         } catch (error) {
             console.error("Failed to send message:", error);
@@ -515,74 +807,453 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         }
     };
 
+    const handleSaveEditedMessage = async () => {
+        if (!editMessageId || !thread || !firestore || !editMessageText.trim()) return;
+        try {
+            const msgRef = doc(firestore, 'supportThreads', thread.id, 'messages', editMessageId);
+            await updateDoc(msgRef, {
+                text: editMessageText,
+                updatedAt: serverTimestamp()
+            });
+            const threadRef = doc(firestore, 'supportThreads', thread.id);
+            await setDoc(threadRef, {
+                lastMessageSnippet: editMessageText,
+                lastMessageAt: serverTimestamp()
+            }, { merge: true });
+            
+            setEditModalOpen(false);
+            setEditMessageId(null);
+            setEditMessageText('');
+            toast({ variant: 'success', title: 'Message Updated', description: 'Your message has been updated successfully.' });
+        } catch (e) {
+            console.error("Failed to update message:", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not update message.' });
+        }
+    };
+
+    const handleDeleteMessage = async (msgId: string) => {
+        if (!thread) return;
+        try {
+            await deleteDoc(doc(firestore, `supportThreads/${thread.id}/messages`, msgId));
+            toast({ variant: 'success', title: 'Message Deleted', description: 'The message was deleted.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not delete message.' });
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunksRef.current = [];
+            let mimeType = 'audio/webm';
+            if (typeof MediaRecorder !== 'undefined') {
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    mimeType = 'audio/webm;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    mimeType = 'audio/mp4';
+                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+                    mimeType = 'audio/ogg;codecs=opus';
+                }
+            }
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result as string;
+                    setIsSending(true);
+                    let currentThread = thread;
+                    try {
+                        if (!currentThread) {
+                            const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
+                            const newThreadData: Omit<SupportThread, 'id'> = {
+                                userId: userProfile.id,
+                                userName: userProfile.name,
+                                userEmail: userProfile.email,
+                                subject: 'Direct CEO Chat',
+                                status: 'open',
+                                lastMessageAt: serverTimestamp(),
+                                lastMessageSnippet: '🎙️ Sent a voice note',
+                                isReadByAdmin: false,
+                                createdAt: serverTimestamp(),
+                            };
+                            await setDoc(newThreadRef, newThreadData);
+                            currentThread = { ...newThreadData, id: newThreadRef.id, createdAt: new Date(), lastMessageAt: new Date() };
+                            setThread(currentThread);
+                        }
+
+                        const messagesRef = collection(firestore, `supportThreads/${currentThread.id}/messages`);
+                        await addDoc(messagesRef, {
+                            senderId: userProfile.id,
+                            senderName: userProfile.name,
+                            voiceUrl: base64Audio,
+                            voiceDuration: recordingSeconds,
+                            createdAt: serverTimestamp(),
+                        });
+
+                        const threadRef = doc(firestore, 'supportThreads', currentThread.id);
+                        await setDoc(threadRef, {
+                            lastMessageSnippet: `🎙️ Voice note (${recordingSeconds}s)`,
+                            lastMessageAt: serverTimestamp(),
+                            isReadByAdmin: false,
+                            status: 'open'
+                        }, { merge: true });
+
+                        toast({ variant: 'success', title: 'Voice Note Sent' });
+                    } catch (e) {
+                        toast({ variant: 'destructive', title: 'Error', description: 'Could not send voice note.' });
+                    } finally {
+                        setIsSending(false);
+                    }
+                };
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingSeconds(0);
+            recTimerRef.current = setInterval(() => {
+                setRecordingSeconds(s => s + 1);
+            }, 1000);
+        } catch (err) {
+            console.error("Microphone access denied:", err);
+            toast({ variant: 'destructive', title: 'Mic Access Denied', description: 'Please enable microphone permission in your browser.' });
+        }
+    };
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.onstop = null;
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+        clearInterval(recTimerRef.current);
+        setIsRecording(false);
+        setRecordingSeconds(0);
+    };
+
+    const stopAndSendVoice = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+        clearInterval(recTimerRef.current);
+        setIsRecording(false);
+    };
+
     if (isLoading) {
         return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 
-    if (!thread) {
-        return (
-             <div className="p-4 border rounded-lg h-full flex flex-col">
-                <p className="text-center text-muted-foreground mb-4">You have no active support conversations. Start a new one below.</p>
-                <div className="space-y-4">
-                    <Input 
-                        placeholder="Subject (e.g., Issue with Billing)" 
-                        value={subject} 
-                        onChange={(e) => setSubject(e.target.value)} 
-                        disabled={isSending}
-                    />
-                    <Textarea 
-                        placeholder="Type your message here..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        className="flex-1"
-                        rows={5}
-                        disabled={isSending}
-                    />
-                </div>
-                <Button onClick={handleSendMessage} disabled={isSending || !message.trim() || !subject.trim()} className="mt-4 w-full">
-                    {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Start Conversation
-                </Button>
-            </div>
-        );
-    }
-
     return (
-        <div className="flex flex-col h-full">
-            <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-                 <div className="space-y-4">
+        <div ref={chatContainerRef} className="flex flex-col h-full bg-[#efeae2] dark:bg-slate-950 rounded-xl border overflow-hidden shadow-lg relative">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
+            />
+
+            <div className="flex items-center gap-3 border-b p-3 bg-white dark:bg-slate-900 z-10 shadow-sm">
+                <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-bold">BI</AvatarFallback>
+                </Avatar>
+                <div>
+                    <h4 className="text-sm font-bold leading-none text-slate-800 dark:text-white">Bello Imam</h4>
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                        CEO Direct Line (replies within minutes)
+                    </p>
+                </div>
+            </div>
+
+            <ScrollArea className="flex-1 p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat bg-[size:360px]" ref={scrollAreaRef}>
+                 <div className="space-y-3 pt-2">
+                    {/* Simulated Greeting from CEO */}
+                    <div className="flex items-start gap-2 justify-start">
+                        <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                            <AvatarFallback className="bg-primary text-primary-foreground font-bold">CEO</AvatarFallback>
+                        </Avatar>
+                        <div className="rounded-xl rounded-tl-none p-3 max-w-[80%] bg-white dark:bg-slate-900 shadow-sm border">
+                            <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-100 font-medium">Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally. Let me know what features you want, any issues you're experiencing, or feedback. How can I help your business today?</p>
+                            <p className="text-[9px] text-muted-foreground mt-1">CEO Direct Office</p>
+                        </div>
+                    </div>
+
                     {isLoadingMessages && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
-                    {(messages || []).map(msg => {
+                    
+                    {allMessages.map(msg => {
                         if (!msg || !msg.id) return null;
+                        const isUser = msg.senderId === userProfile.id;
                         return (
-                            <div key={msg.id} className={`flex items-start gap-3 ${msg.senderId === userProfile.id ? 'justify-end' : 'justify-start'}`}>
-                                 {msg.senderId !== userProfile.id && (
-                                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                                        <AvatarFallback><Bot /></AvatarFallback>
-                                    </Avatar>
-                                )}
-                                 <div className={`rounded-lg p-3 max-w-[80%] whitespace-pre-wrap ${msg.senderId === userProfile.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                    <p className="text-sm">{msg.text || ''}</p>
-                                    <p className="text-xs opacity-70 mt-1 text-right">{safeFormatDate(msg.createdAt)}</p>
+                            <div key={msg.id} className={cn('flex items-end gap-1 group', isUser ? 'justify-end' : 'justify-start')}>
+                                 <div className={cn(
+                                     "max-w-[70%] rounded-xl p-2.5 relative shadow-sm transition-all duration-300", 
+                                     isUser 
+                                        ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pr-8' 
+                                        : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none'
+                                  )}>
+                                     {/* Three-dot dropdown menu instead of hover trash */}
+                                     {isUser && !msg.isUploading && (
+                                         <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                             <DropdownMenu modal={false}>
+                                                 <DropdownMenuTrigger asChild>
+                                                     <button className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border hover:bg-slate-200 dark:hover:bg-slate-700">
+                                                         <MoreVertical className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                                                     </button>
+                                                 </DropdownMenuTrigger>
+                                                 <DropdownMenuContent align="end" className="w-[100px]">
+                                                     {msg.text && (
+                                                         <DropdownMenuItem onClick={() => {
+                                                             setEditMessageId(msg.id);
+                                                             setEditMessageText(msg.text || '');
+                                                             setEditModalOpen(true);
+                                                         }}>
+                                                             <Edit2 className="h-3.5 w-3.5 mr-2" /> Edit
+                                                         </DropdownMenuItem>
+                                                     )}
+                                                     <DropdownMenuItem onClick={() => handleDeleteMessage(msg.id)} className="text-red-500 focus:text-red-500">
+                                                         <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                                     </DropdownMenuItem>
+                                                 </DropdownMenuContent>
+                                             </DropdownMenu>
+                                         </div>
+                                     )}
+
+                                      {msg.mediaUrl && (
+                                          <div 
+                                              className="mb-2 rounded-lg overflow-hidden border max-w-sm relative group/img cursor-pointer" 
+                                              onClick={() => setActiveLightboxUrl(msg.mediaUrl)}
+                                          >
+                                              <img src={msg.mediaUrl} alt="Attached File" className="w-full h-auto object-cover max-h-60 group-hover/img:scale-105 transition-transform duration-300" />
+                                              {msg.isUploading && (
+                                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
+                                                      <div className="h-10 w-10 rounded-full bg-black/45 border border-white/20 flex items-center justify-center animate-spin">
+                                                          <Loader2 className="h-5 w-5 text-white" />
+                                                      </div>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
+                                      {msg.replyTo && (
+                                          <div className="mb-2 p-2 rounded-lg bg-black/5 dark:bg-white/10 border-l-4 border-orange-500 text-xs">
+                                              <p className="font-semibold text-orange-600 dark:text-orange-400 text-[11px]">{msg.replyTo.senderName}</p>
+                                              <p className="text-slate-600 dark:text-slate-300 text-[11px] truncate">{msg.replyTo.text}</p>
+                                          </div>
+                                      )}
+
+                                      {msg.voiceUrl && (
+                                          <div className="mb-2">
+                                              <VoiceNotePlayer voiceUrl={msg.voiceUrl} voiceDuration={msg.voiceDuration} />
+                                          </div>
+                                      )}
+
+                                     {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>}
+
+                                     <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
+                                         {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 mr-0.5">Edited •</span>}
+                                         <span>{safeFormatTime(msg.createdAt)}</span>
+                                         {isUser && (
+                                             msg.isUploading || msg.isPending || !msg.createdAt ? (
+                                                 <Clock className="h-3 w-3 text-slate-500 animate-pulse" />
+                                             ) : msg.isSeen ? (
+                                                 <CheckCheck className="h-3.5 w-3.5 text-blue-500" /> 
+                                             ) : (
+                                                 <Check className="h-3.5 w-3.5 text-slate-400" />
+                                             )
+                                         )}
+                                     </div>
                                  </div>
                             </div>
                         );
                     })}
                  </div>
             </ScrollArea>
-            <div className="mt-4 flex w-full items-center gap-2">
-                <Textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type your reply..."
-                    disabled={isSending}
-                    className="flex-1"
-                    rows={1}
-                />
-                <Button onClick={handleSendMessage} disabled={isSending || !message.trim()}>
-                   {isSending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Send className="h-5 w-5"/>}
-                </Button>
+            
+            <div className="bg-[#f0f0f0] dark:bg-slate-900 p-3 border-t flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
+                        <ImageIcon className="h-5 w-5" />
+                    </Button>
+
+                    {isRecording ? (
+                        <div className="flex-1 flex items-center justify-between bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border h-10 animate-pulse">
+                            <div className="flex items-center gap-2 text-rose-500">
+                                <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                                <span className="text-xs font-bold font-mono">Recording: {recordingSeconds}s</span>
+                            </div>
+                            <div className="flex-1 flex items-center gap-2">
+                                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={cancelRecording}>Cancel</Button>
+                                <Button size="sm" variant="default" className="text-xs h-7 bg-orange-600 text-white" onClick={stopAndSendVoice}>Send</Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex items-center gap-2">
+                            <Textarea 
+                                placeholder={editMessageId ? "Edit your message..." : "Type your message to the CEO..."} 
+                                value={message} 
+                                onChange={(e) => setMessage(e.target.value)} 
+                                disabled={isSending} 
+                                className="flex-1 min-h-[60px] md:min-h-[40px] max-h-[120px] md:max-h-[80px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-none rounded-lg text-sm"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSendMessage();
+                                    }
+                                }}
+                            />
+                            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={startRecording}>
+                                <Mic className="h-5 w-5" />
+                            </Button>
+                        </div>
+                    )}
+
+                    {!isRecording && (
+                        <Button onClick={handleSendMessage} disabled={!message.trim() || isSending} size="icon" className="h-10 w-10 rounded-lg bg-orange-600 text-white hover:bg-orange-700 flex-shrink-0">
+                            {isSending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
+                        </Button>
+                    )}
+                </div>
             </div>
+
+            {/* Inline Premium Edit Message Panel */}
+            {editModalOpen && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 z-[99999]">
+                    <div className="w-full max-w-sm bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <div className="flex items-center gap-2 font-bold text-sm text-orange-600">
+                                <Edit2 className="h-4 w-4" /> Edit Message
+                            </div>
+                            <button 
+                                onClick={() => setEditModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="flex-1">
+                            <Textarea 
+                                value={editMessageText}
+                                onChange={(e) => setEditMessageText(e.target.value)}
+                                className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                placeholder="Edit your message text..."
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 text-xs">
+                            <Button variant="ghost" size="sm" className="rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900 h-8" onClick={() => setEditModalOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button size="sm" className="bg-orange-600 text-white hover:bg-orange-700 rounded-lg h-8 px-3" onClick={handleSaveEditedMessage} disabled={!editMessageText.trim()}>
+                                Save
+                            </Button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {/* WhatsApp-style Image Upload Preview Panel */}
+            {previewUrl && (
+                <div className="absolute inset-0 bg-[#efeae2] dark:bg-[#0b141a] z-50 rounded-xl flex flex-col justify-between overflow-hidden animate-fade-in text-slate-800 dark:text-white">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200/60 dark:border-white/5">
+                        <button 
+                            onClick={() => {
+                                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                                setPreviewFile(null);
+                                setPreviewUrl(null);
+                                setCaption('');
+                            }}
+                            className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-white"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Preview</span>
+                        <div className="w-10"></div> {/* Spacer to center the title */}
+                    </div>
+
+                    {/* Image Container */}
+                    <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
+                        <img 
+                            src={previewUrl} 
+                            alt="Preview" 
+                            className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-xl border border-slate-200/50 dark:border-white/10" 
+                        />
+                    </div>
+
+                    {/* Footer (Caption Input + Send Button) */}
+                    <div className="p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200/60 dark:border-white/5 flex items-center gap-3">
+                        <div className="flex-1 relative">
+                            <input
+                                type="text"
+                                value={caption}
+                                onChange={(e) => setCaption(e.target.value)}
+                                placeholder="Type a message (caption)..."
+                                className="w-full bg-slate-100 dark:bg-[#1f2c34] text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 text-sm py-3 px-4 rounded-xl border border-slate-200 dark:border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSendPreview();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <Button 
+                            onClick={handleSendPreview} 
+                            size="icon" 
+                            className="h-12 w-12 rounded-full bg-orange-600 hover:bg-orange-700 text-white flex-shrink-0 flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
+                        >
+                            <Send className="h-5 w-5" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+            {/* Fullscreen Image Lightbox Modal using React Portal */}
+            {activeLightboxUrl && typeof document !== 'undefined' && createPortal(
+                <div 
+                    className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-lg flex flex-col items-center justify-center p-4 md:p-8 animate-fade-in select-none"
+                    onClick={() => setActiveLightboxUrl(null)}
+                >
+                    {/* Top action bar */}
+                    <div className="absolute top-4 right-4 flex items-center gap-3 z-10" onClick={(e) => e.stopPropagation()}>
+                        <a 
+                            href={activeLightboxUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-white hover:text-orange-400 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-xs font-semibold px-4 flex items-center gap-1.5"
+                            title="Open Original Image"
+                        >
+                            Open Original
+                        </a>
+                        <button 
+                            className="text-white hover:text-rose-400 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                            onClick={() => setActiveLightboxUrl(null)}
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+
+                    {/* Deep expanded high-res image display */}
+                    <div className="relative max-w-[95vw] max-h-[92vh] flex items-center justify-center overflow-auto p-2" onClick={(e) => e.stopPropagation()}>
+                        <img 
+                            src={activeLightboxUrl} 
+                            alt="Expanded View" 
+                            className="max-h-[90vh] max-w-[95vw] w-auto h-auto object-contain rounded-xl shadow-2xl ring-1 ring-white/10 cursor-zoom-out" 
+                            onClick={() => setActiveLightboxUrl(null)}
+                        />
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     )
 }
@@ -596,6 +1267,8 @@ export default function SupportPage() {
 
     const isLoading = isUserLoading || isProfileLoading;
     const [faqSearch, setFaqSearch] = React.useState('');
+    const [isChatMaximized, setIsChatMaximized] = React.useState(false);
+    const [isFaqDialogExpanded, setIsFaqDialogExpanded] = React.useState(false);
 
     // Track FAQ searches to understand user intent
     React.useEffect(() => {
@@ -631,99 +1304,186 @@ export default function SupportPage() {
 
     return (
         <div className="space-y-8 pb-10">
-            <PageTitle title="Help & Support" subtitle="Find answers to your questions and get assistance." />
+            <PageTitle title="Help & Support" subtitle="Directly message our leadership or get assistance from Zen AI." />
             
-            <Accordion type="multiple" defaultValue={['faq']} className="w-full space-y-6">
-                <AccordionItem value="ai-chat" className="border-none">
-                    <Card className="shadow-premium transition-shadow group overflow-hidden">
-                        <AccordionTrigger className="p-6 text-lg hover:no-underline group-data-[state=open]:bg-primary/5">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                                    <Bot className="h-6 w-6" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="font-bold">Chat with Zen AI</p>
-                                    <p className="text-xs text-muted-foreground font-normal">Get instant answers from our intelligent strategist.</p>
-                                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Side: Direct Line to the CEO */}
+                <div className={`${isChatMaximized ? 'lg:col-span-3 h-[85vh]' : 'lg:col-span-2 h-[70vh]'} flex flex-col transition-all duration-300`}>
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Direct Line to CEO</h2>
+                                <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
+                                    ⚡ Replies within minutes
+                                </span>
                             </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-6 pt-0">
-                            <ZenAIChatBot userProfile={userProfile || undefined} />
-                        </AccordionContent>
-                    </Card>
-                </AccordionItem>
-                
-                <AccordionItem value="human-support" className="border-none">
-                    <Card className="shadow-premium transition-shadow group overflow-hidden">
-                        <AccordionTrigger className="p-6 text-lg hover:no-underline group-data-[state=open]:bg-primary/5">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                    <MessageSquare className="h-6 w-6" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="font-bold">Contact Executive Support</p>
-                                    <p className="text-xs text-muted-foreground font-normal">Message our technical team for complex assistance.</p>
-                                </div>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-6 pt-0 h-[60vh]">
-                            {isLoading ? (
-                                <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                            ) : userProfile ? (
-                                <UserSupportChat userProfile={userProfile} />
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
-                            )}
-                        </AccordionContent>
-                    </Card>
-                </AccordionItem>
+                            <p className="text-xs text-muted-foreground mt-0.5">No tickets, no bots. Message Bello Imam directly for feature requests, feedback, or custom support.</p>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                            onClick={() => setIsChatMaximized(!isChatMaximized)}
+                            title={isChatMaximized ? "Shrink Chat" : "Expand Chat"}
+                        >
+                            {isChatMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                    <div className="flex-1 h-full min-h-[500px]">
+                        {isLoading ? (
+                            <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                        ) : userProfile ? (
+                            <UserSupportChat userProfile={userProfile} />
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
+                        )}
+                    </div>
+                </div>
 
-                <AccordionItem value="faq" className="border-none">
-                    <Card className="shadow-premium transition-shadow group overflow-hidden">
-                        <AccordionTrigger className="p-6 text-lg hover:no-underline">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                                    <HelpCircle className="h-6 w-6" />
-                                </div>
-                                <span>Frequently Asked Questions</span>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-6 pt-0">
-                             <div className="relative mb-6">
-                                <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
-                                <Input 
-                                    className="pl-10 h-10 bg-muted/30 border-none ring-1 ring-border" 
-                                    placeholder="Search FAQs by question or keyword..." 
-                                    value={faqSearch}
-                                    onChange={(e) => setFaqSearch(e.target.value)}
-                                />
-                             </div>
+                {/* Right Side: FAQs & Zen AI Assistant (Hidden when chat is maximized) */}
+                {!isChatMaximized && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Resources</h2>
+                        </div>
 
-                             <Accordion type="single" collapsible className="w-full space-y-2">
+                        {/* Zen AI Card */}
+                        <Card className="shadow-sm border">
+                            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Bot className="h-5 w-5 text-primary" />
+                                        Chat with Zen AI
+                                    </CardTitle>
+                                    <CardDescription>Instant automatic support for Zeneva features.</CardDescription>
+                                </div>
+                                <Dialog>
+                                    <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white">
+                                        <DialogTrigger title="Expand AI Strategist">
+                                            <Maximize2 className="h-4 w-4 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" />
+                                        </DialogTrigger>
+                                    </Button>
+                                    <DialogContent className="max-w-xl h-[80vh] flex flex-col p-6">
+                                        <DialogHeader>
+                                            <DialogTitle>Zen AI Support Assistant</DialogTitle>
+                                            <DialogDescription>Ask me anything about Zeneva operations, sync status, or hardware configurations.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="flex-1 overflow-hidden mt-4">
+                                            <ZenAIChatBot userProfile={userProfile || undefined} />
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </CardHeader>
+                            <CardContent>
+                                <Dialog>
+                                    <Button asChild className="w-full animate-pulse-orange">
+                                        <DialogTrigger>Launch AI Strategist</DialogTrigger>
+                                    </Button>
+                                    <DialogContent className="max-w-xl h-[80vh] flex flex-col p-6">
+                                        <DialogHeader>
+                                            <DialogTitle>Zen AI Support Assistant</DialogTitle>
+                                            <DialogDescription>Ask me anything about Zeneva operations, sync status, or hardware configurations.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="flex-1 overflow-hidden mt-4">
+                                            <ZenAIChatBot userProfile={userProfile || undefined} />
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </CardContent>
+                        </Card>
+
+                        {/* FAQs Card */}
+                        <Card className="shadow-sm border">
+                            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <HelpCircle className="h-5 w-5 text-amber-500" />
+                                        FAQs & Guides
+                                    </CardTitle>
+                                    <CardDescription>Search offline and inventory setups.</CardDescription>
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                                    onClick={() => setIsFaqDialogExpanded(true)}
+                                    title="Expand FAQs"
+                                >
+                                    <Maximize2 className="h-4 w-4 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" />
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                 <div className="relative">
+                                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+                                    <Input 
+                                        className="pl-10 h-9 bg-muted/20 border-none ring-1 ring-border text-xs" 
+                                        placeholder="Search answers..." 
+                                        value={faqSearch}
+                                        onChange={(e) => setFaqSearch(e.target.value)}
+                                    />
+                                 </div>
+
+                                 <Accordion type="single" collapsible className="w-full space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                    {filteredFaqs.length > 0 ? (
+                                        filteredFaqs.map((item, index) => (
+                                            <AccordionItem key={index} value={`faq-${index}`} className="border rounded-lg px-3 bg-muted/5 border-transparent">
+                                                <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-xs text-left py-2.5">{item.question}</AccordionTrigger>
+                                                <AccordionContent className="text-xs text-muted-foreground leading-relaxed pb-3">
+                                                    {item.answer}
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6 text-xs text-muted-foreground">No matches found.</div>
+                                    )}
+                                </Accordion>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+            </div>
+
+            {/* Expanded FAQs & Guides Modal */}
+            <Dialog open={isFaqDialogExpanded} onOpenChange={setIsFaqDialogExpanded}>
+                <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-6 rounded-xl">
+                    <DialogHeader className="border-b pb-3">
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                            <HelpCircle className="h-6 w-6 text-amber-500" /> FAQs & Knowledge Base
+                        </DialogTitle>
+                        <DialogDescription className="text-sm">
+                            Search and expand guides to resolve your offline syncing, checkout configurations, and hardware questions.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 flex flex-col min-h-0 gap-4 mt-4">
+                         <div className="relative w-full max-w-md">
+                            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+                            <Input 
+                                className="pl-10 h-10 bg-muted/20 border-none ring-1 ring-border text-sm" 
+                                placeholder="Search all guides..." 
+                                value={faqSearch}
+                                onChange={(e) => setFaqSearch(e.target.value)}
+                            />
+                         </div>
+
+                         <ScrollArea className="flex-1 pr-2">
+                             <Accordion type="single" collapsible className="w-full space-y-3">
                                 {filteredFaqs.length > 0 ? (
                                     filteredFaqs.map((item, index) => (
-                                        <AccordionItem key={index} value={`faq-${index}`} className="border rounded-lg px-4 bg-muted/10 border-transparent transition-all duration-300">
-                                            <AccordionTrigger className="hover:no-underline hover:underline decoration-black underline-offset-2 font-semibold text-sm text-left">{item.question}</AccordionTrigger>
-                                            <AccordionContent className="prose prose-sm dark:prose-invert max-w-none pb-4">
+                                        <AccordionItem key={index} value={`expanded-faq-${index}`} className="border border-slate-200 dark:border-slate-800 rounded-xl px-4 bg-muted/5">
+                                            <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-sm text-left py-4">{item.question}</AccordionTrigger>
+                                            <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">
                                                 {item.answer}
-                                                <div className="flex flex-wrap gap-1 mt-4">
-                                                    {item.tags.map(tag => (
-                                                        <Badge key={tag} variant="secondary" className="text-[10px] uppercase tracking-tighter opacity-70">#{tag}</Badge>
-                                                    ))}
-                                                </div>
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))
                                 ) : (
-                                    <div className="text-center py-10">
-                                        <p className="text-muted-foreground italic">No FAQs found matching your search. Try "offline", "install", or "AI".</p>
-                                    </div>
+                                    <div className="text-center py-10 text-muted-foreground">No matching guides found.</div>
                                 )}
                             </Accordion>
-                        </AccordionContent>
-                    </Card>
-                </AccordionItem>
-            </Accordion>
+                         </ScrollArea>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

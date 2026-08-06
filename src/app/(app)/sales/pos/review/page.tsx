@@ -163,6 +163,9 @@ function ReviewPageContent() {
         const profit = secureTotal - secureTotalCost;
         const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
 
+        const wasScanned = cart.some(c => c.addedViaBarcode);
+        const receiptMethod = autoPrint ? 'printed' : (shouldSendEmail ? 'digital' : 'none');
+
         const receiptData = {
             id: newReceiptId,
             businessId: business.id,
@@ -181,6 +184,9 @@ function ReviewPageContent() {
             isBackdated: !!backdate,
             createdBy: user.uid,
             flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
+            wasScanned,
+            isOffline: !navigator.onLine,
+            receiptMethod,
         };
 
         const productUpdates = cart.map(cartItem => {

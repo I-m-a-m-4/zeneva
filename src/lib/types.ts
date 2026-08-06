@@ -21,6 +21,11 @@ export type InventoryItem = Product;
 export interface CartItem {
     product: Product;
     quantity: number;
+    unit?: string;
+    multiplier?: number;
+    isPriceOverride?: boolean;
+    originalPrice?: number;
+    addedViaBarcode?: boolean;
 }
 
 export type TopSellingItem = Product & {
@@ -76,6 +81,10 @@ export interface Receipt {
     paymentMethod: 'Cash' | 'Card' | 'Bank Transfer';
     createdAt: any; // Can be a Date or a Firestore Timestamp
     createdBy?: string;
+    isOffline?: boolean;
+    syncedAt?: any;
+    wasScanned?: boolean;
+    receiptMethod?: 'printed' | 'digital' | 'none';
 }
 
 export interface OnlineOrder {

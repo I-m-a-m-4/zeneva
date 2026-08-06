@@ -20,7 +20,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import type { Customer } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -300,17 +306,22 @@ export default function CustomersPage() {
                     </div>
                   )}
                 </div>
-                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Sort By" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="spent">Biggest Spender</SelectItem>
-                    <SelectItem value="loyalty">Top Loyalty</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="recent">Most Recent</SelectItem>
-                  </SelectContent>
-                </Select>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-[180px] justify-between font-normal bg-background">
+                      <span>
+                        {sortBy === 'spent' ? 'Biggest Spender' : sortBy === 'loyalty' ? 'Top Loyalty' : sortBy === 'name' ? 'Name' : 'Most Recent'}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[180px]">
+                    <DropdownMenuItem onClick={() => setSortBy('spent')}>Biggest Spender</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('loyalty')}>Top Loyalty</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('name')}>Name</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('recent')}>Most Recent</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@
 import { firebaseConfig } from './config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache, type Firestore } from 'firebase/firestore';
 
 // --- Singleton Initialization ---
 let firebaseApp: FirebaseApp;
@@ -39,11 +39,11 @@ try {
   auth = {} as Auth;
 }
 
-// Safely initialize Firestore with modern persistence
+// Safely initialize Firestore with in-memory cache for 100% stability
 try {
   if (!isServer && hasConfig) {
     firestore = initializeFirestore(firebaseApp, {
-      cache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      cache: memoryLocalCache()
     });
   } else {
     firestore = initializeFirestore(firebaseApp, {});
@@ -58,8 +58,6 @@ if (!isServer && hasConfig) {
   setPersistence(auth, browserLocalPersistence)
     .catch((err) => console.error("Firebase Auth persistence error:", err));
 }
-
-// Firestore persistence is now handled during initialization in the new SDK version.
 
 // --- Exports ---
 export { firebaseApp, auth, firestore };

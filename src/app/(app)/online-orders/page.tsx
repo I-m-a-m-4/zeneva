@@ -192,7 +192,7 @@ export default function OnlineOrdersPage() {
                                         </TableCell>
                                         <TableCell className="text-right font-semibold">{currencySymbol}{order.total.toLocaleString()}</TableCell>
                                         <TableCell className="text-right">
-                                            <DropdownMenu>
+                                            <DropdownMenu modal={false}>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
                                                 </DropdownMenuTrigger>

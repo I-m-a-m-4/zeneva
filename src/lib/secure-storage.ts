@@ -13,13 +13,11 @@ export const secureStorage = {
       const stringValue = JSON.stringify(value);
       const encrypted = CryptoJS.AES.encrypt(stringValue, SECRET_KEY).toString();
       localStorage.setItem(key, encrypted);
-    } catch (error) {
-      console.error('Encryption failed:', error);
-      // Fallback to plain text if encryption fails for some weird reason
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-      } catch (innerErr) {
-        console.error('SecureStorage fallback also failed:', innerErr);
+    } catch (error: any) {
+      if (error?.name === 'QuotaExceededError' || error?.code === 22 || error?.number === 0x8007000E) {
+        console.warn(`SecureStorage: Quota exceeded for key "${key}". Data is safely stored in IndexedDB instead.`);
+      } else {
+        console.error('Encryption failed:', error);
       }
     }
   },

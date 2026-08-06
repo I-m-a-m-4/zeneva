@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,8 +21,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash, CheckCircle2 } from "lucide-react";
+import { Plus, Trash, Trash2, CheckCircle2 } from "lucide-react";
 import { useFieldArray } from "react-hook-form";
 import {
   Select,
@@ -36,10 +38,11 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import Image from "next/image";
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
 import { logAuditEvent } from '@/lib/audit';
@@ -197,6 +200,49 @@ export default function AddProductPage() {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState("");
+  const [isAddingCategory, setIsAddingCategory] = React.useState(false);
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim() || !business || !firestore) return;
+    setIsAddingCategory(true);
+    try {
+      const updatedCategories = [...(business.settings?.productCategories || []), newCategoryName.trim()];
+      await updateDoc(doc(firestore, 'businessInstances', business.id), {
+        'settings.productCategories': updatedCategories
+      });
+      form.setValue('category', newCategoryName.trim());
+      setNewCategoryName("");
+      toast({ title: 'Category Created', description: `Added "${newCategoryName.trim()}" to your categories.`, variant: 'success' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to create category.', variant: 'destructive' });
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catToDelete: string) => {
+    if (!business || !firestore) return;
+    try {
+      const updatedCategories = (business.settings?.productCategories || []).filter(c => c !== catToDelete);
+      await updateDoc(doc(firestore, 'businessInstances', business.id), {
+        'settings.productCategories': updatedCategories
+      });
+      if (form.getValues('category') === catToDelete) {
+        form.setValue('category', '');
+      }
+      toast({ title: 'Category Deleted', description: `Removed "${catToDelete}".`, variant: 'success' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to delete category.', variant: 'destructive' });
+    }
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    form.setValue('sku', barcode);
+    setIsScannerOpen(false);
   };
 
   // Helper to parse date string DD/MM/YY or DD/MM/YYYY
@@ -642,7 +688,81 @@ export default function AddProductPage() {
           <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
             <Card>
               <CardHeader>
-                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                  {typeof window !== 'undefined' && isNewCategoryModalOpen && createPortal(
+                    <div 
+                      className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
+                      onClick={() => setIsNewCategoryModalOpen(false)} 
+                    />,
+                    document.body
+                  )}
+                  <Dialog open={isNewCategoryModalOpen} onOpenChange={setIsNewCategoryModalOpen} modal={false}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" type="button" className="h-7 text-xs">
+                        <Plus className="h-3 w-3 mr-1" /> Manage Categories
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[480px]">
+                      <DialogHeader>
+                        <DialogTitle>Manage Categories</DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground">
+                          Create new categories or manage/delete existing ones.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-3 py-2 border-b pb-4">
+                        <Label className="text-xs font-semibold">Add New Category</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="e.g. Electronics, Bakery..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCategory();
+                              }
+                            }}
+                          />
+                          <Button type="button" onClick={handleAddCategory} disabled={!newCategoryName.trim() || isAddingCategory} className="shrink-0">
+                            {isAddingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-2">
+                        <Label className="text-xs font-semibold">Existing Categories</Label>
+                        <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                          {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
+                            business.settings.productCategories.map((cat: string) => (
+                              <div key={cat} className="flex items-center justify-between p-2 rounded-md bg-muted/50 border text-sm">
+                                <span className="font-medium">{cat}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDeleteCategory(cat)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Delete {cat}</span>
+                                </Button>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic py-2">No categories defined yet.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>Done</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <div className="mt-4 space-y-4 px-2">
                   <FormField
                     control={form.control}

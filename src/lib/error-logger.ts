@@ -1,9 +1,13 @@
+import { firebaseApp, auth, firestore } from '../firebase/instance';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { firestore } from '@/firebase';
+
+// Save reference to original native console before any libraries hook it
+const nativeConsoleError = typeof window !== 'undefined' ? (window.console.error || console.error) : console.error;
 
 // Prevent spam: Max 5 errors per session
 let errorCount = 0;
 const MAX_ERRORS_PER_SESSION = 5;
+let isLogging = false;
 
 interface ErrorLogPayload {
   message: string;
@@ -22,7 +26,10 @@ export const logErrorToFirestore = async (
   context?: { userId?: string; businessId?: string }
 ) => {
   if (typeof window === 'undefined') return; // Do not log server-side errors to this client collection
+  if (isLogging) return;
   if (errorCount >= MAX_ERRORS_PER_SESSION) return;
+
+  isLogging = true;
 
   // Filter out benign or expected errors — network noise, Firestore internals, browser quirks
   const errorMsg = error.message || String(error);
@@ -80,7 +87,50 @@ export const logErrorToFirestore = async (
 
     await addDoc(collection(firestore, 'error_logs'), payload);
   } catch (err) {
-    // Silently fail if logging fails (to prevent infinite error loops)
-    console.error('Failed to log error to Firestore:', err);
+    nativeConsoleError('Failed to log error to Firestore, queuing locally:', err);
+    try {
+      const offlinePayload = {
+        message: errorMsg,
+        stack: error.stack || 'No stack trace available',
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        userId: context?.userId || 'unknown',
+        businessId: context?.businessId || 'unknown',
+        type,
+        createdAt: new Date().toISOString(),
+      };
+      const offlineLogs = JSON.parse(localStorage.getItem('failed_logs') || '[]');
+      offlineLogs.push({ payload: offlinePayload, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() });
+      localStorage.setItem('failed_logs', JSON.stringify(offlineLogs.slice(-20))); // Keep last 20
+    } catch (e) {
+      // If local storage is also full or blocked, fail completely silent
+    }
+  } finally {
+    isLogging = false;
+  }
+};
+
+export const flushOfflineErrors = async () => {
+  if (typeof window === 'undefined' || !firestore) return;
+  try {
+    const offlineLogs = JSON.parse(localStorage.getItem('failed_logs') || '[]');
+    if (!offlineLogs || offlineLogs.length === 0) return;
+
+    // Load dynamic import of firestore functions to avoid dependencies issues
+    const { collection: col, addDoc: add } = await import('firebase/firestore');
+
+    const batch = [];
+    for (const log of offlineLogs) {
+      batch.push(
+        add(col(firestore, 'error_logs'), {
+          ...log.payload,
+          syncedAt: new Date().toISOString(),
+        })
+      );
+    }
+    await Promise.all(batch);
+    localStorage.removeItem('failed_logs');
+  } catch (err) {
+    nativeConsoleError('Failed to flush offline errors to Firestore:', err);
   }
 };

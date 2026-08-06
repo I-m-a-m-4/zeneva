@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +9,7 @@ import * as z from "zod";
 import { Suspense } from 'react';
 import {
     ChevronLeft,
+    ChevronDown,
     Upload,
     Loader2,
     Barcode as BarcodeIcon,
@@ -19,6 +21,12 @@ import {
     AlertCircle
 } from "lucide-react";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -28,6 +36,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { useFieldArray } from "react-hook-form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
@@ -56,6 +73,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -169,6 +187,45 @@ function EditProductContent() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [stockLogs, setStockLogs] = React.useState<AuditLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
+
+    // Category Management
+    const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
+    const [newCategoryName, setNewCategoryName] = React.useState("");
+    const [isAddingCategory, setIsAddingCategory] = React.useState(false);
+
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim() || !business || !firestore) return;
+        setIsAddingCategory(true);
+        try {
+            const updatedCategories = [...(business.settings?.productCategories || []), newCategoryName.trim()];
+            await updateDoc(doc(firestore, 'businessInstances', business.id), {
+                'settings.productCategories': updatedCategories
+            });
+            form.setValue('category', newCategoryName.trim());
+            setNewCategoryName("");
+            toast({ title: 'Category Created', description: `Added "${newCategoryName.trim()}" to categories.`, variant: 'success' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to create category.', variant: 'destructive' });
+        } finally {
+            setIsAddingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (catToDelete: string) => {
+        if (!business || !firestore) return;
+        try {
+            const updatedCategories = (business.settings?.productCategories || []).filter(c => c !== catToDelete);
+            await updateDoc(doc(firestore, 'businessInstances', business.id), {
+                'settings.productCategories': updatedCategories
+            });
+            if (form.getValues('category') === catToDelete) {
+                form.setValue('category', '');
+            }
+            toast({ title: 'Category Deleted', description: `Removed "${catToDelete}".`, variant: 'success' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to delete category.', variant: 'destructive' });
+        }
+    };
 
     // Fetch Stock Logs
     React.useEffect(() => {
@@ -745,7 +802,85 @@ function EditProductContent() {
                     <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
                         <Card>
                             <CardHeader>
-                                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                                    {canManageProduct && (
+                                        <>
+                                            {isMounted && isNewCategoryModalOpen && createPortal(
+                                                <div 
+                                                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
+                                                    onClick={() => setIsNewCategoryModalOpen(false)} 
+                                                />,
+                                                document.body
+                                            )}
+                                            <Dialog open={isNewCategoryModalOpen} onOpenChange={setIsNewCategoryModalOpen} modal={false}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" type="button" className="h-7 text-xs">
+                                                        <Plus className="h-3 w-3 mr-1" /> Manage Categories
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-[480px]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Manage Categories</DialogTitle>
+                                                        <DialogDescription className="text-xs text-muted-foreground">
+                                                            Create new categories or manage/delete existing ones.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    
+                                                    <div className="space-y-3 py-2 border-b pb-4">
+                                                        <Label className="text-xs font-semibold">Add New Category</Label>
+                                                        <div className="flex gap-2">
+                                                            <Input
+                                                                placeholder="e.g. Electronics, Bakery..."
+                                                                value={newCategoryName}
+                                                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleAddCategory();
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Button type="button" onClick={handleAddCategory} disabled={!newCategoryName.trim() || isAddingCategory} className="shrink-0">
+                                                                {isAddingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                                                                Add
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-3 pt-2">
+                                                        <Label className="text-xs font-semibold">Existing Categories</Label>
+                                                        <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                                                            {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
+                                                                business.settings.productCategories.map((cat: string) => (
+                                                                    <div key={cat} className="flex items-center justify-between p-2 rounded-md bg-muted/50 border text-sm">
+                                                                        <span className="font-medium">{cat}</span>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                            onClick={() => handleDeleteCategory(cat)}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                            <span className="sr-only">Delete {cat}</span>
+                                                                        </Button>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <p className="text-xs text-muted-foreground italic py-2">No categories defined yet.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <DialogFooter className="pt-2">
+                                                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>Done</Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </>
+                                    )}
+                                </div>
                                 <div className="mt-4 space-y-4 px-2">
                                     <FormField
                                         control={form.control}
@@ -786,27 +921,27 @@ function EditProductContent() {
                                     name="category"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!canManageProduct}>
-                                                <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select a category" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
+                                             <DropdownMenu modal={false}>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" type="button" className="w-full justify-between font-normal bg-background h-10 px-3 border-input" disabled={!canManageProduct}>
+                                                        <span>{field.value || "Select a category"}</span>
+                                                        <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto z-50">
                                                     {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
                                                         business.settings.productCategories.map((cat: string) => (
-                                                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                                            <DropdownMenuItem key={cat} onClick={() => field.onChange(cat)} className="cursor-pointer">
+                                                                {cat}
+                                                            </DropdownMenuItem>
                                                         ))
                                                     ) : (
                                                         <div className="p-4 text-center text-sm text-muted-foreground">
                                                             No categories defined.
-                                                            <Button variant="link" asChild className="p-0 h-auto ml-1">
-                                                                <Link href="/settings">Create one now</Link>
-                                                            </Button>
                                                         </div>
                                                     )}
-                                                </SelectContent>
-                                            </Select>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -884,17 +1019,22 @@ function EditProductContent() {
                                             : 'Track manual additions, sales, and changes to stock quantity. Changes made offline will appear as "Syncing".'}
                                     </CardDescription>
                                 </div>
-                                <Select value={logFilter} onValueChange={setLogFilter} modal={false}>
-                                    <SelectTrigger className="w-[150px] h-8 text-[11px] bg-background">
-                                        <SelectValue placeholder="All Activities" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Activities</SelectItem>
-                                        <SelectItem value="sale">Sales Only</SelectItem>
-                                        {categoryType === 'product' && <SelectItem value="stock_adjustment">Adjustments Only</SelectItem>}
-                                        <SelectItem value="update">Updates & Cre. Only</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <DropdownMenu modal={false}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="w-[150px] h-8 text-[11px] justify-between bg-background font-normal">
+                                            <span>
+                                                {logFilter === 'all' ? 'All Activities' : logFilter === 'sale' ? 'Sales Only' : logFilter === 'stock_adjustment' ? 'Adjustments Only' : 'Updates & Cre. Only'}
+                                            </span>
+                                            <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[150px]">
+                                        <DropdownMenuItem onClick={() => setLogFilter('all')}>All Activities</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('sale')}>Sales Only</DropdownMenuItem>
+                                        {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('stock_adjustment')}>Adjustments Only</DropdownMenuItem>}
+                                        <DropdownMenuItem onClick={() => setLogFilter('update')}>Updates & Cre. Only</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">

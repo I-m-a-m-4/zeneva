@@ -86,10 +86,11 @@ export function PricingPlans() {
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 5 Staff Accounts</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Smart Bulk Inventory Import</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Shareable Receipt Links (WhatsApp/SMS)</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
-                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
                         <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> Granular Staff Permissions (RBAC)</li>
                     </ul>
                     <div className="mt-auto pt-6">

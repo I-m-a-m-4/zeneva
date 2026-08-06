@@ -6,7 +6,8 @@ import { CachedImage } from "@/components/shared/cached-image";
 import Image from "next/image";
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users, Download } from 'lucide-react';
+import { Award, DollarSign, PartyPopper, PlusCircle, Target, Users, Download, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import html2canvas from 'html2canvas';
 import { usePOS } from '@/context/pos-context';
 import { Progress } from '@/components/ui/progress';
@@ -148,13 +149,24 @@ function GoalSetting() {
                         </div>
                         <div>
                             <Label htmlFor="goal-metric">Metric to Track</Label>
-                            <Select value={newGoal.metric} onValueChange={(value: GoalMetric) => setNewGoal({ ...newGoal, metric: value })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="totalSales"><DollarSign className="inline-block mr-2 h-4 w-4" />Total Sales</SelectItem>
-                                    <SelectItem value="customerCount"><Users className="inline-block mr-2 h-4 w-4" />Customer Count</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between font-normal bg-background mt-1">
+                                        <span className="flex items-center">
+                                            {newGoal.metric === 'totalSales' ? <><DollarSign className="inline-block mr-2 h-4 w-4" />Total Sales</> : <><Users className="inline-block mr-2 h-4 w-4" />Customer Count</>}
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-full min-w-[200px]">
+                                    <DropdownMenuItem onClick={() => setNewGoal({ ...newGoal, metric: 'totalSales' })}>
+                                        <DollarSign className="inline-block mr-2 h-4 w-4" />Total Sales
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setNewGoal({ ...newGoal, metric: 'customerCount' })}>
+                                        <Users className="inline-block mr-2 h-4 w-4" />Customer Count
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                         <div>
                             <Label htmlFor="goal-target">Target Value</Label>

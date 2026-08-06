@@ -8,7 +8,7 @@ import * as React from "react";
 import { useRef, Suspense } from "react";
 // Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { doc, addDoc, serverTimestamp, collection } from "firebase/firestore";
 import type { Receipt, BusinessInstance } from "@/types";
 import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
@@ -98,13 +98,35 @@ function ReceiptContent() {
     }
   };
 
+  const getPublicShareUrl = (id: string, isInvoiceDoc: boolean) => {
+    const baseUrl = 'https://zeneva.space';
+    const path = isInvoiceDoc ? '/invoice/details' : '/receipts/details';
+    return `${baseUrl}${path}?id=${id}`;
+  };
+
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
+    if (!receipt) return;
+    const publicUrl = getPublicShareUrl(receipt.id, isInvoice);
+    navigator.clipboard.writeText(publicUrl).then(() => {
       toast({
         title: "Link Copied",
         description: `${isInvoice ? 'Invoice' : 'Receipt'} link has been copied to your clipboard.`,
         variant: 'success'
       });
+
+      // Track receipt share in Firestore
+      if (firestore) {
+          addDoc(collection(firestore, 'receipt_shares'), {
+              receiptId: receipt.id,
+              receiptNumber: receipt.receiptNumber || `rec-${receipt.id.substring(0, 8)}`,
+              businessId: receipt.businessId,
+              businessName: business?.name || 'Unknown',
+              timestamp: serverTimestamp(),
+              type: 'copy',
+              totalAmount: receipt.total,
+              customerName: receipt.customer?.name || 'Walk-in'
+          }).catch(e => console.error("Failed to log receipt share:", e));
+      }
     }, () => {
       toast({
         title: "Copy Failed",
@@ -115,11 +137,25 @@ function ReceiptContent() {
   };
 
   const handleShare = async () => {
+    if (!receipt || !firestore) return;
+    const publicUrl = getPublicShareUrl(receipt.id, isInvoice);
     const shareData = {
       title: `${isInvoice ? 'Invoice' : 'Receipt'} ${receipt.id.substring(0, 8)}`,
       text: `Here is your ${isInvoice ? 'invoice' : 'receipt'} from ${business?.name || 'our store'} for ${currencySymbol}${receipt.total.toFixed(2)}.`,
-      url: window.location.href,
+      url: publicUrl,
     };
+
+    // Track receipt share in Firestore
+    addDoc(collection(firestore, 'receipt_shares'), {
+        receiptId: receipt.id,
+        receiptNumber: receipt.receiptNumber || `rec-${receipt.id.substring(0, 8)}`,
+        businessId: receipt.businessId,
+        businessName: business?.name || 'Unknown',
+        timestamp: serverTimestamp(),
+        type: 'share',
+        totalAmount: receipt.total,
+        customerName: receipt.customer?.name || 'Walk-in'
+    }).catch(e => console.error("Failed to log receipt share:", e));
 
     if (navigator.share) {
       try {

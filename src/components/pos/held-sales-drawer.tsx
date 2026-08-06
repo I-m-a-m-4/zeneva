@@ -11,6 +11,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { createPortal } from 'react-dom';
+
 interface HeldSalesDrawerProps {
     trigger?: React.ReactNode;
 }
@@ -31,20 +33,28 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
     };
 
     return (
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-                {trigger || (
-                    <Button variant="ghost" size="icon" className="relative">
-                        <History className="h-5 w-5" />
-                        {isMounted && heldSales.length > 0 && (
-                            <span className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground rounded-full border border-background font-bold">
-                                {heldSales.length}
-                            </span>
-                        )}
-                    </Button>
-                )}
-            </SheetTrigger>
-            <SheetContent className="w-full sm:max-w-[540px]">
+        <>
+            {isMounted && isOpen && createPortal(
+                <div 
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
+                    onClick={() => setIsOpen(false)} 
+                />,
+                document.body
+            )}
+            <Sheet open={isOpen} onOpenChange={setIsOpen} modal={false}>
+                <SheetTrigger asChild>
+                    {trigger || (
+                        <Button variant="ghost" size="icon" className="relative">
+                            <History className="h-5 w-5" />
+                            {isMounted && heldSales.length > 0 && (
+                                <span className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground rounded-full border border-background font-bold">
+                                    {heldSales.length}
+                                </span>
+                            )}
+                        </Button>
+                    )}
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-[540px]">
                 <SheetHeader className="pt-2.5 pr-12 pb-1 select-none">
                     <SheetTitle className="flex items-center gap-2 text-lg tracking-tight font-black">
                         <Archive className="h-5 w-5 text-primary" />
@@ -131,5 +141,6 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
                 </ScrollArea>
             </SheetContent>
         </Sheet>
+        </>
     );
 }

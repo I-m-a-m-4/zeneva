@@ -5,10 +5,20 @@ const DODO_API_KEY = process.env.DODO_SECRET_KEY;
 const DODO_MODE = process.env.NEXT_PUBLIC_DODO_MODE === 'live' ? 'live' : 'test';
 const DODO_API_URL = `https://${DODO_MODE}.dodopayments.com/checkouts`;
 
-// Replace these with your actual Dodo Product IDs from the dashboard
-const DODO_PRODUCT_IDS: Record<string, string> = {
-  'pro': process.env.DODO_PRO_PRODUCT_ID || 'pdp_pro_placeholder',
-  'business': process.env.DODO_BUSINESS_PRODUCT_ID || 'pdp_business_placeholder',
+// Product IDs from Dodo Dashboard mapped by planId and cycleMonths
+const DODO_PRODUCT_IDS: Record<string, Record<string, string>> = {
+  'pro': {
+    '1': process.env.DODO_PRO_PRODUCT_ID || 'pdt_0Na8DxFd4qtNiJdum8xaB',
+    '3': process.env.DODO_PRO_3M_PRODUCT_ID || 'pdt_0NkpBsjzk7VlSGUeFz7DI',
+    '6': process.env.DODO_PRO_6M_PRODUCT_ID || 'pdt_0NkpBzjP8l3uXSgyPeP8C',
+    '12': process.env.DODO_PRO_1Y_PRODUCT_ID || 'pdt_0NkpC3pkoA6FLfvUDr9Yq',
+  },
+  'business': {
+    '1': process.env.DODO_BUSINESS_PRODUCT_ID || 'pdt_0Na8FzxfnfO0Q55dQ2QuK',
+    '3': process.env.DODO_BUSINESS_3M_PRODUCT_ID || 'pdt_0NkpBVh9ldI3byXk8hTQW',
+    '6': process.env.DODO_BUSINESS_6M_PRODUCT_ID || 'pdt_0NkpBa3yuk1XV4RsvtPfb',
+    '12': process.env.DODO_BUSINESS_1Y_PRODUCT_ID || 'pdt_0NkpBlN8u6xuhe4pDa9BY',
+  }
 };
 
 export async function POST(req: NextRequest) {
@@ -21,12 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dodo API key not configured' }, { status: 500 });
     }
 
-    const productId = DODO_PRODUCT_IDS[planId];
-    console.log('Target Product ID:', productId);
+    const cycleKey = cycleMonths ? cycleMonths.toString() : '1';
+    const planProducts = DODO_PRODUCT_IDS[planId];
+    
+    if (!planProducts) {
+      console.error('Dodo Product mapping not found for plan:', planId);
+      return NextResponse.json({ error: 'Invalid plan ID' }, { status: 400 });
+    }
+
+    const productId = planProducts[cycleKey];
+    console.log(`Target Product ID for plan ${planId} (${cycleKey} months):`, productId);
 
     if (!productId || productId.includes('placeholder')) {
-      console.error('Dodo Product ID not configured for plan:', planId);
-      return NextResponse.json({ error: 'Dodo Product ID not configured for this plan' }, { status: 400 });
+      console.error(`Dodo Product ID not configured for plan: ${planId}, cycle: ${cycleKey}`);
+      return NextResponse.json({ error: 'Dodo Product ID not configured for this plan cycle' }, { status: 400 });
     }
 
     const body = {

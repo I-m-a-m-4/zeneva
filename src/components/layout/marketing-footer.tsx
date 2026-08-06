@@ -2,6 +2,7 @@
 import { Check, Linkedin, Mail, Phone, Send, Twitter, Loader2, Instagram } from "lucide-react";
 import BackToTopButton from '@/components/back-to-top-button';
 import Link from "next/link";
+import Image from "next/image";
 import React, { useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { sendContactFormEmail } from '@/lib/email';
@@ -258,8 +259,32 @@ export default function MarketingFooter() {
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-white/10">
-            <p className="text-sm text-white/60">© 2026 Zeneva. All rights reserved.</p>
+          <div className="mt-8 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-white/10">
+            <p className="text-sm text-white/60">© 2026 ZENEVATECH SOLUTIONS (BN: 9673520). All rights reserved.</p>
+
+            {/* SEO-Optimized CAC Trust Badge */}
+            <div 
+              className="inline-flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity cursor-pointer"
+              itemScope 
+              itemType="https://schema.org/GovernmentPermit"
+            >
+              {/* Visually hidden text for Google bots to index the registration authority */}
+              <div className="sr-only">
+                <span itemProp="name">Corporate Affairs Commission (CAC) Registration</span>
+                <span itemProp="identifier">BN: 9673520</span>
+                <span itemProp="issuedBy">Federal Republic of Nigeria</span>
+              </div>
+              <Image 
+                src="/cac-badge-cropped.png" 
+                alt="Corporate Affairs Commission (CAC) Registered Entity" 
+                width={300} 
+                height={80} 
+                className="h-10 sm:h-12 w-auto object-contain drop-shadow-md"
+                unoptimized
+                priority
+              />
+            </div>
+
             <div className="flex items-center gap-4 text-sm text-white/60">
               <Link href="/legal/privacy-policy" className="transition hover:text-white">Privacy</Link>
               <span className="hidden sm:block text-white/20">•</span>

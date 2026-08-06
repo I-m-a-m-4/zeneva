@@ -39,7 +39,13 @@ export function ConsoleGuard() {
       '404 (Not Found)',
       'bootstrap.smartsuppchat.com',
       'google.ads',
-      'pagead2.googlesyndication.com'
+      'pagead2.googlesyndication.com',
+      'bis_skin_checked',
+      'react-hydration-error',
+      'hydration-error',
+      'hydration mismatch',
+      'some attributes of the server rendered HTML',
+      'Hydration failed',
     ];
 
     const shouldSuppress = (args: any[]) => {
@@ -69,10 +75,37 @@ export function ConsoleGuard() {
       originalLog.apply(console, args);
     };
 
+    const handleErrorEvent = (event: ErrorEvent) => {
+      const message = event.message || '';
+      const filename = event.filename || '';
+      if (
+        suppressedPatterns.some(pattern => message.includes(pattern) || filename.includes(pattern)) ||
+        filename.includes('bundle.js') ||
+        filename.includes('smartsupp')
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    const handleRejectionEvent = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const message = reason?.message || String(reason) || '';
+      if (suppressedPatterns.some(pattern => message.includes(pattern))) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    window.addEventListener('error', handleErrorEvent, true);
+    window.addEventListener('unhandledrejection', handleRejectionEvent, true);
+
     return () => {
       console.error = originalError;
       console.warn = originalWarn;
       console.log = originalLog;
+      window.removeEventListener('error', handleErrorEvent, true);
+      window.removeEventListener('unhandledrejection', handleRejectionEvent, true);
     };
   }, []);
 

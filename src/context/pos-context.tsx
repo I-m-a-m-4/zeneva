@@ -470,6 +470,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [currentUserProfile, offlineProfile, user?.uid]);
 
   const business = useMemo(() => {
+    // If we successfully fetched the business document while online but it doesn't exist, it was definitively deleted.
+    if (!isLoadingBusiness && initialBusiness === null && isRealOnline && !!businessId) {
+      return { ...(offlineBusiness || {}), status: 'deleted' } as BusinessInstance;
+    }
+
     const base = initialBusiness || offlineBusiness;
     if (!base) return null;
     const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');

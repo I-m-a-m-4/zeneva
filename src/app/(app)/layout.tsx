@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, orderBy, writeBatch, serverTimestamp, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
@@ -188,6 +188,48 @@ export default function AuthenticatedLayout({
   }, []);
 
   const { notify } = useNativeNotifications();
+  
+  // CEO Broadcast Listener
+  const [ceoBroadcastOpen, setCeoBroadcastOpen] = React.useState(false);
+  const [activeBroadcast, setActiveBroadcast] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (!firestore || !user) return;
+    const broadcastsRef = collection(firestore, 'ceo_broadcasts');
+    const q = query(broadcastsRef, orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) return;
+      
+      // Look at the latest broadcast doc
+      const latestDoc = snapshot.docs[0];
+      const broadcastData = { id: latestDoc.id, ...latestDoc.data() } as any;
+      
+      // Check if this notification has been processed locally
+      const seenIds = JSON.parse(localStorage.getItem('zeneva_seen_broadcasts') || '[]');
+      if (!seenIds.includes(broadcastData.id)) {
+        setActiveBroadcast(broadcastData);
+        setCeoBroadcastOpen(true);
+        
+        // Save to seen list
+        seenIds.push(broadcastData.id);
+        localStorage.setItem('zeneva_seen_broadcasts', JSON.stringify(seenIds));
+        
+        // Native notification alert
+        try {
+          notify({
+            title: broadcastData.title || "Direct CEO Line",
+            body: broadcastData.message || "Bello Imam is online! Click to chat directly."
+          });
+        } catch (e) {
+          console.warn("Failed to show native notification:", e);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [firestore, user, notify]);
+
   const { requestPermission: handleRequestFcmPermission } = useFCM();
 
   React.useEffect(() => {
@@ -371,6 +413,44 @@ export default function AuthenticatedLayout({
       console.error("Error clearing notifications:", error);
     }
   }, [currentUserProfile, userNotifications, firestore, toast]);
+
+  const handleNotificationClick = React.useCallback(async (notif: any) => {
+    if (!currentUserProfile || !firestore) return;
+    
+    // Mark as read if user notification
+    if (!notif.isGlobal && !notif.read) {
+      try {
+        const notifRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, notif.id);
+        const { updateDoc } = await import('firebase/firestore');
+        await updateDoc(notifRef, { read: true });
+      } catch (e) {
+        console.error("Error marking notification as read:", e);
+      }
+    }
+
+    // Determine navigation link
+    let targetLink = notif.link || notif.url;
+    if (!targetLink) {
+      const titleLower = (notif.title || '').toLowerCase();
+      const bodyLower = (notif.body || '').toLowerCase();
+      if (notif.type === 'ceo_chat' || titleLower.includes('ceo') || titleLower.includes('chat') || bodyLower.includes('bello imam')) {
+        targetLink = '/support';
+      } else if (notif.type === 'order' || titleLower.includes('order')) {
+        targetLink = '/terminal-alerts';
+      } else if (notif.type === 'inventory' || titleLower.includes('stock')) {
+        targetLink = '/inventory';
+      } else {
+        targetLink = '/support';
+      }
+    }
+
+    setIsNotificationsExpanded(false);
+    if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
+      window.open(targetLink, '_blank');
+    } else {
+      router.push(targetLink);
+    }
+  }, [currentUserProfile, firestore, router]);
 
   const handleConfettiComplete = React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive]);
 
@@ -585,6 +665,84 @@ export default function AuthenticatedLayout({
     }
   }, [onlineOrders, lastOnlineOrderId, currentUserProfile, businessInstance, firestore]);
 
+  // 3. Day 3 Onboarding "Chat with the CEO" Notification
+  React.useEffect(() => {
+    if (currentUserProfile && firestore) {
+      const userCreatedDate = safeToDate(currentUserProfile.createdAt);
+      const now = new Date();
+      const diffTime = now.getTime() - userCreatedDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      // Trigger if user is on their 3rd day or older and hasn't been notified yet
+      if (diffDays >= 3) {
+        const hasNotified = localStorage.getItem(`ceo_day3_notified_${currentUserProfile.id}`);
+        if (!hasNotified) {
+          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
+            title: "💬 Chat with the CEO",
+            body: "Welcome to your 3rd day on Zeneva! Have questions, feedback, or custom feature requests? Tap here to message Bello Imam directly on the CEO Direct Line.",
+            createdAt: serverTimestamp(),
+            read: false,
+            type: 'ceo_chat',
+            link: '/support'
+          }).then(() => {
+            localStorage.setItem(`ceo_day3_notified_${currentUserProfile.id}`, 'true');
+          }).catch(console.error);
+        }
+      }
+    }
+  }, [currentUserProfile, firestore]);
+
+  // 4. Subtle Cross-Platform App Store Native Notification Trigger
+  React.useEffect(() => {
+    if (currentUserProfile && firestore) {
+      const userCreatedDate = safeToDate(currentUserProfile.createdAt);
+      const now = new Date();
+      const diffTime = now.getTime() - userCreatedDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      // Trigger subtly after 2 days of usage
+      if (diffDays >= 2) {
+        const hasPrompted = localStorage.getItem(`app_download_prompt_${currentUserProfile.id}`);
+        if (!hasPrompted) {
+          localStorage.setItem(`app_download_prompt_${currentUserProfile.id}`, 'true');
+          const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : '';
+          const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
+
+          let notifTitle = '';
+          let notifBody = '';
+          let notifLink = '';
+
+          const playStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
+          const msStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
+
+          if (isTauri || !isMobile) {
+            // User is on Desktop (Windows / Microsoft App) -> Recommend Android Mobile App
+            notifTitle = "📱 Download Zeneva Mobile App";
+            notifBody = "Get the Zeneva Android App from the Google Play Store to manage your business from anywhere.";
+            notifLink = playStoreUrl;
+          } else {
+            // User is on Mobile -> Recommend Windows Desktop App
+            notifTitle = "💻 Download Zeneva Desktop App";
+            notifBody = "Get the Zeneva Windows App from the Microsoft Store for blazing-fast desktop performance.";
+            notifLink = msStoreUrl;
+          }
+
+          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
+            title: notifTitle,
+            body: notifBody,
+            createdAt: serverTimestamp(),
+            read: false,
+            type: 'app_download',
+            link: notifLink
+          }).then(() => {
+            notify(notifTitle, notifBody, notifLink);
+          }).catch(console.error);
+        }
+      }
+    }
+  }, [currentUserProfile, firestore, notify]);
+
   if (isLoggingOut) {
     return <AppLoader text="Logging out..." />;
   }
@@ -705,8 +863,8 @@ export default function AuthenticatedLayout({
 
       // 4. Zeneva Terminal Feature Availability (Only for Nigeria)
       if (item.href === '/terminal-alerts') {
-        const isNigerian = ipCountry === 'Nigeria';
-        if (!isNigerian) return false;
+        const isForeign = ipCountry !== null && ipCountry !== 'Unknown' && ipCountry !== 'Nigeria';
+        if (isForeign) return false;
       }
 
       return true;
@@ -783,8 +941,8 @@ export default function AuthenticatedLayout({
     
     // Extra Route Guard for Terminal Alerts
     if (protectedRoute === '/terminal-alerts') {
-      const isNigerian = ipCountry === 'Nigeria';
-      if (!isNigerian) hasRouteAccess = false;
+      const isForeign = ipCountry !== null && ipCountry !== 'Unknown' && ipCountry !== 'Nigeria';
+      if (isForeign) hasRouteAccess = false;
     }
   }
 
@@ -961,6 +1119,17 @@ export default function AuthenticatedLayout({
                       <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild><Link href="/support"><LifeBuoy className="mr-2 h-4 w-4" />Support</Link></DropdownMenuItem>
+                    {user?.email === 'belloimam431@gmail.com' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin-imamshaffy" className="text-orange-600 dark:text-orange-400 font-semibold">
+                            <Bug className="mr-2 h-4 w-4" />
+                            Admin Panel
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -1128,6 +1297,17 @@ export default function AuthenticatedLayout({
                           </Link>
                         </DropdownMenuItem>
                       )}
+                      {user?.email === 'belloimam431@gmail.com' && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <Link href="/admin-imamshaffy" className="text-orange-600 dark:text-orange-400 font-semibold">
+                              <Bug className="mr-2 h-4 w-4" />
+                              <span>Admin Panel</span>
+                            </Link>
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
@@ -1238,6 +1418,7 @@ export default function AuthenticatedLayout({
             navItems={isUserLoading ? [] : mainMobileNavItems} 
             moreNavItems={isUserLoading ? [] : allMoreNavItems} 
             isLoading={isUserLoading}
+            userEmail={user?.email ?? undefined}
           />
           <Calculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
         </SidebarProvider>
@@ -1245,53 +1426,63 @@ export default function AuthenticatedLayout({
       </TooltipProvider>
 
       <Dialog open={isNotificationsExpanded} onOpenChange={setIsNotificationsExpanded}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
-            <div>
-              <DialogTitle className="text-2xl">Notifications Center</DialogTitle>
-              <DialogDescription>
+        <DialogContent className="max-w-3xl h-[85vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-4 sm:p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 text-left">
+              <DialogTitle className="text-xl sm:text-2xl font-bold">Notifications Center</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm max-w-md">
                 Stay updated with your business performance, inventory alerts, and system updates.
               </DialogDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleMarkAsRead} disabled={unreadCount === 0}>
+            <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={handleMarkAsRead} disabled={unreadCount === 0}>
                 Mark all read
               </Button>
-              <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5" onClick={handleClearAll} disabled={allNotifications.length === 0}>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9 text-destructive hover:bg-destructive/5" onClick={handleClearAll} disabled={allNotifications.length === 0}>
                 Clear All
               </Button>
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {allNotifications.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {allNotifications.map((notif) => (
-                    <Card key={notif.id} className={cn("overflow-hidden border-none shadow-sm transition-all hover:shadow-md", !notif.isGlobal && !notif.read ? 'bg-primary/5 border-l-4 border-l-primary' : 'bg-muted/10')}>
-                      <CardContent className="p-4 flex gap-4">
-                        <div className={cn("h-10 w-10 shrink-0 rounded-full flex items-center justify-center", notif.isGlobal ? 'bg-blue-500/10 text-blue-500' : 'bg-primary/10 text-primary')}>
-                          {notif.isGlobal ? <Globe className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+                    <Card 
+                      key={notif.id} 
+                      className={cn(
+                        "overflow-hidden border-none shadow-sm transition-all hover:shadow-md cursor-pointer group hover:bg-muted/30", 
+                        !notif.isGlobal && !notif.read ? 'bg-primary/5 border-l-4 border-l-primary' : 'bg-muted/10'
+                      )}
+                      onClick={() => handleNotificationClick(notif)}
+                    >
+                      <CardContent className="p-3 sm:p-4 flex gap-3 sm:gap-4">
+                        <div className={cn("h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-full flex items-center justify-center", notif.isGlobal ? 'bg-blue-500/10 text-blue-500' : 'bg-primary/10 text-primary')}>
+                          {notif.isGlobal ? <Globe className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bell className="h-4 w-4 sm:h-5 sm:w-5" />}
                         </div>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-bold text-base">{notif.title}</h4>
-                            <span className="text-xs text-muted-foreground">
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                            <h4 className="font-bold text-sm sm:text-base truncate sm:whitespace-normal group-hover:text-primary transition-colors">{notif.title}</h4>
+                            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
                               {notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : ''}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
+                          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">
                             {notif.body}
                           </p>
-                          <div className="pt-2 flex items-center gap-3">
-                            <Badge variant="outline" className="text-[10px] font-mono">
+                          <div className="pt-1.5 flex items-center gap-3">
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] font-mono py-0 px-1.5 h-5 flex items-center">
                               {notif.isGlobal ? 'SYSTEM' : 'BUSINESS'}
                             </Badge>
                             {!notif.isGlobal && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeleteNotification(notif.id, false)}
+                                className="h-5 px-1.5 text-[11px] sm:text-xs text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteNotification(notif.id, false);
+                                }}
                               >
                                 Remove
                               </Button>
@@ -1337,6 +1528,34 @@ export default function AuthenticatedLayout({
           <div className="flex justify-center pt-2">
             <Button onClick={handleClosePermissionPopup} className="w-full sm:w-1/2" size="lg">
               Got it, thanks!
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* CEO Invite Broadcast Popup */}
+      <Dialog open={ceoBroadcastOpen} onOpenChange={setCeoBroadcastOpen}>
+        <DialogContent className="max-w-md border-2 border-orange-500/20 bg-background shadow-2xl rounded-xl">
+          <DialogHeader className="mb-4">
+            <div className="mx-auto bg-orange-100 dark:bg-orange-950/30 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-orange-500 shadow-sm border border-orange-500/20">
+              <LifeBuoy className="h-8 w-8 text-orange-600" />
+            </div>
+            <DialogTitle className="text-center text-xl font-bold text-orange-600">
+              {activeBroadcast?.title || "Direct CEO Line"}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm pt-2 text-foreground/80 leading-relaxed">
+              {activeBroadcast?.message || "Bello Imam (CEO of Zeneva) is online! You can chat directly for feature requests, feedback, or custom support."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setCeoBroadcastOpen(false)} className="flex-1 rounded-lg">
+              Later
+            </Button>
+            <Button onClick={() => {
+              setCeoBroadcastOpen(false);
+              router.push('/support');
+            }} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg">
+              Start Chat
             </Button>
           </div>
         </DialogContent>

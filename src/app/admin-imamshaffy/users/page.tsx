@@ -104,10 +104,14 @@ export default function UsersPage() {
   }, [currentUser?.businessId, firestore]);
   const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
 
+  const canManageUsers = currentUser?.role === 'imamshaffy' || 
+                         currentUser?.id === 'jzQgCHzaObeUbeYklTLtQQh03G53' || 
+                         currentUser?.email === 'belloimam431@gmail.com';
+
   const usersQuery = useMemoFirebase(() => {
-    if (!firestore || currentUser?.role !== 'imamshaffy') return null;
+    if (!firestore || !canManageUsers) return null;
     return query(collection(firestore, "users"));
-  }, [currentUser, firestore]);
+  }, [canManageUsers, firestore]);
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
   const sortedUsers = React.useMemo(() => {
@@ -134,7 +138,6 @@ export default function UsersPage() {
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
 
   const isLoading = isProfileLoading || areUsersLoading || areInvitationsLoading || isBusinessLoading;
-  const canManageUsers = currentUser?.role === 'imamshaffy';
 
   const handleRevokeInvitation = async () => {
     if (!invitationToRevoke || !firestore) return;
@@ -260,8 +263,8 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                          {user.role.replace('_', ' ')}
+                        <Badge variant={(user.role || 'operator') === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                          {(user.role || 'operator').replace('_', ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">

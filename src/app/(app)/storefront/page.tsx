@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail } from 'lucide-react';
+import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, limit, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import Image from 'next/image';
 import FeatureGate from '@/components/shared/feature-gate';
@@ -463,16 +464,37 @@ function StorefrontCustomizationPage() {
             toast({ title: 'Link Copied', description: 'Your public store link has been copied.', variant: 'success' });
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
+
+            // Track storefront click/copy in Firestore
+            if (business?.id && firestore) {
+                addDoc(collection(firestore, 'storefront_shares'), {
+                    businessId: business.id,
+                    businessName: business.name,
+                    timestamp: serverTimestamp(),
+                    type: 'copy',
+                    url: publicStoreUrl
+                }).catch(e => console.error("Failed to log storefront share:", e));
+            }
         });
     };
 
     const handleShareLink = async () => {
-        if (!business) return;
+        if (!business || !firestore) return;
         const shareData = {
             title: storeSettings.headline || business.name,
             text: storeSettings.description || `Check out ${business.name}'s store!`,
             url: publicStoreUrl,
         };
+
+        // Track share button click in Firestore
+        addDoc(collection(firestore, 'storefront_shares'), {
+            businessId: business.id,
+            businessName: business.name,
+            timestamp: serverTimestamp(),
+            type: 'share',
+            url: publicStoreUrl
+        }).catch(e => console.error("Failed to log storefront share:", e));
+
         if (navigator.share) {
             try {
                 await navigator.share(shareData);
@@ -638,14 +660,19 @@ function StorefrontCustomizationPage() {
                                         </div>
                                         <div>
                                             <Label htmlFor="desktopColumns">Product Columns (Desktop)</Label>
-                                            <Select value={String(storeSettings.desktopColumns || 4)} onValueChange={(value) => handleSettingsChange('desktopColumns', Number(value))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="3">3 Columns</SelectItem>
-                                                    <SelectItem value="4">4 Columns</SelectItem>
-                                                    <SelectItem value="5">5 Columns</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                            <DropdownMenu modal={false}>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" className="w-full justify-between font-normal bg-background mt-1">
+                                                        <span>{storeSettings.desktopColumns || 4} Columns</span>
+                                                        <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-full min-w-[200px]">
+                                                    <DropdownMenuItem onClick={() => handleSettingsChange('desktopColumns', 3)}>3 Columns</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSettingsChange('desktopColumns', 4)}>4 Columns</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSettingsChange('desktopColumns', 5)}>5 Columns</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <Switch id="hideOutOfStock" checked={storeSettings.hideOutOfStock} onCheckedChange={(checked) => handleSettingsChange('hideOutOfStock', checked)} />
@@ -729,19 +756,21 @@ function StorefrontCustomizationPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="bankName">Bank Name</Label>
-                            <Select value={bankDetails.bankCode} onValueChange={(val) => {
-                                const bank = banks.find(b => b.code === val);
-                                setBankDetails(prev => ({ ...prev, bankCode: val, bankName: bank?.name || '' }));
-                            }}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a bank" />
-                                </SelectTrigger>
-                                <SelectContent>
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between font-normal bg-background mt-1">
+                                        <span>{bankDetails.bankName || "Select a bank"}</span>
+                                        <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
                                     {banks.map(bank => (
-                                        <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                                        <DropdownMenuItem key={bank.code} onClick={() => setBankDetails(prev => ({ ...prev, bankCode: bank.code, bankName: bank.name }))}>
+                                            {bank.name}
+                                        </DropdownMenuItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="accountNumber">Account Number</Label>

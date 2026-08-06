@@ -2,16 +2,11 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Delete, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CalculatorProps {
   isOpen: boolean;
@@ -128,7 +123,7 @@ export default function Calculator({ isOpen, onOpenChange }: CalculatorProps) {
   };
   
   const buttons = [
-    { label: 'C', action: clearCalculator, variant: 'destructive' },
+    { label: 'C', action: clearCalculator, variant: 'destructive', className: 'hover:bg-red-600 hover:text-white text-white' },
     { icon: Delete, action: handleBackspace, variant: 'secondary', key: 'backspace' },
     { label: '%', action: () => performOperation('%'), variant: 'secondary' },
     { label: '÷', action: () => performOperation('÷'), variant: 'secondary' },
@@ -157,48 +152,56 @@ export default function Calculator({ isOpen, onOpenChange }: CalculatorProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange} modal={false}>
-      <DialogContent className="sm:max-w-[320px] bg-transparent border-0 shadow-none p-0 focus-visible:outline-none [&>button]:hidden">
+    <AnimatePresence>
+      {isOpen && (
         <motion.div
-          drag
-          dragMomentum={false}
-          className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-2xl space-y-4 cursor-grab active:cursor-grabbing select-none w-full"
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ duration: 0.2 }}
+          className="fixed z-[100] top-24 right-8 w-full max-w-[320px]"
         >
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <DialogTitle className="text-base font-semibold">Calculator</DialogTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogHeader>
-          <div className="space-y-2">
-            <div className="h-8 text-right text-muted-foreground pr-4 text-lg truncate">{fullOperation}</div>
-            <Input
-              ref={inputRef}
-              type="text"
-              readOnly
-              value={formattedDisplay()}
-              className="text-right text-5xl font-mono h-24 p-4 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-            />
-            <div className="grid grid-cols-4 gap-2 pt-2">
-              {buttons.map(({label, action, variant, className, icon: Icon, key}, i) => (
-                <Button
-                  key={key || label || i}
-                  variant={variant as any}
-                  className={cn("text-2xl h-16 pointer-events-auto", className)}
-                  onClick={action}
-                >
-                  {Icon ? <Icon className="h-6 w-6"/> : label}
-                </Button>
-              ))}
+          <motion.div
+            drag
+            dragMomentum={false}
+            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-2xl space-y-4 cursor-grab active:cursor-grabbing select-none w-full"
+          >
+            <div className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <h2 className="text-base font-semibold">Calculator</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+                onClick={() => onOpenChange(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
+            <div className="space-y-2">
+              <div className="h-8 text-right text-muted-foreground pr-4 text-lg truncate">{fullOperation}</div>
+              <Input
+                ref={inputRef}
+                type="text"
+                readOnly
+                value={formattedDisplay()}
+                className="text-right text-5xl font-mono h-24 p-4 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <div className="grid grid-cols-4 gap-2 pt-2">
+                {buttons.map(({label, action, variant, className, icon: Icon, key}, i) => (
+                  <Button
+                    key={key || label || i}
+                    variant={variant as any}
+                    className={cn("text-2xl h-16 pointer-events-auto", className)}
+                    onClick={action}
+                  >
+                    {Icon ? <Icon className="h-6 w-6"/> : label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
-      </DialogContent>
-    </Dialog>
+      )}
+    </AnimatePresence>
   );
 }

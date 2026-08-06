@@ -397,8 +397,8 @@ export default function Home() {
                                     },
                                     {
                                         icon: Download,
-                                        title: "Bulk Data Tools",
-                                        description: "Migrate your existing inventory effortlessly with our smart CSV importer. Export your data at any time.",
+                                        title: "Smart Bulk Import",
+                                        description: "Upload and migrate thousands of products in seconds using our smart bulk import tools. Highly utilized by high-volume retailers.",
                                         bgColor: "bg-teal-100",
                                         iconColor: "text-teal-600",
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
@@ -453,16 +453,23 @@ export default function Home() {
                                     },
                                     {
                                         icon: Printer,
-                                        title: "Receipt Printing",
-                                        description: "Provide professional, branded receipts for every transaction. Compatible with most thermal receipt printers.",
+                                        title: "Shareable Receipt Links",
+                                        description: "Share live receipt URLs directly with customers via WhatsApp or SMS, alongside thermal printing compatibility.",
                                         bgColor: "bg-amber-100",
                                         iconColor: "text-amber-600",
-                                        hoverBg: "bg-[#FFFBEB]" // Light Amber
+                                        hoverBg: "bg-[#FFFBEB]", // Light Amber
+                                        badge: "Highly Shared"
                                     }
                                 ].map((feature, index) => (
                                     <div key={index} className="group relative p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden transition-all duration-300 isolate cursor-pointer shadow-sm">
                                         {/* Slide-in Background Animation */}
                                         <div className={`absolute inset-0 w-0 group-hover:w-full transition-all duration-500 ease-out ${feature.hoverBg} -z-10`}></div>
+
+                                        {feature.badge && (
+                                            <span className="absolute top-4 right-10 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/20 z-20">
+                                                {feature.badge}
+                                            </span>
+                                        )}
 
                                         <div className={`w-12 h-12 ${feature.bgColor} ${feature.iconColor} rounded-xl flex items-center justify-center mb-6 relative z-10 transition-colors duration-300 group-hover:bg-white/80`}>
                                             <feature.icon width="24" height="24" />

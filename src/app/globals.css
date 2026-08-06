@@ -20,7 +20,8 @@
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 0 0% 90%; /* Crisp silver for definitive hairline borders */
+    --border: 0 0% 90%;
+    /* Crisp silver for definitive hairline borders */
     --input: 220 13% 94%;
     --ring: 22 90% 55%;
     --radius: 0.5rem;
@@ -58,7 +59,8 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 12%; /* Keep dark but allow for sharper contrast */
+    --border: 240 3.7% 12%;
+    /* Keep dark but allow for sharper contrast */
     --input: 240 3.7% 12%;
     --ring: 22 90% 55%;
 
@@ -80,6 +82,7 @@
 }
 
 @layer base {
+
   /* Custom scrollbar to match premium feel - Neutral grey for better integration */
   ::-webkit-scrollbar {
     width: 6px;
@@ -91,7 +94,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.2); 
+    background-color: hsl(var(--muted-foreground) / 0.2);
     border-radius: 20px;
     border: 1px solid transparent;
     background-clip: padding-box;
@@ -103,7 +106,8 @@
   }
 
   /* Force HTML/Body to match background */
-  html, body {
+  html,
+  body {
     min-height: 100%;
     margin: 0;
     padding: 0;
@@ -112,10 +116,11 @@
   }
 
   /* Prevent layout shift from Radix UI Dialogs */
-  html, body {
+  html,
+  body {
     --removed-body-scroll-bar-size: 0px !important;
   }
-  
+
   :root {
     --removed-body-scroll-bar-size: 0px !important;
   }
@@ -135,7 +140,8 @@
     padding-right: 0px !important;
   }
 
-  html, body {
+  html,
+  body {
     transition: opacity ease-in 0.3s;
     opacity: 1;
   }
@@ -154,9 +160,9 @@
   body {
     overscroll-behavior: none;
   }
- 
+
   body.is-desktop {
-     overflow: hidden;
+    overflow: hidden;
   }
 
   ::selection {
@@ -181,14 +187,14 @@
      This ensures the POS and Admin Dashboard maintain the 'Crisp Silver' hairline aesthetic
      without affecting the softer marketing homepage.
   */
-  .high-fidelity-shell .border, 
-  .high-fidelity-shell .border-b, 
-  .high-fidelity-shell .border-t, 
-  .high-fidelity-shell .border-l, 
+  .high-fidelity-shell .border,
+  .high-fidelity-shell .border-b,
+  .high-fidelity-shell .border-t,
+  .high-fidelity-shell .border-l,
   .high-fidelity-shell .border-r,
   .high-fidelity-shell .sidebar-border,
   .high-fidelity-shell [class*='border-border'] {
-    border-color: hsl(var(--border)) !important; 
+    border-color: hsl(var(--border)) !important;
   }
 
   /* Keep sidebar borders slightly more subtle even in high-fidelity mode */
@@ -202,7 +208,8 @@
   .dark .high-fidelity-shell .border-l,
   .dark .high-fidelity-shell .border-r,
   .dark .high-fidelity-shell [class*='border-border'] {
-    border-color: hsl(var(--border) / 0.5) !important; /* Sharper definition in dark mode */
+    border-color: hsl(var(--border) / 0.5) !important;
+    /* Sharper definition in dark mode */
   }
 
   .dark .high-fidelity-shell .sidebar-border,
@@ -301,6 +308,7 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -332,7 +340,8 @@
     @page {
       margin: 0 !important;
       padding: 0 !important;
-      size: auto; /* Allow the browser to determine height, but we'll constrain width */
+      size: auto;
+      /* Allow the browser to determine height, but we'll constrain width */
     }
 
     .print-receipt {
@@ -412,11 +421,11 @@
     font-family: var(--font-inter), sans-serif !important;
   }
 
-  .blog-layout h1, 
-  .blog-layout h2, 
-  .blog-layout h3, 
-  .blog-layout h4, 
-  .blog-layout h5, 
+  .blog-layout h1,
+  .blog-layout h2,
+  .blog-layout h3,
+  .blog-layout h4,
+  .blog-layout h5,
   .blog-layout h6,
   .blog-layout .prose h1,
   .blog-layout .prose h2,
@@ -572,8 +581,13 @@ body {
 }
 
 @keyframes marquee-left {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 .animate-marquee-left {
@@ -589,11 +603,11 @@ body {
 }
 
 .font-geist {
-  font-family: 'Inter', sans-serif; /* Fallback for Geist */
+  font-family: 'Inter', sans-serif;
+  /* Fallback for Geist */
 }
 
-@layer utilities {
-}
+@layer utilities {}
 
 @layer components {
   .home-marq {
@@ -634,40 +648,13 @@ body {
 }
 
 /* Prevent Radix UI / react-remove-scroll scroll-lock from shifting the viewport layout */
-:root, [data-scroll-locked], body, html {
-  --removed-body-scroll-width: 0px !important;
-  --removed-body-scroll-bar-size: 0px !important;
-}
-
-html, body, #app-main-content {
-  scrollbar-gutter: stable !important;
+body {
+  scrollbar-gutter: stable;
+  padding-right: 0px !important;
 }
 
 body[data-scroll-locked],
 html[data-scroll-locked] {
   margin-right: 0px !important;
   padding-right: 0px !important;
-}
-
-/* Neutralize inline padding/margin shift on all fixed, sticky, and sidebar elements */
-body[data-scroll-locked] .fixed,
-body[data-scroll-locked] .sticky,
-body[data-scroll-locked] header,
-body[data-scroll-locked] nav,
-body[data-scroll-locked] aside,
-body[data-scroll-locked] [data-sidebar="sidebar"],
-body[data-scroll-locked] [style*="padding-right"],
-body[data-scroll-locked] [style*="margin-right"],
-html[style*="overflow: hidden"] .fixed,
-html[style*="overflow: hidden"] .sticky,
-html[style*="overflow: hidden"] header,
-html[style*="overflow: hidden"] nav,
-html[style*="overflow: hidden"] aside,
-html[style*="overflow: hidden"] [data-sidebar="sidebar"],
-html[style*="overflow: hidden"] [style*="padding-right"],
-html[style*="overflow: hidden"] [style*="margin-right"],
-[data-radix-portal] [style*="padding-right"],
-[data-radix-portal] [style*="margin-right"] {
-  padding-right: 0px !important;
-  margin-right: 0px !important;
 }

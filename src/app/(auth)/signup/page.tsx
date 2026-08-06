@@ -8,7 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
@@ -39,6 +40,9 @@ const signupSchema = z.object({
     }, { message: 'Temporary/disposable email addresses are not allowed.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   phone: z.string().optional(),
+  agreeToTerms: z.boolean().refine(val => val === true, {
+    message: 'You must agree to the Terms of Service and Privacy Policy.',
+  }),
 });
 
 type SignupFormValues = z.infer<typeof signupSchema>;
@@ -97,7 +101,7 @@ export default function SignupPage() {
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', name: '', phone: '' },
+    defaultValues: { email: '', password: '', name: '', phone: '', agreeToTerms: false },
   });
 
   useEffect(() => {
@@ -263,6 +267,33 @@ export default function SignupPage() {
                       </div>
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="agreeToTerms"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 mt-2">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="font-normal text-sm">
+                        I agree to the{' '}
+                        <Link href="/legal/terms-of-service" className="text-primary hover:underline" target="_blank">
+                          Terms of Service
+                        </Link>
+                        {' '}and{' '}
+                        <Link href="/legal/privacy-policy" className="text-primary hover:underline" target="_blank">
+                          Privacy Policy
+                        </Link>.
+                      </FormLabel>
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />

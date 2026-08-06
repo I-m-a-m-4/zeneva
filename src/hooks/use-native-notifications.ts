@@ -4,7 +4,7 @@
  * and the Native Mobile/Desktop notification system.
  */
 export function useNativeNotifications() {
-  const notify = async (title: string, body: string) => {
+  const notify = async (title: string, body: string, link?: string) => {
     try {
       const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
       if (!isTauri) {
@@ -13,12 +13,24 @@ export function useNativeNotifications() {
           return;
         }
 
+        const targetUrl = link || (title.toLowerCase().includes('ceo') || title.toLowerCase().includes('chat') ? '/support' : '/dashboard');
+
+        const createNotif = () => {
+          const n = new Notification(title, { body, icon: '/icon-192x192.png' });
+          n.onclick = () => {
+            window.focus();
+            if (targetUrl) {
+              window.location.href = targetUrl;
+            }
+          };
+        };
+
         if (Notification.permission === "granted") {
-          new Notification(title, { body, icon: '/icon-192x192.png' });
+          createNotif();
         } else if (Notification.permission !== "denied") {
           const permission = await Notification.requestPermission();
           if (permission === "granted") {
-            new Notification(title, { body, icon: '/icon-192x192.png' });
+            createNotif();
           }
         }
         return;
@@ -37,7 +49,6 @@ export function useNativeNotifications() {
         sendNotification({
           title,
           body,
-          // You can add more options here like icons/attachments in future
         });
       }
     } catch (err) {

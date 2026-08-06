@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { safeToDate } from '@/lib/utils';
+import { createPortal } from 'react-dom';
 
 type SuspiciousActivity = {
     title: string;
@@ -377,7 +378,8 @@ function AuditLogPageContent() {
                                     <TableBody>
                                         {filteredLogs.length > 0 ? (
                                             filteredLogs.map(log => {
-                                                const entityType = log.action.split('.')[0];
+                                                const actionStr = log.action || '';
+                                                const entityType = actionStr.split('.')[0] || '';
                                                 const Icon = actionIcons[entityType] || History;
                                                 return (
                                                     <TableRow key={log.id} onClick={() => setSelectedLog(log)} className="cursor-pointer hover:bg-muted/30">
@@ -403,11 +405,11 @@ function AuditLogPageContent() {
                                                         <TableCell>
                                                             <Badge variant="secondary" className="capitalize whitespace-nowrap text-[10px] py-0 h-5 font-bold">
                                                                 <Icon className="mr-1 h-2.5 w-2.5" />
-                                                                {log.action.replace('.', ' ')}
+                                                                {actionStr ? actionStr.replace('.', ' ') : 'Event'}
                                                             </Badge>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="text-sm font-medium truncate max-w-[150px] sm:max-w-xs">{log.details.entityName || log.entityType || 'N/A'}</div>
+                                                            <div className="text-sm font-medium truncate max-w-[150px] sm:max-w-xs">{log.details?.entityName || log.entityType || 'N/A'}</div>
                                                             <div className="text-[10px] text-muted-foreground truncate max-w-[150px] sm:max-w-xs" title={log.entityId}>
                                                                 {log.entityId}
                                                             </div>
@@ -445,7 +447,14 @@ function AuditLogPageContent() {
                     )}
                 </CardContent>
             </Card>
-            <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+            {typeof window !== 'undefined' && !!selectedLog && createPortal(
+                <div 
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
+                    onClick={() => setSelectedLog(null)} 
+                />,
+                document.body
+            )}
+            <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)} modal={false}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Log Event Details</DialogTitle>
@@ -461,7 +470,7 @@ function AuditLogPageContent() {
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Action</p>
-                                <p className="font-medium capitalize">{selectedLog.action.replace('.', ' ')}</p>
+                                <p className="font-medium capitalize">{(selectedLog.action || '').replace('.', ' ')}</p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Date</p>
@@ -469,13 +478,13 @@ function AuditLogPageContent() {
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Target</p>
-                                <p className="font-medium">{selectedLog.details.entityName || selectedLog.entityType}</p>
+                                <p className="font-medium">{selectedLog.details?.entityName || selectedLog.entityType || 'N/A'}</p>
                                 <p className="text-muted-foreground text-xs font-mono">{selectedLog.entityId}</p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-muted-foreground">Details</p>
                                 <pre className="p-3 bg-muted rounded-md text-xs whitespace-pre-wrap font-mono">
-                                    {JSON.stringify(selectedLog.details, null, 2)}
+                                    {JSON.stringify(selectedLog.details || {}, null, 2)}
                                 </pre>
                             </div>
                         </div>

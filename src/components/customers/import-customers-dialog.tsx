@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -224,8 +225,19 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
     onOpenChange(open);
   }
 
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => { setIsMounted(true); }, []);
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <>
+      {isMounted && isOpen && createPortal(
+        <div 
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
+          onClick={() => handleOpenChange(false)} 
+        />,
+        document.body
+      )}
+      <Dialog open={isOpen} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
@@ -321,5 +333,6 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

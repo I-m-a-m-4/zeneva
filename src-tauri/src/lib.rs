@@ -32,6 +32,9 @@ fn validate_subscription(access_level: String, trial_expires_at: i64) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  #[cfg(target_os = "android")]
+  let _ = rustls::crypto::ring::default_provider().install_default();
+
   println!("Zeneva: Initializing Builder...");
   
   #[allow(unused_mut)]
@@ -47,9 +50,9 @@ pub fn run() {
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
-    .plugin(tauri_plugin_stronghold::Builder::new(|_password| {
-        "zeneva-secure-key-2024".as_bytes().to_vec()
-    }).build())
+    // .plugin(tauri_plugin_stronghold::Builder::new(|_password| {
+    //     "zeneva-secure-key-2024".as_bytes().to_vec()
+    // }).build())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_http::init())

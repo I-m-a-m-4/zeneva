@@ -72,13 +72,13 @@ function ReceiptsContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const customerId = searchParams.get('customerId');
-  
-  const { 
-    receipts, 
-    isLoading: isPosLoading, 
-    business, 
-    currentUserProfile: currentUser, 
-    currencySymbol, 
+
+  const {
+    receipts,
+    isLoading: isPosLoading,
+    business,
+    currentUserProfile: currentUser,
+    currencySymbol,
     triggerRefresh,
     searchReceipts,
     fetchMoreReceipts,
@@ -106,7 +106,7 @@ function ReceiptsContent() {
   const displayedReceipts = React.useMemo(() => {
     if (!receipts) return [];
     let filtered = receipts.filter(r => r && r.paymentMethod !== 'Invoice');
-    
+
     if (customerId) {
       filtered = filtered.filter(r => r.customer?.id === customerId);
     } else if (searchTerm.trim()) {
@@ -114,9 +114,9 @@ function ReceiptsContent() {
       filtered = filtered.filter(r => {
         const receiptId = r.id || '';
         const rNumber = r.receiptNumber || `rec-${receiptId.substring(0, 8)}`;
-        
-        return rNumber.toLowerCase().includes(lower) || 
-          receiptId.toLowerCase().includes(lower) || 
+
+        return rNumber.toLowerCase().includes(lower) ||
+          receiptId.toLowerCase().includes(lower) ||
           (r.customer?.name || '').toLowerCase().includes(lower) ||
           (r.paymentMethod || '').toLowerCase().includes(lower) ||
           (r.total || 0).toString().includes(lower);
@@ -151,21 +151,21 @@ function ReceiptsContent() {
     setIsFetchingMore(false);
   };
 
-    const safeFormatDate = (val: any) => {
-        if (!val) return 'N/A';
-        const date = safeToDate(val);
-        if (date.getTime() === 0) return 'N/A';
-        return format(date, 'PP');
-    };
+  const safeFormatDate = (val: any) => {
+    if (!val) return 'N/A';
+    const date = safeToDate(val);
+    if (date.getTime() === 0) return 'N/A';
+    return format(date, 'PP');
+  };
 
-    const safeFormatTime = (val: any) => {
-        if (!val) return 'N/A';
-        const date = safeToDate(val);
-        if (date.getTime() === 0) return 'N/A';
-        return format(date, 'p');
-    };
+  const safeFormatTime = (val: any) => {
+    if (!val) return 'N/A';
+    const date = safeToDate(val);
+    if (date.getTime() === 0) return 'N/A';
+    return format(date, 'p');
+  };
 
-    const isLoading = receipts === null;
+  const isLoading = receipts === null;
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete || !firestore || !business || !currentUser) return;
@@ -225,15 +225,15 @@ function ReceiptsContent() {
       await voidReceipt(receiptToDelete.id);
     } catch (e: any) {
       console.error("Failed to void sale:", e);
-      
+
       // Fallback: Even if the direct online transaction failed (e.g. network error, already deleted, or sync mismatch),
       // we MUST call voidReceipt to clear it from local cache and enqueue the operation for safety.
       await voidReceipt(receiptToDelete.id);
-      
-      toast({ 
-        title: 'Offline Void Handled', 
+
+      toast({
+        title: 'Offline Void Handled',
         description: 'The sale was voided locally and the update queued for synchronization.',
-        variant: 'default' 
+        variant: 'default'
       });
     } finally {
       setReceiptToDelete(null);
@@ -275,9 +275,9 @@ function ReceiptsContent() {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
                 {(startDate || endDate) && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => { setStartDate(''); setEndDate(''); }}
                     className="text-xs text-muted-foreground hover:text-foreground h-9 px-2"
                   >
@@ -327,7 +327,7 @@ function ReceiptsContent() {
                 </TableHeader>
                 <TableBody>
                   {displayedReceipts.map((receipt: Receipt) => (
-                    <TableRow 
+                    <TableRow
                       key={receipt.id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => router.push(`/receipts/details?id=${receipt.id}`)}
@@ -341,7 +341,7 @@ function ReceiptsContent() {
                       <TableCell>{receipt.paymentMethod || 'N/A'}</TableCell>
                       <TableCell className="text-right">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button aria-haspopup="true" size="icon" variant="ghost">
                               <MoreHorizontal className="h-4 w-4" />
@@ -368,12 +368,12 @@ function ReceiptsContent() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {!searchTerm && hasMore && (
                 <div className="flex justify-center mt-6 pt-4 border-t">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleLoadMore} 
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadMore}
                     disabled={isFetchingMore}
                     className="min-w-[200px]"
                   >

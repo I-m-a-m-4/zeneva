@@ -63,7 +63,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
             <Button 
               variant="ghost" 
               disabled={!isOwner} 
-              className="h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-muted/60 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5"
+              className="h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5"
             >
               <div className="flex items-center gap-1.5 truncate">
                 {activeBranchId === 'all' ? (
@@ -100,7 +100,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
             <Button 
               variant="outline" 
               disabled={!isOwner} 
-              className="w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 transition-all justify-between gap-2"
+              className="w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-all justify-between gap-2"
             >
               <div className="flex items-center gap-2 truncate">
                 {activeBranchId === 'all' ? (
@@ -135,7 +135,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
           <Button 
             variant="outline" 
             disabled={!isOwner} 
-            className="w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary justify-between font-normal gap-2"
+            className="w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary justify-between font-normal hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 gap-2"
           >
             <div className="flex items-center gap-2 truncate">
               {activeBranchId === 'all' ? (

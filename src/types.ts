@@ -41,6 +41,7 @@ export interface CartItem {
     multiplier?: number;
     isPriceOverride?: boolean;
     originalPrice?: number;
+    addedViaBarcode?: boolean;
 }
 
 export interface HeldSale {
@@ -130,6 +131,10 @@ export interface Receipt {
         closeTime?: string;
     } | null;
     branchId?: string;
+    isOffline?: boolean;
+    syncedAt?: any;
+    wasScanned?: boolean;
+    receiptMethod?: 'printed' | 'digital' | 'none';
 }
 
 export interface OnlineOrder {

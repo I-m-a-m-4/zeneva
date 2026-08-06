@@ -5,11 +5,16 @@ import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { ConsoleGuard } from './console-guard';
 
+import { flushOfflineErrors } from '@/lib/error-logger';
+
 export function ClientSideInitializer() {
   const [isMounted, setIsMounted] = React.useState(false);
   
   React.useEffect(() => {
     setIsMounted(true);
+    
+    // Flush any cached errors queued while offline/failed
+    flushOfflineErrors().catch((err) => console.warn('Failed to flush offline errors:', err));
 
     // Zeneva Console Branding
     // Note: Important errors are NOT suppressed. Only non-critical tracker and network noise is silenced.
