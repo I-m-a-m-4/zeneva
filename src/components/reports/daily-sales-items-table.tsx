@@ -7,7 +7,7 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { CachedImage } from '../shared/cached-image';
-import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon, Banknote, ArrowRightLeft, ShieldCheck } from 'lucide-react';
+import { Package, Search, ChevronLeft, ChevronRight, FileText, Download, Calendar as CalendarIcon, Banknote, ArrowRightLeft, ShieldCheck, CreditCard } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
 import { format, formatDistanceToNow, startOfDay, endOfDay, isSameDay, subDays } from 'date-fns';
 import { safeToDate, cn } from '@/lib/utils';
@@ -47,10 +47,11 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const { currentUserProfile, business } = usePOS();
   const [dailyTransferReceived, setDailyTransferReceived] = React.useState(0);
 
-  // Compute Cash and Expected Transfers for the selected day
-  const { dailyCash, dailyTransferExpected } = React.useMemo(() => {
+  // Compute Cash, Transfers, and Card for the selected day
+  const { dailyCash, dailyTransferExpected, dailyCard } = React.useMemo(() => {
     let cash = 0;
     let transfer = 0;
+    let card = 0;
     const targetDateStart = startOfDay(selectedDate).getTime();
     const targetDateEnd = endOfDay(selectedDate).getTime();
 
@@ -59,10 +60,11 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       if (rTime >= targetDateStart && rTime <= targetDateEnd) {
         if (r.paymentMethod === 'Cash') cash += r.total;
         if (r.paymentMethod === 'Bank Transfer') transfer += r.total;
+        if (r.paymentMethod === 'Card' || r.paymentMethod === 'POS Card' || r.paymentMethod?.toLowerCase().includes('card')) card += r.total;
       }
     });
 
-    return { dailyCash: cash, dailyTransferExpected: transfer };
+    return { dailyCash: cash, dailyTransferExpected: transfer, dailyCard: card };
   }, [receipts, selectedDate]);
 
   // Fetch actual terminal alerts for the selected day to compute Verified Transfers
@@ -403,7 +405,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       </CardHeader>
       
       {/* Daily Sales Summary Header */}
-      <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-border/50 bg-muted/5">
+      <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-border/50 bg-muted/5">
         <Card className="bg-slate-50 border-slate-200 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-slate-500">Day's Cash Sales</CardTitle>
@@ -423,6 +425,17 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
           <CardContent>
             <div className="text-2xl font-bold text-blue-900">{currencySymbol}{dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
             <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-violet-50 border-violet-200 shadow-none">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-violet-600">Card Transactions</CardTitle>
+            <CreditCard className="h-4 w-4 text-violet-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-violet-900">{currencySymbol}{dailyCard.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-violet-600/70 mt-1">Total POS card payments collected</p>
           </CardContent>
         </Card>
 
