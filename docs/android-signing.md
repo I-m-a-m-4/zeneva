@@ -140,6 +140,16 @@ check it on the first successful upload after a gap.
 
 ## Rules
 
+- **Workflow env, not step env.** `tauri.conf.json`'s `beforeBuildCommand`
+  runs `scripts/tauri-prebuild.mjs`, which calls `npm run build` a *second*
+  time inside the `tauri-action` step. That rebuild is what gets bundled.
+  Secrets declared only on the "Build frontend" step do not reach it, so the
+  `NEXT_PUBLIC_*` values inline as `undefined`, Firebase initialises with an
+  empty config, and every login fails with "Invalid email or password" —
+  the credentials are fine, the app simply has no backend. This shipped in
+  3.1.2. `NEXT_PUBLIC_*` now lives in the workflow-level `env:` block so
+  every step and every nested process inherits it, and a *Verify Firebase
+  config is present* step fails the build if any is missing.
 - **Never generate a signing key in CI.** Generate once, locally, store as a
   secret. A workflow that mints keys will eventually mint one Play doesn't
   know about, which is exactly what happened here.

@@ -8,6 +8,26 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Workflow-level so every step inherits these, including the second `next build`
+# that tauri.conf.json's beforeBuildCommand triggers via scripts/tauri-prebuild.mjs.
+# That rebuild is what actually gets bundled; without these the NEXT_PUBLIC_*
+# values inline as undefined and Firebase auth fails at runtime.
+env:
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+  NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+  NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+  NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
+  NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
+  NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
+  NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID }}
+  NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID }}
+  NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY }}
+  NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
+  NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
+
 jobs:
   release:
     name: Build & Release (${{ matrix.platform }})
@@ -45,23 +65,24 @@ jobs:
         run: |
           # No extra brew deps usually needed for standard Tauri, but can add if necessary
 
+      - name: Verify Firebase config is present
+        shell: bash
+        run: |
+          missing=""
+          for v in NEXT_PUBLIC_FIREBASE_API_KEY NEXT_PUBLIC_FIREBASE_PROJECT_ID \
+                   NEXT_PUBLIC_FIREBASE_APP_ID NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+                   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID; do
+            [ -z "${!v}" ] && missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing Firebase secrets:$missing - the app would build but every login would fail."
+            exit 1
+          fi
+          echo "Firebase config present."
+
       - name: Build frontend
         env:
           IS_TAURI: true
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
-          NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
-          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY }}
         run: |
           node scripts/prepare-tauri.mjs
           npm run build
@@ -201,23 +222,10 @@ jobs:
       - name: Build frontend
         env:
           IS_TAURI: true
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
-          NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
-          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY }}
         run: |
           node scripts/prepare-tauri.mjs
           npm run build
+
       - name: Initialize Android (if not exists)
         run: npx tauri android init --ci
         continue-on-error: true
@@ -376,20 +384,6 @@ jobs:
       - name: Build frontend
         env:
           IS_TAURI: true
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
-          NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY: ${{ secrets.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY }}
-          NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_SERVICE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_TEMPLATE_ID }}
-          NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_RECEIPT_PUBLIC_KEY }}
         run: |
           node scripts/prepare-tauri.mjs
           npm run build

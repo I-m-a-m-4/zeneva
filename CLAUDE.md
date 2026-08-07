@@ -23,6 +23,21 @@ The short version, because this cost two days once already:
   mismatch. Rotating the key means updating that value *and* the hash in
   `public/.well-known/assetlinks.json`.
 
+## Build env — read before editing release.yml
+
+`tauri.conf.json`'s `beforeBuildCommand` runs `scripts/tauri-prebuild.mjs`,
+which calls `npm run build` a **second** time from inside the `tauri-action`
+step. That rebuild is the one that gets bundled.
+
+So `NEXT_PUBLIC_*` secrets must be declared in the **workflow-level `env:`
+block**, never only on a step. Declaring them per-step means the nested
+rebuild sees `undefined`, Firebase initialises with an empty config, and
+every login fails with "Invalid email or password" on a correct password.
+That shipped in 3.1.2 across desktop, Android and iOS.
+
+`release.yml` has a *Verify Firebase config is present* step that fails the
+build if any required value is missing. Keep it.
+
 ## Releasing
 
 Version is read from `package.json`, not the git tag. Bump `package.json`,
