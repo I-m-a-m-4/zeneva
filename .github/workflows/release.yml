@@ -243,9 +243,7 @@ jobs:
 
           # Boost Gradle JVM heap inside gradlew itself
           mkdir -p src-tauri/gen/android
-          echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" >> src-tauri/gen/android/gradle.properties
-          echo "android.useAndroidX=true" >> src-tauri/gen/android/gradle.properties
-          echo "android.enableJetifier=true" >> src-tauri/gen/android/gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8\nandroid.useAndroidX=true\nandroid.enableJetifier=true\n' >> src-tauri/gen/android/gradle.properties
 
           # Build AAB for Play Store
           npm run tauri android build -- --aab --target aarch64 --target armv7 --ignore-version-mismatches
