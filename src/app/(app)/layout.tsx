@@ -611,8 +611,6 @@ export default function AuthenticatedLayout({
       localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
     }
 
-    const { collection, query, where, orderBy, limit, onSnapshot } = require('firebase/firestore');
-    
     const q = query(
       collection(firestore, 'supportThreads'),
       where('userId', '==', currentUserProfile.id),
@@ -620,13 +618,13 @@ export default function AuthenticatedLayout({
       limit(5)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot: any) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       if (typeof window === 'undefined') return;
       
       const lastViewedTimeStr = localStorage.getItem('zeneva_last_viewed_support_user');
       const lastViewedTime = lastViewedTimeStr ? parseInt(lastViewedTimeStr) : 0;
 
-      snapshot.docChanges().forEach((change: any) => {
+      snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified') {
           const data = change.doc.data();
           if (data.lastMessageSender === 'user') return;
