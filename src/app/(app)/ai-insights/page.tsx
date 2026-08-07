@@ -161,11 +161,8 @@ function ToolStatusChip({ tool }: { tool: any }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ZenAIPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: any, firestore: any }) {
   const { toast } = useToast();
-  const [businessId, setBusinessId] = React.useState<string | null>(null);
   const [proposalStatuses, setProposalStatuses] = React.useState<Record<string, 'APPROVED' | 'REJECTED'>>({});
   
   // Chat Session State
@@ -191,15 +188,6 @@ export default function ZenAIPage() {
     });
     return () => unsubscribe();
   }, [businessId, firestore]);
-
-  // Load businessId from user profile
-  useEffect(() => {
-    if (!user || !firestore) return;
-    getDoc(doc(firestore, `users/${user.uid}`))
-      .then(snap => {
-        if (snap.exists()) setBusinessId(snap.data().businessId ?? null);
-      });
-  }, [user, firestore]);
 
   // Load Sessions
   useEffect(() => {
@@ -229,7 +217,7 @@ export default function ZenAIPage() {
 
   const { messages, setMessages, append, sendMessage, isLoading, stop } = useChat({
     id: sessionId,
-    api: '/api/chat',
+    api: `/api/chat?businessId=${businessId || ''}&userId=${user?.uid || ''}`,
     fetch: async (url, options) => {
       const fetchHeaders = new Headers(options?.headers);
       const { businessId: currentBizId, userId: currentUserId } = authRef.current;
@@ -630,4 +618,32 @@ export default function ZenAIPage() {
     </div>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page Wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+export default function ZenAIPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [businessId, setBusinessId] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !firestore) return;
+    getDoc(doc(firestore, `users/${user.uid}`))
+      .then(snap => {
+        if (snap.exists()) setBusinessId(snap.data().businessId ?? null);
+      });
+  }, [user, firestore]);
+
+  if (!businessId || !user) {
+    return (
+      <div className="flex flex-col h-screen bg-white items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
+        <p className="text-gray-500 text-sm font-medium">Loading AI Copilot...</p>
+      </div>
+    );
+  }
+
+  return <ZenAIChat businessId={businessId} user={user} firestore={firestore} />;
 }

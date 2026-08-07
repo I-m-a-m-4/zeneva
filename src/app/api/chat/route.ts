@@ -64,17 +64,21 @@ You are operating on behalf of a verified business owner. You have access to the
 
 
 export async function POST(req: Request) {
+  const url = new URL(req.url);
+  const qBusinessId = url.searchParams.get('businessId');
+  const qUserId = url.searchParams.get('userId');
+
   const json = await req.json();
   console.log("Chat API payload:", JSON.stringify(json, null, 2));
   console.log("Chat API Headers x-business-id:", req.headers.get('x-business-id'));
   const { messages, data } = json;
   
-  let businessId = req.headers.get('x-business-id') || json.businessId;
-  let userId = req.headers.get('x-user-id') || json.userId;
+  let businessId = req.headers.get('x-business-id') || json.businessId || qBusinessId;
+  let userId = req.headers.get('x-user-id') || json.userId || qUserId;
 
   if (!businessId && data) {
     const dataObj = Array.isArray(data) ? data[0] : data;
-    businessId = dataObj?.businessId;
+    businessId = dataObj?.businessId || businessId;
     userId = dataObj?.userId || userId;
   }
 
