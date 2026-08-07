@@ -63,21 +63,24 @@ stubs.forEach(s => {
 
 console.log('--- Setting up root page redirect ---');
 const rootPagePath = path.resolve(process.cwd(), 'src/app/page.tsx');
+// Mobile opens on the /welcome carousel; desktop goes straight to /login.
+// signedOutLandingRoute() reads the userAgent, so this has to run client-side.
 const redirectContent = `'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signedOutLandingRoute } from '@/lib/platform';
 
 export default function Home() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/login');
+    router.replace(signedOutLandingRoute());
   }, [router]);
   return null;
 }`;
 
 if (fs.existsSync(rootPagePath)) {
     fs.writeFileSync(rootPagePath, redirectContent);
-    console.log('Root page updated with redirect to /login');
+    console.log('Root page updated: /welcome on mobile, /login on desktop');
 }
 
 console.log('--- Preparation Complete ---');

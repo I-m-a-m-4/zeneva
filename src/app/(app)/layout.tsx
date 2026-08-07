@@ -41,6 +41,7 @@ import NetworkStatusIndicator from '@/components/shared/network-status-indicator
 import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
+import { signedOutLandingRoute } from '@/lib/platform';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -453,9 +454,10 @@ export default function AuthenticatedLayout({
   const handleConfettiComplete = React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive]);
 
   React.useEffect(() => {
-    // If auth checking is complete and there's no authenticated user, redirect to login.
+    // If auth checking is complete and there's no authenticated user, send them out.
+    // Mobile lands on /welcome, desktop and web on /login.
     if (!isUserLoading && !user) {
-      router.replace('/login');
+      router.replace(signedOutLandingRoute());
     }
   }, [isUserLoading, user, router]);
 
