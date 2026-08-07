@@ -23,6 +23,13 @@ if (fs.existsSync(packagePath)) {
 if (fs.existsSync(tauriConfPath)) {
   const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
   tauriConf.version = newVersion;
+  // The window title carries the version too; without this it silently drifts
+  // (it still read v3.1.2 as of the 3.1.4 release).
+  (tauriConf.app?.windows || []).forEach((w) => {
+    if (typeof w.title === 'string') {
+      w.title = w.title.replace(/v[\d.]+$/, `v${newVersion}`);
+    }
+  });
   fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
   console.log(`Updated tauri.conf.json to ${newVersion}`);
 }
