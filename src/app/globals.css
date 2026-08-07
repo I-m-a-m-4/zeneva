@@ -658,3 +658,7 @@ html[data-scroll-locked] {
   margin-right: 0px !important;
   padding-right: 0px !important;
 }
+
+/* Prevent Radix UI / react-remove-scroll scroll-lock from shifting layout */
+body { scrollbar-gutter: stable; padding-right: 0px !important; }
+body[data-scroll-locked], html[data-scroll-locked] { margin-right: 0px !important; padding-right: 0px !important; }

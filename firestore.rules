@@ -134,6 +134,13 @@ service cloud.firestore {
       }
     }
 
+    match /ai_sessions/{sessionId} {
+      allow read, write: if isUserAuthenticated() && 
+        (isRequestingUserMemberOf(resource.data.get('businessId', 'none')) || resource.data.get('userId', 'none') == request.auth.uid);
+      allow create: if isUserAuthenticated() && 
+        (isRequestingUserMemberOf(request.resource.data.get('businessId', 'none')) || request.resource.data.get('userId', 'none') == request.auth.uid);
+    }
+
     match /users/{userId} {
       allow get: if isSuperAdmin() || (isUserAuthenticated() && request.auth.uid == userId);
       allow list: if isSuperAdmin() || (isUserAuthenticated() && getCurrentUserBusinessId() == resource.data.businessId);
@@ -241,6 +248,11 @@ service cloud.firestore {
                       hasPermission('view_customers') &&
                       isRequestingUserMemberOf(resource.data.get('businessId', null)) && 
                       isSubscriptionActive(resource.data.get('businessId', null)))));
+    }
+
+    match /ai_sessions/{sessionId} {
+      allow read, update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.businessId));
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(request.resource.data.businessId));
     }
 
     match /admin_analytics/{docId} {

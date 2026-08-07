@@ -28,6 +28,7 @@ import {
   Box,
   Activity,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -178,6 +179,8 @@ function InventoryPageContent() {
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('all');
+  const [healthFilter, setHealthFilter] = React.useState<'all'|'missing-image'|'out-of-stock'|'low-stock'|'negative'>('all');
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
@@ -282,13 +285,38 @@ function InventoryPageContent() {
     return valid;
   }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
-  const totalCount = filteredProducts.length;
+  const healthMetrics = React.useMemo(() => {
+    if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0 };
+    let missing = 0, oos = 0, low = 0, neg = 0, total = 0;
+    products.forEach(p => {
+      let isUnhealthy = false;
+      if (!p.imageUrl) { missing++; isUnhealthy = true; }
+      if (p.stock === 0) { oos++; isUnhealthy = true; }
+      if (p.stock !== undefined && p.stock > 0 && p.stock <= 5) { low++; isUnhealthy = true; }
+      if (p.stock !== undefined && p.stock < 0) { neg++; isUnhealthy = true; }
+      if (isUnhealthy) total++;
+    });
+    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total };
+  }, [products]);
 
-
+  const displayedProducts = React.useMemo(() => {
+    if (activeTab === 'all') return filteredProducts;
+    
+    // Health tab filtering
+    return filteredProducts.filter(p => {
+      if (healthFilter === 'missing-image') return !p.imageUrl;
+      if (healthFilter === 'out-of-stock') return p.stock === 0;
+      if (healthFilter === 'low-stock') return p.stock !== undefined && p.stock > 0 && p.stock <= 5;
+      if (healthFilter === 'negative') return p.stock !== undefined && p.stock < 0;
+      
+      // 'all' health issues
+      return !p.imageUrl || p.stock === 0 || (p.stock !== undefined && p.stock > 0 && p.stock <= 5) || (p.stock !== undefined && p.stock < 0);
+    });
+  }, [filteredProducts, activeTab, healthFilter]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      setSelectedProductIds(filteredProducts.map(p => p.id));
+      setSelectedProductIds(displayedProducts.map(p => p.id));
     } else {
       setSelectedProductIds([]);
     }
@@ -672,6 +700,60 @@ function InventoryPageContent() {
             </DropdownMenu>
           </div>
       </div>
+
+      <div className="w-full mb-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-md">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="all">All Products</TabsTrigger>
+            <TabsTrigger value="health" className="flex items-center gap-1.5">
+              Inventory Health
+              {healthMetrics.total > 0 && <span className="flex h-2 w-2 rounded-full bg-red-500" />}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {activeTab === 'health' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card 
+            className={cn("cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
+            onClick={() => setHealthFilter('all')}
+          >
+            <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <span className="text-2xl font-bold">{healthMetrics.total}</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Issues</span>
+            </CardContent>
+          </Card>
+          <Card 
+            className={cn("cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
+            onClick={() => setHealthFilter('out-of-stock')}
+          >
+            <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <span className="text-2xl font-bold text-red-600">{healthMetrics.outOfStock}</span>
+              <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">Out of Stock</span>
+            </CardContent>
+          </Card>
+          <Card 
+            className={cn("cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
+            onClick={() => setHealthFilter('low-stock')}
+          >
+            <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <span className="text-2xl font-bold text-orange-600">{healthMetrics.lowStock}</span>
+              <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">Low Stock (≤5)</span>
+            </CardContent>
+          </Card>
+          <Card 
+            className={cn("cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
+            onClick={() => setHealthFilter('missing-image')}
+          >
+            <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <span className="text-2xl font-bold text-blue-600">{healthMetrics.missingImages}</span>
+              <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">Missing Images</span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -682,20 +764,20 @@ function InventoryPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
-          {(isLoading && filteredProducts.length === 0) || products === null ? (
+          {(isLoading && displayedProducts.length === 0) || products === null ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
               <p className="text-muted-foreground animate-pulse font-medium">Scanning inventory catalogs...</p>
               <p className="text-[10px] text-muted-foreground/60 mt-2 uppercase tracking-widest">Just a moment</p>
             </div>
           ) : (
-            filteredProducts && filteredProducts.length > 0 ? (
+            displayedProducts && displayedProducts.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-12">
                       <Checkbox
-                        checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length}
+                        checked={displayedProducts.length > 0 && selectedProductIds.length === displayedProducts.length}
                         onCheckedChange={handleSelectAll}
                       />
                     </TableHead>
@@ -710,8 +792,15 @@ function InventoryPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) && "selected"} className={cn((product as any).isOptimistic && "opacity-70 bg-muted/50")}>
+                  {displayedProducts.map((product) => (
+                    <TableRow 
+                      key={product.id} 
+                      data-state={selectedProductIds.includes(product.id) && "selected"} 
+                      className={cn(
+                        "group hover:bg-muted/50 cursor-pointer transition-colors",
+                        (product as any).isOptimistic && "opacity-70 bg-muted/50"
+                      )}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedProductIds.includes(product.id)}
@@ -836,20 +925,26 @@ function InventoryPageContent() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px]">
                 <PackageOpen className="h-24 w-24 text-muted-foreground/30 mb-4" />
-                <h3 className="text-xl font-semibold">{searchTerm ? 'No product found' : 'Empty Inventory'}</h3>
+                <h3 className="text-xl font-semibold">
+                  {activeTab === 'health' ? 'No health issues found' : (searchTerm ? 'No product found' : 'Empty Inventory')}
+                </h3>
                 <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
-                  {searchTerm ? `Try searching for something else or clear the search.` : 'Start adding products to your shop.'}
+                  {activeTab === 'health' 
+                    ? "Your inventory is looking great! No products match the current health filter."
+                    : (searchTerm ? `Try searching for something else or clear the search.` : 'Start adding products to your shop.')}
                 </p>
-                <div className="flex gap-2">
-                  <Button asChild>
-                    <Link href="/inventory/add">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                    </Link>
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                    <Upload className="mr-2 h-4 w-4" /> Import CSV
-                  </Button>
-                </div>
+                {activeTab === 'all' && (!searchTerm && stockFilter === 'all' && categoryFilter === 'all') && (
+                  <div className="flex gap-2">
+                    <Button asChild>
+                      <Link href="/inventory/add">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                      </Link>
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                      <Upload className="mr-2 h-4 w-4" /> Import CSV
+                    </Button>
+                  </div>
+                )}
               </div>
             )
           )}

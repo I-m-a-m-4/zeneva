@@ -31,3 +31,9 @@ apiFiles.forEach(file => {
 });
 
 console.log('Successfully renamed API routes to .bak to bypass Next.js static export errors completely.');
+
+import { execSync } from 'child_process';
+console.log('Starting Next.js static export build...');
+process.env.IS_TAURI = 'true';
+execSync('npm run build', { stdio: 'inherit' });
+console.log('Next.js build finished.');

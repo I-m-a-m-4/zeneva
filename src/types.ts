@@ -336,6 +336,9 @@ export interface BusinessInstance {
         multiBranchEnabled?: boolean;
         aiTroubleshootSuggestions?: AISuggestions;
         businessAnalysis?: BusinessAnalysisOutput;
+        aiUsageCurrentDate?: string; // YYYY-MM-DD
+        aiUsageCount?: number;
+        aiBonusCredits?: number;
         publicStore?: {
             enabled?: boolean;
             headline?: string;
