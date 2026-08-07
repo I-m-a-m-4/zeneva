@@ -583,22 +583,76 @@ export default function AuthenticatedLayout({
         const notif = unreadPermissionNotifs[unreadPermissionNotifs.length - 1];
         setPermissionPopup({ id: notif.id, title: notif.title, body: notif.body });
       }
+    }
+  }, [userNotifications, permissionPopup]);
 
-      const latestNotif = userNotifications[0]; // Already ordered by desc createdAt
-      if (!latestNotif.read && latestNotif.id !== lastNotifiedId) {
-        // We only notify if the notification is less than 30 seconds old to avoid 
-        // flooding on initial load or re-syncs.
+  // Native Push Notifications for standard Alerts
+  React.useEffect(() => {
+    if (allNotifications && allNotifications.length > 0) {
+      const latestNotif = allNotifications[0]; // Already ordered by desc createdAt
+      if (latestNotif.id !== lastNotifiedId) {
         const createdDate = safeToDate(latestNotif.createdAt);
         const now = new Date();
         const diffSeconds = (now.getTime() - createdDate.getTime()) / 1000;
 
+        // Only notify if the notification is less than 30 seconds old
         if (diffSeconds < 30) {
-          notify(latestNotif.title, latestNotif.body);
-          setLastNotifiedId(latestNotif.id);
+          notify(latestNotif.title, latestNotif.body, getNotificationLink(latestNotif));
         }
+        setLastNotifiedId(latestNotif.id);
       }
     }
-  }, [userNotifications, lastNotifiedId, notify]);
+  }, [allNotifications, lastNotifiedId, notify]);
+
+  // Support Messages Notifications for User
+  React.useEffect(() => {
+    if (!firestore || !currentUserProfile?.id) return;
+    if (typeof window !== 'undefined' && pathname === '/support') {
+      localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
+    }
+
+    const { collection, query, where, orderBy, limit, onSnapshot } = require('firebase/firestore');
+    
+    const q = query(
+      collection(firestore, 'supportThreads'),
+      where('userId', '==', currentUserProfile.id),
+      orderBy('lastMessageAt', 'desc'),
+      limit(5)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot: any) => {
+      if (typeof window === 'undefined') return;
+      
+      const lastViewedTimeStr = localStorage.getItem('zeneva_last_viewed_support_user');
+      const lastViewedTime = lastViewedTimeStr ? parseInt(lastViewedTimeStr) : 0;
+
+      snapshot.docChanges().forEach((change: any) => {
+        if (change.type === 'added' || change.type === 'modified') {
+          const data = change.doc.data();
+          if (data.lastMessageSender === 'user') return;
+          
+          if (data.lastMessageAt) {
+            const date = typeof data.lastMessageAt.toDate === 'function'
+              ? data.lastMessageAt.toDate()
+              : new Date(data.lastMessageAt);
+            const time = date.getTime();
+            
+            // Only notify if it's new, less than 60 seconds old, and we're not currently on the support page
+            if (!isNaN(time) && time > lastViewedTime && (Date.now() - time) < 60000 && pathname !== '/support') {
+              notify(
+                'New Message from Zeneva Support', 
+                data.lastMessage || 'You have a new message from our team.',
+                '/support'
+              );
+              localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
+            }
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [firestore, currentUserProfile?.id, pathname, notify]);
 
   // --- Automated Notification Triggers ---
 
@@ -1167,91 +1221,12 @@ export default function AuthenticatedLayout({
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Popover onOpenChange={(open) => { if (open) handleMarkAsRead() }}>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-                            <Bell className="h-5 w-5" />
-                            {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-96 p-0">
-                          <div className="flex items-center justify-between p-4 border-b">
-                            <p className="font-medium">Notifications</p>
-                            <div className="flex items-center gap-2">
-                              {unreadCount > 0 && <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={handleMarkAsRead}>Mark read</Button>}
-                              {allNotifications.length > 0 && <Button variant="link" size="sm" className="p-0 h-auto text-xs text-destructive hover:text-destructive/80" onClick={handleClearAll}>Clear all</Button>}
-                            </div>
-                          </div>
-                          <ScrollArea className="h-[300px]">
-                            {isLoadingUserNotifications || isLoadingAdminNotifications ? <div className="flex justify-center items-center h-full"><Loader className="h-6 w-6 animate-spin text-primary" /></div> : allNotifications && allNotifications.length > 0 ? (
-                              <div className="flex flex-col">
-                                  {allNotifications.slice(0, 5).map(notif => {
-                                    const isClickable = notif.clickable !== false;
-                                    const content = (
-                                      <div className="flex items-start gap-2 p-4 pr-10">
-                                        <div className="space-y-1 flex-1">
-                                          <p className={`font-semibold text-sm ${!notif.isGlobal && !notif.read ? 'text-primary' : ''}`}>
-                                            {notif.isGlobal && (
-                                              <Badge variant="outline" className="mr-2 h-4 px-1 text-[8px] uppercase tracking-tighter">System</Badge>
-                                            )}
-                                            {notif.title}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
-                                          <p className="text-[10px] text-muted-foreground/60 mt-1">
-                                            {notif.createdAt ? formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true }) : ''}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    );
-
-                                    return (
-                                      <div key={notif.id} className={`border-b last:border-b-0 group relative ${!notif.isGlobal && !notif.read ? 'bg-primary/5' : ''}`}>
-                                        {isClickable ? (
-                                          <Link
-                                            href={getNotificationLink(notif)}
-                                            className="block hover:bg-muted/30 transition-colors"
-                                          >
-                                            {content}
-                                          </Link>
-                                        ) : (
-                                          <div className="block">
-                                            {content}
-                                          </div>
-                                        )}
-                                        {!notif.isGlobal && (
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="absolute top-3 right-3 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteNotification(notif.id, false);
-                                            }}
-                                          >
-                                            <X className="h-3.5 w-3.5" />
-                                            <span className="sr-only">Delete</span>
-                                          </Button>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  <Button
-                                    asChild
-                                    variant="ghost"
-                                    className="w-full text-xs font-bold py-3 rounded-none border-t hover:bg-black hover:text-white transition-all duration-200"
-                                  >
-                                    <Link href="/notifications">View all ({allNotifications.length})</Link>
-                                  </Button>
-                                </div>
-                              ) : (
-                              <div className="flex flex-col items-center justify-center h-[200px] text-center p-4">
-                                <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                                <p className="text-sm text-muted-foreground">All caught up!</p>
-                              </div>
-                            )}
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
+                      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative" asChild>
+                        <Link href="/notifications">
+                          <Bell className="h-5 w-5" />
+                          {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
+                        </Link>
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Notifications</p>
