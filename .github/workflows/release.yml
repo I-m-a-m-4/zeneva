@@ -235,15 +235,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ env.NDK_HOME }}
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
         run: |
           echo "Checking for Android keystore in GitHub Secrets..."
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "Real keystore found. Decoding..."
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > src-tauri/gen/android/app/upload-keystore.jks
-            echo -e "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}\nkeyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}\nkeyAlias=${{ secrets.ANDROID_KEY_ALIAS }}\nstoreFile=upload-keystore.jks\n" > src-tauri/gen/android/app/key.properties
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Release keystore found. Decoding..."
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > src-tauri/gen/android/app/upload-keystore.jks
+            {
+              echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+              echo "keyPassword=$ANDROID_KEY_PASSWORD"
+              echo "keyAlias=$ANDROID_KEY_ALIAS"
+              echo "storeFile=upload-keystore.jks"
+            } > src-tauri/gen/android/app/key.properties
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set. A tagged release must be signed with the registered Play upload key."
+            exit 1
           else
-            echo "No ANDROID_KEYSTORE_BASE64 secret found. Building unsigned AAB/APK. You must sign the AAB locally before uploading to Play Console."
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret found. Building unsigned AAB/APK - Play Console will reject these."
           fi
 
           # Boost Gradle JVM heap inside gradlew itself
@@ -283,6 +295,36 @@ jobs:
           else
             echo "Warning: No AAB file found!"
           fi
+
+      - name: Verify AAB signing certificate
+        run: |
+          # Fingerprint Play expects for com.zeneva.app. Must match the
+          # sha256_cert_fingerprints in public/.well-known/assetlinks.json.
+          EXPECTED="5C:20:BF:52:BD:9A:C3:0A:5A:A3:C4:AF:D2:7A:C6:EA:14:23:7B:B0:CE:37:8A:BF:FE:E2:BC:AC:19:63:8F:D1"
+          AAB="./zeneva-v${{ env.APP_VERSION }}-Android.aab"
+
+          if [ ! -f "$AAB" ]; then
+            echo "::error::No AAB produced - nothing to verify."
+            exit 1
+          fi
+
+          ACTUAL=$(keytool -printcert -jarfile "$AAB" 2>/dev/null \
+            | grep -m1 'SHA256:' | sed 's/.*SHA256: *//' | tr -d '[:space:]')
+
+          if [ -z "$ACTUAL" ]; then
+            echo "::error::AAB is unsigned. Play Console will reject it."
+            exit 1
+          fi
+
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::AAB signed with the wrong key. Check that ANDROID_KEYSTORE_BASE64 and ANDROID_KEY_ALIAS hold the registered Play upload key."
+            exit 1
+          fi
+
+          echo "AAB is signed with the registered Play upload key."
 
       - name: Upload Artifacts to Release
         uses: softprops/action-gh-release@v2
