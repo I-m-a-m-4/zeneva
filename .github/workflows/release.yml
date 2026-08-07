@@ -237,9 +237,14 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.NDK_HOME }}
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
         run: |
-          echo "Generating temporary keystore for CI build..."
-          keytool -genkey -v -keystore src-tauri/gen/android/app/upload-keystore.jks -alias zeneva -keyalg RSA -keysize 2048 -validity 10000 -storepass zenevapass -keypass zenevapass -dname "CN=Zeneva CI, OU=Mobile, O=Zeneva, L=Lagos, S=Lagos, C=NG"
-          echo -e "storePassword=zenevapass\nkeyPassword=zenevapass\nkeyAlias=zeneva\nstoreFile=upload-keystore.jks\n" > src-tauri/gen/android/app/key.properties
+          echo "Checking for Android keystore in GitHub Secrets..."
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Real keystore found. Decoding..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > src-tauri/gen/android/app/upload-keystore.jks
+            echo -e "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}\nkeyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}\nkeyAlias=${{ secrets.ANDROID_KEY_ALIAS }}\nstoreFile=upload-keystore.jks\n" > src-tauri/gen/android/app/key.properties
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret found. Building unsigned AAB/APK. You must sign the AAB locally before uploading to Play Console."
+          fi
 
           # Boost Gradle JVM heap inside gradlew itself
           mkdir -p src-tauri/gen/android
@@ -265,16 +270,16 @@ jobs:
           
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at: $APK_PATH"
-            cp "$APK_PATH" "./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk"
-            echo "APK ready at ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk"
+            cp "$APK_PATH" "./zeneva-v${{ env.APP_VERSION }}-Android.apk"
+            echo "APK ready at ./zeneva-v${{ env.APP_VERSION }}-Android.apk"
           else
             echo "Warning: No APK file found!"
           fi
           
           if [ -n "$AAB_PATH" ]; then
             echo "Found AAB at: $AAB_PATH"
-            cp "$AAB_PATH" "./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab"
-            echo "AAB ready at ./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab"
+            cp "$AAB_PATH" "./zeneva-v${{ env.APP_VERSION }}-Android.aab"
+            echo "AAB ready at ./zeneva-v${{ env.APP_VERSION }}-Android.aab"
           else
             echo "Warning: No AAB file found!"
           fi
@@ -283,8 +288,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./zeneva-v${{ env.APP_VERSION }}-SIGNED.apk
-            ./zeneva-v${{ env.APP_VERSION }}-SIGNED.aab
+            ./zeneva-v${{ env.APP_VERSION }}-Android.apk
+            ./zeneva-v${{ env.APP_VERSION }}-Android.aab
           tag_name: v${{ env.APP_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
@@ -294,8 +299,8 @@ jobs:
         with:
           name: zeneva-android-artifacts
           path: |
-            ./zeneva-*-SIGNED.apk
-            ./zeneva-*-SIGNED.aab
+            ./zeneva-*-Android.apk
+            ./zeneva-*-Android.aab
           if-no-files-found: warn
 
   release-ios:
