@@ -217,18 +217,8 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
 
   const { messages, setMessages, append, sendMessage, isLoading, stop } = useChat({
     id: sessionId,
-    api: `/api/chat?businessId=${businessId || ''}&userId=${user?.uid || ''}`,
-    fetch: async (url, options) => {
-      const fetchHeaders = new Headers(options?.headers);
-      const { businessId: currentBizId, userId: currentUserId } = authRef.current;
-      if (currentBizId) fetchHeaders.set('x-business-id', currentBizId);
-      if (currentUserId) fetchHeaders.set('x-user-id', currentUserId);
-      
-      return fetch(url, {
-        ...options,
-        headers: fetchHeaders
-      });
-    }
+    api: `/api/chat`,
+    body: { businessId, userId: user?.uid }
   });
   const [localInput, setLocalInput] = React.useState('');
 
@@ -241,16 +231,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     // send handles optimistic update internally
     const send = append || sendMessage;
     if (send) {
-      send(userMessage, { 
-        data: { businessId, userId: user?.uid },
-        options: {
-          headers: {
-            'x-business-id': businessId || '',
-            'x-user-id': user?.uid || ''
-          },
-          body: { businessId, userId: user?.uid }
-        }
-      });
+      send(userMessage);
     }
     setLocalInput('');
   };
