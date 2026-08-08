@@ -2837,7 +2837,7 @@ function AdminDashboardContent({
                                 <Database className="h-5 w-5 text-blue-500" />
                                 Operational Cost & Usage Tracking
                             </CardTitle>
-                            <CardDescription>Track Zeneva's live Firebase infrastructure costs and reads.</CardDescription>
+                            <CardDescription>Track Zeneva's live infrastructure costs, database reads, and store performance.</CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
                             <a href="https://console.cloud.google.com/billing/01459A-506211-CE0671?project=studio-3699136485-6747d" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors cursor-pointer group">
@@ -2861,6 +2861,19 @@ function AdminDashboardContent({
                                     <div>
                                         <p className="text-sm font-bold">Firestore Usage Metrics</p>
                                         <p className="text-xs text-muted-foreground mt-0.5">Track daily reads, writes, and database load</p>
+                                    </div>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            </a>
+
+                            <a href="https://partner.microsoft.com/en-us/dashboard/insights/analytics/store/acquisitions?productId=9NVN0F8NJWMJ" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors cursor-pointer group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full group-hover:bg-green-200 transition-colors">
+                                        <Store className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold">Microsoft Store Analytics</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">Track desktop app acquisitions and installs</p>
                                     </div>
                                 </div>
                                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
