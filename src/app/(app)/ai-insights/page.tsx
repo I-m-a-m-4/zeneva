@@ -3,11 +3,12 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import {
   ArrowUp, Sparkles, Loader2, User, CheckCircle2, Mic,
   Paperclip, Package, TrendingUp, Users, AlertTriangle,
   DollarSign, BarChart2, ShieldAlert, XCircle, ChevronDown, HelpCircle,
-  SquarePen, BookOpen, Trash2, Zap, Send, Gauge
+  SquarePen, BookOpen, Trash2, Zap, Send, Gauge, PanelLeftClose, PanelLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppConfig } from '@/lib/config';
@@ -25,15 +26,51 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+/**
+ * One message in the chat transcript.
+ *
+ * AI SDK v5+ switched from `{role, content}` to UI messages with `parts`, and
+ * `toolInvocations` became `tool-*` parts. We persist whatever the SDK hands us
+ * so old and new sessions stay loadable.
+ */
+type ZenMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  parts?: any[];
+  content?: string;      // pre-v5 sessions saved by older builds
+  createdAt?: string;
+  toolInvocations?: any[]; // pre-v5 sessions
+};
+
+/** Extract the visible text of a message for display + title generation. */
+function textOf(message: ZenMessage | undefined | null): string {
+  if (!message) return '';
+  if (typeof message.content === 'string') return message.content;
+  if (!Array.isArray(message.parts)) return '';
+  return message.parts
+    .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
+    .map((p: any) => p.text)
+    .join(' ');
+}
+
+/** Normalise an old {content} session doc into the v5+ parts shape. */
+function normaliseMessage(m: any): ZenMessage {
+  if (!m || typeof m !== 'object') return m;
+  if (Array.isArray(m.parts)) return m as ZenMessage;
+  const parts = typeof m.content === 'string' && m.content.length
+    ? [{ type: 'text', text: m.content }]
+    : [];
+  return { ...m, parts, content: undefined } as ZenMessage;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Proposal Card Component — Handles all write approvals
 // ─────────────────────────────────────────────────────────────────────────────
-function ProposalCard({ tool, onApprove, onReject }: {
-  tool: any;
+function ProposalCard({ result, onApprove, onReject }: {
+  result: any;
   onApprove: (proposalId: string, action: any) => void;
   onReject: (proposalId: string) => void;
 }) {
-  const result = tool.result;
   if (!result || result.type !== 'PROPOSAL') return null;
 
   const icons: Record<string, React.ReactNode> = {
@@ -129,7 +166,11 @@ function ProposalCard({ tool, onApprove, onReject }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool Status Chip — Shows live thought process
 // ─────────────────────────────────────────────────────────────────────────────
-function ToolStatusChip({ tool }: { tool: any }) {
+function ToolStatusChip({ toolName, state, output }: {
+  toolName: string;
+  state: string;
+  output: any;
+}) {
   const toolLabels: Record<string, { label: string; icon: React.ReactNode }> = {
     queryProducts: { label: 'Scanning inventory', icon: <Package className="w-3.5 h-3.5" /> },
     proposeStockAdjustment: { label: 'Preparing stock proposal', icon: <Package className="w-3.5 h-3.5" /> },
@@ -141,11 +182,15 @@ function ToolStatusChip({ tool }: { tool: any }) {
     getLowStockAlerts: { label: 'Checking stock levels', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
   };
 
-  const info = toolLabels[tool.toolName];
-  const isDone = tool.state === 'result';
-  const isProposal = tool.result?.type === 'PROPOSAL';
+  const info = toolLabels[toolName] ?? {
+    label: toolName,
+    icon: <Sparkles className="w-3.5 h-3.5" />,
+  };
+  const isDone = state === 'output-available';
+  const isProposal = output?.type === 'PROPOSAL';
 
-  if (!info || isProposal) return null;
+  // The proposal card below says everything the chip would.
+  if (isProposal) return null;
 
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium w-fit transition-colors ${
@@ -168,15 +213,29 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   // Chat Session State
   const [sessionId, setSessionId] = React.useState<string>(() => `session_${Date.now()}`);
   const [sessions, setSessions] = React.useState<any[]>([]);
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sessionToDelete, setSessionToDelete] = React.useState<string | null>(null);
   const [businessData, setBusinessData] = React.useState<any>(null);
   const [isMounted, setIsMounted] = React.useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Restore the last collapse state. Defaults to open on desktop and closed on
+  // phones, where a 16rem rail would eat most of the screen.
   useEffect(() => {
     setIsMounted(true);
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('zen_ai_sidebar') : null;
+    if (saved === 'open') setSidebarOpen(true);
+    else if (saved === 'closed') setSidebarOpen(false);
+    else setSidebarOpen(window.innerWidth >= 768);
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem('zen_ai_sidebar', next ? 'open' : 'closed'); } catch { /* private mode */ }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -215,24 +274,48 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     authRef.current = { businessId, userId: user?.uid };
   }, [businessId, user]);
 
-  const { messages, setMessages, append, sendMessage, isLoading, stop } = useChat({
+  // The transport is built once; `prepareSendMessagesRequest` reads authRef on
+  // every send so a businessId that resolves late still reaches the server.
+  const transport = React.useMemo(() => new DefaultChatTransport({
+    api: '/api/chat',
+    prepareSendMessagesRequest: ({ messages, body }) => ({
+      body: {
+        ...body,
+        messages,
+        businessId: authRef.current.businessId,
+        userId: authRef.current.userId,
+      },
+    }),
+  }), []);
+
+  const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: sessionId,
-    api: `/api/chat`,
-    body: { businessId, userId: user?.uid }
+    transport,
+    onError: (err) => {
+      // The server sends {"error": "..."} for quota/auth failures; surface that
+      // rather than the raw JSON blob the SDK puts in err.message.
+      let description = err?.message || 'Something went wrong.';
+      try {
+        const parsed = JSON.parse(description);
+        if (parsed?.error) description = parsed.error;
+      } catch { /* not JSON - use as-is */ }
+      toast({ title: 'Zen AI could not respond', description, variant: 'destructive' });
+    },
   });
+
+  const isLoading = status === 'submitted' || status === 'streaming';
   const [localInput, setLocalInput] = React.useState('');
+
+  const submitPrompt = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !authRef.current.businessId) return;
+    sendMessage({ text: trimmed });
+  }, [sendMessage]);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!localInput.trim() || !businessId) return;
-    
-    const userMessage = { role: 'user', content: localInput };
-    
-    // send handles optimistic update internally
-    const send = append || sendMessage;
-    if (send) {
-      send(userMessage);
-    }
+    if (!localInput.trim() || isLoading) return;
+    submitPrompt(localInput);
     setLocalInput('');
   };
 
@@ -243,9 +326,12 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   // Sync messages to Firestore
   useEffect(() => {
     if (!firestore || !businessId || !user || messages.length === 0) return;
+    // Don't checkpoint a half-streamed reply - wait for the turn to settle.
+    if (isLoading) return;
     try {
       const cleanMessages = JSON.parse(JSON.stringify(messages));
-      const title = cleanMessages.find((m: any) => m.role === 'user')?.content.slice(0, 40) || 'New Chat';
+      const firstUser = cleanMessages.find((m: any) => m.role === 'user');
+      const title = (textOf(firstUser).slice(0, 40) || 'New Chat').trim();
       setDoc(doc(firestore, 'ai_sessions', sessionId), {
         businessId,
         userId: user.uid,
@@ -256,19 +342,22 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     } catch (e) {
       console.error('Error syncing messages', e);
     }
-  }, [messages, sessionId, firestore, businessId, user]);
+  }, [messages, isLoading, sessionId, firestore, businessId, user]);
 
   const handleNewChat = () => {
     stop?.();
     setSessionId(`session_${Date.now()}`);
-    if (setMessages) setMessages([]);
+    setMessages([]);
   };
 
   const loadSession = (session: any) => {
     stop?.();
     setSessionId(session.id);
+    // Defer so the new sessionId is in effect before the messages land; the
+    // chat then re-fetches nothing (we set from local state) but the id
+    // switch means the next send belongs to the loaded session.
     setTimeout(() => {
-      if (setMessages) setMessages(session.messages || []);
+      setMessages((session.messages || []).map(normaliseMessage));
     }, 0);
   };
 
@@ -361,23 +450,47 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
         </DialogContent>
       </Dialog>
       
+      {/* Backdrop for the drawer on phones, where the sidebar overlays the chat. */}
+      {isMounted && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          onClick={toggleSidebar}
+          aria-hidden
+        />
+      )}
+
       {/* ── Sidebar (Chat History) ── */}
-      <div className={`w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col transition-all ${sidebarOpen ? 'block' : 'hidden md:flex'}`}>
-        <div className="p-4 border-b border-gray-200">
-          <Button onClick={handleNewChat} className="w-full justify-start gap-2 bg-white hover:bg-gray-100 hover:text-gray-900" variant="outline">
+      {/* Collapses to zero width on desktop and slides out as a drawer on
+          phones. Rendered either way so the collapse animates. */}
+      <div
+        className={`z-30 flex flex-col bg-gray-50 border-r border-gray-200 transition-[width,transform] duration-200 ease-in-out
+          max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-64
+          ${sidebarOpen ? 'max-md:translate-x-0 md:w-64' : 'max-md:-translate-x-full md:w-0 md:border-r-0'}
+          md:relative md:flex-shrink-0 overflow-hidden`}
+      >
+        <div className="p-4 border-b border-gray-200 flex items-center gap-2 w-64">
+          <Button onClick={handleNewChat} className="flex-1 justify-start gap-2 bg-white hover:bg-gray-100 hover:text-gray-900" variant="outline">
             <SquarePen className="w-4 h-4 text-orange-500" /> New Chat
           </Button>
+          <button
+            onClick={toggleSidebar}
+            className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-colors flex-none"
+            title="Collapse chat history"
+            aria-label="Collapse chat history"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+        <div className="flex-1 overflow-y-auto p-3 space-y-1 w-64">
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2 mt-2">Recent Chats</div>
           {sessions.map(session => (
-            <div 
+            <div
               key={session.id}
               onClick={() => loadSession(session)}
               className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${sessionId === session.id ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-200 text-gray-700'}`}
             >
               <span className="text-sm truncate pr-2 flex-1">{session.title || 'New Chat'}</span>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setSessionToDelete(session.id);
@@ -400,12 +513,26 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
 
       {/* ── Help Button ── */}
       {/* ── Link to Use Cases Page ── */}
-      <Link 
+      <Link
         href="/ai-insights/use-cases"
         className="absolute top-4 right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 backdrop-blur border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 shadow-sm transition-all"
       >
         <BookOpen className="w-3.5 h-3.5 text-orange-500" /> Zen AI Use Cases
       </Link>
+
+      {/* Reopen the history rail. Only mounted while collapsed, so it never
+          sits on top of the sidebar's own collapse button. */}
+      {isMounted && !sidebarOpen && (
+        <button
+          onClick={toggleSidebar}
+          className="absolute top-4 left-4 z-40 flex items-center gap-1.5 px-2.5 py-1.5 bg-white/80 backdrop-blur border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 shadow-sm transition-all"
+          title="Show chat history"
+          aria-label="Show chat history"
+        >
+          <PanelLeft className="w-3.5 h-3.5 text-orange-500" />
+          <span className="hidden sm:inline">Chats</span>
+        </button>
+      )}
 
       {/* ── Main Scrollable Area ── */}
       <div className={`flex-1 flex flex-col ${isInitialState ? 'justify-center items-center' : ''} overflow-y-auto z-10 scroll-smooth`}>
@@ -430,12 +557,8 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                     <button
                       key={i}
                       type="button"
-                      onClick={() => {
-                        const send = append || sendMessage;
-                        if (send && businessId) {
-                          send({ role: 'user', content: prompt.text }, { data: { businessId, userId: user?.uid } });
-                        }
-                      }}
+                      onClick={() => submitPrompt(prompt.text)}
+                      disabled={isLoading}
                       className="text-left p-3.5 rounded-xl border border-gray-100 bg-white hover:border-orange-200 hover:shadow-sm transition-all flex items-center gap-3 text-sm text-gray-700 hover:text-orange-600 group"
                     >
                     <span className="text-gray-400">{prompt.icon}</span>{prompt.text}
@@ -497,38 +620,37 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                 <div className="flex flex-col gap-1 min-w-0 max-w-[85%] items-start">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
                     {m.role === 'user' ? 'You' : 'Zen AI'}
-                    {m.createdAt && <span className="text-xs font-normal text-gray-400">{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                   </div>
 
-                  {m.content && (
+                  {textOf(m as any).trim() && (
                     <div className={`text-base leading-relaxed whitespace-pre-wrap px-4 py-2.5 rounded-2xl ${m.role === 'user' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-800 bg-transparent px-0'}`}>
-                      {m.content}
+                      {textOf(m as any)}
                     </div>
                   )}
 
                   {/* Tool calls — Thought Process + Proposals */}
                   <div className="flex flex-col gap-3">
-                    {m.toolInvocations?.map(tool => {
-                      const enrichedResult = tool.state === 'result' && tool.result?.type === 'PROPOSAL'
-                        ? { ...tool.result, status: proposalStatuses[tool.result.proposalId] || tool.result.status }
-                        : tool.result;
-
-                      const enrichedTool = { ...tool, result: enrichedResult };
+                    {(m.parts ?? []).filter(isToolUIPart).map((part: any) => {
+                      const output = part.output;
+                      const isProposal = output?.type === 'PROPOSAL';
+                      const enriched = isProposal
+                        ? { ...output, status: proposalStatuses[output.proposalId] || output.status }
+                        : output;
 
                       return (
-                        <div key={tool.toolCallId}>
-                          <ToolStatusChip tool={tool} />
-                          {tool.state === 'result' && tool.result?.type === 'PROPOSAL' && (
+                        <div key={part.toolCallId}>
+                          <ToolStatusChip toolName={getToolName(part)} state={part.state} output={output} />
+                          {isProposal && (
                             <ProposalCard
-                              tool={enrichedTool}
+                              result={enriched}
                               onApprove={handleApprove}
                               onReject={handleReject}
                             />
                           )}
-                          {/* Error from tool */}
-                          {tool.state === 'result' && tool.result?.error && (
+                          {/* Tool returned a handled error, or the call itself failed */}
+                          {(output?.error || part.state === 'output-error') && (
                             <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-red-50 text-red-600 border border-red-100 w-fit">
-                              <XCircle className="w-3.5 h-3.5" /> {tool.result.error}
+                              <XCircle className="w-3.5 h-3.5" /> {output?.error || part.errorText}
                             </div>
                           )}
                         </div>

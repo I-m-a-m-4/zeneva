@@ -50,6 +50,7 @@ import { useNativeNotifications } from '@/hooks/use-native-notifications';
 import { useFCM } from '@/hooks/use-fcm';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { terminalListenerErrorHandler } from '@/firebase/retry';
 import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
 import { History } from 'lucide-react';
 import { BranchSwitcher } from '@/components/layout/branch-switcher';
@@ -649,7 +650,7 @@ export default function AuthenticatedLayout({
           }
         }
       });
-    });
+    }, terminalListenerErrorHandler('Support notifications', () => unsubscribe()));
 
     return () => unsubscribe();
   }, [firestore, currentUserProfile?.id, pathname, notify]);
@@ -727,8 +728,12 @@ export default function AuthenticatedLayout({
 
       // Trigger if user is on their 3rd day or older and hasn't been notified yet
       if (diffDays >= 3) {
-        const hasNotified = localStorage.getItem(`ceo_day3_notified_${currentUserProfile.id}`);
+        const storageKey = `ceo_day3_notified_${currentUserProfile.id}`;
+        const hasNotified = localStorage.getItem(storageKey);
         if (!hasNotified) {
+          // Set the key BEFORE writing to Firestore to prevent double-writes
+          // in React Strict Mode (which runs effects twice in dev).
+          localStorage.setItem(storageKey, 'true');
           addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
             title: "💬 Chat with the CEO",
             body: "Welcome to your 3rd day on Zeneva! Have questions, feedback, or custom feature requests? Tap here to message Bello Imam directly on the CEO Direct Line.",
@@ -736,9 +741,11 @@ export default function AuthenticatedLayout({
             read: false,
             type: 'ceo_chat',
             link: '/support'
-          }).then(() => {
-            localStorage.setItem(`ceo_day3_notified_${currentUserProfile.id}`, 'true');
-          }).catch(console.error);
+          }).catch((err) => {
+            // Rollback the key so it can be retried if the write failed
+            localStorage.removeItem(storageKey);
+            console.error(err);
+          });
         }
       }
     }
@@ -752,14 +759,18 @@ export default function AuthenticatedLayout({
       const diffTime = now.getTime() - userCreatedDate.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-      // Trigger subtly after 2 days of usage
-      if (diffDays >= 2) {
-        const hasPrompted = localStorage.getItem(`app_download_prompt_${currentUserProfile.id}`);
+      // Trigger subtly after 5 days of usage (give more breathing room)
+      if (diffDays >= 5) {
+        const storageKey = `app_download_prompt_${currentUserProfile.id}`;
+        const hasPrompted = localStorage.getItem(storageKey);
         if (!hasPrompted) {
-          localStorage.setItem(`app_download_prompt_${currentUserProfile.id}`, 'true');
           const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
           const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : '';
           const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
+          const isAndroidTauri = isTauri && /android/i.test(userAgent);
+
+          // Never show this notification to users on the Android app — they already have it!
+          if (isAndroidTauri) return;
 
           let notifTitle = '';
           let notifBody = '';
@@ -770,26 +781,33 @@ export default function AuthenticatedLayout({
 
           if (isTauri || !isMobile) {
             // User is on Desktop (Windows / Microsoft App) -> Recommend Android Mobile App
-            notifTitle = "📱 Download Zeneva Mobile App";
-            notifBody = "Get the Zeneva Android App from the Google Play Store to manage your business from anywhere.";
+            notifTitle = "📱 Zeneva is also on Android";
+            notifBody = "Manage your business from anywhere. Download the Zeneva Android App on Google Play.";
             notifLink = playStoreUrl;
           } else {
-            // User is on Mobile -> Recommend Windows Desktop App
-            notifTitle = "💻 Download Zeneva Desktop App";
-            notifBody = "Get the Zeneva Windows App from the Microsoft Store for blazing-fast desktop performance.";
+            // User is on Mobile browser -> Recommend Windows Desktop App
+            notifTitle = "💻 Zeneva is also on Windows";
+            notifBody = "Get the full Zeneva experience on your PC. Available now on the Microsoft Store.";
             notifLink = msStoreUrl;
           }
 
+          // Set key BEFORE writing to prevent double-triggers in React Strict Mode
+          localStorage.setItem(storageKey, 'true');
           addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
             title: notifTitle,
             body: notifBody,
             createdAt: serverTimestamp(),
             read: false,
             type: 'app_download',
-            link: notifLink
+            link: notifLink,
+            // Flag so the notification handler knows to open this in an external browser
+            openExternal: true,
           }).then(() => {
             notify(notifTitle, notifBody, notifLink);
-          }).catch(console.error);
+          }).catch((err) => {
+            localStorage.removeItem(storageKey);
+            console.error(err);
+          });
         }
       }
     }

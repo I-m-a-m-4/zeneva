@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText, tool } from 'ai';
+import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { adminFirestore } from '@/firebase/admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -24,6 +24,23 @@ const INJECTION_PATTERNS = [
 
 function detectInjection(message: string): boolean {
   return INJECTION_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+/**
+ * Pull the plain text out of a message.
+ *
+ * AI SDK v5+ sends `parts: [{type:'text', text}]` rather than a `content`
+ * string. Sessions saved by older builds still carry `content`, so accept both
+ * - otherwise the injection scan silently reads '' and waves everything past.
+ */
+function textOf(message: any): string {
+  if (!message) return '';
+  if (typeof message.content === 'string') return message.content;
+  if (!Array.isArray(message.parts)) return '';
+  return message.parts
+    .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
+    .map((p: any) => p.text)
+    .join(' ');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,10 +86,8 @@ export async function POST(req: Request) {
   const qUserId = url.searchParams.get('userId');
 
   const json = await req.json();
-  console.log("Chat API payload:", JSON.stringify(json, null, 2));
-  console.log("Chat API Headers x-business-id:", req.headers.get('x-business-id'));
-  const { messages, data } = json;
-  
+  const { messages, data } = json as { messages: UIMessage[]; data?: any };
+
   let businessId = req.headers.get('x-business-id') || json.businessId || qBusinessId;
   let userId = req.headers.get('x-user-id') || json.userId || qUserId;
 
@@ -84,19 +99,31 @@ export async function POST(req: Request) {
 
   // ── SECURITY LAYER 1: Auth validation ──
   if (!businessId || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: missing businessId or userId.' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized: missing businessId or userId.' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(JSON.stringify({ error: 'No messages supplied.' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   // ── SECURITY LAYER 2: Prompt injection scan on the latest user message ──
   const lastUserMessage = messages.filter((m: any) => m.role === 'user').at(-1);
-  if (lastUserMessage && detectInjection(lastUserMessage.content ?? '')) {
-    return new Response(JSON.stringify({ error: 'Blocked: Potential prompt injection detected.' }), { status: 400 });
+  if (lastUserMessage && detectInjection(textOf(lastUserMessage))) {
+    return new Response(JSON.stringify({ error: 'Blocked: Potential prompt injection detected.' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   // ── SECURITY LAYER 3: Rate Limiting & Quotas ──
   const db = adminFirestore;
   if (!db) {
-    return new Response(JSON.stringify({ error: 'Server configuration error.' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -114,14 +141,18 @@ export async function POST(req: Request) {
   }
 
   if (globalCount >= GLOBAL_LIMIT) {
-    return new Response(JSON.stringify({ error: 'Global daily AI limit reached. Please try again tomorrow.' }), { status: 429 });
+    return new Response(JSON.stringify({ error: 'Global daily AI limit reached. Please try again tomorrow.' }), {
+      status: 429, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   // 2. Business Check
   const businessRef = db.collection('businessInstances').doc(businessId);
   const businessDoc = await businessRef.get();
   if (!businessDoc.exists) {
-    return new Response(JSON.stringify({ error: 'Business not found.' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'Business not found.' }), {
+      status: 404, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const businessData = businessDoc.data();
@@ -143,15 +174,35 @@ export async function POST(req: Request) {
     if (bonusCredits > 0) {
       useBonusCredit = true;
     } else {
-      return new Response(JSON.stringify({ error: `Daily AI limit of ${dailyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until tomorrow.` }), { status: 429 });
+      return new Response(JSON.stringify({ error: `Daily AI limit of ${dailyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until tomorrow.` }), {
+        status: 429, headers: { 'Content-Type': 'application/json' },
+      });
     }
+  }
+
+  // Sessions saved by pre-v5 builds stored `content` strings; convertToModelMessages
+  // only understands `parts`, so normalise before handing the history over.
+  const normalised = messages.map((m: any) =>
+    Array.isArray(m?.parts)
+      ? m
+      : { ...m, parts: [{ type: 'text', text: typeof m?.content === 'string' ? m.content : '' }] },
+  );
+
+  let modelMessages;
+  try {
+    modelMessages = await convertToModelMessages(normalised as UIMessage[]);
+  } catch (e: any) {
+    console.error('Failed to convert chat history:', e);
+    return new Response(JSON.stringify({ error: 'This chat history could not be read. Start a new chat.' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const result = streamText({
     model: google('gemini-2.5-flash'),
     system: `${SYSTEM_PROMPT}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
-    messages,
-    maxSteps: 10,
+    messages: modelMessages,
+    stopWhen: stepCountIs(10),
     onFinish: async () => {
       // Increment usage atomically
       try {
@@ -185,7 +236,7 @@ export async function POST(req: Request) {
       // ── INVENTORY: Query ──
       queryProducts: tool({
         description: 'Search and retrieve products from the inventory. Use this to find stock levels, prices, categories, or specific items. This is a READ-ONLY tool.',
-        parameters: z.object({
+        inputSchema: z.object({
           searchTerm: z.string().optional().describe('Product name or keyword to search for.'),
           category: z.string().optional().describe('Filter by product category.'),
           lowStockOnly: z.boolean().optional().describe('If true, returns only products at or below their lowStockThreshold.'),
@@ -223,7 +274,7 @@ export async function POST(req: Request) {
       // ── INVENTORY: Propose Stock Adjustment ──
       proposeStockAdjustment: tool({
         description: 'Propose a stock quantity adjustment for a product. This streams a proposal card to the user for approval. Does NOT write to the database.',
-        parameters: z.object({
+        inputSchema: z.object({
           productId: z.string().describe('The Firestore document ID of the product.'),
           productName: z.string().describe('Human-readable name of the product.'),
           currentStock: z.number().describe('The current stock level.'),
@@ -251,7 +302,7 @@ export async function POST(req: Request) {
       // ── INVENTORY: Propose Price Change ──
       proposePriceChange: tool({
         description: 'Propose a price change for a product. Streams a proposal card for user approval. Does NOT write to the database.',
-        parameters: z.object({
+        inputSchema: z.object({
           productId: z.string().describe('The Firestore document ID of the product.'),
           productName: z.string().describe('Human-readable name of the product.'),
           currentPrice: z.number().describe('The current selling price.'),
@@ -283,7 +334,7 @@ export async function POST(req: Request) {
       // ── SALES: Get Sales Metrics ──
       getSalesMetrics: tool({
         description: 'Get sales data, revenue totals, transaction counts, and profit figures for a specific period.',
-        parameters: z.object({
+        inputSchema: z.object({
           period: z.enum(['today', 'yesterday', 'last7days', 'last30days', 'thisMonth']).describe('The time period to analyze.'),
         }),
         execute: async ({ period }) => {
@@ -328,7 +379,7 @@ export async function POST(req: Request) {
       // ── SALES: Get Top Selling Products ──
       getTopSellingProducts: tool({
         description: 'Analyze sales receipts to identify the best-selling products by quantity sold or revenue generated.',
-        parameters: z.object({
+        inputSchema: z.object({
           period: z.enum(['last7days', 'last30days', 'thisMonth']).describe('Time period to analyze.'),
           rankBy: z.enum(['quantity', 'revenue']).default('revenue').describe('Whether to rank by units sold or total revenue.'),
           topN: z.number().min(1).max(20).default(10).describe('Number of top products to return.'),
@@ -372,7 +423,7 @@ export async function POST(req: Request) {
       // ── CUSTOMERS: Query ──
       queryCustomer: tool({
         description: 'Find a customer by name, email, or phone number. Returns their profile, loyalty points, total spent, and recent activity.',
-        parameters: z.object({
+        inputSchema: z.object({
           searchTerm: z.string().describe('Name, email, or phone to search for.'),
         }),
         execute: async ({ searchTerm }) => {
@@ -415,7 +466,7 @@ export async function POST(req: Request) {
       // ── CUSTOMERS: Propose Loyalty Points Adjustment ──
       proposeLoyaltyAdjustment: tool({
         description: 'Propose adding or deducting loyalty points for a specific customer. Requires user approval.',
-        parameters: z.object({
+        inputSchema: z.object({
           customerId: z.string().describe('The Firestore document ID of the customer.'),
           customerName: z.string().describe('Human-readable customer name.'),
           currentPoints: z.number().describe('Current loyalty point balance.'),
@@ -443,7 +494,7 @@ export async function POST(req: Request) {
       // ── BUSINESS: Get Low Stock Alert Summary ──
       getLowStockAlerts: tool({
         description: 'Scan the entire inventory and return a list of items that are at or below their low stock threshold.',
-        parameters: z.object({}),
+        inputSchema: z.object({}),
         execute: async () => {
           try {
             const snapshot = await db.collection('products')
@@ -465,5 +516,18 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse();
+  // v5+ renamed this from `toDataStreamResponse`. `sendReasoning: false` keeps
+  // Gemini's private thinking out of the transcript we persist to Firestore.
+  return result.toUIMessageStreamResponse({
+    sendReasoning: false,
+    // Without this the SDK masks every failure as "An error occurred", which is
+    // useless when a tool blows up on the owner's own data.
+    onError: (error) => {
+      console.error('Zen AI stream error:', error);
+      if (error == null) return 'Unknown error.';
+      if (typeof error === 'string') return error;
+      if (error instanceof Error) return error.message;
+      return JSON.stringify(error);
+    },
+  });
 }

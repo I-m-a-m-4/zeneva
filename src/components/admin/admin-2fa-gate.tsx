@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUser } from '@/firebase';
+import { withFirestoreRetry } from '@/firebase/retry';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
@@ -49,7 +50,10 @@ export default function Admin2FAGate({ children }: Admin2FAGateProps) {
 
     const checkSecurityStatus = async () => {
         try {
-            const securityDoc = await getDoc(doc(firestore, 'admin_config', 'totp'));
+            const securityDoc = await withFirestoreRetry(
+                () => getDoc(doc(firestore, 'admin_config', 'totp')),
+                { label: 'Admin 2FA config' },
+            );
             if (securityDoc.exists()) {
                 setSecret(securityDoc.data().secret);
                 setSetupMode(false);

@@ -111,9 +111,11 @@ import {
     getDoc,
     deleteDoc,
     onSnapshot,
+    limit,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays, startOfDay, endOfDay } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { withFirestoreRetry } from '@/firebase/retry';
 import { logAuditEvent } from '@/lib/audit';
 import { 
     AlertDialog, 
@@ -753,6 +755,7 @@ function formatDuration(seconds: number): string {
 function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; businesses: BusinessInstance[] }) {
     const [sortField, setSortField] = useState<'usage' | 'name' | 'lastSeen'>('usage');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+    const [drillUser, setDrillUser] = useState<UserProfile | null>(null);
 
     const todayStart = startOfDay(new Date());
 
@@ -834,7 +837,8 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                         Per-User Usage Breakdown
                     </CardTitle>
                     <CardDescription>
-                        Cumulative app usage time per user. Tracked since v3.0.0. Click a column header to sort.
+                        Cumulative app usage time per user. Tracked since v3.0.0. Click a column header to sort,
+                        or click any row to open that user's full usage breakdown.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -860,6 +864,7 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                         </button>
                                     </TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead className="w-8" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -869,7 +874,11 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                     const isOnline = lastSeenDate && lastSeenDate > fiveMinAgo;
                                     const totalSec = u.totalUsageSeconds ?? 0;
                                     return (
-                                        <TableRow key={u.id}>
+                                        <TableRow
+                                            key={u.id}
+                                            onClick={() => setDrillUser(u)}
+                                            className="cursor-pointer"
+                                        >
                                             <TableCell className="font-medium">{u.name}</TableCell>
                                             <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
                                             <TableCell className="text-sm">{biz?.name ?? '—'}</TableCell>
@@ -897,11 +906,14 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                                     <Badge variant="outline" className="text-xs text-muted-foreground">Offline</Badge>
                                                 )}
                                             </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                <ArrowRight className="h-4 w-4" />
+                                            </TableCell>
                                         </TableRow>
                                     );
                                 }) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                                        <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                                             No users found. Usage data will appear here once users log in after v3.0.0.
                                         </TableCell>
                                     </TableRow>
@@ -911,7 +923,354 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                     </div>
                 </CardContent>
             </Card>
+
+            <UserUsageDetailDialog
+                user={drillUser}
+                business={businesses.find(b => b.id === drillUser?.businessId)}
+                open={!!drillUser}
+                onOpenChange={(v) => { if (!v) setDrillUser(null); }}
+            />
         </div>
+    );
+}
+
+// ======================== PER-USER USAGE DRILL-DOWN ========================
+
+interface UsageSession {
+    id: string;
+    startedAt?: any;
+    endedAt?: any;
+    lastSeen?: any;
+    createdAt?: any;
+    durationSeconds?: number;
+    date?: string;
+    userAgent?: string;
+    revoked?: boolean;
+    deviceInfo?: { platform?: string; vendor?: string; language?: string };
+}
+
+function toDate(value: any): Date | null {
+    if (!value) return null;
+    try {
+        const d = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+        return isNaN(d.getTime()) ? null : d;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Deep-dive into one user's usage.
+ *
+ * Reads `users/{id}/sessions` - written by useSessionTracker on every session
+ * end and by UserActivityTracker on each heartbeat - and derives the daily
+ * pattern, streaks and device mix from it. Loaded on open rather than with the
+ * table, so opening the tab still costs one query instead of one per user.
+ */
+function UserUsageDetailDialog({
+    user, business, open, onOpenChange,
+}: {
+    user: UserProfile | null;
+    business: BusinessInstance | undefined;
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+}) {
+    const firestore = useFirestore();
+    const [sessions, setSessions] = useState<UsageSession[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!open || !user || !firestore) return;
+
+        let cancelled = false;
+        setIsLoading(true);
+        setLoadError(null);
+
+        (async () => {
+            try {
+                const snap = await withFirestoreRetry(
+                    () => getDocs(query(
+                        collection(firestore, 'users', user.id, 'sessions'),
+                        limit(500),
+                    )),
+                    { label: `Usage sessions for ${user.name}` },
+                );
+                if (cancelled) return;
+                setSessions(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+            } catch (err: any) {
+                if (cancelled) return;
+                console.error('Failed to load usage sessions', err);
+                setLoadError(err?.message || 'Could not load session history.');
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [open, user, firestore]);
+
+    const stats = useMemo(() => {
+        const withDuration = sessions.filter(s => (s.durationSeconds ?? 0) > 0);
+
+        // Group into days using the session's own `date` when present, falling
+        // back to the start time. Heartbeat docs carry neither and are ignored.
+        const byDay = new Map<string, number>();
+        for (const s of withDuration) {
+            const started = toDate(s.startedAt) || toDate(s.createdAt);
+            const key = s.date || (started ? format(started, 'yyyy-MM-dd') : null);
+            if (!key) continue;
+            byDay.set(key, (byDay.get(key) || 0) + (s.durationSeconds ?? 0));
+        }
+
+        const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const longest = withDuration.reduce(
+            (best, s) => ((s.durationSeconds ?? 0) > (best?.durationSeconds ?? 0) ? s : best),
+            null as UsageSession | null,
+        );
+
+        // Current streak: consecutive days with any usage, counting back from
+        // the most recent active day (today or yesterday still counts as live).
+        let streak = 0;
+        if (days.length) {
+            const active = new Set(days.map(d => d[0]));
+            const cursor = new Date();
+            if (!active.has(format(cursor, 'yyyy-MM-dd'))) cursor.setDate(cursor.getDate() - 1);
+            while (active.has(format(cursor, 'yyyy-MM-dd'))) {
+                streak++;
+                cursor.setDate(cursor.getDate() - 1);
+            }
+        }
+
+        const last30 = days.slice(-30);
+        const activeDays = days.length;
+        const avgPerActiveDay = activeDays
+            ? Math.round(days.reduce((s, d) => s + d[1], 0) / activeDays)
+            : 0;
+
+        // Busiest hour of day, so support knows when this user is actually working.
+        const byHour = new Array(24).fill(0);
+        for (const s of withDuration) {
+            const started = toDate(s.startedAt) || toDate(s.createdAt);
+            if (started) byHour[started.getHours()] += s.durationSeconds ?? 0;
+        }
+        const peakHour = byHour.some(v => v > 0) ? byHour.indexOf(Math.max(...byHour)) : null;
+
+        const devices = new Map<string, number>();
+        for (const s of sessions) {
+            const platform = s.deviceInfo?.platform || 'Unknown';
+            devices.set(platform, (devices.get(platform) || 0) + 1);
+        }
+
+        return {
+            sessionCount: withDuration.length,
+            activeDays,
+            avgPerActiveDay,
+            longest,
+            streak,
+            peakHour,
+            chartData: last30.map(([date, seconds]) => ({
+                date: format(new Date(`${date}T00:00:00`), 'MMM d'),
+                minutes: Math.round(seconds / 60),
+            })),
+            devices: [...devices.entries()].sort((a, b) => b[1] - a[1]),
+            recent: [...sessions]
+                .sort((a, b) => {
+                    const at = toDate(a.startedAt) || toDate(a.createdAt) || toDate(a.lastSeen);
+                    const bt = toDate(b.startedAt) || toDate(b.createdAt) || toDate(b.lastSeen);
+                    return (bt?.getTime() ?? 0) - (at?.getTime() ?? 0);
+                })
+                .slice(0, 15),
+        };
+    }, [sessions]);
+
+    if (!user) return null;
+
+    const lastSeenDate = toDate(user.lastSeen);
+    const joinedDate = toDate(user.createdAt);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Timer className="h-5 w-5 text-primary" />
+                        {user.name} — Usage Insights
+                    </DialogTitle>
+                    <DialogDescription>
+                        {user.email}
+                        {business?.name ? ` · ${business.name}` : ''}
+                        {joinedDate ? ` · Joined ${format(joinedDate, 'PP')}` : ''}
+                    </DialogDescription>
+                </DialogHeader>
+
+                {/* Headline numbers come from the user doc, so they render even
+                    while the session history is still loading. */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card className="p-3">
+                        <p className="text-xs text-muted-foreground font-bold">Total Usage</p>
+                        <p className="text-xl font-bold mt-1">{formatDuration(user.totalUsageSeconds ?? 0)}</p>
+                    </Card>
+                    <Card className="p-3">
+                        <p className="text-xs text-muted-foreground font-bold">Active Days</p>
+                        <p className="text-xl font-bold mt-1">{isLoading ? '—' : stats.activeDays}</p>
+                    </Card>
+                    <Card className="p-3">
+                        <p className="text-xs text-muted-foreground font-bold">Current Streak</p>
+                        <p className="text-xl font-bold mt-1">
+                            {isLoading ? '—' : `${stats.streak} day${stats.streak === 1 ? '' : 's'}`}
+                        </p>
+                    </Card>
+                    <Card className="p-3">
+                        <p className="text-xs text-muted-foreground font-bold">Avg / Active Day</p>
+                        <p className="text-xl font-bold mt-1">
+                            {isLoading ? '—' : formatDuration(stats.avgPerActiveDay)}
+                        </p>
+                    </Card>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div>
+                        <Label className="text-xs text-muted-foreground font-bold">Last Seen</Label>
+                        <p className="font-medium mt-1">
+                            {lastSeenDate ? formatDistanceToNow(lastSeenDate, { addSuffix: true }) : 'Never'}
+                        </p>
+                    </div>
+                    <div>
+                        <Label className="text-xs text-muted-foreground font-bold">Device</Label>
+                        <p className="font-medium mt-1">{user.deviceType || 'Unknown'}</p>
+                    </div>
+                    <div>
+                        <Label className="text-xs text-muted-foreground font-bold">App Version</Label>
+                        <p className="font-medium mt-1">{user.appVersion || 'Unknown'}</p>
+                    </div>
+                    <div>
+                        <Label className="text-xs text-muted-foreground font-bold">Peak Hour</Label>
+                        <p className="font-medium mt-1">
+                            {isLoading || stats.peakHour === null
+                                ? '—'
+                                : `${String(stats.peakHour).padStart(2, '0')}:00`}
+                        </p>
+                    </div>
+                </div>
+
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-12 gap-3 text-muted-foreground">
+                        <Loader className="h-5 w-5 animate-spin" />
+                        Loading session history…
+                    </div>
+                ) : loadError ? (
+                    <div className="flex items-center gap-2 py-8 text-sm text-destructive justify-center">
+                        <AlertTriangle className="h-4 w-4" />
+                        {loadError}
+                    </div>
+                ) : stats.sessionCount === 0 ? (
+                    <div className="text-center py-10 text-sm text-muted-foreground">
+                        No completed sessions recorded yet. Per-session history starts once the user
+                        closes the app at least once on v3.0.0 or later.
+                    </div>
+                ) : (
+                    <>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">Daily Usage (last 30 active days)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[220px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ReBarChart data={stats.chartData}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="date" fontSize={11} tickLine={false} axisLine={false} />
+                                            <YAxis
+                                                fontSize={11}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                                            />
+                                            <ReTooltip
+                                                formatter={(v: any) => [`${v} min`, 'Usage']}
+                                                contentStyle={{ fontSize: 12 }}
+                                            />
+                                            <Bar dataKey="minutes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                                        </ReBarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Session Summary</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Recorded sessions</span>
+                                        <span className="font-semibold">{stats.sessionCount}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Longest session</span>
+                                        <span className="font-semibold">
+                                            {formatDuration(stats.longest?.durationSeconds ?? 0)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Avg session length</span>
+                                        <span className="font-semibold">
+                                            {formatDuration(Math.round(
+                                                sessions.reduce((s, x) => s + (x.durationSeconds ?? 0), 0) /
+                                                Math.max(stats.sessionCount, 1),
+                                            ))}
+                                        </span>
+                                    </div>
+                                    {stats.devices.map(([platform, count]) => (
+                                        <div key={platform} className="flex justify-between">
+                                            <span className="text-muted-foreground">{platform}</span>
+                                            <span className="font-semibold">{count} session{count === 1 ? '' : 's'}</span>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Recent Sessions</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="max-h-[260px] overflow-y-auto">
+                                        <Table>
+                                            <TableHeader className="sticky top-0 bg-background">
+                                                <TableRow>
+                                                    <TableHead className="text-xs">When</TableHead>
+                                                    <TableHead className="text-xs">Duration</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {stats.recent.map(s => {
+                                                    const when = toDate(s.startedAt) || toDate(s.createdAt) || toDate(s.lastSeen);
+                                                    return (
+                                                        <TableRow key={s.id}>
+                                                            <TableCell className="text-xs">
+                                                                {when ? format(when, 'PPp') : '—'}
+                                                            </TableCell>
+                                                            <TableCell className="text-xs font-mono">
+                                                                {s.durationSeconds
+                                                                    ? formatDuration(s.durationSeconds)
+                                                                    : <span className="text-muted-foreground">active</span>}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -1443,7 +1802,9 @@ function AdminDashboardContent({
                 collection(firestore, 'follow_up_logs'),
                 orderBy('sentAt', 'desc')
             );
-            const snapshot = await getDocs(logsQuery);
+            const snapshot = await withFirestoreRetry(() => getDocs(logsQuery), {
+                label: 'Admin outreach logs',
+            });
             const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
             
             setOutreachLogs(logs);
@@ -1461,7 +1822,9 @@ function AdminDashboardContent({
             try {
                 // Intel Mission: Directly query the analytics overview document
                 const analyticsRef = doc(firestore, 'admin_analytics', 'overview');
-                const analyticsDoc = await getDoc(analyticsRef);
+                const analyticsDoc = await withFirestoreRetry(() => getDoc(analyticsRef), {
+                    label: 'Admin analytics overview',
+                });
                 
                 if (analyticsDoc.exists()) {
                     const data = analyticsDoc.data();

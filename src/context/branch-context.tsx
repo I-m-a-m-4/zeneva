@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { collection, query, where, getDocs, orderBy, getDoc, doc } from 'firebase/firestore';
 import { useFirestore, useUser } from '@/firebase';
+import { withFirestoreRetry, isOfflineError } from '@/firebase/retry';
 import type { Branch } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +27,29 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
   const [impersonationTrigger, setImpersonationTrigger] = useState(0);
   const lastLoadedUserIdRef = React.useRef<string | null>(null);
+  // Branches gate every other screen, and the effect below only re-runs when the
+  // user changes. If the load dies because Firestore had not connected yet, it
+  // would never be retried and the app would sit empty for the whole session -
+  // so remember that and try again as soon as the network comes back.
+  const loadFailedOfflineRef = React.useRef(false);
+  const [connectivityRetry, setConnectivityRetry] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const retryIfStalled = () => {
+      if (!loadFailedOfflineRef.current) return;
+      loadFailedOfflineRef.current = false;
+      setConnectivityRetry((n) => n + 1);
+    };
+    window.addEventListener('online', retryIfStalled);
+    // 'online' does not fire when the machine was never flagged offline in the
+    // first place - which is exactly the case here - so also poll slowly.
+    const interval = setInterval(retryIfStalled, 15000);
+    return () => {
+      window.removeEventListener('online', retryIfStalled);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const handleImpersonationChange = () => {
@@ -79,7 +103,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         lastLoadedUserIdRef.current = targetUserId;
 
         const userDocRef = doc(firestore, 'users', targetUserId);
-        const userDocSnap = await getDoc(userDocRef);
+        const userDocSnap = await withFirestoreRetry(() => getDoc(userDocRef), {
+          label: 'BranchProvider user profile',
+        });
         
         if (userDocSnap.exists()) {
           const businessId = userDocSnap.data().businessId;
@@ -100,7 +126,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
               orderBy('createdAt', 'asc')
             );
             
-            const branchesSnap = await getDocs(branchesQuery);
+            const branchesSnap = await withFirestoreRetry(() => getDocs(branchesQuery), {
+              label: 'BranchProvider branches',
+            });
             let fetchedBranches = branchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Branch));
             
             // Ensure a primary branch exists with ID = businessId
@@ -111,7 +139,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             let businessAddress = '';
             try {
               const businessDocRef = doc(firestore, 'businessInstances', businessId);
-              const businessDocSnap = await getDoc(businessDocRef);
+              const businessDocSnap = await withFirestoreRetry(
+                () => getDoc(businessDocRef),
+                { label: 'BranchProvider business instance' },
+              );
               if (businessDocSnap.exists()) {
                 businessName = businessDocSnap.data().name || businessName;
                 businessAddress = businessDocSnap.data().address || '';
@@ -202,7 +233,15 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
           setBranches([]);
         } else {
-          console.error("Failed to load branches", err);
+          // Retries are already exhausted by this point. Flag it so the
+          // connectivity watcher above re-runs the load instead of leaving the
+          // user on an empty app until they restart it.
+          if (isOfflineError(err)) {
+            loadFailedOfflineRef.current = true;
+            console.warn('Failed to load branches: Firestore unreachable. Will retry when the connection settles.', err);
+          } else {
+            console.error("Failed to load branches", err);
+          }
           // Network or offline error: keep cached branches if they exist, or fall back to single primary branch
           if (typeof window !== 'undefined') {
             const cachedBusinessId = localStorage.getItem('zeneva_cached_business_id');
@@ -236,7 +275,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     };
 
     loadBranches();
-  }, [user, firestore, impersonationTrigger]);
+  }, [user, firestore, impersonationTrigger, connectivityRetry]);
 
   const handleSetActiveBranch = (id: string) => {
     setActiveBranchId(id);

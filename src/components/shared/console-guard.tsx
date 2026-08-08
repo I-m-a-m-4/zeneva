@@ -28,15 +28,6 @@ export function ConsoleGuard() {
       'Minified React error #423',
       'ResponsiveContainer',
       'fixed numbers, maybe you don\'t need to use a ResponsiveContainer',
-      'QUIC_PROTOCOL_ERROR',
-      'QUIC_NETWORK_IDLE_TIMEOUT',
-      'transport errored',
-      'WebChannelConnection RPC',
-      'Firestore (11.10.0)',
-      'firestore.googleapis.com',
-      'google.firestore.v1.Firestore',
-      '400 (Bad Request)',
-      '404 (Not Found)',
       'bootstrap.smartsuppchat.com',
       'google.ads',
       'pagead2.googlesyndication.com',
@@ -46,6 +37,23 @@ export function ConsoleGuard() {
       'hydration mismatch',
       'some attributes of the server rendered HTML',
       'Hydration failed',
+      // Firestore transport noise. These are routine when the SDK retries and
+      // recovers, so users should never see them - but when the client gets
+      // stuck offline on a machine with working internet, they are the only
+      // evidence of why. Keep them visible while developing.
+      ...(process.env.NODE_ENV === 'production'
+        ? [
+            'QUIC_PROTOCOL_ERROR',
+            'QUIC_NETWORK_IDLE_TIMEOUT',
+            'transport errored',
+            'WebChannelConnection RPC',
+            'Firestore (11.10.0)',
+            'firestore.googleapis.com',
+            'google.firestore.v1.Firestore',
+            '400 (Bad Request)',
+            '404 (Not Found)',
+          ]
+        : []),
     ];
 
     const shouldSuppress = (args: any[]) => {

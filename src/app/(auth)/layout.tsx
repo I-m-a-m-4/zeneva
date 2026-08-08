@@ -4,11 +4,11 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader } from 'lucide-react';
 
-function FullScreenLoader({ text }: { text?: string }) {
+function FullScreenLoader({ text, dark }: { text?: string; dark?: boolean }) {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-2">
-      <Loader className="h-8 w-8 animate-spin text-primary" />
-      {text && <p className="text-sm text-muted-foreground">{text}</p>}
+    <div className={`flex h-screen w-full items-center justify-center flex-col gap-2 ${dark ? 'bg-black' : 'bg-background'}`}>
+      <Loader className={`h-8 w-8 animate-spin ${dark ? 'text-white' : 'text-primary'}`} />
+      {text && <p className={`text-sm ${dark ? 'text-white/60' : 'text-muted-foreground'}`}>{text}</p>}
     </div>
   );
 }
@@ -42,6 +42,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     return <FullScreenLoader text="Authenticating..." />;
   }
 
+  // For the welcome page while loading, show a black screen to match the dark video feel
+  if (isUserLoading && pathname === '/welcome') {
+    return <FullScreenLoader dark />;
+  }
+
   // If a user is logged in, they are about to be redirected by the useEffect.
   // Showing a loader here provides a better UX than a flash of the login/signup page.
   // We exclude the signup page from this logic as it handles its own post-signup redirect.
@@ -51,5 +56,19 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   }
 
   // If no user is logged in and we are not loading, it's safe to render the auth pages.
-  return <div className="h-screen overflow-y-auto w-full">{children}</div>;
+  // For the welcome page: use bg-black + overflow-hidden so the video fills edge-to-edge
+  // with no white scrollbar or background bleeding through on mobile.
+  //
+  // `h-screen` is 100vh, which on mobile Safari/Chrome is the viewport *without*
+  // the browser chrome - taller than what you can actually see. Combined with
+  // the page's own 100dvh that produced a page you could scroll a few pixels.
+  // dvh matches the visible area, so the welcome screen fits exactly.
+  const isWelcomePage = pathname === '/welcome';
+  return (
+    <div className={`w-full ${
+      isWelcomePage ? 'h-[100dvh] overflow-hidden bg-black overscroll-none' : 'h-screen overflow-y-auto'
+    }`}>
+      {children}
+    </div>
+  );
 }

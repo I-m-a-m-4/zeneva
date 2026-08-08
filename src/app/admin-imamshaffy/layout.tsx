@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useUser, useFirestore } from '@/firebase';
+import { terminalListenerErrorHandler } from '@/firebase/retry';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap } from 'lucide-react';
@@ -138,7 +139,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           }
         }
       });
-    });
+    }, terminalListenerErrorHandler('Admin support notifications', () => unsubscribe()));
 
     return () => unsubscribe();
   }, [firestore, user, notify]);

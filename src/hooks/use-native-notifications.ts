@@ -1,4 +1,5 @@
 
+
 /**
  * useNativeNotifications provides a bridge between Zeneva's internal events
  * and the Native Mobile/Desktop notification system.
@@ -14,13 +15,19 @@ export function useNativeNotifications() {
         }
 
         const targetUrl = link || (title.toLowerCase().includes('ceo') || title.toLowerCase().includes('chat') ? '/support' : '/dashboard');
+        const isExternal = targetUrl.startsWith('http://') || targetUrl.startsWith('https://');
 
         const createNotif = () => {
           const n = new Notification(title, { body, icon: '/icon-192x192.png' });
           n.onclick = () => {
             window.focus();
             if (targetUrl) {
-              window.location.href = targetUrl;
+              if (isExternal) {
+                // Open store links in the system browser, not inside the app
+                window.open(targetUrl, '_blank', 'noopener,noreferrer');
+              } else {
+                window.location.href = targetUrl;
+              }
             }
           };
         };

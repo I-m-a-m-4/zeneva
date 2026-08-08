@@ -75,6 +75,9 @@ export interface UserProfile {
     branchId?: string;
     totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
     appVersion?: string; // Latest app version used by the user
+    deviceType?: string; // 'Desktop App' | 'Mobile App' | 'Mobile' | 'Web' - written by UserActivityTracker
+    country?: string; // Resolved at sign-in by UserActivityTracker; absent when lookup failed
+    ip?: string; // Last known public IP, for the admin login-location column
 }
 
 
