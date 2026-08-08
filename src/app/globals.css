@@ -662,3 +662,53 @@ html[data-scroll-locked] {
 /* Prevent Radix UI / react-remove-scroll scroll-lock from shifting layout */
 body { scrollbar-gutter: stable; padding-right: 0px !important; }
 body[data-scroll-locked], html[data-scroll-locked] { margin-right: 0px !important; padding-right: 0px !important; }
+
+/* ── Zen AI ───────────────────────────────────────────────────────────────
+   The glyph breathes while a reply streams. The silver sweep itself is an
+   SVG <animateTransform> inside <ZenMark>; this only adds the scale, so the
+   two effects can run at different rates and not look mechanical. */
+@keyframes zen-mark-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.06); opacity: 0.92; }
+}
+
+.zen-mark-pulse {
+  transform-origin: center;
+  animation: zen-mark-pulse 2.1s ease-in-out infinite;
+}
+
+/* Each word of the status line fades up as the label changes. */
+@keyframes zen-status-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.zen-status-in {
+  animation: zen-status-in 0.28s ease-out both;
+}
+
+/* Streaming caret on the in-progress assistant message. */
+@keyframes zen-caret {
+  0%, 45%   { opacity: 1; }
+  50%, 95%  { opacity: 0; }
+  100%      { opacity: 1; }
+}
+
+.zen-caret {
+  display: inline-block;
+  width: 0.45rem;
+  height: 1.02em;
+  margin-left: 0.15rem;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: hsl(var(--primary));
+  animation: zen-caret 1.05s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zen-mark-pulse,
+  .zen-status-in,
+  .zen-caret {
+    animation: none;
+  }
+}

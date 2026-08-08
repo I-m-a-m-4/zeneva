@@ -44,6 +44,17 @@ function ReviewPageContent() {
     // Memoize the receipt number so it doesn't change on every render
     const stableReceiptNumber = React.useMemo(() => `rec-${uuidv4().split('-')[0]}`, []);
 
+    // Parse the backdate input once. A datetime-local field can hand back a
+    // partial or unparseable value while the user is still picking, and
+    // `new Date('')`/`new Date('garbage')` is an Invalid Date whose
+    // .toISOString() throws - which used to abort checkout after the
+    // "already started" guard had latched, wedging the POS.
+    const backdatedAt = React.useMemo(() => {
+        if (!backdate) return null;
+        const parsed = new Date(backdate);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }, [backdate]);
+
     // Create a temporary receipt object for display before saving
     const displayReceipt = React.useMemo(() => ({
         id: 'temp-id',
@@ -63,8 +74,8 @@ function ReviewPageContent() {
         total,
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
         status: (paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid')) as 'pending' | 'unpaid' | 'paid',
-        createdAt: backdate ? new Date(backdate) : new Date(), // Use a real date for optimistic display
-    }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdate]);
+        createdAt: backdatedAt || new Date(), // Use a real date for optimistic display
+    }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdatedAt]);
 
     const handleCompleteSale = React.useCallback(() => {
         if (checkoutStartedRef.current) return;
@@ -93,7 +104,7 @@ function ReviewPageContent() {
         const operatingHours = business.settings?.operatingHours;
         let isOutsideHours = false;
         if (operatingHours?.enabled) {
-            const saleDate = backdate ? new Date(backdate) : new Date();
+            const saleDate = backdatedAt || new Date();
             const [openH, openM] = operatingHours.openTime.split(':').map(Number);
             const [closeH, closeM] = operatingHours.closeTime.split(':').map(Number);
             const nowMinutes = saleDate.getHours() * 60 + saleDate.getMinutes();
@@ -180,8 +191,8 @@ function ReviewPageContent() {
             profit, 
             paymentMethod,
             status,
-            createdAt: backdate ? new Date(backdate) : new Date(),
-            isBackdated: !!backdate,
+            createdAt: backdatedAt || new Date(),
+            isBackdated: !!backdatedAt,
             createdBy: user.uid,
             flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
             wasScanned,
@@ -219,6 +230,33 @@ function ReviewPageContent() {
 
         // Queue audit logs for stock adjustment due to sales
         const activeProfile = currentUserProfile || offlineProfile;
+
+        // The backdate control promises "this action will be flagged in the audit
+        // log", so record it. Queued rather than written directly so it survives
+        // an offline checkout like every other write on this page.
+        if (backdatedAt) {
+            addToQueue({
+                type: 'add-audit-log',
+                payload: {
+                    businessId: business.id,
+                    userId: activeProfile?.id || user.uid,
+                    userName: activeProfile?.name || 'Staff',
+                    userEmail: activeProfile?.email || user.email || '',
+                    userRole: activeProfile?.role || 'staff',
+                    action: 'sale.backdated',
+                    entityType: 'Receipt',
+                    entityId: newReceiptId,
+                    details: {
+                        entityName: displayReceipt.receiptNumber,
+                        backdatedTo: backdatedAt.toISOString(),
+                        recordedAt: new Date().toISOString(),
+                        total: secureTotal,
+                        reason: 'Sale recorded with an admin-selected date'
+                    }
+                }
+            }, `Flagging backdated sale ${displayReceipt.receiptNumber}`);
+        }
+
         cart.forEach(cartItem => {
             const masterProduct = products.find(p => p.id === cartItem.product.id);
             const isService = masterProduct?.categoryType === 'service';
@@ -301,7 +339,7 @@ function ReviewPageContent() {
                     discount: numberFormat.format(discount),
                     total: numberFormat.format(secureTotal),
                     payment_method: paymentMethod,
-                    date: new Date().toLocaleString()
+                    date: receiptData.createdAt.toLocaleString()
                 }).catch(e => console.error("Email failed:", e));
             }
         }
@@ -354,7 +392,7 @@ function ReviewPageContent() {
         // to prevent the auto-submit useEffect from re-firing.
         // It will be reset when the component unmounts or POS is reset.
 
-    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdate, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
+    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
 
     // **Auto-Submit Logic**
     // We only want to trigger this ONCE when auto-prompted

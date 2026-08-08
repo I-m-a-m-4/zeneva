@@ -2,6 +2,26 @@
 
 Tauri + Next.js retail POS/ERP. Desktop (Windows/macOS), Android, iOS.
 
+## Zen AI — read before touching the chat client or a stale-bundle bug
+
+`docs/zen-ai.md` is required reading for anything touching `/ai-insights` or
+`src/app/api/chat/route.ts`.
+
+The short version:
+
+- `ai@7` + `@ai-sdk/react@4` are the **matching pair**; the version numbers are
+  not meant to line up. On v7, `useChat` accepts **neither `api` nor `body`** —
+  they belong to the transport. Passing them is silently ignored, which strips
+  `businessId`/`userId` from the request and makes every prompt 401.
+- **A stack-trace line number that doesn't match the source means a stale
+  service worker, not a bad edit.** `npm run build` leaves a production
+  `public/sw.js` behind, and the dev server happily serves it; the worker then
+  serves precached *built* chunks over your source changes. A normal refresh
+  goes through the worker and does not help.
+- The dev guard in `src/components/shared/client-initializer.tsx` unregisters
+  stray workers but deliberately spares `firebase-messaging-sw.js` — killing
+  that one breaks push notifications in dev.
+
 ## Android signing — read before touching release builds
 
 `docs/android-signing.md` is required reading if the task involves the

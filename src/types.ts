@@ -127,6 +127,8 @@ export interface Receipt {
     paymentMethod: 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice';
     status?: 'paid' | 'unpaid' | 'pending';
     createdAt: any; // Can be a Date or a Firestore Timestamp
+    /** True when an admin chose the sale date instead of using the sync clock. */
+    isBackdated?: boolean;
     createdBy?: string;
     flagged?: {
         reason: string;
@@ -170,7 +172,7 @@ export interface OnlineOrder {
 
 export interface QueuedAction {
     id: string;
-    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings';
+    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings' | 'add-audit-log' | 'delete-receipt';
     description: string;
     payload: any;
     timestamp: number;

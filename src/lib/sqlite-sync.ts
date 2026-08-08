@@ -285,14 +285,40 @@ export async function syncCustomersToOffline(businessId: string, customers: any[
   }
 }
 
+/**
+ * Seconds since the epoch for a receipt's createdAt.
+ *
+ * The value arrives in three shapes: a Firestore Timestamp ({seconds}) from a
+ * server read, a JS Date from a just-completed sale re-injected into the cache,
+ * and an ISO string once it has been through JSON (the offline queue, or any
+ * cached copy that round-tripped through storage). Only the first has .seconds,
+ * so reading that field alone quietly fell back to "now" for the other two -
+ * which stamped backdated and offline sales with the current date in the
+ * created_at column used for ordering and for monthly revenue grouping.
+ */
+function receiptCreatedAtSeconds(receipt: any): number {
+  const raw = receipt?.createdAt;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (!raw) return nowSeconds;
+
+  if (typeof raw.seconds === 'number') return raw.seconds;
+  if (typeof raw.toDate === 'function') {
+    const d = raw.toDate();
+    return isNaN(d.getTime()) ? nowSeconds : Math.floor(d.getTime() / 1000);
+  }
+
+  const parsed = raw instanceof Date ? raw : new Date(raw);
+  return isNaN(parsed.getTime()) ? nowSeconds : Math.floor(parsed.getTime() / 1000);
+}
+
 export async function syncReceiptsToOffline(businessId: string, receipts: any[]) {
   const db = await getOfflineDb();
   if (!db || receipts.length === 0) return;
-  
+
   for (const receipt of receipts) {
     if (!receipt || !receipt.id) continue;
     try {
-      const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
+      const createdAt = receiptCreatedAtSeconds(receipt);
       await db.execute(
         'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
         [receipt.id, businessId, JSON.stringify(receipt), createdAt]
@@ -306,9 +332,9 @@ export async function syncReceiptsToOffline(businessId: string, receipts: any[])
 export async function syncReceiptToOffline(businessId: string, receipt: any) {
   const db = await getOfflineDb();
   if (!db || !receipt?.id) return;
-  
+
   try {
-    const createdAt = receipt.createdAt?.seconds || Math.floor(Date.now() / 1000);
+    const createdAt = receiptCreatedAtSeconds(receipt);
     await db.execute(
       'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
       [receipt.id, businessId, JSON.stringify(receipt), createdAt]

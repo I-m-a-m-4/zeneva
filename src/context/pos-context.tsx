@@ -1116,12 +1116,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
               // Write Discrete Receipt Record
               const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
               
-              // Handle backdated sales correctly (preserve user-selected date)
-              const isBackdated = action.payload.receiptData.isBackdated;
-              const dateVal = isBackdated && action.payload.receiptData.createdAt 
-                ? Timestamp.fromDate(new Date(action.payload.receiptData.createdAt)) 
+              // Preserve the date the sale actually belongs to.
+              //
+              // Two cases must beat the server clock, which is only correct for a
+              // sale recorded and synced in the same moment:
+              //   1. The admin backdated it (isBackdated).
+              //   2. It sat in the offline queue - a sale rung up on Monday and
+              //      synced on Wednesday is a Monday sale, not a Wednesday one.
+              // Case 2 also covers actions queued by an older build that predates
+              // the isBackdated flag, which would otherwise be stamped with the
+              // sync time and appear to "lose" the date the cashier chose.
+              const rawCreatedAt = action.payload.receiptData.createdAt;
+              const clientDate = rawCreatedAt ? safeToDate(rawCreatedAt) : null;
+              // safeToDate returns epoch 0 for anything unparseable - never trust that.
+              const hasClientDate = !!clientDate && clientDate.getTime() > 0;
+              const isOlderThanSync = hasClientDate && (Date.now() - clientDate!.getTime()) > 120_000;
+              const dateVal = hasClientDate && (action.payload.receiptData.isBackdated || isOlderThanSync)
+                ? Timestamp.fromDate(clientDate!)
                 : serverTimestamp();
-                
+
+
               batch.set(rRef, { 
                 ...action.payload.receiptData, 
                 businessId: businessId, 
