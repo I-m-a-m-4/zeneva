@@ -10,8 +10,10 @@ function findFile(dir, fileName) {
   for (const file of files) {
     const fullPath = path.join(dir, file);
     if (fs.statSync(fullPath).isDirectory()) {
-      // Avoid recursive node_modules or target folders to speed up
-      if (file === 'node_modules' || file === 'target' || file === '.git') continue;
+      // Skip node_modules/target/.git for speed, and `build` because Gradle
+      // writes a merged AndroidManifest.xml there. Patching that copy is
+      // useless - it is regenerated from source on every build.
+      if (file === 'node_modules' || file === 'target' || file === '.git' || file === 'build') continue;
       const found = findFile(fullPath, fileName);
       if (found) return found;
     } else if (file === fileName) {
@@ -22,37 +24,47 @@ function findFile(dir, fileName) {
 }
 
 async function patchManifest() {
-  const searchRoot = path.join(__dirname, '../src-tauri');
-  console.log(`Scanning recursively for AndroidManifest.xml starting from: ${searchRoot}`);
-  
-  const manifestPath = findFile(searchRoot, 'AndroidManifest.xml');
-  
-  if (!manifestPath) {
-    console.warn('WARNING: AndroidManifest.xml was not found in src-tauri subtree. Tauri might not have fully generated android project directories yet. Looking in fallback path.');
-    const fallbackPath = path.join(__dirname, '../src-tauri/gen/android/app/src/main/AndroidManifest.xml');
-    if (!fs.existsSync(fallbackPath)) {
-      console.error('CRITICAL ERROR: Cannot locate AndroidManifest.xml. Direct integration aborted.');
-      process.exit(1);
-    }
-    processManifest(fallbackPath);
-  } else {
-    processManifest(manifestPath);
+  // The canonical source manifest. Prefer it outright rather than trusting a
+  // directory walk, which previously resolved to Gradle's merged copy under
+  // app/build/intermediates/ and silently patched a throwaway file.
+  const canonical = path.join(__dirname, '../src-tauri/gen/android/app/src/main/AndroidManifest.xml');
+  if (fs.existsSync(canonical)) {
+    processManifest(canonical);
+    return;
   }
+
+  const searchRoot = path.join(__dirname, '../src-tauri');
+  console.log(`Canonical manifest not found. Scanning recursively from: ${searchRoot}`);
+
+  const manifestPath = findFile(searchRoot, 'AndroidManifest.xml');
+
+  if (!manifestPath) {
+    console.error('CRITICAL ERROR: Cannot locate AndroidManifest.xml. Direct integration aborted.');
+    process.exit(1);
+  }
+
+  processManifest(manifestPath);
 }
 
 function processManifest(filePath) {
   console.log(`Found AndroidManifest.xml at: ${filePath}`);
   let content = fs.readFileSync(filePath, 'utf8');
   
-  const permissions = `
-    <!-- Zeneva System-level Hardware Integrations -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-`;
+  // Each entry is checked and injected independently so that adding a new
+  // permission later is not skipped just because an earlier one is present.
+  const entries = [
+    { match: 'android.permission.CAMERA', tag: '<uses-permission android:name="android.permission.CAMERA" />' },
+    { match: 'android.permission.RECORD_AUDIO', tag: '<uses-permission android:name="android.permission.RECORD_AUDIO" />' },
+    { match: 'android.permission.MODIFY_AUDIO_SETTINGS', tag: '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' },
+    { match: 'android.hardware.camera"', tag: '<uses-feature android:name="android.hardware.camera" android:required="false" />' },
+    { match: 'android.hardware.camera.autofocus', tag: '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />' },
+    { match: 'android.hardware.microphone', tag: '<uses-feature android:name="android.hardware.microphone" android:required="false" />' },
+  ];
 
-  if (content.includes('android.permission.CAMERA')) {
-    console.log('SUCCESS: Camera permissions already defined in Manifest. Skipping injection.');
+  const missing = entries.filter((e) => !content.includes(e.match));
+
+  if (missing.length === 0) {
+    console.log('SUCCESS: All hardware permissions already defined in Manifest. Skipping injection.');
     return;
   }
 
@@ -61,9 +73,15 @@ function processManifest(filePath) {
     process.exit(1);
   }
 
-  const patched = content.replace('<application', `${permissions}\n    <application`);
+  const block = `
+    <!-- Zeneva System-level Hardware Integrations -->
+${missing.map((e) => `    ${e.tag}`).join('\n')}
+`;
+
+  const patched = content.replace('<application', `${block}\n    <application`);
   fs.writeFileSync(filePath, patched, 'utf8');
-  console.log('SUCCESS: Successfully patched AndroidManifest.xml with system-level camera and autofocus hardware support!');
+  console.log(`SUCCESS: Patched AndroidManifest.xml with ${missing.length} hardware entr${missing.length === 1 ? 'y' : 'ies'}:`);
+  missing.forEach((e) => console.log(`  + ${e.match}`));
 }
 
 patchManifest().catch(console.error);

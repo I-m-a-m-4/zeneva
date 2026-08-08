@@ -18,6 +18,7 @@ import { DesktopTitleBar } from '@/components/desktop/TitleBar';
 import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
 import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
+import { FirestoreRecovery } from '@/components/shared/firestore-recovery';
 import { ClientSideInitializer } from '@/components/shared/client-initializer';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
@@ -297,6 +298,7 @@ export default function RootLayout({
           <SplashScreen />
           <ClientSideInitializer />
           <ChunkErrorListener />
+          <FirestoreRecovery />
           <FirebaseClientProvider>
             <PWAProvider>
               <UserActivityTracker />

@@ -102,7 +102,14 @@ export function useDoc<T = any>(
 
     return () => {
       isMounted = false;
-      if (unsubscribe) unsubscribe();
+      if (!unsubscribe) return;
+      // See useCollection: unsubscribe can throw the SDK's internal assertion
+      // when detached mid-stream. Never let that escape cleanup.
+      try {
+        unsubscribe();
+      } catch (err) {
+        console.warn('useDoc: listener teardown threw, ignoring.', err);
+      }
     };
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 

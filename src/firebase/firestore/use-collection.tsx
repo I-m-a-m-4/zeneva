@@ -114,7 +114,16 @@ export function useCollection<T = any>(
 
     return () => {
       isMounted = false;
-      if (unsubscribe) unsubscribe();
+      if (!unsubscribe) return;
+      // The SDK can throw "INTERNAL ASSERTION FAILED: Unexpected state" out of
+      // unsubscribe when a listener is detached while its Listen stream still
+      // has in-flight target changes. Letting that escape a cleanup function
+      // turns a recoverable teardown race into an unhandled crash.
+      try {
+        unsubscribe();
+      } catch (err) {
+        console.warn('useCollection: listener teardown threw, ignoring.', err);
+      }
     };
   }, [memoizedTargetRefOrQuery]);
 
