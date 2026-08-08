@@ -1,9 +1,22 @@
 
 import type { NextConfig } from 'next';
+import { readFileSync } from 'fs';
+import path from 'path';
 
 const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
 
+// Single source of truth for the version the running app reports. Read from
+// package.json at build time so AppConfig.version cannot drift from the real
+// release (it sat at 2.9.9 while the app shipped 3.1.4), which matters because
+// the update check compares against it.
+const appVersion = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')
+).version as string;
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+  },
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
   serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],

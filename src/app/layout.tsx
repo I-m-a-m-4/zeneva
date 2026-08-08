@@ -13,6 +13,7 @@ import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
 import { TauriUpdater } from '@/components/TauriUpdater';
+import { UpdatePrompt } from '@/components/update-prompt';
 import { DesktopTitleBar } from '@/components/desktop/TitleBar';
 import { DesktopLauncher } from '@/components/desktop/DesktopLauncher';
 import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
@@ -303,6 +304,7 @@ export default function RootLayout({
               <Loader />
               <InstallPrompt />
               <TauriUpdater />
+              <UpdatePrompt />
               <BranchProvider>
                 <POSProvider>
                   <TauriLayoutWrapper>

@@ -1219,19 +1219,80 @@ export default function AuthenticatedLayout({
                       <p>Calculator</p>
                     </TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative" asChild>
-                        <Link href="/notifications">
-                          <Bell className="h-5 w-5" />
-                          {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
+                  <DropdownMenu modal={false}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+                            <Bell className="h-5 w-5" />
+                            {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Notifications</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent className="w-80 sm:w-96" align="end" forceMount>
+                      <DropdownMenuLabel className="flex items-center justify-between font-normal">
+                        <span className="text-sm font-medium">Notifications</span>
+                        {unreadCount > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.preventDefault(); handleMarkAsRead(); }}
+                          >
+                            Mark all read
+                          </Button>
+                        )}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {allNotifications.length === 0 ? (
+                        <div className="px-3 py-8 text-center">
+                          <Bell className="mx-auto h-6 w-6 text-muted-foreground/40" />
+                          <p className="mt-2 text-xs text-muted-foreground">You're all caught up</p>
+                        </div>
+                      ) : (
+                        <ScrollArea className="max-h-[320px]">
+                          {allNotifications.slice(0, 6).map((notif: any) => (
+                            <DropdownMenuItem
+                              key={`${notif.isGlobal ? 'g' : 'u'}-${notif.id}`}
+                              className="flex cursor-pointer items-start gap-2.5 px-3 py-2.5"
+                              onSelect={() => handleNotificationClick(notif)}
+                            >
+                              <span
+                                className={cn(
+                                  'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                                  notif.read ? 'bg-transparent' : 'bg-primary'
+                                )}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className={cn('truncate text-xs', !notif.read && 'font-semibold')}>
+                                  {notif.title || 'Notification'}
+                                </p>
+                                {notif.body && (
+                                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                                    {notif.body}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-[10px] text-muted-foreground/70">
+                                  {formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                        </ScrollArea>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild className="cursor-pointer justify-center">
+                        <Link href="/notifications" className="text-xs font-medium">
+                          View all
+                          <ChevronRight className="ml-1 h-3.5 w-3.5" />
                         </Link>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Notifications</p>
-                    </TooltipContent>
-                  </Tooltip>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
