@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "patch-package",
     "tauri": "tauri",
-    "version-up": "node scripts/update-version.js"
+    "version-up": "node scripts/update-version.js",
+    "announce-release": "node scripts/announce-release.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.36",

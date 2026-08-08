@@ -38,6 +38,24 @@ That shipped in 3.1.2 across desktop, Android and iOS.
 `release.yml` has a *Verify Firebase config is present* step that fails the
 build if any required value is missing. Keep it.
 
+## Announcing an update to store users
+
+Play Store and Microsoft Store installs cannot self-patch, so the in-app
+banner (`src/components/update-prompt.tsx`) tells them a new version exists.
+It reads Firestore `system_config/app_release` and stays hidden until that
+document exists.
+
+```bash
+npm run announce-release -- --show          # what is currently announced
+npm run announce-release -- 3.1.7 --notes "Faster receipts"
+npm run announce-release -- --clear         # hide the banner again
+```
+
+Only announce a version that is **already live in the stores**. Announcing
+during a rollout sends users to a listing still serving the build they have.
+The script refuses any version not newer than `package.json` as a backstop,
+but it cannot know whether the store rollout finished — that part is on you.
+
 ## Releasing
 
 Version is read from `package.json`, not the git tag. Bump `package.json`,
