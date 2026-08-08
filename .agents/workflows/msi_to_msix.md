@@ -37,8 +37,29 @@ Whenever a new MSI installer for Zeneva (e.g., `zeneva_3.0.1_x64_en-US.msi`) is 
    ```
    *(Replace `VERSION` with the current version, e.g., `3.0.1`)*
 
-7. **Sign the MSIX Package**:
-   To make the generated MSIX package installable on Windows, sign it using your certificate via the MSIX Hero GUI:
-   - Go to **Tools** > **Sign package**.
-   - Select the generated `.msix` file.
-   - Choose your code signing certificate and click sign.
+7. **Done — do NOT sign for Store submission**:
+   Partner Center signs the package with the Store identity
+   (`CN=FB9C471D-AB12-4486-AC75-1AA3579E4073`) during certification. Shipped
+   packages are unsigned locally — verify with:
+   ```powershell
+   Get-AuthenticodeSignature "C:\Users\Bello Imam\Downloads\ZenevaPack_VERSION.msix" | Select-Object Status
+   ```
+   Upload the `.msix` straight to Partner Center.
+
+   Only needed for **sideloading** (installing without the Store), which
+   requires a certificate that is not present on this machine:
+   ```powershell
+   MSIXHeroCLI.exe sign -f "path\to\cert.pfx" -p "PASSWORD" "C:\...\ZenevaPack_VERSION.msix"
+   ```
+
+## Notes
+
+- Quote the whole `-ArgumentList` as a **single string**, exactly as written in
+  step 2. Passing a PowerShell array breaks on the spaces in `C:\Users\Bello
+  Imam\...` and msiexec fails with error **1639** (invalid command line).
+- Never name the variable `$args` — it is a reserved PowerShell automatic
+  variable and `Start-Process` silently does nothing.
+- `npm run version-up <version>` already updates `AppxManifest.xml`, so step 5
+  is usually a no-op. Confirm the `<Identity Version="X.Y.Z.0">` matches before
+  packing.
+
