@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddUserDialog from '@/components/users/add-user-dialog';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import pkg from '../../../../package.json';
+import { AppConfig } from '@/lib/config';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -277,8 +277,8 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>
                         {user.appVersion ? (
-                          <Badge variant={user.appVersion === pkg.version ? 'default' : 'destructive'} className="font-mono text-[10px]">
-                            v{user.appVersion} {user.appVersion !== pkg.version && '(Outdated)'}
+                          <Badge variant={user.appVersion === AppConfig.version ? 'default' : 'destructive'} className="font-mono text-[10px]">
+                            v{user.appVersion} {user.appVersion !== AppConfig.version && '(Outdated)'}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs italic">Unknown</span>

@@ -44,3 +44,9 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 android-keystore-backup.json
+
+# next-pwa generated service worker artifacts (regenerated on every build)
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map

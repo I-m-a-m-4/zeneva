@@ -35,46 +35,24 @@ export async function getCountryFromIP(): Promise<string> {
 
   let country = 'Unknown';
 
-  // Try Service 1: freeipapi.com (No strict CORS/Rate limit issues usually)
-  try {
-    const res = await fetch('https://freeipapi.com/api/json');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.countryName) {
-        country = data.countryName;
-      }
-    }
-  } catch (e) {
-    // Silently fail
-  }
+  // Ordered by reliability. freeipapi.com was first here but now answers with a
+  // 302 and no Access-Control-Allow-Origin, so every call failed CORS and logged
+  // a console error the try/catch cannot suppress - the browser logs a blocked
+  // request regardless of whether the promise is handled.
+  const providers: Array<{ url: string; read: (data: any) => string | undefined }> = [
+    { url: 'https://ipwho.is/', read: (d) => (d?.success ? d.country : undefined) },
+    { url: 'https://ipapi.co/json/', read: (d) => d?.country_name },
+  ];
 
-  // Try Service 2: ipwho.is (Generous limits)
-  if (country === 'Unknown') {
+  for (const provider of providers) {
+    if (country !== 'Unknown') break;
     try {
-      const res = await fetch('https://ipwho.is/');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && data.country) {
-          country = data.country;
-        }
-      }
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
-  // Try Service 3: ipapi.co (Strict limits, causes 429 CORS errors)
-  if (country === 'Unknown') {
-    try {
-      const res = await fetch('https://ipapi.co/json/');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.country_name) {
-          country = data.country_name;
-        }
-      }
-    } catch (e) {
-      // Silently fail
+      const res = await fetch(provider.url);
+      if (!res.ok) continue;
+      const value = provider.read(await res.json());
+      if (value) country = value;
+    } catch {
+      // Provider unreachable or blocked - fall through to the next one.
     }
   }
 

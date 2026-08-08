@@ -41,6 +41,20 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: isTauri ? true : undefined,
     minimumCacheTTL: 31536000, // 1 year
+    // Required from Next 16: quality values and local src patterns must be
+    // declared up front. 100 is used by the login/welcome carousels.
+    qualities: [75, 100],
+    localPatterns: [
+      {
+        pathname: '/**',
+        search: '',
+      },
+      {
+        // The login slides cache-bust with ?v=2
+        pathname: '/**',
+        search: '?v=2',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'https',
