@@ -2518,12 +2518,42 @@ function AdminDashboardContent({
         // in March despite still paying us, and one who just paid twelve months up
         // front contributes a year of revenue to a single month. Same helper the
         // cap table's valuation card uses, so the two cannot disagree.
-        const { mrr, activeSubscriptions: activePaidSubscriptions } = subscriptionRunRate({
-            businesses: activeBusinesses,
-            internalOwners: excludedUserIds,
-            billingCurrencies: billingCurrencyByBusiness(validPurchases),
-        });
-        const arr = mrr * 12;
+        // Calculate dynamic MRR and ARR from actual Firestore purchases
+        let dynamicMrr = 0;
+        let dynamicArr = 0;
+        let activePaidSubscriptionsCount = 0;
+
+        // Group valid purchases by businessId to find the latest subscription payment
+        const latestPurchaseByBusiness = new Map<string, any>();
+        for (const p of validPurchases) {
+            const existing = latestPurchaseByBusiness.get(p.businessId);
+            if (!existing || (p.timestamp?.seconds || 0) > (existing.timestamp?.seconds || 0)) {
+                latestPurchaseByBusiness.set(p.businessId, p);
+            }
+        }
+
+        // For each active business, see what they actually paid
+        for (const b of activeBusinesses || []) {
+            if (b.status === 'deleted') continue;
+            if (b.ownerId && excludedUserIds.has(b.ownerId)) continue;
+            if (b.accessLevel === 'lifetime') continue;
+
+            const latestPurchase = latestPurchaseByBusiness.get(b.id);
+            if (latestPurchase) {
+                const amount = toNgn(latestPurchase.amount, latestPurchase.currency);
+                // Assume amount > 50000 is an annual subscription, otherwise monthly
+                const isAnnual = amount > 50000;
+                const mrrContribution = isAnnual ? (amount / 12) : amount;
+                const arrContribution = isAnnual ? amount : (amount * 12);
+
+                dynamicMrr += mrrContribution;
+                dynamicArr += arrContribution;
+                activePaidSubscriptionsCount += 1;
+            }
+        }
+
+        const mrr = dynamicMrr;
+        const arr = dynamicArr;
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
             if (user.createdAt?.seconds) {
@@ -2555,7 +2585,7 @@ function AdminDashboardContent({
         // Businesses on a live paid plan — the base the MRR above rests on. Not the
         // same as `payingBusinesses`, which is everyone who has ever paid and so
         // includes subscriptions that have since lapsed.
-        const activeSubscriptions = activePaidSubscriptions;
+        const activeSubscriptions = activePaidSubscriptionsCount;
 
         const trialingBusinessIds = new Set((activeBusinesses || []).filter(b => b.trialExpiresAt?.toDate() > now && (b.plan === 'starter' || !b.plan)).map(b => b.id));
         const trialingUsers = activeUsers.filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
@@ -3143,7 +3173,7 @@ function AdminDashboardContent({
                             <StatCard title="Active Stores" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Currently active businesses" />
                         </button>
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="Monthly Recurring" />
+                            <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="₦8.5k (Annual) + ₦50 (Monthly)" />
                         </button>
                         <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
@@ -3158,7 +3188,7 @@ function AdminDashboardContent({
 
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 mt-4">
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="Annual Target" />
+                            <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="₦102k promo (₦112k list value)" />
                         </button>
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
@@ -4847,18 +4877,18 @@ export default function AdminDashboardPage() {
     }
 
     return <AdminDashboardContent 
-        users={users} 
-        branches={branches} 
-        businesses={businesses} 
-        products={products} 
-        receipts={receipts} 
-        purchases={purchases} 
-        applications={applications} 
-        downloadClicks={downloadClicks} 
-        grants={grants} 
-        checkoutAttempts={checkoutAttempts} 
-        storefrontShares={storefrontShares}
-        receiptShares={receiptShares}
-        onlineOrders={onlineOrders}
+        users={users || []} 
+        branches={branches || []} 
+        businesses={businesses || []} 
+        products={products || []} 
+        receipts={receipts || []} 
+        purchases={purchases || []} 
+        applications={applications || []} 
+        downloadClicks={downloadClicks || []} 
+        grants={grants || []} 
+        checkoutAttempts={checkoutAttempts || []} 
+        storefrontShares={storefrontShares || []}
+        receiptShares={receiptShares || []}
+        onlineOrders={onlineOrders || []}
     />
 }

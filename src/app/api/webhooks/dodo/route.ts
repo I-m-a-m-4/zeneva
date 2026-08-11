@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { adminFirestore } from '@/firebase/admin';
+import { notifyAdminsOfSubscription } from '@/lib/server/notifications';
 
 /**
  * POST /api/webhooks/dodo — Dodo Payments Standard Webhooks receiver.
@@ -208,6 +209,16 @@ export async function POST(req: Request) {
 
               await batch.commit();
               console.log(`[dodo-webhook] Applied plan update to business: ${businessId}`);
+              
+              // Notify platform admins/owners about the new subscription
+              notifyAdminsOfSubscription({
+                businessName: bData.name || 'Another Business',
+                planId: planId,
+                amount: (pData.total_amount || 0) / 100,
+                currency: pData.currency || 'USD'
+              }).catch(err => {
+                console.error('[dodo-webhook] Failed to send admin subscription notification:', err);
+              });
             } else {
               console.error(`Business record NOT FOUND in Firestore: ${businessId}`);
             }

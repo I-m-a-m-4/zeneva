@@ -1388,15 +1388,11 @@ export default function AuthenticatedLayout({
                 exit affordance went missing on mobile. Sticky so it survives scrolling.
               */}
               {isImpersonating && (
-                <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm font-medium text-destructive">
-                  <span>
-                    You are viewing{' '}
-                    <strong>{currentUserProfile?.name || 'another'}</strong>
-                    {currentUserProfile?.name ? "'s" : ''} account.
-                  </span>
+                <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 no-print animate-in fade-in slide-in-from-bottom-4 duration-300">
                   <Button
                     size="sm"
                     variant="destructive"
+                    className="shadow-lg hover:shadow-xl font-medium border border-destructive-foreground/10 h-9 px-4 rounded-full flex items-center gap-1.5"
                     aria-label="Exit impersonation and return to the admin panel"
                     onClick={async () => {
                       // Must clear the impersonation state BEFORE navigating. The old
@@ -1410,7 +1406,8 @@ export default function AuthenticatedLayout({
                       }
                     }}
                   >
-                    Exit View
+                    <X className="h-4 w-4" />
+                    <span>Exit View</span>
                   </Button>
                 </div>
               )}

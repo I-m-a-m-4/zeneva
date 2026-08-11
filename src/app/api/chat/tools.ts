@@ -1311,7 +1311,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             note: best ? `Best day was ${best.date}.` : undefined,
             // Surfaced rather than swallowed: if this is set, the chart above is
             // incomplete and the model must say so instead of quoting the total.
-            dataGap: unplaced,
+            dataGap: unplaced ?? undefined,
             caveat: unplaced ?? undefined,
             currency,
             bestDay: best ? { date: best.date, revenue: best.revenue } : null,
@@ -2121,7 +2121,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
                 { label: 'Days with a sale', value: daysWithSales, format: 'number' },
                 ...(dropped ? [{ label: 'Sales with a bad date', value: dropped, format: 'number' as const }] : []),
               ],
-              dataGap: unplaced,
+              dataGap: unplaced ?? undefined,
               caveat: dropped
                 ? `${unplaced} So the ${daysWithSales} day(s) counted above is not how much this shop has traded — it is how much of its trading carries a date that can be placed on a calendar. Fix those receipts' dates and ask again.`
                 : `A projection needs at least 7 days that actually had sales; this book has ${daysWithSales}. Record more trading and ask again — a forecast from this little data would be a guess dressed up as a number.`,
@@ -2166,7 +2166,12 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               { label: 'Fit quality', value: `${Math.round(r2 * 100)}%`, format: 'text', hint: 'How well a straight line explains the history' },
             ],
             flags: [`Confidence: ${level}.`],
-            caveat,
+            // The gap matters more here than in the refusal above, not less: this
+            // branch hands back an actual number. A trend fitted to a history that
+            // is missing receipts under-projects, and nothing else on this card
+            // would hint at it.
+            dataGap: unplaced ?? undefined,
+            caveat: unplaced ? `${unplaced} ${caveat}` : caveat,
           };
         } catch (e: any) { return fail('Failed to build the projection', e); }
       },

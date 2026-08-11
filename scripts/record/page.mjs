@@ -42,16 +42,31 @@ const HIDE_DEV_UI = `
     var css = 'nextjs-portal,nextjs-toast,#__next-build-watcher,'
       + '#__next-prerender-indicator{display:none!important}';
     var add = function () {
-      if (document.getElementById(ID)) return;
-      var s = document.createElement('style');
-      s.id = ID;
-      s.textContent = css;
-      // head is not parsed yet at document-start; a style element applies from
-      // anywhere in the document, and this is re-run on DOMContentLoaded anyway.
-      (document.head || document.documentElement).appendChild(s);
+      try {
+        if (document.getElementById(ID)) return true;
+        // At document-start there is no documentElement *either* — the document
+        // is empty until the parser sees <html>. Verified, not assumed: a probe
+        // reported hasDocEl:false, readyState:"loading" at this point.
+        var root = document.head || document.documentElement;
+        if (!root) return false;
+        var s = document.createElement('style');
+        s.id = ID;
+        s.textContent = css;
+        // A style element applies from anywhere in the document, so documentElement
+        // is as good as head on the early call.
+        root.appendChild(s);
+        return true;
+      } catch (e) { return false; }
     };
-    add();
+    // Listeners before the eager call, and this order is the whole fix. The
+    // first version called add() first, so the guaranteed document-start failure
+    // threw out of the shared try/catch and the DOMContentLoaded registration
+    // below never ran — the rule then landed on no page at all, and the pill
+    // stayed in the footage. \`readystatechange\` is the second chance for a
+    // re-injection into a document that has already finished parsing.
     document.addEventListener('DOMContentLoaded', add);
+    document.addEventListener('readystatechange', add);
+    add();
   } catch (e) { /* the film is worth more than the rule */ }
 })();
 `;

@@ -8,6 +8,7 @@ import {
     type PushSource,
     type PushTarget,
 } from './push-log';
+import { INTERNAL_ACCOUNT_EMAILS } from '@/lib/platform-revenue';
 
 /**
  * Push to one user's devices.
@@ -207,4 +208,59 @@ export async function broadcastToAllDevices(payload: {
     });
 
     return { deviceCount: targets.length, successCount, failureCount, recipientCount, campaignId };
+}
+
+export async function notifyAdminsOfSubscription(payload: {
+    businessName: string;
+    planId: string;
+    amount: number;
+    currency: string;
+}) {
+    try {
+        const querySnapshot = await adminFirestore
+            .collection('users')
+            .where('email', 'in', INTERNAL_ACCOUNT_EMAILS)
+            .get();
+
+        if (querySnapshot.empty) {
+            console.log('No admin users found to notify.');
+            return;
+        }
+
+        const formattedAmount = `${payload.currency === 'USD' ? '$' : '₦'}${payload.amount.toLocaleString()}`;
+        const title = '🎉 New Subscription!';
+        const body = `"${payload.businessName}" subscribed to ${payload.planId} for ${formattedAmount}.`;
+
+        const notificationPromises = querySnapshot.docs.flatMap((doc: any) => {
+            // Write to in-app notification feed
+            const dbWrite = adminFirestore
+                .collection('users')
+                .doc(doc.id)
+                .collection('notifications')
+                .add({
+                    title,
+                    body,
+                    createdAt: new Date(),
+                    read: false,
+                    type: 'system',
+                    amount: payload.amount,
+                    plan: payload.planId,
+                });
+
+            // Send push notification
+            const pushSend = sendNotificationToUser(doc.id, {
+                title,
+                body,
+                url: '/admin-imamshaffy',
+                source: 'system',
+            });
+
+            return [dbWrite, pushSend];
+        });
+
+        await Promise.all(notificationPromises);
+        console.log(`Successfully dispatched subscription notifications to ${querySnapshot.size} admin(s).`);
+    } catch (error) {
+        console.error('Error notifying admins of subscription:', error);
+    }
 }
