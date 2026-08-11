@@ -3700,7 +3700,11 @@ function AdminDashboardContent({
                                         </div>
                                     </div>
                                     <ScrollArea className="h-[500px]">
-                                        <Table>
+                                        {/* min-w forces the table to overflow rather than squeeze.
+                                            Without it `w-full` compresses seven columns into a phone
+                                            width, and the Actions cell — which holds Impersonate —
+                                            collapses to nothing with no way to scroll across to it. */}
+                                        <Table className="min-w-[900px]">
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>User</TableHead>

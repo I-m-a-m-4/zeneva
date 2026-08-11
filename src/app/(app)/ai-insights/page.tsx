@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import {
-  ArrowUp, Loader2, Package, TrendingUp, DollarSign, Users, ReceiptText,
-  Sparkles, ShieldAlert, SquarePen, BookOpen, Trash2, Send, Gauge,
+  ArrowUp, Loader2, Clock, TrendingUp, DollarSign, Users, ReceiptText,
+  SquarePen, BookOpen, Trash2, Send, Gauge, X,
   PanelLeft, PanelLeftClose, XCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -76,6 +76,74 @@ function runningTool(message: any): string | null {
     }
   }
   return null;
+}
+
+/**
+ * How long a reply took, at the precision that is actually meaningful.
+ *
+ * This is wall-clock for the whole turn — tool round-trips included — because
+ * that is what the owner waited through. Sub-10s keeps a decimal, since the
+ * difference between 2.1s and 4.8s is the difference between "instant" and
+ * "noticeable"; past that the tenth is noise.
+ */
+function formatThinkingTime(seconds: number): string {
+  if (seconds < 10) return `${seconds.toFixed(1)}s`;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const mins = Math.floor(seconds / 60);
+  return `${mins}m ${Math.round(seconds - mins * 60)}s`;
+}
+
+/**
+ * When a chat began.
+ *
+ * Read from the session **id** rather than a stored field: every id is minted as
+ * `session_${Date.now()}` (see `handleNewChat`), so the start time is already
+ * there for every chat ever saved. Adding a `createdAt` would only cover new
+ * ones, and re-stamping it on each `setDoc(..., {merge:true})` checkpoint would
+ * overwrite the real value with the time of the last message. Falls back to the
+ * document's own timestamps if an id ever arrives in another shape.
+ */
+function sessionStartedAt(session: any): Date | null {
+  const match = /^session_(\d{10,16})$/.exec(String(session?.id ?? ''));
+  if (match) {
+    const date = new Date(Number(match[1]));
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  const millis = session?.createdAt?.toMillis?.() ?? session?.updatedAt?.toMillis?.();
+  return millis ? new Date(millis) : null;
+}
+
+/** Sidebar timestamp: a clock for today, a date once it stops being today. */
+function formatSessionTime(date: Date | null): string {
+  if (!date) return '';
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(undefined,
+    sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+/**
+ * Message ids, as Firestore map keys.
+ *
+ * The durations map is keyed by message id, and Firestore rejects a field name
+ * containing `.`, `/`, `[`, `]`, `*`, `` ` ``, or one wrapped in `__`. SDK-minted
+ * ids are alphanumeric and safe, but a session restored from an old build could
+ * carry anything — and one bad key would reject the whole `setDoc`, taking the
+ * transcript checkpoint down with it. Dropping a timing is the cheap failure.
+ */
+function safeDurationKeys(map: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (/^[A-Za-z0-9_-]{1,300}$/.test(key) && !key.startsWith('__')) out[key] = value;
+  }
+  return out;
 }
 
 
@@ -191,11 +259,57 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   const isLoading = status === 'submitted' || status === 'streaming';
   const [localInput, setLocalInput] = React.useState('');
 
+  /*
+   * How long each reply took, keyed by the assistant message it produced.
+   *
+   * Timed on the client and stored beside the transcript rather than returned by
+   * the route: the number the owner cares about is the wait they actually sat
+   * through — request, tool round-trips, and the last token arriving — and only
+   * this side can see all of that. `status` is the clock: it leaves `ready` on
+   * send and comes back when the turn settles.
+   */
+  const [durations, setDurations] = React.useState<Record<string, number>>({});
+  const turnStartRef = useRef<number | null>(null);
+  // Mirrors `durations` so the Firestore checkpoint below can read the timing
+  // recorded in the same commit. State lands on the next render, and adding
+  // `durations` to that effect's deps would bill a second write per turn.
+  const durationsRef = useRef<Record<string, number>>({});
+
   const submitPrompt = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !authRef.current.businessId) return;
+    turnStartRef.current = Date.now();
     sendMessage({ text: trimmed });
   }, [sendMessage]);
+
+  useEffect(() => {
+    // Still working — leave the stopwatch running.
+    if (status === 'submitted' || status === 'streaming') return;
+    const startedAt = turnStartRef.current;
+    if (!startedAt) return;
+
+    // A failed turn has no duration worth showing; the toast already explained
+    // it. Stop the clock anyway, or the next turn gets measured from this one.
+    if (status !== 'ready') {
+      turnStartRef.current = null;
+      return;
+    }
+
+    // `submitPrompt` starts the clock a beat before `status` leaves 'ready', so
+    // this can run once with the owner's own message still last. That is the
+    // start of the turn, not the end — leave the clock running.
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+
+    turnStartRef.current = null;
+    if (durationsRef.current[last.id] !== undefined) return;
+    // Written to the ref first and synchronously: this effect is declared above
+    // the Firestore checkpoint, so the checkpoint for this same turn already
+    // sees the timing instead of persisting it a turn late.
+    const next = { ...durationsRef.current, [last.id]: (Date.now() - startedAt) / 1000 };
+    durationsRef.current = next;
+    setDurations(next);
+  }, [status, messages]);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -246,6 +360,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
         userId: user.uid,
         title,
         messages: cleanMessages,
+        // Response times ride along on the checkpoint that already happens, so
+        // a reopened chat still shows how long each answer took. Keyed by
+        // message id, which survives the round trip through Firestore.
+        durations: safeDurationKeys(durationsRef.current),
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (e) {
@@ -253,15 +371,38 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     }
   }, [messages, isLoading, sessionId, firestore, businessId, user]);
 
+  /**
+   * Dismiss the history drawer on phones only.
+   *
+   * Below md the rail is an overlay, so leaving it open after a tap means the
+   * chat you just chose is behind it. On desktop it is a docked rail and
+   * closing it would be a jarring, unasked-for layout change — and it would
+   * also overwrite the collapse preference the owner set, so this deliberately
+   * does not go through `toggleSidebar`.
+   */
+  const closeSidebarOnMobile = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false);
+  }, []);
+
   const handleNewChat = () => {
     stop?.();
+    closeSidebarOnMobile();
+    turnStartRef.current = null;
+    durationsRef.current = {};
+    setDurations({});
     setSessionId(`session_${Date.now()}`);
     setMessages([]);
   };
 
   const loadSession = (session: any) => {
     stop?.();
+    closeSidebarOnMobile();
     setSessionId(session.id);
+    // Timings belong to the session being opened, not the one being left.
+    turnStartRef.current = null;
+    const stored = session.durations;
+    durationsRef.current = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    setDurations(durationsRef.current);
     // Opening a chat is not a change to it. Suppress the next checkpoint, or
     // the sync effect below fires on the new `messages` and rewrites
     // updatedAt — which reorders the list under the finger that just tapped.
@@ -397,8 +538,16 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
    * The welcome screen is the whole pitch. "Show me low stock items" reads like
    * a search box and undersells what this can do, so each of these is a
    * question an owner actually has, chosen to show a capability they would not
-   * assume was there: margin leaks, lapsed customers, forecasting, and ringing
-   * up a sale by typing it. The hint line is what makes it land at a glance.
+   * assume was there: margin leaks, forecasting, lapsed customers, and ringing
+   * up a sale by typing it.
+   *
+   * Four, not six. Six cards plus a hint line each filled a phone screen before
+   * the input was even reachable, and the two that were cut ("what should I
+   * reorder", "teach me to bulk import") are both covered at length on
+   * /ai-insights/use-cases, which is linked from the top of this page. The hint
+   * line is what makes each land at a glance, so it stays — on desktop. On a
+   * phone the hints are hidden and each card collapses to one line, which is
+   * the density fix; the text alone still reads as a real question.
    */
   const SUGGESTED_PROMPTS = [
     {
@@ -412,11 +561,6 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
       hint: 'Projects your real sales trend, and says how much to trust it',
     },
     {
-      icon: <Package className="w-4 h-4" />,
-      text: 'What should I reorder before the weekend?',
-      hint: 'Ranked by how fast each item actually sells',
-    },
-    {
       icon: <Users className="w-4 h-4" />,
       text: "Who used to buy from me but stopped?",
       hint: 'Lapsed regulars worth a phone call',
@@ -425,13 +569,6 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
       icon: <ReceiptText className="w-4 h-4" />,
       text: 'Record a sale: 2 bags of rice, paid cash',
       hint: 'Asks what it needs, then waits for your approval',
-      desktopOnly: true,
-    },
-    {
-      icon: <Sparkles className="w-4 h-4" />,
-      text: 'Teach me how to bulk import my products',
-      hint: 'Step by step, with the page you need at the end',
-      desktopOnly: true,
     },
   ];
 
@@ -467,64 +604,108 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4 gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setSessionToDelete(null)}>Cancel</Button>
+            {/* Same neutral-hover override as New Chat below — the last outline
+                button on this page, so no orange hover is left anywhere here. */}
+            <Button variant="outline" className="hover:bg-muted hover:text-foreground" onClick={() => setSessionToDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={deleteSession}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {/* Backdrop for the drawer on phones, where the sidebar overlays the chat. */}
+      {/* Backdrop for the drawer on phones, where the sidebar overlays the chat.
+          The one ladder for this page, low to high: scroll area 10, the two
+          floating pills 15, the composer 20, this backdrop 25, the drawer 30,
+          the delete dialog 40. Nothing here shares a level — the pills used to
+          be at 40, above both the backdrop and the drawer, which is what made
+          them float over the open sidebar; the backdrop used to tie with the
+          composer at 20 and lose to it on DOM order. */}
       {isMounted && sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          className="fixed inset-0 z-[25] bg-black/50 backdrop-blur-[2px] md:hidden"
           onClick={toggleSidebar}
           aria-hidden
         />
       )}
 
       {/* ── Sidebar (Chat History) ── */}
-      {/* Collapses to zero width on desktop and slides out as a drawer on
-          phones. Rendered either way so the collapse animates. */}
+      {/* Two different things sharing one element: a rail that collapses to zero
+          width on desktop, and a drawer that slides over the chat on phones.
+          As a rail it is a translucent tint on the page; as a drawer it has to
+          be **opaque**, or the conversation shows through the chat titles. That
+          is why the surface is `bg-background` up to md and only becomes
+          `bg-muted/40` above it — and why the drawer carries a shadow instead
+          of relying on a border that vanishes against the backdrop. */}
       <div
-        className={`z-30 flex flex-col bg-muted/40 border-r border-border transition-[width,transform] duration-200 ease-in-out
-          max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-64
+        className={`z-30 flex flex-col border-r border-border transition-[width,transform] duration-200 ease-in-out
+          bg-background md:bg-muted/40
+          max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-64 max-md:shadow-2xl
           ${sidebarOpen ? 'max-md:translate-x-0 md:w-64' : 'max-md:-translate-x-full md:w-0 md:border-r-0'}
           md:relative md:flex-shrink-0 overflow-hidden`}
       >
-        <div className="p-4 border-b border-border flex items-center gap-2 w-64">
-          <Button onClick={handleNewChat} className="flex-1 justify-start gap-2" variant="outline">
+        {/* pt-safe on phones: the drawer runs to the top of the screen, which on
+            a notched device is under the status bar. */}
+        <div className="p-4 max-md:pt-[max(1rem,env(safe-area-inset-top))] border-b border-border flex items-center gap-2 w-64">
+          {/* The `outline` variant hovers to `bg-accent`/`accent-foreground`,
+              and in light mode those tokens are the brand orange on white — so
+              the stock button flips to a solid orange block. Overridden to the
+              neutral hover here rather than in `ui/button.tsx`, which every
+              outline button in the app shares. */}
+          <Button
+            onClick={handleNewChat}
+            className="flex-1 justify-start gap-2 hover:bg-muted hover:text-foreground"
+            variant="outline"
+          >
             <SquarePen className="w-4 h-4 text-orange-500" /> New Chat
           </Button>
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-none"
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-none"
             title="Collapse chat history"
             aria-label="Collapse chat history"
           >
-            <PanelLeftClose className="w-4 h-4" />
+            {/* An X reads as "close this drawer"; the panel glyph reads as
+                "collapse this rail". Same button, the right verb for each. */}
+            <X className="w-4 h-4 md:hidden" />
+            <PanelLeftClose className="w-4 h-4 hidden md:block" />
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1 w-64">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-1 w-64">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 mt-2">Recent Chats</div>
-          {sessions.map(session => (
+          {sessions.map(session => {
+            const startedAt = sessionStartedAt(session);
+            return (
             <div
               key={session.id}
               onClick={() => loadSession(session)}
-              className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${sessionId === session.id ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'hover:bg-accent text-foreground/80'}`}
+              className={`group flex items-center justify-between gap-1 p-2 max-md:py-2.5 rounded-lg cursor-pointer transition-colors ${sessionId === session.id ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'hover:bg-muted text-foreground/80 active:bg-muted'}`}
             >
-              <span className="text-sm truncate pr-2 flex-1">{session.title || 'New Chat'}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSessionToDelete(session.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 p-1.5 rounded-md hover:bg-background transition-all"
-                title="Delete chat"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <span className="text-sm truncate pr-1 flex-1">{session.title || 'New Chat'}</span>
+              {/* On a pointer device the timestamp is the resting state and the
+                  bin takes its place on hover — one fixed-width slot, so the row
+                  never reflows under the cursor. A phone has no hover, so a
+                  hover-only bin is an unreachable bin: below md both sit in a
+                  plain row, always visible. */}
+              <span className="shrink-0 flex items-center gap-0.5 md:relative md:w-[52px] md:h-7 md:justify-end">
+                <span
+                  className="text-[10px] tabular-nums text-muted-foreground/70 transition-opacity md:absolute md:inset-0 md:flex md:items-center md:justify-end md:pr-0.5 md:group-hover:opacity-0"
+                  title={startedAt ? `Started ${startedAt.toLocaleString()}` : undefined}
+                >
+                  {formatSessionTime(startedAt)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSessionToDelete(session.id);
+                  }}
+                  className="text-muted-foreground hover:text-red-500 p-1.5 rounded-md hover:bg-background transition-all md:absolute md:inset-y-0 md:right-0 md:opacity-0 md:group-hover:opacity-100"
+                  title="Delete chat"
+                  aria-label={`Delete chat: ${session.title || 'New Chat'}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </span>
             </div>
-          ))}
+          );})}
           {sessions.length === 0 && (
             <div className="text-sm text-muted-foreground px-2 italic">No previous chats.</div>
           )}
@@ -538,7 +719,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
       {/* ── Link to Use Cases Page ── */}
       <Link
         href="/ai-insights/use-cases"
-        className="absolute top-4 right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 bg-background/80 backdrop-blur border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent shadow-sm transition-all"
+        className="absolute top-4 right-4 z-[15] flex items-center gap-1.5 px-3 py-1.5 bg-background/80 backdrop-blur border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted shadow-sm transition-all"
       >
         <BookOpen className="w-3.5 h-3.5 text-orange-500" /> Zen AI Use Cases
       </Link>
@@ -548,7 +729,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
       {isMounted && !sidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="absolute top-4 left-4 z-40 flex items-center gap-1.5 px-2.5 py-1.5 bg-background/80 backdrop-blur border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent shadow-sm transition-all"
+          className="absolute top-4 left-4 z-[15] flex items-center gap-1.5 px-2.5 py-1.5 bg-background/80 backdrop-blur border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted shadow-sm transition-all"
           title="Show chat history"
           aria-label="Show chat history"
         >
@@ -568,26 +749,35 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.35 }}
-              className="w-full max-w-2xl px-4 flex flex-col items-center justify-center -mt-16"
+              className="w-full max-w-2xl px-4 flex flex-col items-center justify-center -mt-10 sm:-mt-16"
             >
-              <img src={AppConfig.logoUrl} alt="Zeneva" className="h-12 w-auto mb-6" />
-              <h1 className="text-3xl font-bold text-foreground mb-2 text-center">What would you like to know?</h1>
-              <p className="text-muted-foreground text-center mb-8 text-base">I can analyze your inventory, sales, and customers — and propose changes for your approval.</p>
+              <img src={AppConfig.logoUrl} alt="Zeneva" className="h-10 sm:h-12 w-auto mb-4 sm:mb-6" />
+              {/* Headline only. The subtitle and the guarded-mode badge both
+                  said what the four cards below already demonstrate, and the
+                  approval promise is unmissable the first time a proposal card
+                  appears — it is repeated once more under the chat composer.
+                  Explaining it on the welcome screen was teaching a lesson the
+                  product teaches itself. */}
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8 text-center">What would you like to know?</h1>
 
               {/* Suggested prompts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-6 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 mb-6 w-full">
                   {SUGGESTED_PROMPTS.map((prompt, i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => submitPrompt(prompt.text)}
                       disabled={isLoading}
-                      className={`text-left p-3.5 rounded-xl border border-border bg-card hover:border-orange-500/50 hover:shadow-sm transition-all flex items-start gap-3 group ${prompt.desktopOnly ? 'hidden sm:flex' : 'flex'}`}
+                      className="text-left rounded-xl border border-border bg-card/60 hover:bg-muted hover:border-muted-foreground/30 hover:shadow-sm transition-all flex items-center sm:items-start gap-2.5 px-3 py-2.5 sm:p-3.5 group"
                     >
-                      <span className="text-muted-foreground group-hover:text-orange-500 transition-colors shrink-0 mt-px">{prompt.icon}</span>
+                      {/* Tinted well rather than a bare glyph — it gives the row a
+                          left edge to align on, which is what makes a stack of
+                          four read as a list instead of a wall. */}
+                      <span className="shrink-0 rounded-lg bg-orange-500/10 p-1.5 text-orange-500">{prompt.icon}</span>
                       <span className="min-w-0">
-                        <span className="block text-sm text-foreground group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors leading-snug">{prompt.text}</span>
-                        <span className="block text-[11px] text-muted-foreground mt-1 leading-relaxed">{prompt.hint}</span>
+                        <span className="block text-[13px] sm:text-sm text-foreground leading-snug">{prompt.text}</span>
+                        {/* Hidden on phones: four hint lines is most of the fold. */}
+                        <span className="hidden sm:block text-[11px] text-muted-foreground mt-1 leading-relaxed">{prompt.hint}</span>
                       </span>
                     </button>
                 ))}
@@ -607,12 +797,13 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                   </div>
                   <div className="flex justify-between items-center px-4 py-2.5 bg-muted border-t border-border rounded-b-2xl">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-                        <ShieldAlert className="w-3.5 h-3.5 text-emerald-500" />
-                        Guarded mode — all changes require approval
-                      </span>
+                      {/* Quota only. The "nothing is saved until you approve
+                          it" line that used to sit beside it is gone: the
+                          approval step is unmissable the first time a proposal
+                          card appears, so stating it up front was teaching a
+                          lesson the product teaches itself. */}
                       {businessData && (
-                        <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 border-l border-border pl-2">
+                        <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                           <Gauge className="w-3.5 h-3.5 text-orange-500" />
                           {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} daily AI responses left`}
                         </span>
@@ -653,6 +844,19 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                   <div className={`flex flex-col gap-1.5 min-w-0 ${isUser ? 'items-end max-w-[85%]' : 'items-start max-w-[85%]'}`}>
                     <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${isUser ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                       {isUser ? 'You' : 'Zen AI'}
+                      {/* Wall-clock for the whole turn, tool calls included —
+                          the wait the owner actually sat through, not the
+                          model's own generation time. Absent while streaming
+                          and on any turn that predates this being recorded. */}
+                      {!isUser && typeof durations[m.id] === 'number' && (
+                        <span
+                          className="inline-flex items-center gap-1 font-normal normal-case tracking-normal text-muted-foreground/70"
+                          title="Time from send to the last word of this reply, including any tools it ran"
+                        >
+                          <Clock className="w-3 h-3" />
+                          {formatThinkingTime(durations[m.id])}
+                        </span>
+                      )}
                     </div>
 
                     {/* The prompt the owner sent — warm gray bubble, smaller type */}

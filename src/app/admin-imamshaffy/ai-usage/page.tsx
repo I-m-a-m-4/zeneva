@@ -13,13 +13,19 @@ import {
   ShieldAlert, Timer, Coins, MessageSquare, RefreshCw, ShieldCheck, Gauge, Activity,
 } from 'lucide-react';
 import {
-  ZEN_TOOL_COUNT, ZEN_READ_TOOL_NAMES, ZEN_WRITE_TOOL_NAMES, labelForTool,
+  ZEN_TOOL_COUNT, ZEN_TOOL_NAMES, ZEN_READ_TOOL_NAMES, ZEN_WRITE_TOOL_NAMES, labelForTool,
 } from '@/components/ai-insights/zen-status';
 import {
   AI_DAILY_COLLECTION, INTENTS, TOOL_GROUPS,
   groupForTool, mergeCountMaps, topEntries, recentDates,
   type AiDailyStats,
 } from '@/lib/ai-analytics';
+import {
+  ZEN_MODEL, estimateCostUsd, formatUsd, formatTokens,
+} from '@/lib/ai-cost';
+import {
+  MetricCard, DetailRow, ReferenceNote, type SparkPoint,
+} from '@/components/admin/ai-usage/metric-card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   BarChart, LineChart, PieChart, ComposedChart, XAxis, YAxis, Bar, Line, Pie, Cell, Area,
@@ -62,6 +68,8 @@ type DayPoint = {
   businesses: number;
   proposals: number;
   tokens: number;
+  tokensIn: number;
+  tokensOut: number;
   avgLatency: number;
   present: boolean;
 };
@@ -69,6 +77,57 @@ type DayPoint = {
 function shortDate(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
+}
+
+/**
+ * The window immediately before the selected one, same length.
+ *
+ * `recentDates(2n)` minus its tail rather than its own date maths, so the two
+ * windows can never drift apart at a month boundary or across a DST-shifted
+ * local midnight — both are derived from the same UTC generator.
+ */
+function priorDates(rangeDays: number): string[] {
+  return recentDates(rangeDays * 2).slice(0, rangeDays);
+}
+
+/** Totals for one window, used for both the current period and the one before. */
+type WindowTotals = {
+  turns: number;
+  blocked: number;
+  errors: number;
+  proposals: number;
+  tokens: number;
+  tokensIn: number;
+  tokensOut: number;
+  latencySum: number;
+  avgLatency: number;
+  businesses: number;
+  toolCalls: number;
+};
+
+function foldDays(docs: AiDailyStats[]): WindowTotals {
+  const turns = docs.reduce((s, d) => s + (d.count ?? 0), 0);
+  const latencySum = docs.reduce((s, d) => s + (d.latencyMsTotal ?? 0), 0);
+  const tokensIn = docs.reduce((s, d) => s + (d.tokensIn ?? 0), 0);
+  const tokensOut = docs.reduce((s, d) => s + (d.tokensOut ?? 0), 0);
+  return {
+    turns,
+    blocked: docs.reduce((s, d) => s + Object.values(d.blocked ?? {}).reduce((a, n) => a + n, 0), 0),
+    errors: docs.reduce((s, d) => s + (d.errors ?? 0), 0),
+    proposals: docs.reduce((s, d) => s + (d.proposalTurns ?? 0), 0),
+    tokens: tokensIn + tokensOut,
+    tokensIn,
+    tokensOut,
+    latencySum,
+    avgLatency: turns > 0 ? Math.round(latencySum / turns) : 0,
+    // Distinct tenants, not the sum of daily actives — the same shop on five
+    // days is one business, not five.
+    businesses: new Set(docs.flatMap((d) => Object.keys(d.businesses ?? {}))).size,
+    toolCalls: docs.reduce(
+      (s, d) => s + Object.values(d.tools ?? {}).reduce((a, n) => a + n, 0),
+      0,
+    ),
+  };
 }
 
 export default function AdminAIUsage() {
@@ -79,6 +138,7 @@ export default function AdminAIUsage() {
   const [rangeDays, setRangeDays] = useState(14);
   const [globalCount, setGlobalCount] = useState(0);
   const [days, setDays] = useState<AiDailyStats[]>([]);
+  const [priorDays, setPriorDays] = useState<AiDailyStats[]>([]);
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,6 +161,7 @@ export default function AdminAIUsage() {
       setIsLoading(true);
 
       const wanted = recentDates(rangeDays);
+      const prior = priorDates(rangeDays);
 
       /*
        * `documentId()` with `in` fetches the whole range in one query rather
@@ -111,14 +172,27 @@ export default function AdminAIUsage() {
        * not per query, so the only cost of an extra chunk is a round trip. The
        * alternative — one query at the current 30-value cap — sits exactly on
        * the limit, and the next range added to RANGES would break it silently.
+       *
+       * The prior window doubles the day documents read (2 × rangeDays, so 60
+       * at the widest range). That is deliberate and bounded: it is what makes
+       * every figure comparable rather than a number floating on its own, this
+       * page is super-admin-only, and it refetches on an explicit Refresh or a
+       * range change — not on a timer and not per tenant.
        */
       const chunks: string[][] = [];
       for (let i = 0; i < wanted.length; i += 10) chunks.push(wanted.slice(i, i + 10));
+      const priorChunks: string[][] = [];
+      for (let i = 0; i < prior.length; i += 10) priorChunks.push(prior.slice(i, i + 10));
 
-      const [globalDoc, dailySnaps, bSnap] = await Promise.all([
+      const [globalDoc, dailySnaps, priorSnaps, bSnap] = await Promise.all([
         getDoc(doc(firestore, 'platform_stats', 'ai_usage_global')),
         Promise.all(
           chunks.map((ids) =>
+            getDocs(query(collection(firestore, AI_DAILY_COLLECTION), where(documentId(), 'in', ids))),
+          ),
+        ),
+        Promise.all(
+          priorChunks.map((ids) =>
             getDocs(query(collection(firestore, AI_DAILY_COLLECTION), where(documentId(), 'in', ids))),
           ),
         ),
@@ -133,6 +207,7 @@ export default function AdminAIUsage() {
       }
 
       setDays(dailySnaps.flatMap((snap) => snap.docs.map((d) => ({ date: d.id, ...(d.data() as any) }))));
+      setPriorDays(priorSnaps.flatMap((snap) => snap.docs.map((d) => ({ date: d.id, ...(d.data() as any) }))));
 
       const bData = bSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
@@ -196,6 +271,8 @@ export default function AdminAIUsage() {
         businesses: Object.keys(d?.businesses ?? {}).length,
         proposals: d?.proposalTurns ?? 0,
         tokens: (d?.tokensIn ?? 0) + (d?.tokensOut ?? 0),
+        tokensIn: d?.tokensIn ?? 0,
+        tokensOut: d?.tokensOut ?? 0,
         // Averaged at read time — the rollup stores the sum, because you cannot
         // add two averages together and get the average of the whole.
         avgLatency: turns > 0 ? Math.round((d?.latencyMsTotal ?? 0) / turns) : 0,
@@ -214,6 +291,8 @@ export default function AdminAIUsage() {
     const daysWithData = series.filter((p) => p.present).length;
     return {
       turns, blocked, errors, proposals, tokens, daysWithData,
+      tokensIn: days.reduce((s, d) => s + (d.tokensIn ?? 0), 0),
+      tokensOut: days.reduce((s, d) => s + (d.tokensOut ?? 0), 0),
       avgLatency: turns > 0 ? Math.round(latencySum / turns) : 0,
       avgPerDay: daysWithData > 0 ? Math.round(turns / daysWithData) : 0,
       // Distinct tenants across the window, not the sum of daily actives — the
@@ -222,6 +301,9 @@ export default function AdminAIUsage() {
       peakDay: series.reduce<DayPoint | null>((best, p) => (!best || p.turns > best.turns ? p : best), null),
     };
   }, [series, days]);
+
+  /** The same fold over the window before this one — every card's comparison. */
+  const prior = useMemo(() => foldDays(priorDays), [priorDays]);
 
   /** Platform-wide tool calls for the window. */
   const toolTotals = useMemo(() => mergeCountMaps(days.map((d) => d.tools)), [days]);
@@ -237,6 +319,65 @@ export default function AdminAIUsage() {
     () => mergeCountMaps(businesses.map((b) => b.aiToolUsageCounts)),
     [businesses],
   );
+
+  /**
+   * Every tool Zen AI has, beside how often it was actually reached for.
+   *
+   * Built from `ZEN_TOOL_NAMES` rather than from the recorded counts, so a tool
+   * that has never been called still appears — with a zero. A roster derived
+   * from usage can only ever show what was used, which is precisely the half
+   * that does not need investigating.
+   */
+  const toolRoster = useMemo(() => {
+    const rows = ZEN_TOOL_NAMES.map((name) => ({
+      name,
+      label: labelForTool(name),
+      group: groupForTool(name),
+      isPropose: name.startsWith('propose'),
+      windowCalls: toolTotals[name] ?? 0,
+      lifetimeCalls: lifetimeToolTotals[name] ?? 0,
+    })).map((r) => ({ ...r, everCalled: r.windowCalls > 0 || r.lifetimeCalls > 0 }));
+
+    const used = rows.filter((r) => r.everCalled);
+    return {
+      rows,
+      used,
+      unused: rows.filter((r) => !r.everCalled),
+      usedInWindow: rows.filter((r) => r.windowCalls > 0).length,
+      // Share of the surface that has ever been exercised. The interesting
+      // reading is a low number with high turn volume: people are using Zen AI
+      // hard through a narrow slice of what it can do.
+      coverage: rows.length > 0 ? (used.length / rows.length) * 100 : 0,
+      topInWindow: [...rows].filter((r) => r.windowCalls > 0).sort((a, b) => b.windowCalls - a.windowCalls),
+      topLifetime: [...rows].filter((r) => r.lifetimeCalls > 0).sort((a, b) => b.lifetimeCalls - a.lifetimeCalls),
+      totalWindowCalls: rows.reduce((s, r) => s + r.windowCalls, 0),
+    };
+  }, [toolTotals, lifetimeToolTotals]);
+
+  /** Ceiling spend for both windows. See `ai-cost.ts` on why it is a ceiling. */
+  const cost = useMemo(
+    () => ({
+      window: estimateCostUsd(totals.tokensIn, totals.tokensOut),
+      prior: estimateCostUsd(prior.tokensIn, prior.tokensOut),
+      perTurn: totals.turns > 0 ? estimateCostUsd(totals.tokensIn, totals.tokensOut) / totals.turns : 0,
+    }),
+    [totals, prior],
+  );
+
+  /** Sparkline series, one builder so every card's bars mean the same thing. */
+  const spark = useMemo(() => {
+    const build = (pick: (p: DayPoint) => number): SparkPoint[] =>
+      series.map((p) => ({ label: p.label, value: pick(p), present: p.present }));
+    return {
+      turns: build((p) => p.turns),
+      tokens: build((p) => p.tokens),
+      latency: build((p) => p.avgLatency),
+      businesses: build((p) => p.businesses),
+      errors: build((p) => p.errors),
+      blocked: build((p) => p.blocked),
+      proposals: build((p) => p.proposals),
+    };
+  }, [series]);
 
   const toolChart = useMemo(() => {
     const source = totals.turns > 0 ? toolTotals : lifetimeToolTotals;
@@ -351,12 +492,25 @@ export default function AdminAIUsage() {
   );
 
   const activeToday = businessRows.filter((b) => b.todayUsage > 0).length;
+  const rangeLabel = RANGES.find((r) => r.days === rangeDays)?.label ?? `${rangeDays} days`;
   const usagePercent = Math.min((globalCount / GLOBAL_LIMIT) * 100, 100);
   const isDanger = usagePercent > 90;
   const errorRate = totals.turns > 0 ? (totals.errors / totals.turns) * 100 : 0;
   const refusalRate =
     totals.turns + totals.blocked > 0 ? (totals.blocked / (totals.turns + totals.blocked)) * 100 : 0;
   const hasHistory = totals.daysWithData > 0;
+
+  // Rates for the previous window, on the same definitions — comparing a rate
+  // against a count would make the delta meaningless.
+  const priorErrorRate = prior.turns > 0 ? (prior.errors / prior.turns) * 100 : 0;
+  const priorRefusalRate =
+    prior.turns + prior.blocked > 0 ? (prior.blocked / (prior.turns + prior.blocked)) * 100 : 0;
+  const proposalShare = totals.turns > 0 ? (totals.proposals / totals.turns) * 100 : 0;
+  const tokensPerTurn = totals.turns > 0 ? Math.round(totals.tokens / totals.turns) : 0;
+  const capHeadroom = Math.max(GLOBAL_LIMIT - globalCount, 0);
+  const outputShare = totals.tokens > 0 ? (totals.tokensOut / totals.tokens) * 100 : 0;
+  /** Whole windows, so "prev 14 days" is literal rather than approximate. */
+  const priorWindowLabel = rangeLabel;
 
   if (isLoading) {
     return (
@@ -366,10 +520,9 @@ export default function AdminAIUsage() {
       </div>
     );
   }
-  const rangeLabel = RANGES.find((r) => r.days === rangeDays)?.label ?? `${rangeDays} days`;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-[1800px] mx-auto space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
@@ -420,152 +573,586 @@ export default function AdminAIUsage() {
         </div>
       )}
 
-      {/* ── Row 1: today, live ── */}
+      {/* ── Row 1: today, live ──
+          Every card opens to the same four things: what it counts, how it moved
+          against the previous window of equal length, where the figure comes
+          from, and whatever detail is specific to it. */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card className={isDanger ? 'border-red-200 bg-red-50' : 'border-slate-200'}>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-slate-500">Global Usage (Today)</p>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <h2 className="text-3xl font-bold text-slate-900">{globalCount.toLocaleString()}</h2>
-                  <span className="text-sm font-medium text-slate-500">/ {GLOBAL_LIMIT.toLocaleString()}</span>
-                </div>
+        <MetricCard
+          label="Global Usage (Today)"
+          value={globalCount.toLocaleString()}
+          unit={`/ ${GLOBAL_LIMIT.toLocaleString()}`}
+          icon={isDanger ? AlertTriangle : TrendingUp}
+          accent={isDanger ? 'red' : 'orange'}
+          alert={isDanger}
+          emphasis
+          summary={
+            <>
+              <div className="w-full bg-slate-100 h-2 rounded-full mb-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${isDanger ? 'bg-red-500' : 'bg-orange-500'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
               </div>
-              <div className={`p-3 rounded-xl ${isDanger ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
-                {isDanger ? <AlertTriangle className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
-              </div>
-            </div>
-            <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${isDanger ? 'bg-red-500' : 'bg-orange-500'}`}
-                style={{ width: `${usagePercent}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-2">{Math.round(usagePercent)}% of the daily platform cap.</p>
-          </CardContent>
-        </Card>
+              {Math.round(usagePercent)}% of the daily platform cap ·{' '}
+              {capHeadroom.toLocaleString()} turns left today.
+            </>
+          }
+          explain={
+            <>
+              <p>
+                One counter shared by every tenant on the platform, reset at UTC midnight. It is a
+                spend brake, not a per-business limit — a single busy shop can exhaust it for
+                everyone, and when it is gone every turn is refused with{' '}
+                <code className="text-[10px] bg-slate-100 px-1 rounded">global_limit</code> before
+                the model is called.
+              </p>
+              <p>
+                Rising steadily is growth. Rising in one hour is a shape problem — check{' '}
+                <span className="font-medium">Demand by Hour</span> below before raising the cap,
+                because a cap raised against a single spike buys headroom you pay for all day.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Used today" value={globalCount.toLocaleString()} />
+          <DetailRow label="Remaining today" value={capHeadroom.toLocaleString()} />
+          <DetailRow
+            label="Ceiling cost if fully spent"
+            value={formatUsd(estimateCostUsd(
+              tokensPerTurn > 0 ? capHeadroom * tokensPerTurn * (1 - outputShare / 100) : 0,
+              tokensPerTurn > 0 ? capHeadroom * tokensPerTurn * (outputShare / 100) : 0,
+            ))}
+            hint="Remaining turns at this window's average token use"
+          />
+          <ReferenceNote
+            lines={[
+              `Cap: ${GLOBAL_LIMIT.toLocaleString()} turns/day, set as GLOBAL_LIMIT in this page and enforced in src/app/api/chat/route.ts.`,
+              'Counter: platform_stats/ai_usage_global — a single document, not a per-tenant sum.',
+              'Resets at 00:00 UTC, matching the day-document boundary used everywhere on this page.',
+            ]}
+          />
+        </MetricCard>
 
-        <Card className="border-slate-200">
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-slate-500">Businesses Using AI Today</p>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <h2 className="text-3xl font-bold text-slate-900">{activeToday}</h2>
-                  <span className="text-sm font-medium text-slate-500">/ {businessRows.length} active</span>
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-100 text-emerald-600">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 mt-4">
-              {totals.distinctBusinesses > 0
-                ? `${totals.distinctBusinesses} distinct businesses over ${rangeLabel}.`
-                : 'Businesses that sent at least one prompt today.'}
-            </p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          label="Businesses Using AI Today"
+          value={activeToday.toLocaleString()}
+          unit={`/ ${businessRows.length} active`}
+          icon={Users}
+          accent="emerald"
+          emphasis
+          delta={{
+            current: totals.distinctBusinesses,
+            previous: prior.businesses,
+            higherIsBetter: true,
+            windowLabel: priorWindowLabel,
+          }}
+          spark={{ data: spark.businesses }}
+          summary={
+            totals.distinctBusinesses > 0
+              ? `${totals.distinctBusinesses} distinct businesses over ${rangeLabel}.`
+              : 'Businesses that sent at least one prompt today.'
+          }
+          explain={
+            <>
+              <p>
+                The figure is today; the sparkline and the comparison are distinct businesses per
+                day across {rangeLabel}. Distinct, not summed — the same shop on five days counts
+                once, so this cannot be inflated by one heavy user.
+              </p>
+              <p>
+                Read it against Turns. Both climbing is adoption. Turns climbing while this stays
+                flat means your existing users are leaning harder on Zen AI, which moves the quota
+                and the bill without moving revenue.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Active today" value={activeToday.toLocaleString()} />
+          <DetailRow
+            label={`Distinct over ${rangeLabel}`}
+            value={totals.distinctBusinesses.toLocaleString()}
+          />
+          <DetailRow
+            label="Previous window"
+            value={prior.businesses.toLocaleString()}
+            hint="Same number of days, immediately before"
+          />
+          <DetailRow
+            label="Turns per business"
+            value={
+              totals.distinctBusinesses > 0
+                ? (totals.turns / totals.distinctBusinesses).toFixed(1)
+                : '—'
+            }
+            hint="Window turns ÷ distinct businesses"
+          />
+          <ReferenceNote
+            lines={[
+              'Counted from the `businesses` map on each day document — keyed by businessId, which is the only field that gives distinct actives per day.',
+              '"Active" in the denominator means businessInstances with status == "active" that have any AI history, not all tenants.',
+            ]}
+          />
+        </MetricCard>
 
-        <Card className="border-slate-200">
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-slate-500">Turns — {rangeLabel}</p>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <h2 className="text-3xl font-bold text-slate-900">{totals.turns.toLocaleString()}</h2>
-                  <span className="text-sm font-medium text-slate-500">
-                    ~{totals.avgPerDay.toLocaleString()}/day
-                  </span>
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 mt-4">
-              {totals.peakDay && totals.peakDay.turns > 0
-                ? `Busiest day ${totals.peakDay.label} with ${totals.peakDay.turns.toLocaleString()}.`
-                : 'No prompts recorded in this range yet.'}
-            </p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          label={`Turns — ${rangeLabel}`}
+          value={totals.turns.toLocaleString()}
+          unit={`~${totals.avgPerDay.toLocaleString()}/day`}
+          icon={MessageSquare}
+          accent="blue"
+          emphasis
+          delta={{
+            current: totals.turns,
+            previous: prior.turns,
+            higherIsBetter: true,
+            windowLabel: priorWindowLabel,
+          }}
+          spark={{ data: spark.turns }}
+          summary={
+            totals.peakDay && totals.peakDay.turns > 0
+              ? `Busiest day ${totals.peakDay.label} with ${totals.peakDay.turns.toLocaleString()}.`
+              : 'No prompts recorded in this range yet.'
+          }
+          explain={
+            <>
+              <p>
+                A turn is one prompt that reached the model. Refusals are not in here — they never
+                got that far — so Turns is the number that costs money, while Turns + refusals is
+                the number that reflects demand.
+              </p>
+              <p>
+                One turn can call several tools, which is why total tool calls below exceeds this
+                figure. The per-day average divides by days that have a rollup document, not by
+                calendar days, so a range extending before the recorder shipped is not dragged down
+                by days that were never recorded.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label={`Turns over ${rangeLabel}`} value={totals.turns.toLocaleString()} />
+          <DetailRow
+            label="Previous window"
+            value={prior.turns.toLocaleString()}
+            hint="Same number of days, immediately before"
+          />
+          <DetailRow
+            label="Days with data"
+            value={`${totals.daysWithData} / ${rangeDays}`}
+            hint="Days that have a rollup document at all"
+          />
+          <DetailRow
+            label="Refused on top"
+            value={totals.blocked.toLocaleString()}
+            hint="Demand that never reached the model"
+          />
+          <DetailRow label="Tool calls made" value={toolRoster.totalWindowCalls.toLocaleString()} />
+          <ReferenceNote
+            lines={[
+              `Source: the \`count\` field on each of the ${rangeDays} day documents under ${AI_DAILY_COLLECTION}.`,
+              'A missing day is drawn as a hollow tick on the sparkline, never as a zero — history exists only from the day the rollup recorder shipped.',
+            ]}
+          />
+        </MetricCard>
 
-        <Card className="border-slate-200">
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-slate-500">Tools Zen AI Can Call</p>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <h2 className="text-3xl font-bold text-slate-900">{ZEN_TOOL_COUNT}</h2>
-                  <span className="text-sm font-medium text-slate-500">capabilities</span>
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-violet-100 text-violet-600">
-                <Wrench className="w-5 h-5" />
+        <MetricCard
+          label="Tools Zen AI Can Call"
+          value={String(ZEN_TOOL_COUNT)}
+          unit="capabilities"
+          icon={Wrench}
+          accent="violet"
+          emphasis
+          summary={
+            <span className="flex flex-wrap gap-1.5 items-center">
+              <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-[10px]">
+                {ZEN_READ_TOOL_NAMES.length} read
+              </Badge>
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">
+                {ZEN_WRITE_TOOL_NAMES.length} propose
+              </Badge>
+              <span className="text-slate-500">
+                {toolRoster.used.length} ever used · {Math.round(toolRoster.coverage)}% coverage
+              </span>
+            </span>
+          }
+          explain={
+            <>
+              <p>
+                The total is what Zen AI <em>can</em> do; coverage is what anyone has actually
+                reached for. Low coverage against high turn volume is the signal worth acting on —
+                people are using Zen AI hard through a narrow slice of it, which is a discoverability
+                problem rather than a missing feature.
+              </p>
+              <p>
+                The {ZEN_WRITE_TOOL_NAMES.length} propose tools never write on their own. Each
+                returns a card the owner has to approve; the write then happens client-side, where
+                RBAC, the active branch and offline queueing are enforced.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Used in this window" value={`${toolRoster.usedInWindow} / ${ZEN_TOOL_COUNT}`} />
+          <DetailRow
+            label="Ever used (lifetime)"
+            value={`${toolRoster.used.length} / ${ZEN_TOOL_COUNT}`}
+            hint="Includes calls from before the day rollups existed"
+          />
+          <DetailRow label="Never used" value={toolRoster.unused.length.toLocaleString()} />
+
+          {toolRoster.topInWindow.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                Most called — {rangeLabel}
+              </p>
+              <div className="space-y-1">
+                {toolRoster.topInWindow.slice(0, 8).map((t) => {
+                  const max = toolRoster.topInWindow[0].windowCalls || 1;
+                  return (
+                    <div key={t.name} className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-600 w-[46%] truncate" title={t.name}>
+                        {t.label}
+                      </span>
+                      <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${(t.windowCalls / max) * 100}%`,
+                            backgroundColor:
+                              TOOL_GROUPS.find((g) => g.id === t.group)?.color ?? '#94a3b8',
+                          }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-700 tabular-nums w-8 text-right">
+                        {t.windowCalls}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <Badge variant="secondary" className="bg-slate-100 text-slate-700">{ZEN_READ_TOOL_NAMES.length} read</Badge>
-              <Badge variant="secondary" className="bg-amber-100 text-amber-800">{ZEN_WRITE_TOOL_NAMES.length} propose</Badge>
+          )}
+
+          {toolRoster.unused.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                Never called by anyone
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {toolRoster.unused.map((t) => (
+                  <Badge
+                    key={t.name}
+                    variant="outline"
+                    className="text-[10px] font-normal text-slate-500"
+                    title={t.name}
+                  >
+                    {t.label}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          <ReferenceNote
+            lines={[
+              'Roster: TOOL_LINES in src/components/ai-insights/zen-status.tsx, which is the same list the chat status line renders from.',
+              'Definitions: the 41 tools themselves live in src/app/api/chat/tools.ts.',
+              'Windowed counts come from the day documents; lifetime counts from each tenant\'s aiToolUsageCounts, which predates the rollups and cannot be filtered by date.',
+            ]}
+          />
+        </MetricCard>
       </div>
 
       {/* ── Row 2: health of the service over the window ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {[
-          {
-            label: 'Avg response time',
-            value: totals.avgLatency > 0 ? `${(totals.avgLatency / 1000).toFixed(1)}s` : '—',
-            hint: 'Whole turn, tools included',
-            icon: Timer,
-            tone: totals.avgLatency > 12000 ? 'text-red-600 bg-red-50' : 'text-slate-700 bg-slate-100',
-          },
-          {
-            label: 'Refusal rate',
-            value: `${refusalRate.toFixed(1)}%`,
-            hint: `${totals.blocked.toLocaleString()} turns blocked`,
-            icon: ShieldAlert,
-            tone: refusalRate > 10 ? 'text-amber-700 bg-amber-50' : 'text-slate-700 bg-slate-100',
-          },
-          {
-            label: 'Error rate',
-            value: `${errorRate.toFixed(1)}%`,
-            hint: `${totals.errors.toLocaleString()} failed mid-stream`,
-            icon: Activity,
-            tone: errorRate > 2 ? 'text-red-600 bg-red-50' : 'text-slate-700 bg-slate-100',
-          },
-          {
-            label: 'Proposal turns',
-            value: totals.proposals.toLocaleString(),
-            hint: totals.turns > 0 ? `${Math.round((totals.proposals / totals.turns) * 100)}% asked for a change` : 'Writes awaiting approval',
-            icon: ShieldCheck,
-            tone: 'text-orange-700 bg-orange-50',
-          },
-          {
-            label: 'Tokens used',
-            value: totals.tokens >= 1000 ? `${(totals.tokens / 1000).toFixed(1)}k` : totals.tokens.toLocaleString(),
-            hint: `Input + output over ${rangeLabel}`,
-            icon: Coins,
-            tone: 'text-emerald-700 bg-emerald-50',
-          },
-        ].map((s) => (
-          <Card key={s.label} className="border-slate-200">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2">
-                <div className={`p-1.5 rounded-lg ${s.tone}`}>
-                  <s.icon className="w-3.5 h-3.5" />
-                </div>
-                <p className="text-xs font-medium text-slate-500">{s.label}</p>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mt-2">{s.value}</h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">{s.hint}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <MetricCard
+          label="Avg response time"
+          value={totals.avgLatency > 0 ? `${(totals.avgLatency / 1000).toFixed(1)}s` : '—'}
+          icon={Timer}
+          accent={totals.avgLatency > 12000 ? 'red' : 'slate'}
+          alert={totals.avgLatency > 12000}
+          delta={{
+            current: totals.avgLatency,
+            previous: prior.avgLatency,
+            higherIsBetter: false,
+            windowLabel: priorWindowLabel,
+            format: (v) => (v > 0 ? `${(v / 1000).toFixed(1)}s` : '—'),
+          }}
+          spark={{
+            data: spark.latency,
+            format: (v) => (v > 0 ? `${(v / 1000).toFixed(1)}s` : 'no turns'),
+          }}
+          summary="Whole turn, tools included — what the owner actually waits."
+          explain={
+            <>
+              <p>
+                Measured from the request arriving to the stream closing, so it includes every
+                Firestore round trip a tool makes. It is wall-clock waiting, not model time.
+              </p>
+              <p>
+                Rising here while Tokens stays flat almost always means tools are doing more
+                database work per turn, not that answers got longer. Averaged at read time from a
+                stored sum — two averages cannot be added to get the average of the whole.
+              </p>
+            </>
+          }
+        >
+          <DetailRow
+            label="This window"
+            value={totals.avgLatency > 0 ? `${(totals.avgLatency / 1000).toFixed(2)}s` : '—'}
+          />
+          <DetailRow
+            label="Previous window"
+            value={prior.avgLatency > 0 ? `${(prior.avgLatency / 1000).toFixed(2)}s` : '—'}
+          />
+          <DetailRow
+            label="Slowest day"
+            value={(() => {
+              const worst = series.filter((p) => p.avgLatency > 0)
+                .reduce<DayPoint | null>((b, p) => (!b || p.avgLatency > b.avgLatency ? p : b), null);
+              return worst ? `${(worst.avgLatency / 1000).toFixed(1)}s on ${worst.label}` : '—';
+            })()}
+          />
+          <DetailRow label="Alert threshold" value="12.0s" hint="Above this the card turns red" />
+          <ReferenceNote
+            lines={[
+              'Source: latencyMsTotal ÷ count, per day document. The rollup stores the sum precisely so it can be re-averaged across any range.',
+              'Includes tool execution and Firestore reads, not just model generation.',
+            ]}
+          />
+        </MetricCard>
+
+        <MetricCard
+          label="Refusal rate"
+          value={`${refusalRate.toFixed(1)}%`}
+          icon={ShieldAlert}
+          accent={refusalRate > 10 ? 'amber' : 'slate'}
+          delta={{
+            current: refusalRate,
+            previous: priorRefusalRate,
+            higherIsBetter: false,
+            windowLabel: priorWindowLabel,
+            format: (v) => `${v.toFixed(1)}%`,
+          }}
+          spark={{ data: spark.blocked, format: (v) => `${v} blocked` }}
+          summary={`${totals.blocked.toLocaleString()} turns blocked before the model.`}
+          explain={
+            <>
+              <p>
+                Refused turns never reached Gemini, so they cost nothing and appear nowhere in Turns
+                or Tokens. The denominator here is turns + refusals — the demand that arrived, not
+                the demand that was served.
+              </p>
+              <p>
+                The reason matters more than the rate. Plan limits climbing is a pricing signal.
+                The injection scan firing repeatedly is a security one, and belongs in Cyber Shield
+                for the same window, not here.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Refused this window" value={totals.blocked.toLocaleString()} />
+          <DetailRow label="Refused previously" value={prior.blocked.toLocaleString()} />
+          <DetailRow
+            label="Demand that arrived"
+            value={(totals.turns + totals.blocked).toLocaleString()}
+            hint="Turns + refusals — the rate's denominator"
+          />
+          {blockedChart.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {blockedChart.map((row) => (
+                <DetailRow key={row.key} label={row.name} value={row.value.toLocaleString()} />
+              ))}
+            </div>
+          )}
+          <ReferenceNote
+            lines={[
+              'Source: the `blocked` map on each day document, keyed by reason (plan_limit, global_limit, injection, bad_history).',
+              'Refusals happen in src/app/api/chat/route.ts before streamText is called.',
+            ]}
+          />
+        </MetricCard>
+
+        <MetricCard
+          label="Error rate"
+          value={`${errorRate.toFixed(1)}%`}
+          icon={Activity}
+          accent={errorRate > 2 ? 'red' : 'slate'}
+          alert={errorRate > 2}
+          delta={{
+            current: errorRate,
+            previous: priorErrorRate,
+            higherIsBetter: false,
+            windowLabel: priorWindowLabel,
+            format: (v) => `${v.toFixed(1)}%`,
+          }}
+          spark={{ data: spark.errors, format: (v) => `${v} errors` }}
+          summary={`${totals.errors.toLocaleString()} failed mid-stream.`}
+          explain={
+            <>
+              <p>
+                These reached the model and then threw — the owner saw a half-written answer stop.
+                Unlike a refusal, the tokens up to that point were still spent, so errors cost money
+                and produce nothing.
+              </p>
+              <p>
+                A tool throwing is the usual cause. Anything above about 2% is worth tracing to a
+                specific tool rather than watching; the rate alone cannot tell you which.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Errors this window" value={totals.errors.toLocaleString()} />
+          <DetailRow label="Errors previously" value={prior.errors.toLocaleString()} />
+          <DetailRow
+            label="Worst day"
+            value={(() => {
+              const worst = series.reduce<DayPoint | null>(
+                (b, p) => (!b || p.errors > b.errors ? p : b), null);
+              return worst && worst.errors > 0 ? `${worst.errors} on ${worst.label}` : 'none';
+            })()}
+          />
+          <ReferenceNote
+            lines={[
+              'Source: the `errors` counter on each day document, incremented when a turn throws after streaming began.',
+              'Denominator is turns that reached the model — refusals are excluded, since they never got the chance to fail.',
+            ]}
+          />
+        </MetricCard>
+
+        <MetricCard
+          label="Proposal turns"
+          value={totals.proposals.toLocaleString()}
+          icon={ShieldCheck}
+          accent="orange"
+          delta={{
+            current: totals.proposals,
+            previous: prior.proposals,
+            higherIsBetter: true,
+            windowLabel: priorWindowLabel,
+          }}
+          spark={{ data: spark.proposals, format: (v) => `${v} proposals` }}
+          summary={
+            totals.turns > 0
+              ? `${proposalShare.toFixed(0)}% of turns asked for a change.`
+              : 'Writes awaiting approval.'
+          }
+          explain={
+            <>
+              <p>
+                Turns where Zen AI drew at least one approval card — a sale to record, stock to
+                adjust, a price to change. Nothing was written by the server: the card is a
+                proposal, and the write only happens if the owner approves it.
+              </p>
+              <p>
+                This is the clearest read on whether people trust Zen AI to <em>do</em> things
+                rather than just answer. A flat zero against healthy turn volume means it is being
+                used as a reporting tool, which is a much cheaper product than the one you built.
+              </p>
+            </>
+          }
+        >
+          <DetailRow label="Proposal turns" value={totals.proposals.toLocaleString()} />
+          <DetailRow label="Previous window" value={prior.proposals.toLocaleString()} />
+          <DetailRow
+            label="Share of all turns"
+            value={totals.turns > 0 ? `${proposalShare.toFixed(1)}%` : '—'}
+          />
+          <DetailRow
+            label="Propose tools available"
+            value={ZEN_WRITE_TOOL_NAMES.length.toLocaleString()}
+          />
+          <ReferenceNote
+            lines={[
+              'Source: proposalTurns on each day document — counted once per turn, however many cards it drew.',
+              'Approval happens client-side; the write goes through addToQueue, which is what enforces RBAC, injects the active branch, and survives offline.',
+              'This counts proposals made, not proposals accepted — acceptance is not recorded platform-wide.',
+            ]}
+          />
+        </MetricCard>
+
+        <MetricCard
+          label="Tokens used"
+          value={formatTokens(totals.tokens)}
+          icon={Coins}
+          accent="emerald"
+          delta={{
+            current: totals.tokens,
+            previous: prior.tokens,
+            higherIsBetter: false,
+            windowLabel: priorWindowLabel,
+            format: formatTokens,
+          }}
+          spark={{ data: spark.tokens, format: formatTokens }}
+          summary={
+            <>
+              Input + output over {rangeLabel} · ceiling{' '}
+              <span className="font-semibold text-slate-700">{formatUsd(cost.window)}</span>
+            </>
+          }
+          explain={
+            <>
+              <p>
+                What {ZEN_MODEL.label} read and wrote. Input is the system prompt, the chat history
+                and every tool result fed back for the model to read; output is only the words it
+                produced. Output is charged at{' '}
+                {(ZEN_MODEL.outputPerMillion / ZEN_MODEL.inputPerMillion).toFixed(1)}× the input
+                rate, which is why the split below matters more than the total.
+              </p>
+              <p>
+                <span className="font-semibold text-slate-700">Every money figure here is a
+                ceiling, not an invoice.</span> Context caching bills a repeated prompt prefix at a
+                large discount and Zen AI resends a long system prompt every turn, so real spend
+                lands below this — and the free-tier allowance is not modelled at all.
+              </p>
+            </>
+          }
+        >
+          <DetailRow
+            label="Input tokens"
+            value={formatTokens(totals.tokensIn)}
+            hint={`System prompt, history, tool results · $${ZEN_MODEL.inputPerMillion}/M`}
+          />
+          <DetailRow
+            label="Output tokens"
+            value={formatTokens(totals.tokensOut)}
+            hint={`What the model wrote · $${ZEN_MODEL.outputPerMillion}/M`}
+          />
+          <DetailRow
+            label="Output share"
+            value={totals.tokens > 0 ? `${outputShare.toFixed(1)}%` : '—'}
+            hint="The expensive half of the bill"
+          />
+          <DetailRow label="Per turn" value={tokensPerTurn > 0 ? formatTokens(tokensPerTurn) : '—'} />
+          <DetailRow
+            label="Ceiling cost — window"
+            value={formatUsd(cost.window)}
+            hint={`Previous window ${formatUsd(cost.prior)}`}
+          />
+          <DetailRow
+            label="Ceiling cost — per turn"
+            value={cost.perTurn > 0 ? formatUsd(cost.perTurn) : '—'}
+          />
+          <DetailRow
+            label="Context window"
+            value={`${formatTokens(ZEN_MODEL.contextWindow)} tokens`}
+            hint={
+              tokensPerTurn > 0
+                ? `An average turn uses ${((tokensPerTurn / ZEN_MODEL.contextWindow) * 100).toFixed(3)}% of it`
+                : undefined
+            }
+          />
+          <ReferenceNote
+            lines={[
+              `Model: ${ZEN_MODEL.label} (${ZEN_MODEL.id}), ${ZEN_MODEL.vendor} — the model src/app/api/chat/route.ts passes to streamText.`,
+              `List rates: $${ZEN_MODEL.inputPerMillion} per 1M input tokens, $${ZEN_MODEL.outputPerMillion} per 1M output tokens.`,
+              'Token counts come from the SDK usage report on each finished turn, summed into tokensIn / tokensOut per day.',
+              'Costs shown are ceilings: caching discounts and free-tier allowance are not modelled, so the real invoice is lower.',
+            ]}
+            href={ZEN_MODEL.pricingUrl}
+            hrefLabel="Google pricing"
+            checkedOn={ZEN_MODEL.ratesCheckedOn}
+          />
+        </MetricCard>
       </div>
       {/* ── Demand over time ── */}
       <Card className="border-slate-200">
@@ -583,33 +1170,33 @@ export default function AdminAIUsage() {
         <CardContent>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              {/* ComposedChart, not AreaChart: this mixes an Area with two
-                  Lines on two axes, and ComposedChart is the one component
-                  recharts documents for that. */}
+              {/* One y-axis. Turns, blocked turns and distinct businesses are all
+                  counts of the same kind of thing, so they share a scale
+                  honestly — a second axis scaled to fit would make "businesses
+                  crossing turns" look like an event when it is a drawing choice. */}
               <ComposedChart data={series}>
                 <defs>
                   <linearGradient id="aiTurnsFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#eb6834" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#eb6834" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="label" {...AXIS} />
-                <YAxis yAxisId="left" {...AXIS} allowDecimals={false} />
-                <YAxis yAxisId="right" orientation="right" {...AXIS} allowDecimals={false} />
+                <YAxis {...AXIS} allowDecimals={false} />
                 <ReTooltip contentStyle={{ fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Area
-                  yAxisId="left" type="monotone" dataKey="turns" name="Turns"
-                  stroke="#f97316" strokeWidth={2} fill="url(#aiTurnsFill)"
+                  type="monotone" dataKey="turns" name="Turns"
+                  stroke="#eb6834" strokeWidth={2} fill="url(#aiTurnsFill)"
                 />
                 <Line
-                  yAxisId="right" type="monotone" dataKey="businesses" name="Distinct businesses"
-                  stroke="#10b981" strokeWidth={2} strokeDasharray="4 3" dot={false}
+                  type="monotone" dataKey="businesses" name="Distinct businesses"
+                  stroke="#2a78d6" strokeWidth={2} strokeDasharray="4 3" dot={false}
                 />
                 <Line
-                  yAxisId="left" type="monotone" dataKey="blocked" name="Blocked"
-                  stroke="#ef4444" strokeWidth={1.5} dot={false}
+                  type="monotone" dataKey="blocked" name="Blocked"
+                  stroke="#4a3aa7" strokeWidth={1.5} dot={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -913,31 +1500,62 @@ export default function AdminAIUsage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Coins className="w-4 h-4 text-emerald-600" />
-              Token Spend & Response Time — {rangeLabel}
+              Token Spend — {rangeLabel}
             </CardTitle>
             <CardDescription>
-              Tokens are the bill; response time is what the owner feels. Latency rising while tokens
-              stay flat usually means tools are doing more Firestore work per turn, not that answers
-              got longer.
+              Split by direction, because they are not priced the same: output costs{' '}
+              {(ZEN_MODEL.outputPerMillion / ZEN_MODEL.inputPerMillion).toFixed(1)}× input on{' '}
+              {ZEN_MODEL.label}. A day that is mostly input is a day of long context and short
+              answers — cheap. Ceiling for this window: {formatUsd(cost.window)}.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[240px] w-full">
+            {/* Two separate charts rather than one with a second y-axis. Tokens
+                and seconds share no scale, so plotting them together makes the
+                crossings look meaningful when they are an artefact of whatever
+                the two axes were scaled to. */}
+            <div className="h-[200px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <BarChart data={series}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                   <XAxis dataKey="label" {...AXIS} />
-                  <YAxis yAxisId="left" {...AXIS} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)} />
-                  <YAxis yAxisId="right" orientation="right" {...AXIS} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}s`} />
+                  <YAxis {...AXIS} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)} />
                   <ReTooltip
                     contentStyle={{ fontSize: 12 }}
-                    formatter={(v: any, n: any) =>
-                      n === 'Avg response' ? [`${(Number(v) / 1000).toFixed(1)}s`, n] : [Number(v).toLocaleString(), n]
-                    }
+                    formatter={(v: any, n: any) => [Number(v).toLocaleString(), n]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Line yAxisId="left" type="monotone" dataKey="tokens" name="Tokens" stroke="#10b981" strokeWidth={2} dot={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="avgLatency" name="Avg response" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+                  {/* stroke in the surface colour gives the 2px gap between
+                      stacked segments, so the boundary is a gap not a seam */}
+                  <Bar
+                    dataKey="tokensIn" name="Input" stackId="tok"
+                    fill="#2a78d6" stroke="#ffffff" strokeWidth={2}
+                  />
+                  <Bar
+                    dataKey="tokensOut" name="Output" stackId="tok"
+                    fill="#eb6834" stroke="#ffffff" strokeWidth={2} radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="h-[150px] w-full mt-4 pt-4 border-t border-slate-100">
+              <p className="text-xs font-medium text-slate-500 mb-1">
+                Avg response time — same days, its own scale
+              </p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                  <XAxis dataKey="label" {...AXIS} />
+                  <YAxis {...AXIS} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}s`} />
+                  <ReTooltip
+                    contentStyle={{ fontSize: 12 }}
+                    formatter={(v: any) => [`${(Number(v) / 1000).toFixed(1)}s`, 'Avg response']}
+                  />
+                  <Line
+                    type="monotone" dataKey="avgLatency" name="Avg response"
+                    stroke="#7c3aed" strokeWidth={2} dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>

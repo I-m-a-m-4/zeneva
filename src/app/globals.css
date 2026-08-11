@@ -730,3 +730,107 @@ body[data-scroll-locked], html[data-scroll-locked] { margin-right: 0px !importan
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Short-phone density
+   ---------------------------------------------------------------------------
+
+   On a tall phone (Pixel 7 at 412x915, iPhone 14 Pro Max at 430x932) the app
+   reads well. On a short one (iPhone SE at 375x667, a 360x640 Android) the
+   *same* layout feels oversized: type and padding are unchanged but there is
+   28% less vertical room, so every screen needs more scrolling to say the same
+   thing. Nothing is broken there — it is simply too dense for the space.
+
+   The fix is one root font-size step-down rather than per-component overrides,
+   and that is safe here for a specific, verified reason:
+
+     Tailwind breakpoints in this repo are the default **pixel** ones. There is
+     no `screens` override in tailwind.config.ts and no rem/em media query in
+     this file. So scaling the root changes how big things are and *not* when
+     the layout changes shape. `md:grid-cols-2` still flips at exactly 768px.
+
+   Everything sized in rem follows along in proportion, which is what keeps the
+   existing responsive work intact. In particular the two that had to stay in
+   step do, automatically:
+
+     - mobile-bottom-nav.tsx  h-[calc(4rem+env(safe-area-inset-bottom))]
+     - (app)/layout.tsx       pb-32 md:pb-0   (the content reserve under it)
+
+   Both are rem, so the bar shrinks and the reserve shrinks with it. No gap and
+   no occluded content. Hand-editing either one is what would have desynced them.
+
+   Deliberately left alone: anything already fixed in px. `min-w-[600px]` tables
+   inside their overflow-x-auto wrappers, recharts' inline `fontSize: 12` axis
+   labels, and calc(100vh - 120px) drawers keep their current size — the tables
+   just fit more rows per screen and the axis labels stay legible.
+
+   Gated on width as well as height so this is phones only. A short *desktop*
+   window (1280x600) keeps its current sizing; below 768px the mobile layout is
+   already in play, so scaling there is consistent with what is on screen.
+
+   Percentages rather than px, so a reader who has raised their browser's
+   default font size keeps that preference — this scales relative to it instead
+   of overwriting it. `screen` keeps it out of the print stylesheet above.
+
+   On the choice of `max-height` over `dvh`: a media query resolves height
+   against the *large* viewport — the same basis as `100vh`, per the note in
+   (auth)/layout.tsx about 100vh being the viewport without browser chrome.
+   That value is stable while the URL bar collapses and expands, so the size
+   is decided once on load and does not jump mid-scroll. A dvh-based query
+   would re-evaluate on every scroll and visibly reflow the page; that is the
+   reason this is not written with dvh, so keep it as-is.
+--------------------------------------------------------------------------- */
+
+@media screen and (max-width: 767.98px) and (max-height: 800px) {
+  html {
+    font-size: 93.75%; /* 15px at a default root */
+  }
+}
+
+@media screen and (max-width: 767.98px) and (max-height: 690px) {
+  html {
+    font-size: 87.5%; /* 14px — iPhone SE, 360x640 Androids */
+  }
+}
+
+/* The one thing that must NOT scale: form control text.
+   iOS Safari zooms the whole page when you focus a control whose text is under
+   16px, and it does not zoom back out. `input.tsx` carries `text-base md:text-sm`
+   precisely for that — the 16px on mobile is a functional requirement, not a
+   design choice. Scaling the root would drop `text-base` under the line and
+   reintroduce the zoom, so pin it back.
+
+   Scoped to `.text-base` on purpose. tailwind-merge guarantees a control has
+   exactly one text-size class, so this matches only the controls that were
+   relying on the default 16px and cannot match the dozen inputs that opt into
+   `text-sm` deliberately — those keep the compact size they were given. It also
+   beats the plain `.text-base` utility on specificity alone (0,1,1 vs 0,1,0),
+   so no !important and no dependence on rule order.
+
+   max() rather than a flat 16px so a raised browser default still wins. */
+@media screen and (max-width: 767.98px) and (max-height: 800px) {
+  input.text-base,
+  textarea.text-base,
+  select.text-base {
+    font-size: max(16px, 1rem);
+  }
+
+  /* Controls that opted into a smaller size keep the exact px they had before
+     this file scaled the root — measured, not assumed: the landing page's
+     hand-rolled contact fields (they bypass `input.tsx`) computed 14px and 12px
+     at a 16px root, and scaling took them to 12.25px and 10.5px. Restating the
+     sizes in px holds them where they were.
+
+     These are already under the iOS 16px threshold and always have been, so
+     focusing one zooms the page. That is a pre-existing bug in those fields, not
+     something this block introduces; fixing it means giving them `text-base`
+     like every other control, which is a change to those components rather than
+     to the density pass. Left alone deliberately — the rule here only ensures
+     this change makes nothing smaller than it already was.
+
+     px, not rem: rem resolves against the root this file just scaled, so
+     restating `0.875rem` would recompute to the same 12.25px and change nothing.
+     px is what actually pins them. */
+  input.text-sm, textarea.text-sm, select.text-sm { font-size: 14px; }
+  input.text-xs, textarea.text-xs, select.text-xs { font-size: 12px; }
+}

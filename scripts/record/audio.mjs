@@ -263,18 +263,20 @@ function tidy(times, duration, minGap) {
  * @param {number[]} o.clicks      click times, in video-timeline seconds
  * @param {number[]} o.keys        keystroke times, in video-timeline seconds
  * @param {number}   o.fadeOut     seconds of music fade at the tail
+ * @param {string?}  o.narration   path to a voice-over WAV, already time-aligned
  */
 export async function mixAudio(o) {
   const {
     videoPath, outPath, duration,
     music = null, musicVolume = 0.28,
     clicks = [], keys = [], fadeOut = 1.6,
+    narration = null,
   } = o;
 
   const clickTimes = tidy(clicks, duration, 0.05);
   const keyTimes = tidy(keys, duration, 0.03);
   const hasTicks = clickTimes.length + keyTimes.length > 0;
-  if (!music && !hasTicks) return { path: videoPath, scored: false };
+  if (!music && !hasTicks && !narration) return { path: videoPath, scored: false };
 
   const inputs = ['-i', videoPath];
   const filters = [];
@@ -298,6 +300,53 @@ export async function mixAudio(o) {
       `aresample=48000,apad=whole_dur=${duration.toFixed(3)}[bed]`,
     );
     stems.push('[bed]');
+  }
+
+  // The voice-over. Already delayed line-by-line to its own timestamps by
+  // narrate.mjs, so here it is one continuous track that only needs levelling.
+  if (narration) {
+    const vin = inputs.length / 2;
+    inputs.push('-i', narration);
+    filters.push(
+      `[${vin}:a]aresample=48000,aformat=channel_layouts=stereo,`
+      // Speech is the one stem worth compressing: TTS output varies a few dB
+      // line to line, and a voice that dips under the bed mid-sentence is the
+      // difference between narration and a distraction.
+      + `acompressor=threshold=0.09:ratio=3:attack=12:release=220:makeup=1,`
+      + `apad=whole_dur=${duration.toFixed(3)},asplit=2[vkey][vmix]`,
+    );
+    // The trim happens on the mix branch only. Tapping the sidechain key *after*
+    // it would hand the ducker a signal 7.5dB quieter than the voice actually is,
+    // and since the threshold is absolute the bed would barely move — that version
+    // measured 0.4dB of duck in the finished mix, which is nothing. Keying off the
+    // untrimmed copy measures 5.0dB on the same fixture. The key has to be the
+    // voice at the level it was spoken; only the copy that reaches the mix gets
+    // levelled.
+    filters.push(
+      // 0.42 because MASTER_GAIN (2.1) is applied to the sum: TTS arrives near
+      // full scale, so 0.42 × 2.1 lands just under the limiter's 0.94 ceiling.
+      // Leaving it at unity would make the limiter the volume control, which is
+      // what pumping sounds like.
+      `[vmix]volume=0.42[voice]`,
+    );
+    stems.push('[voice]');
+  }
+
+  // Duck the bed under the voice rather than picking one fixed music level that
+  // works for both. `sidechaincompress` keys the bed's gain off the voice track
+  // itself, so the music drops only while someone is talking and comes back up
+  // in the gaps — the same move a human mix engineer makes, and it needs no
+  // knowledge of where the lines are because the voice track is the trigger.
+  if (narration && music) {
+    const bedIdx = stems.indexOf('[bed]');
+    filters.push(
+      `[bed][vkey]sidechaincompress=threshold=0.02:ratio=12:attack=8:release=420:makeup=1[bedduck]`,
+    );
+    stems[bedIdx] = '[bedduck]';
+  } else if (narration) {
+    // Nothing to key off. Discard the split copy or ffmpeg fails on an unused
+    // filter output rather than ignoring it.
+    filters.push('[vkey]anullsink');
   }
 
   // One synthesised source per tick kind, split into as many copies as there are
@@ -357,5 +406,6 @@ export async function mixAudio(o) {
     music: music ? path.basename(music) : null,
     clicks: clickTimes.length,
     keys: keyTimes.length,
+    narrated: Boolean(narration),
   };
 }

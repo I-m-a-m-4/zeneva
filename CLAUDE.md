@@ -2,6 +2,11 @@
 
 Tauri + Next.js retail POS/ERP. Desktop (Windows/macOS), Android, iOS.
 
+`docs/technology.md` is the map of the whole stack — what each piece is for and
+why it is there. `docs/blueprint.md` is the product and design-language view
+(the palette is orange, not the blue the old blueprint claimed). Read those
+once; the sections below are the specific things that have cost real time.
+
 ## Zen AI — read before touching the chat client or a stale-bundle bug
 
 `docs/zen-ai.md` is required reading for anything touching `/ai-insights` or
@@ -108,11 +113,27 @@ Two things that travel with that rename and must not come back:
 - A stray **UTF-8 BOM** was written into the middle of some of them by a
   PowerShell `>` redirect (see the Shell section). `grep -P '\xEF\xBB\xBF'`.
 
-Routes restored so far: `api/chat`, `api/admin/*`, `api/dodo/checkout`,
-`api/webhooks/dodo`. **Still `.bak`, so still 404 in production:** every
-`api/paystack/*` route and `api/webhooks/paystack` (the NGN checkout path),
-plus `api/platform-stats`, `api/download/[platform]`, `api/track`,
-`api/upload` and `api/auth/create-login-token`.
+A live route and a leftover `.bak` can sit in the same folder, so
+`find … -name "route.ts.bak"` **over-reports**: nine of them are stale
+duplicates next to a working `route.ts`. Ask which of the two exists:
+
+```bash
+for d in $(find src/app/api -name "route.ts.bak" | xargs -n1 dirname); do
+  [ -f "$d/route.ts" ] && echo "dupe (live): ${d#src/app/api/}" \
+                       || echo "STILL 404:   ${d#src/app/api/}"
+done
+```
+
+**Still 404 in production** (only a `.bak` exists) — verified August 2026:
+`api/auth/create-login-token`, `api/download/[platform]`, `api/upload`, and the
+NGN checkout path's remaining routes: `api/paystack`,
+`api/paystack/activate-terminal`, `api/paystack/banks`,
+`api/paystack/create-subaccount`, `api/paystack/resolve-account`,
+`api/paystack/verify-customer`.
+
+Restored and live: `api/chat`, `api/admin/*`, `api/dodo/checkout`,
+`api/webhooks/dodo`, `api/webhooks/paystack`, `api/paystack/verify`,
+`api/paystack/verify-transaction`, `api/platform-stats`, `api/track`.
 
 `scripts/prepare-tauri.mjs` deletes `src/app/api` wholesale for native builds,
 so the desktop and mobile shells call the hosted API by absolute URL. A route

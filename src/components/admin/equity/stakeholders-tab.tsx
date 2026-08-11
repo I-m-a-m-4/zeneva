@@ -28,7 +28,7 @@ import {
   deleteEquityRecord,
   updateEquityRecord,
 } from '@/lib/equity/data';
-import { money, percent, shares as fmtShares } from '@/lib/equity/format';
+import { investedLabel, percent, shares as fmtShares } from '@/lib/equity/format';
 import { isKind } from '@/lib/equity/types';
 import type { CapTableSummary, EquityRecord, Stakeholder } from '@/lib/equity/types';
 import {
@@ -232,8 +232,14 @@ export function StakeholdersTab({
                       {holding ? fmtShares(holding.fullyDilutedShares) : '—'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {holding && holding.invested > 0
-                        ? money(holding.invested, summary.currency)
+                      {/* Reads "for IP" rather than a dash where the shares were
+                          not bought with money — see investedLabel. */}
+                      {holding
+                        ? investedLabel(
+                            holding.invested,
+                            holding.nonCashConsiderations,
+                            summary.currency,
+                          )
                         : '—'}
                     </TableCell>
                     <TableCell className="text-right">

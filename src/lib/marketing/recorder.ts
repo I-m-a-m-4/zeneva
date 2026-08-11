@@ -23,6 +23,36 @@ export type DeviceId = (typeof DEVICE_IDS)[number];
 export type ThemeId = (typeof THEME_IDS)[number];
 export type FormatId = (typeof FORMAT_IDS)[number];
 
+/**
+ * The narration voices, mirroring `VOICES` in `scripts/record/narrate.mjs`.
+ *
+ * Same relationship as `FLOWS` below: that file is the source of truth and this
+ * is the copy the studio draws its picker from. Kept short deliberately — Gemini
+ * offers around thirty prebuilt voices and most are characterful in a way that
+ * fights a product demo.
+ *
+ * Enumerated rather than free text because the value reaches `--voice`, and an
+ * allow-list on both sides is what makes an unknown voice a rejected request
+ * rather than a take that records for forty seconds and then fails at the TTS
+ * call.
+ */
+export const VOICE_IDS = ['Charon', 'Kore', 'Puck', 'Aoede', 'Fenrir', 'Leda'] as const;
+export type VoiceId = (typeof VOICE_IDS)[number];
+
+export const VOICES: Record<VoiceId, { note: string }> = {
+  Charon: { note: 'Warm, measured. The default.' },
+  Kore: { note: 'Bright and direct.' },
+  Puck: { note: 'Upbeat, quicker.' },
+  Aoede: { note: 'Soft, unhurried.' },
+  Fenrir: { note: 'Deeper, steady.' },
+  Leda: { note: 'Youthful, clear.' },
+};
+
+export const DEFAULT_VOICE: VoiceId = 'Charon';
+
+/** Longest tone direction accepted, matching the route's clamp. */
+export const VOICE_STYLE_MAX = 240;
+
 // ------------------------------------------------------------------ recipes
 
 /**
@@ -37,6 +67,7 @@ export type FormatId = (typeof FORMAT_IDS)[number];
  */
 export const STEP_KINDS = [
   'caption', 'hold', 'click', 'clickTo', 'hover', 'scroll', 'fill', 'press', 'goto', 'card',
+  'punch', 'wide',
 ] as const;
 
 export type StepKind = (typeof STEP_KINDS)[number];
@@ -61,7 +92,19 @@ export type RecipeStep =
   | { kind: 'fill'; spec: TargetSpec; text: string; enter?: boolean; clear?: boolean; ms?: number }
   | { kind: 'press'; key: 'Enter' | 'Escape' | 'Tab' | 'Backspace' | 'Delete' }
   | { kind: 'goto'; route: string; ms?: number }
-  | { kind: 'card'; title: string; subtitle?: string; cta?: string; ms?: number };
+  | { kind: 'card'; title: string; subtitle?: string; cta?: string; ms?: number }
+  /**
+   * Camera moves. These are an **encode-time ffmpeg filter**, never a CSS
+   * transform on the page — the app renders exactly as it always does and the
+   * punch is applied to the finished frames afterwards.
+   *
+   * `to` is clamped to 1–1.6 by the recorder for a physical reason: the camera is
+   * a lanczos upscale of captured 1080p rather than a re-render, so text softens
+   * past roughly 1.5. Capturing supersampled instead measured 10–17fps painted,
+   * under the 30 the sampler needs.
+   */
+  | { kind: 'punch'; to?: number; spec?: TargetSpec; ms?: number }
+  | { kind: 'wide'; ms?: number };
 
 export type TitleCard = {
   title: string;
@@ -138,6 +181,11 @@ function stepToWire(s: RecipeStep): Record<string, unknown> {
     case 'press': return { press: s.key };
     case 'goto': return { goto: s.route, ms: s.ms };
     case 'card': return { card: { title: s.title, subtitle: s.subtitle, cta: s.cta, ms: s.ms } };
+    // A punch with no target frames the middle of the screen, which is what "just
+    // push in a bit" means. Sending `spec: undefined` inside the object would read
+    // as a malformed target rather than as an absent one, so it is left off.
+    case 'punch': return { punch: s.spec ? { spec: s.spec, to: s.to } : { to: s.to ?? 1.3 }, ms: s.ms };
+    case 'wide': return { wide: true, ms: s.ms };
   }
 }
 
@@ -153,6 +201,8 @@ export const STEP_LABELS: Record<StepKind, { label: string; hint: string }> = {
   press: { label: 'Press a key', hint: 'Enter, Escape, Tab, Backspace or Delete.' },
   goto: { label: 'Go to a page', hint: 'Jump straight to another route.' },
   card: { label: 'Title card', hint: 'A full-screen card over the app.' },
+  punch: { label: 'Push the camera in', hint: 'Zoom towards something to make it the subject.' },
+  wide: { label: 'Pull back wide', hint: 'Return the camera to the full frame.' },
 };
 
 /** Blank recipe pointed at a route, as the starting point for a new recording. */
@@ -208,6 +258,26 @@ export type RecorderRequest = {
   musicVolume: number;
   clickSfx: boolean;
   typingSfx: boolean;
+  /**
+   * Speak the captions.
+   *
+   * Off by default and never inferred, because it is the one audio option that
+   * costs money — every caption in the take is a Gemini TTS request. The captions
+   * are already the script, so this adds no writing: it speaks the sentences the
+   * flow was going to put on screen anyway, each landing on the frame it was
+   * written for.
+   */
+  narrate: boolean;
+  voice: VoiceId;
+  /**
+   * How the line should be read — "slower, and a little drier", say.
+   *
+   * Free text, because Gemini TTS takes its direction in the prompt rather than
+   * through a style parameter. `null` uses the recorder's own direction, which is
+   * tuned for restraint; the failure mode of TTS on marketing copy is an
+   * infomercial voice.
+   */
+  voiceStyle: string | null;
   /** Let the flow actually save — rings up the sale, writes the stock count. */
   commit: boolean;
   /** Show the browser while it records, for debugging a broken selector. */
@@ -276,6 +346,9 @@ export function defaultRequest(): RecorderRequest {
     musicVolume: 0.28,
     clickSfx: true,
     typingSfx: true,
+    narrate: false,
+    voice: DEFAULT_VOICE,
+    voiceStyle: null,
     commit: false,
     headed: false,
     recipe: null,
@@ -306,7 +379,19 @@ export function estimateSeconds(r: RecorderRequest): number {
   const takes = r.devices.length * r.themes.length;
   const LAUNCH_AND_LOGIN = 22;
   const ENCODE_RATIO = 0.9;
-  return Math.round(takes * (perSubject * (1 + ENCODE_RATIO) + LAUNCH_AND_LOGIN * Math.max(1, subjects)));
+  /**
+   * Narration adds a round trip per caption, and the cache is keyed by take, so
+   * every take pays for its own.
+   *
+   * Estimated from footage length rather than from a caption count, because the
+   * count is only knowable for a recipe — a coded flow's captions live in the
+   * CLI. Roughly one caption per six seconds on camera at about three and a half
+   * seconds a request, which is about 0.6× the footage duration.
+   */
+  const narration = r.narrate ? perSubject * 0.6 : 0;
+  return Math.round(
+    takes * (perSubject * (1 + ENCODE_RATIO) + narration + LAUNCH_AND_LOGIN * Math.max(1, subjects)),
+  );
 }
 
 /** Seconds a recipe spends on camera, from its own step timings. */
@@ -321,6 +406,10 @@ export function recipeSeconds(r: Recipe): number {
       case 'hold': ms += s.ms; break;
       case 'scroll': ms += 900; break;
       case 'press': ms += 300; break;
+      // Camera moves are a glide, not an interaction: nothing is searched for and
+      // nothing settles afterwards, so they cost only their own duration.
+      case 'punch': ms += (s.ms ?? 900) + 200; break;
+      case 'wide': ms += (s.ms ?? 800) + 200; break;
       case 'card': ms += (s.ms ?? 2200) + 600; break;
       case 'fill': ms += (s.ms ?? 700) + s.text.length * 90 + ACTION_OVERHEAD * 1000; break;
       default: ms += (s.ms ?? 800) + ACTION_OVERHEAD * 1000; break;
@@ -357,6 +446,58 @@ export type JobStatus = {
   /** Videos this job wrote, resolved when it finishes. */
   takes: RecorderTake[];
   error: string | null;
+};
+
+// ----------------------------------------------------------------- trimming
+
+/**
+ * How a cut is made. Both are offered because neither is strictly better.
+ *
+ * `fast` copies the streams untouched — a second or two regardless of length,
+ * and the picture is bit-for-bit the take that was approved. The cost is that a
+ * copied cut can only begin on a keyframe, so the in-point moves *earlier* to
+ * the nearest one, by up to a second on an mp4 and further on a webm.
+ *
+ * `exact` re-encodes, so the cut starts on the frame asked for. It costs real
+ * time on a long take and a generation of quality, which on flat UI footage at
+ * crf 18 is invisible — but it is a re-encode, and worth saying so.
+ */
+export const TRIM_MODES = ['fast', 'exact'] as const;
+export type TrimMode = (typeof TRIM_MODES)[number];
+
+/**
+ * Shortest cut worth making, in seconds.
+ *
+ * Not a technical floor — ffmpeg will happily write four frames — but below
+ * about half a second the result is a flicker, and the usual cause is a mis-set
+ * in-point rather than an intention.
+ */
+export const TRIM_MIN_SECONDS = 0.4;
+
+export type TrimRequest = {
+  /** A filename from `RecorderStatus.takes`, never a path. */
+  name: string;
+  start: number;
+  end: number;
+  mode: TrimMode;
+};
+
+export type TrimResult = {
+  /** The new file, ready to preview or download like any other take. */
+  take: RecorderTake;
+  /** Where the cut actually landed, measured from the finished file. */
+  start: number;
+  end: number;
+  seconds: number;
+  mode: TrimMode;
+  /**
+   * The in-point that was asked for, when a keyframe forced the cut earlier.
+   * `null` when the cut landed where it was requested — so a non-null value is
+   * the studio's cue to say the clip starts a moment sooner than you set it.
+   */
+  snappedFrom: number | null;
+  /** Whether the marks sidecar came along, re-timed to the new clip. */
+  marks: boolean;
 };
 
 // ------------------------------------------------------------- live view
@@ -431,6 +572,16 @@ export type RecorderStatus = {
     source: 'env' | 'file' | null;
   };
   ffmpeg: boolean;
+  /**
+   * Whether a Gemini key is on this machine, so the studio can say so up front.
+   *
+   * Only ever a boolean — the key itself is never returned, for the same reason
+   * the recorder password is not. Worth surfacing because narration is wired to
+   * fail soft: without a key the recorder logs one line and produces the take
+   * unnarrated, which from the studio looks identical to narration that ran and
+   * came back silent.
+   */
+  narration: boolean;
   music: string[];
   job: JobStatus | null;
   takes: RecorderTake[];

@@ -47,6 +47,21 @@ export const AI_DAILY_LIMITS: Record<PlanId, number> = {
   business: 500,
 };
 
+/**
+ * List price per month. Must match `components/settings/subscription-section.tsx`
+ * and the marketing pages — this is the same number, not an approximation of it.
+ *
+ * Lives here because MRR is computed from the plan a business is on rather than
+ * from what it last paid: an annual subscriber pays twelve months at once, and
+ * counting the cheque as one month's revenue understates the run rate as badly
+ * as counting it as twelve overstates it.
+ */
+export const PLAN_MONTHLY_PRICE: Record<PlanId, { NGN: number; USD: number }> = {
+  starter: { NGN: 0, USD: 0 },
+  pro: { NGN: 10_000, USD: 10 },
+  business: { NGN: 30_000, USD: 30 },
+};
+
 /** Only these plans are ever bought, so only these can lapse. */
 const PAID_PLANS: PlanId[] = ['pro', 'business'];
 

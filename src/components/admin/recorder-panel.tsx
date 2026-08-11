@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
   Loader2, Play, Square, Download, AlertTriangle, Info, RefreshCw, Terminal,
   Sun, Moon, Monitor, Smartphone, Music, KeyRound, CheckCircle2, Video, Trash2,
-  Eye, EyeOff,
+  Eye, EyeOff, Mic,
 } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,10 @@ import { RecorderRecipe } from '@/components/admin/recorder-recipe';
 import { FlowTitleCards } from '@/components/admin/recorder-cards';
 import {
   FLOWS, DEVICES, FLOW_IDS, DEVICE_IDS, THEME_IDS, FPS_RANGE, QUALITY_RANGE,
+  VOICE_IDS, VOICES, VOICE_STYLE_MAX,
   defaultRequest, takeCount, estimateSeconds, durationLabel,
   type Recipe, type RecorderRequest, type RecorderStatus, type RecorderTake,
-  type FlowId, type DeviceId, type ThemeId,
+  type FlowId, type DeviceId, type ThemeId, type VoiceId,
 } from '@/lib/marketing/recorder';
 
 /**
@@ -564,9 +565,10 @@ export function RecorderPanel() {
                 <Music className="h-4 w-4" /> Audio
               </CardTitle>
               <CardDescription>
-                Clicks and keystrokes are synthesised. A music bed is the one file you supply —
-                drop tracks in <code className="font-mono text-[11px]">marketing-music/</code> and
-                they appear here.
+                Clicks and keystrokes are synthesised, and so is the voice. A music bed is
+                the one file you supply — drop tracks in{' '}
+                <code className="font-mono text-[11px]">marketing-music/</code> and they
+                appear here.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -665,6 +667,99 @@ export function RecorderPanel() {
                   disabled={running}
                   onCheckedChange={(v) => setReq((r) => ({ ...r, typingSfx: v }))}
                 />
+              </div>
+
+              {/* ---------------------------------------------- narration */}
+              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="rec-narrate" className="text-sm font-normal">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Mic className="h-3.5 w-3.5 text-primary" /> Speak the captions
+                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                      Every caption becomes a spoken line, landing on the frame it was
+                      written for. The music ducks under the voice on its own.
+                    </span>
+                  </Label>
+                  <Switch
+                    id="rec-narrate"
+                    checked={req.narrate}
+                    disabled={running || status?.narration === false}
+                    onCheckedChange={(v) => setReq((r) => ({ ...r, narrate: v }))}
+                  />
+                </div>
+
+                {/* The recorder fails soft without a key — it logs a line and produces
+                    an unnarrated take. That is indistinguishable from broken narration
+                    from in here, so the studio says it up front instead. */}
+                {status && !status.narration && (
+                  <div className="flex gap-2.5 rounded-md border border-dashed border-border p-2.5">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      No <code className="font-mono">GEMINI_API_KEY</code> on this machine, so
+                      there is no voice to use. Add it to{' '}
+                      <code className="font-mono">.env.recorder</code> or your shell and refresh —
+                      everything else records exactly as it does now.
+                    </p>
+                  </div>
+                )}
+
+                {req.narrate && status?.narration && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Voice</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {VOICE_IDS.map((id) => (
+                          <button
+                            key={id}
+                            type="button"
+                            disabled={running}
+                            onClick={() => setReq((r) => ({ ...r, voice: id as VoiceId }))}
+                            title={VOICES[id].note}
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-left transition-colors disabled:opacity-50',
+                              req.voice === id
+                                ? 'border-primary bg-primary/5 text-primary'
+                                : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/40 hover:text-foreground',
+                            )}
+                          >
+                            <span className="block text-xs font-medium">{id}</span>
+                            <span className="block text-[10px] leading-tight opacity-80">
+                              {VOICES[id].note}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="rec-style" className="text-xs text-muted-foreground">
+                        How to read it <span className="opacity-70">(optional)</span>
+                      </Label>
+                      <Input
+                        id="rec-style"
+                        value={req.voiceStyle ?? ''}
+                        disabled={running}
+                        maxLength={VOICE_STYLE_MAX}
+                        placeholder="Calm and warm, like a colleague explaining something useful"
+                        onChange={(e) =>
+                          setReq((r) => ({ ...r, voiceStyle: e.target.value || null }))
+                        }
+                      />
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        Leave this empty and the recorder uses its own direction, which is
+                        tuned for restraint — TTS on marketing copy drifts into an
+                        infomercial voice unless you ask it not to.
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      One synthesis request per caption, so this is the one option that costs
+                      money. Lines are cached per take — re-scoring the same footage does not
+                      pay twice.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

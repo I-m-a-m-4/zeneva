@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   Plus, Trash2, ArrowUp, ArrowDown, Wand2, X, Info, MousePointerClick,
   Type, Timer, MoveVertical, Keyboard, Navigation, Captions, Hand, LayoutTemplate,
+  ZoomIn, Maximize,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
   type Recipe, type RecipeStep, type StepKind, type TargetSpec,
 } from '@/lib/marketing/recorder';
 import { TitleCardEditor } from './recorder-cards';
+import { RecorderPresets } from './recorder-presets';
 
 /**
  * Build a recording for any page, without writing a flow.
@@ -46,6 +48,8 @@ const ICONS: Record<StepKind, React.ElementType> = {
   press: Keyboard,
   goto: Navigation,
   card: LayoutTemplate,
+  punch: ZoomIn,
+  wide: Maximize,
 };
 
 /** A new step of each kind, with defaults that already read well on camera. */
@@ -61,6 +65,11 @@ function makeStep(kind: StepKind): RecipeStep {
     case 'press': return { kind, key: 'Enter' };
     case 'goto': return { kind, route: '/dashboard', ms: 1200 };
     case 'card': return { kind, title: 'Zeneva', subtitle: 'Retail, handled.', ms: 2200 };
+    // 1.25 rather than the recorder's 1.3 default: the camera is an upscale of
+    // captured 1080p, so a gentler push keeps text crisp. The recorder clamps to
+    // 1.6 regardless.
+    case 'punch': return { kind, to: 1.25, ms: 900 };
+    case 'wide': return { kind, ms: 800 };
   }
 }
 
@@ -79,6 +88,8 @@ function describe(s: RecipeStep): string {
     case 'press': return s.key;
     case 'goto': return s.route;
     case 'card': return s.title || '(untitled)';
+    case 'punch': return `${(s.to ?? 1.3).toFixed(2)}×${s.spec?.text ? ` on “${s.spec.text}”` : ' (centre)'}`;
+    case 'wide': return 'back to full frame';
   }
 }
 
@@ -118,30 +129,39 @@ export function RecorderRecipe({ recipe, onChange, disabled }: Props) {
 
   if (!recipe) {
     return (
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onChange(blankRecipe())}
-        className={cn(
-          'flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border p-6',
-          'text-center transition-all hover:border-primary/40 hover:bg-accent/40 disabled:opacity-50',
-        )}
-      >
-        <Wand2 className="h-5 w-5 text-muted-foreground" />
-        <span className="text-sm font-semibold">Record any other page</span>
-        <span className="max-w-md text-xs leading-relaxed text-muted-foreground">
-          Point the bot at a route and describe what it should do there — click, type,
-          scroll, hold. No code, and it runs through the same machinery as the flows
-          above.
-        </span>
-      </button>
+      <div className="space-y-4">
+        <RecorderPresets recipe={null} onPick={onChange} disabled={disabled} />
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(blankRecipe())}
+          className={cn(
+            'flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border p-6',
+            'text-center transition-all hover:border-primary/40 hover:bg-accent/40 disabled:opacity-50',
+          )}
+        >
+          <Wand2 className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm font-semibold">Or start from nothing</span>
+          <span className="max-w-md text-xs leading-relaxed text-muted-foreground">
+            Point the bot at any route and describe what it should do there — click, type,
+            scroll, hold, push the camera in. No code, and it runs through the same
+            machinery as the flows above.
+          </span>
+        </button>
+      </div>
     );
   }
 
   const seconds = recipeSeconds(recipe);
 
   return (
-    <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/[0.03] p-4">
+    <div className="space-y-4">
+      {/* Still visible with a recipe loaded, so switching page is one click rather
+          than Remove → hunt → pick. Choosing another replaces this one; the tick
+          on the current page's card says which is loaded. */}
+      <RecorderPresets recipe={recipe} onPick={onChange} disabled={disabled} />
+
+      <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/[0.03] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-primary" />
@@ -303,6 +323,7 @@ export function RecorderRecipe({ recipe, onChange, disabled }: Props) {
           silently and takes the whole take with it.
         </p>
       </div>
+      </div>
     </div>
   );
 }
@@ -352,6 +373,53 @@ function StepFields({
             ))}
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (step.kind === 'wide') {
+    return (
+      <div className="mt-2 pl-7">
+        <p className="text-[11px] text-muted-foreground">
+          Nothing to set — the camera glides back to the whole frame.
+        </p>
+      </div>
+    );
+  }
+
+  if (step.kind === 'punch') {
+    return (
+      <div className="mt-2 grid gap-2 pl-7 sm:grid-cols-2">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Zoom</span>
+            <span className="font-code text-[11px]">{(step.to ?? 1.25).toFixed(2)}×</span>
+          </div>
+          <input
+            type="range" min={1} max={1.6} step={0.05}
+            value={step.to ?? 1.25}
+            disabled={disabled}
+            onChange={(e) => onChange({ to: Number(e.target.value) })}
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:opacity-50"
+            aria-label="Zoom amount"
+          />
+          {/* 1.6 is the recorder's own ceiling. Stated here because a soft-looking
+              take at 1.55 reads as a broken encoder rather than as physics. */}
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Past about 1.5× text starts to soften — the camera enlarges the captured
+            frame rather than re-rendering the page.
+          </p>
+        </div>
+        <Input
+          value={step.spec?.text ?? ''}
+          disabled={disabled}
+          className={cls}
+          placeholder="Push in on this text (blank = centre)"
+          onChange={(e) => {
+            const text = e.target.value;
+            onChange({ spec: text ? { text } : undefined });
+          }}
+        />
       </div>
     );
   }

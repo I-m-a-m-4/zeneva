@@ -3,6 +3,9 @@
 The AI copilot. Next.js route `src/app/api/chat/route.ts` streams from Gemini
 via the Vercel AI SDK; the client is `src/app/(app)/ai-insights/page.tsx`.
 
+Where this sits in the wider system — and why the stack is what it is — is in
+[`technology.md`](technology.md) §4. This file is the depth.
+
 ## The 401 that cost a session — read this before touching the chat client
 
 Symptom: every prompt returned `POST /api/chat 401 (Unauthorized)`, with the

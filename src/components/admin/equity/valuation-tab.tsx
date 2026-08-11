@@ -48,6 +48,7 @@ import {
   toDateInput,
   type FieldDef,
 } from './equity-dialogs';
+import { RevenueValuationCard } from './revenue-valuation-card';
 import { Term } from './term';
 
 const METHOD_LABELS: Record<ValuationMethod, string> = {
@@ -193,7 +194,7 @@ export function ValuationTab({
           <EmptyState
             icon={Scale}
             title="No valuation set"
-            description="Until you record what the company is worth, there is no share price — so nothing on this page can tell you what an investment would buy."
+            description="Until you record what the company is worth, there is no share price — so nothing on this page can tell you what an investment would buy. If Zeneva has subscription revenue, the card below works one out from the live figures; otherwise set your own estimate."
             action={
               <Button onClick={() => setIsCreating(true)} className="gap-2">
                 <Plus className="size-4" />
@@ -338,6 +339,10 @@ export function ValuationTab({
           </div>
         )}
       </TabSection>
+
+      {/* Sits above the calculator because it is what produces a valuation,
+          and the calculator is what spends one. */}
+      <RevenueValuationCard records={records} summary={summary} actorEmail={actorEmail} />
 
       <InvestmentCalculator summary={summary} />
 

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { requireSuperAdmin, corsHeaders } from '../_guard';
+import { OUT_DIR, VIDEO_EXT, hasFfmpeg, hostReason, jobSlot } from './_host';
 import {
     FLOW_IDS, DEVICE_IDS, THEME_IDS, FORMAT_IDS, FPS_RANGE, QUALITY_RANGE,
+    VOICE_IDS, DEFAULT_VOICE, VOICE_STYLE_MAX,
     recipeId, recipeToWire,
     type JobStatus, type Recipe, type RecorderStatus, type RecorderTake,
 } from '@/lib/marketing/recorder';
@@ -37,38 +39,24 @@ export const revalidate = 0;
 
 const ROOT = process.cwd();
 const SCRIPT = path.join(ROOT, 'scripts', 'record', 'record.mjs');
-const OUT_DIR = path.join(ROOT, 'marketing-out');
 const RECIPE_FILE = path.join(OUT_DIR, '.recipes', 'studio.json');
 const CARDS_FILE = path.join(OUT_DIR, '.recipes', 'cards.json');
 const MUSIC_DIR = path.join(ROOT, 'marketing-music');
 const AUDIO_EXT = new Set(['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.opus']);
-const VIDEO_EXT = new Set(['.mp4', '.webm']);
 
 /** Keep the tail bounded — a twelve-take run is thousands of lines. */
 const MAX_LOG_LINES = 400;
 
-// The dev server reloads modules on edit, which would otherwise orphan a running
-// child and lose the job state mid-recording. Parking both on globalThis keeps a
-// take alive across a hot reload.
-type JobSlot = { job: JobStatus | null; child: ChildProcess | null };
-const slot: JobSlot = ((globalThis as any).__zenevaRecorderJob ??= { job: null, child: null });
+// Shared with the trim route so a cut cannot start in the middle of a take, and
+// so a hot reload does not orphan a running child.
+const slot = jobSlot();
 
 // ------------------------------------------------------------------ gates
 
 /** Why this machine may not run the recorder, or null if it may. */
 function unavailableReason(): string | null {
-    const serverless =
-        process.env.VERCEL
-        || process.env.AWS_LAMBDA_FUNCTION_NAME
-        || process.env.NETLIFY
-        || process.env.CF_PAGES
-        || process.env.K_SERVICE;
-    if (serverless) {
-        return 'The recorder runs a real browser and ffmpeg, so it only works on a developer machine — not on the hosted deployment.';
-    }
-    if (process.env.NODE_ENV === 'production' && process.env.ZENEVA_RECORDER_ENABLE !== '1') {
-        return 'This is a production build. Run `npm run dev` to use the recorder, or set ZENEVA_RECORDER_ENABLE=1 if this really is your own machine.';
-    }
+    const host = hostReason();
+    if (host) return host;
     if (!existsSync(SCRIPT)) {
         return 'scripts/record/record.mjs is missing from this checkout.';
     }
@@ -154,16 +142,6 @@ function writeCredentials(email: string, password: string): void {
     ].join('\n').trimEnd() + '\n';
 
     writeFileSync(ENV_FILE, body, { encoding: 'utf8', mode: 0o600 });
-}
-
-function hasFfmpeg(): Promise<boolean> {
-    return new Promise((resolve) => {
-        const p = spawn(process.platform === 'win32' ? 'where' : 'which', ['ffmpeg'], {
-            stdio: 'ignore',
-        });
-        p.on('error', () => resolve(false));
-        p.on('exit', (code) => resolve(code === 0));
-    });
 }
 
 function listDir(dir: string, exts: Set<string>): RecorderTake[] {
@@ -269,6 +247,44 @@ function writeCards(raw: unknown): string[] {
     return ['--cards', CARDS_FILE];
 }
 
+/**
+ * Whether a Gemini key is on this machine. Answers a boolean and nothing else.
+ *
+ * Both names because `narrate.mjs` accepts either, and the recorder is a child
+ * process of this one — so if the key is visible here it will be visible there.
+ */
+function hasNarrationKey(): boolean {
+    return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+}
+
+/**
+ * The tone direction for the voice, sanitised.
+ *
+ * This is the one free-text field in the whole request that reaches argv, and it
+ * gets there because Gemini TTS has no style parameter — direction is prepended
+ * to the text being spoken. `spawn` runs without a shell so no value here can be
+ * read as a command, but three things are still worth doing: strip control
+ * characters, since a newline inside the prompt would read as a second
+ * instruction to the model; clamp the length, because a thousand-word direction
+ * is a thousand words the model weighs against a one-sentence caption; and
+ * collapse whitespace so the recorder logs one readable line.
+ */
+function voiceStyle(raw: unknown): string | null {
+    if (typeof raw !== 'string') return null;
+    // Code points rather than a regex character class: the control range has to
+    // be written as numeric escapes, and a numeric escape is exactly the kind of
+    // thing that arrives already-decoded when a tool edits this file. Comparing
+    // numbers cannot be mangled that way.
+    const printable = Array.from(raw)
+        .filter((ch) => {
+            const code = ch.codePointAt(0) ?? 0;
+            return code >= 32 && code !== 127;
+        })
+        .join('');
+    const clean = printable.split(/[ \t]+/).join(' ').trim();
+    return clean ? clean.slice(0, VOICE_STYLE_MAX) : null;
+}
+
 function buildArgs(body: any): string[] {
     // A recipe stands on its own: recording *only* a custom page is the whole
     // point of the feature, so `flows` is allowed to be empty when one is present.
@@ -309,6 +325,16 @@ function buildArgs(body: any): string[] {
     }
     if (body?.clickSfx === false) args.push('--no-click-sfx');
     if (body?.typingSfx === false) args.push('--no-typing-sfx');
+    // Narration is opt-in because it is the only option that costs money — one
+    // Gemini TTS request per caption. The voice is enumerated on both sides so an
+    // unknown one is a rejected request rather than a take that records for forty
+    // seconds and then fails at the synthesis call.
+    if (body?.narrate === true) {
+        const voice = VOICE_IDS.includes(body?.voice) ? body.voice : DEFAULT_VOICE;
+        args.push('--narrate', '--voice', voice);
+        const style = voiceStyle(body?.voiceStyle);
+        if (style) args.push('--voice-style', style);
+    }
     // Both of these change what the run does to real data / the real screen, so
     // they are opt-in and never inferred.
     if (body?.commit === true) args.push('--commit');
@@ -407,6 +433,7 @@ export async function GET(req: Request) {
         reason,
         credentials: credentialState(),
         ffmpeg: await hasFfmpeg(),
+        narration: hasNarrationKey(),
         music: listDir(MUSIC_DIR, AUDIO_EXT).map((t) => t.name),
         job: slot.job,
         takes: listDir(OUT_DIR, VIDEO_EXT),

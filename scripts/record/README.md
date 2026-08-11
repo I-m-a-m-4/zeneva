@@ -48,13 +48,20 @@ npm run record -- [options]
   --url       app to record                      (default: $ZENEVA_RECORD_URL)
   --out       output directory                   (default: ./marketing-out)
   --fps       output frame rate                  (default: 30)
-  --quality   capture JPEG quality 1-100         (default: 92)
+  --quality   capture JPEG quality 1-100         (default: 85)
   --format    mp4 | webm                         (default: mp4)
   --commit    let the flow actually save
   --headed    show the browser while recording
   --keep-frames  keep the raw JPEG sequence
+  --timings   print wall-clock per stage
   --browser   path to chrome.exe / msedge.exe
 ```
+
+`--quality` is a frame-rate lever, not just a size one: Chrome will not paint the
+next frame until the current one is acked, so the in-browser JPEG encode *is* the
+capture rate. Measured at 1920×1080 — q92 painted 19-31fps, q85 33, q70 37. Below
+the requested fps some emitted frames are repeats, which is judder. 85 is the
+default because these frames are re-encoded to H.264 at crf 18 anyway.
 
 `--flow all --device both --theme both` is twelve takes in one run: three flows
 × desktop/mobile × light/dark.
@@ -133,16 +140,20 @@ its frame is worse than no tick.
 <details>
 <summary>Why the marks are needed at all</summary>
 
-Screencast frames only arrive when the compositor paints, so a frame that sat on
-screen for four seconds while Firestore thought about it is *one* frame with a
-four-second duration. Encoding clamps that to two seconds, which means
-wall-clock time and the finished video's timeline drift apart on any take where
-the app stalled — by then everything afterwards sits earlier in the file than it
-happened in real life.
+A click happens at a wall-clock instant; the sound has to land on a *frame*. The
+sampler emits at a constant rate, so video time is just `frameIndex / fps` — but
+nothing records which frame index was on screen when the mouse went down, and by
+the time the audio is mixed the JPEG sequence has been deleted.
 
-`Recorder.videoTimeFor()` replays the same clamp to convert one clock to the
-other, and the sidecar stores the already-converted times. Without it you would
-have to re-derive them from a JPEG sequence that has since been deleted.
+`marks` is the emitted-frame timeline: one wall-clock stamp per frame written.
+`videoTimeFor()` binary-searches it and divides by fps, interpolating across the
+gap so several ticks between two frames do not collapse onto one instant. The
+sidecar stores the already-converted times so a re-score lands identically.
+
+This used to be much harder. Frames were written with per-frame durations and a
+`fps=` resample filter, so wall-clock and video time genuinely diverged on any
+take where the app stalled, and `videoTimeFor` had to replay that transform
+exactly. Constant-rate sampling deleted the problem rather than solving it.
 
 </details>
 
@@ -264,7 +275,56 @@ at `--url`, or the account has no business attached.
 7. A second ffmpeg pass mixes the bed and the ticks in with `-c:v copy`, so
    scoring a take costs a second or two rather than a re-encode.
 
+---
+
+## How long a take takes
+
+```bash
+npm run record -- --flow pos --timings
+```
+
+```
+launch 0.7s · login 8.1s · warm 6.0s · flow 44.9s · encode 10.4s · score 2.0s · total 72.0s
+```
+
+`flow` is the video's own length — a creative decision, not overhead. Everything
+else is cost, and on a first take it is roughly a third of the run.
+
+**A batch amortises most of it.** Route warming defeats the *dev server's*
+on-demand compile, and that cache lives in the server process, so it is done once
+per run rather than once per take — the second take of the batch above reported
+`warm 0.0s` and finished in 62.9s. A `--url` that is not localhost skips warming
+altogether, since the routes are already built.
+
+**Do not bother re-tuning the encoder.** It was benchmarked on a fixed 205MB /
+1962-frame capture, and 8.2s of the 18.3s is MJPEG *decode*:
+
+| variant | time |
+| --- | --- |
+| `libx264 veryfast crf 18` (default) | 18.3s |
+| `-threads 8` | 17.9s |
+| `-filter_complex_threads 8` | 18.6s |
+| `h264_qsv` (hardware) | 19.7s |
+| `h264_mf` (hardware) | 20.4s |
+| `preset fast crf 19` | 20.4s |
+| no camera filter at all | 19.4s |
+
+Every alternative is inside run-to-run noise or worse — including both working
+hardware encoders. The stage is decode-bound and already at its floor.
+
+**Compare stages within one run, never across runs.** Machine load moves every
+number together: the same take measured 52.1s of flow at 24fps painted on a busy
+machine and 44.8s at 43fps on a quiet one. Two consecutive takes in one batch are
+a fair A/B; two separate invocations are not.
+
 The browser runs under a throwaway `--user-data-dir` from the system temp
 directory, deleted afterwards, so a real login leaves no session token on disk.
 Capture starts *after* login lands, so no credential is ever on camera, and the
 email is masked in the console output.
+
+---
+
+The recorder drives the real app, so what it records is whatever the app does.
+For the app itself: `docs/technology.md` (the stack), `docs/blueprint.md` (the
+design language the footage will show), `docs/zen-ai.md` (the `zen` flow's
+subject).

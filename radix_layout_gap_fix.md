@@ -110,3 +110,11 @@ html[data-scroll-locked] {
 
 - [ ] **Dropdowns / Table Row Menus / Selects**: Add `modal={false}`.
 - [ ] **Drawers & Modals needing Dark Backdrop**: Add `modal={false}` AND render `{isOpen && <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px]" onClick={() => setIsOpen(false)} />}`.
+
+---
+
+Verified against the tree in August 2026: 57 `modal={false}` call sites, the
+`HeldSalesDrawer` backdrop pattern, and the `globals.css` safeguards are all
+still in place. Related: [`docs/blueprint.md`](docs/blueprint.md) for the design
+language these overlays sit in, [`docs/technology.md`](docs/technology.md) for
+the architecture.

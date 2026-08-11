@@ -12,6 +12,7 @@
  */
 
 import { formatMoney, formatNumber } from '@/lib/i18n/format';
+import type { Consideration } from './types';
 
 /** Money in the company's equity currency. Whole units by default — cap tables deal in big numbers. */
 export function money(amount: number, currency: string, opts?: Intl.NumberFormatOptions): string {
@@ -80,4 +81,38 @@ export function percentDelta(value: number, digits = 2): string {
 export function multiple(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '—';
   return `${value.toFixed(2)}x`;
+}
+
+/**
+ * What an empty Invested cell means.
+ *
+ * Shares can be paid for with something other than money — the founding issuance
+ * here was paid for with the product itself. The engine correctly counts that as
+ * zero cash in, so wherever Invested is rendered it needs to say *why* it is
+ * zero, or a bootstrapped cap table reads as one somebody forgot to fill in.
+ *
+ * Lives here rather than in a component because three places render the same
+ * column and they must not word it differently.
+ */
+const CONSIDERATION_LABELS: Record<Consideration, string> = {
+  cash: 'cash',
+  ip: 'for IP',
+  services: 'for services',
+  conversion: 'on conversion',
+};
+
+/**
+ * The Invested cell for one holder: an amount where cash was paid, otherwise what
+ * the shares were issued for.
+ */
+export function investedLabel(
+  invested: number,
+  nonCashConsiderations: Consideration[],
+  currency: string,
+): string {
+  if (invested > 0) return money(invested, currency);
+  if (nonCashConsiderations.length > 0) {
+    return nonCashConsiderations.map((c) => CONSIDERATION_LABELS[c]).join(', ');
+  }
+  return '—';
 }

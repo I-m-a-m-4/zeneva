@@ -24,6 +24,10 @@ Welcome to **Zeneva**, a borderless, industrial-grade retail operating system bu
 
 ## 🛠️ Technical Stack & Architecture
 
+> **Full architecture write-up: [`docs/technology.md`](docs/technology.md)** —
+> what every piece is for, why it was chosen, and the operational details that
+> have cost real debugging time. The summary below is the shape of it.
+
 Zeneva is built on a modern, robust, resilient stack designed for secure multi-tenant execution and lightning-fast speed:
 
 ```mermaid
@@ -50,8 +54,8 @@ graph TD
 * **Framer Motion** for premium, fluid transitions and subtle micro-animations that improve tactile UX.
 
 ### 2. Local-First Engine & Storage
-* **Tauri SQL Plugin (`@tauri-apps/plugin-sql`)**: Local **SQLite** database hydration. Zeneva is fully functional offline; sales and inventory updates are performed instantly against SQLite and queued for sync.
-* **Firebase SDK v11.9.1**: Connects client states to **Cloud Firestore** and Real-time Database for multi-tenant, cloud-synced storage when internet connectivity is active.
+* **Tauri SQL Plugin (`@tauri-apps/plugin-sql`)**: Local **SQLite** database mirror. Zeneva is fully functional offline; sales and inventory updates are performed instantly against the local cache and queued for sync to Firestore.
+* **Firebase SDK v11.9.1**: Connects client states to **Cloud Firestore** for multi-tenant, cloud-synced storage when internet connectivity is active. Firestore is the source of truth; the local SQLite database is a mirror of it, not a second store.
 * **Firebase Admin SDK v13.6.1**: Provides multi-tenant data validation, user authorization, and secure back-end operations.
 * **Upstash Redis (Admin Caching Engine)**: The global platform admin dashboard is powered by a custom Next.js API Route utilizing `@upstash/redis`. Instead of the browser pulling 10,000+ receipts and users on every load, a dedicated Serverless Function aggregates all global GMV, MRR, ARR, and sales velocity data via the Firebase Admin SDK. This massive data object is then serialized and cached in Upstash Redis.
   * **Result**: Admin payload size drops from megabytes to kilobytes.
@@ -59,8 +63,10 @@ graph TD
   * **Invalidation**: The cache operates on a TTL, and admins can trigger a forced cache invalidation using the platform interface to instantly sync real-time data.
 
 ### 3. Zen AI Engine (Predictive Analytics)
-* **Genkit v1.20.0** combined with **Google GenAI** (`@genkit-ai/google-genai`).
+* **Genkit v1.20.0** combined with **Google GenAI** (`@genkit-ai/google-genai`) for the deterministic analysis side, and the **Vercel AI SDK** (`ai` v7 + `@ai-sdk/react` v4) for the streaming chat at `/ai-insights`.
+* **41 tools** in `src/app/api/chat/tools.ts` give the chat typed access to the business's own data.
 * **Core Capabilities**: Analyzes product sales velocity, highlights "trapped cash" in slow-moving inventory, identifies potential duplicates or pricing discrepancies, and provides deterministic replenishment suggestions.
+* **Two hard boundaries**: Zen AI **never writes on the server** (a `propose*` tool returns a card; the write happens client-side after the owner approves) and **never stores prompt text** (usage analytics record an intent label plus an allow-listed keyword, never the prompt). See [`docs/zen-ai.md`](docs/zen-ai.md).
 
 ### 4. Peripherals, Printing & Imaging
 * **`html5-qrcode`**: Leverages device camera feeds for high-fidelity, real-time barcode scanning.
@@ -74,6 +80,11 @@ graph TD
 ### 6. Communications & Notifications
 * **Resend & Nodemailer**: Enterprise email dispatching for digital receipts, audit logs, and critical operational reports.
 * **Tauri Notification Plugin (`@tauri-apps/plugin-notification`)**: Native system notification integrations for desktop platforms.
+
+### 7. Marketing Recorder
+* The admin area's **Marketing Studio** drives a headless-Chrome recorder (`scripts/record/`) that logs into the real app and records real flows — POS, inventory, Zen AI — with a custom cursor, click effects, camera punch-ins, a phone chassis for mobile takes, and synthesized or supplied audio.
+* Built on **raw Chrome DevTools Protocol** over Node's global `WebSocket` (no Playwright), with ffmpeg as the only external dependency. Videos are real footage of the app, not animations.
+* See [`scripts/record/README.md`](scripts/record/README.md).
 
 ---
 

@@ -16,6 +16,12 @@
  * skipped, because guessing where the clicks were would put them on the wrong
  * frames and a tick half a beat off is worse than no tick.
  *
+ * The sidecar also carries the spoken script — every caption and the instant it
+ * appeared — so `--narrate` works here too. That is what makes a voice a thing
+ * you can change your mind about: record once, then try Charon against Kore
+ * against a different reading direction, at ffmpeg speed, on footage that is
+ * already approved. Only lines you have never heard before cost a request.
+ *
  * Writes alongside the input as `<name>-scored.mp4` unless you pass --out.
  */
 
@@ -23,6 +29,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { mixAudio, resolveMusic, synthBed } from './audio.mjs';
 import { hasFfmpeg, probe } from './capture.mjs';
+import { synthNarration, DEFAULT_VOICE, VOICES } from './narrate.mjs';
 
 const HELP = `
 Add music and interaction sound to an existing recording.
@@ -36,14 +43,26 @@ Add music and interaction sound to an existing recording.
   --no-typing-sfx       skip keystroke ticks
   --marks <path>        marks sidecar   (default: <video>.marks.json)
 
+  --narrate             speak the captions (needs GEMINI_API_KEY)
+  --voice <name>        Charon | Kore | Puck | Aoede | Fenrir | Leda
+                        (default: Charon.) Implies --narrate.
+  --voice-style "..."   how to read it: "slower, and a little drier".
+                        Implies --narrate.
+
 Click/keystroke ticks need the marks sidecar the recorder writes next to each
 video. Without it you still get the music bed.
+
+Narration needs the sidecar too — it holds the script and the frame each line
+belongs to, and neither survives in the video itself. With music, the bed ducks
+under the voice on its own. Lines are cached by what they sound like, so a voice
+you have used on this footage before re-scores for nothing.
 `;
 
 function parseArgs(argv) {
   const out = {
     video: null, music: null, musicVolume: 0.28,
     outPath: null, marks: null, clickSfx: true, typingSfx: true,
+    narrate: false, voice: DEFAULT_VOICE, voiceStyle: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -55,6 +74,11 @@ function parseArgs(argv) {
       case '--marks': out.marks = path.resolve(next()); break;
       case '--no-click-sfx': out.clickSfx = false; break;
       case '--no-typing-sfx': out.typingSfx = false; break;
+      // Naming a voice or a reading is asking for narration; making you pass
+      // --narrate as well would only be a way to get it silently wrong.
+      case '--narrate': out.narrate = true; break;
+      case '--voice': out.voice = next(); out.narrate = true; break;
+      case '--voice-style': out.voiceStyle = next(); out.narrate = true; break;
       case '-h': case '--help': out.help = true; break;
       default:
         if (a.startsWith('--')) throw new Error(`unknown flag ${a}`);
@@ -72,6 +96,12 @@ async function main() {
   }
   if (!existsSync(o.video)) throw new Error(`no such file: ${o.video}`);
   if (!(await hasFfmpeg())) throw new Error('ffmpeg is not on PATH');
+  // Before anything is read or synthesised, for the same reason the recorder
+  // checks it before launching Chrome: a mistyped voice would otherwise fail once
+  // per line, and six identical API errors is a worse answer than "no such voice".
+  if (o.narrate && !VOICES.some((v) => v.id === o.voice)) {
+    throw new Error(`unknown voice "${o.voice}" — try: ${VOICES.map((v) => v.id).join(', ')}`);
+  }
 
   const ext = path.extname(o.video);
   const outPath = o.outPath
@@ -86,11 +116,13 @@ async function main() {
   const duration = info.seconds;
 
   const marksPath = o.marks ?? `${o.video}.marks.json`;
-  let marks = { clicks: [], keys: [] };
-  if (existsSync(marksPath)) {
+  let marks = { clicks: [], keys: [], narration: [] };
+  const hasMarks = existsSync(marksPath);
+  if (hasMarks) {
     marks = JSON.parse(readFileSync(marksPath, 'utf8'));
-  } else if (o.clickSfx || o.typingSfx) {
-    console.log(`   no marks sidecar at ${path.basename(marksPath)} — music only, no ticks`);
+  } else if (o.clickSfx || o.typingSfx || o.narrate) {
+    console.log(`   no marks sidecar at ${path.basename(marksPath)}`
+      + ` — music only, no ticks${o.narrate ? ' and no voice' : ''}`);
   }
 
   // Derive the flow name from the recorder's own filename (zeneva-pos-desktop-light)
@@ -104,6 +136,42 @@ async function main() {
     ? resolveMusic(o.music, flowId)
     : await synthBed(path.join(path.dirname(outPath), '.frames'));
 
+  /**
+   * The voice, re-synthesised from the script the take recorded.
+   *
+   * A sidecar written before narration existed has no `narration` array, and
+   * there is nothing to fall back on: the caption timings live in the frame
+   * sequence, which was deleted when the take was encoded. So this says what is
+   * missing instead of narrating to guessed timings — a voice that lands a second
+   * off its caption is worse than a video with no voice, and much harder to
+   * diagnose than a sentence saying the take predates the feature.
+   *
+   * `dir` is the output's folder so the spoken-line cache sits next to the
+   * recorder's own, which is what makes the second voice on the same footage — or
+   * the same voice on the next re-score — cost nothing.
+   */
+  let narrationFile = null;
+  if (o.narrate) {
+    const lines = Array.isArray(marks.narration) ? marks.narration : [];
+    if (!lines.length && hasMarks) {
+      console.log(`   ${path.basename(marksPath)} carries no script`
+        + ' — re-record the take with --narrate to get one');
+    } else if (lines.length) {
+      narrationFile = await synthNarration({
+        lines,
+        dir: path.dirname(outPath),
+        // Named after the output, not the clock: re-scoring the same file
+        // overwrites its own mixdown instead of leaving a folder per attempt,
+        // and two voices written to two --out paths stay out of each other's way.
+        stamp: path.basename(outPath, ext),
+        voice: o.voice,
+        style: o.voiceStyle,
+        duration,
+        log: (m) => console.log(`   ${m}`),
+      });
+    }
+  }
+
   const res = await mixAudio({
     videoPath: o.video,
     outPath,
@@ -112,6 +180,7 @@ async function main() {
     musicVolume: o.musicVolume,
     clicks: o.clickSfx ? (marks.clicks ?? []) : [],
     keys: o.typingSfx ? (marks.keys ?? []) : [],
+    narration: narrationFile,
   });
 
   if (!res.scored) {
@@ -120,7 +189,8 @@ async function main() {
   }
   console.log(`\n   ✓ ${outPath}`);
   console.log(`     ${duration.toFixed(1)}s · ${res.clicks} clicks · ${res.keys} keystrokes`
-    + (res.music ? ` · bed: ${res.music}` : ' · no bed'));
+    + (res.music ? ` · bed: ${res.music}` : ' · no bed')
+    + (res.narrated ? ` · voice: ${o.voice}` : ''));
   console.log('');
   return 0;
 }

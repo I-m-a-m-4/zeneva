@@ -100,7 +100,13 @@ export class Page {
      * dispatched — a caption or a slow selector lookup shifts everything after
      * it, and a sound effect that drifts off its frame is worse than silence.
      */
-    this.marks = { clicks: [], keys: [], zooms: [] };
+    /**
+     * `narration` is the same idea applied to spoken lines: every caption, with
+     * the instant it appeared. The caption track *is* the script — a separate
+     * narration script would be a second copy of the same sentences, and the two
+     * would disagree the first time someone edited one of them.
+     */
+    this.marks = { clicks: [], keys: [], zooms: [], narration: [] };
   }
 
   async prepare() {
@@ -255,7 +261,14 @@ export class Page {
    */
   async ensureInView(spec, rect) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (rect?.inView) return rect;
+      // `shifted` means the hit test had to walk the click point off the
+      // target's centre to find a spot that reaches it — true on this page after
+      // one pass, where the button sits three pixels clear of the bottom nav and
+      // only an inset probe lands on it. That click would work, and it is one
+      // late-rendering row away from not working, so treat it like a target that
+      // is not in view yet and scroll again. The second pass has the final
+      // scroll range to clamp against and centres the button properly.
+      if (rect?.inView && !rect.shifted) return rect;
       await this.eval(`window.__zen.scrollTo(${JSON.stringify(spec)})`);
       await sleep(700);
       const next = await this.find(spec, { required: false });
@@ -518,9 +531,14 @@ export class Page {
    */
   async warm(routes) {
     for (const route of routes) {
+      // `goto` already ends in waitForSettled, so the settle this used to do
+      // afterwards re-checked a condition that was true before it slept. What is
+      // left is a short grace for the fetches settled() does not cover, so the
+      // route is warm in the data cache and not only in Next's compiler — those
+      // are what the real take reads back. Run with --timings to see the cost;
+      // nothing here is on camera.
       await this.goto(route);
-      await sleep(1200);
-      await this.waitForSettled();
+      await sleep(300);
     }
   }
 
@@ -624,6 +642,11 @@ export class Page {
   // ------------------------------------------------------------- narration
 
   caption(text, ms) {
+    // Stamped before the round-trip rather than after: the caption animates in as
+    // the evaluate resolves, so the earlier instant is the one that matches what
+    // the viewer sees. A voice line entering a beat early reads as anticipation;
+    // a beat late reads as a mistake.
+    if (text) this.marks.narration.push({ at: Date.now() / 1000, text: String(text), ms: ms ?? null });
     return this.zen(`caption(${JSON.stringify(text ?? '')}${ms ? `,${ms}` : ''})`);
   }
 

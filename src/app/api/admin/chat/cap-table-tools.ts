@@ -115,13 +115,29 @@ export function createCapTableTools({ db }: Ctx) {
           note: `${s.fullyDilutedShares.toLocaleString()} shares fully diluted${
             s.pricePerShare ? `, at ${s.pricePerShare.toFixed(4)} per share` : ''
           }.`,
-          columns: ['Holder', 'Shares', '% outstanding', '% fully diluted', 'Invested'],
+          columns: [
+            'Holder',
+            'Shares',
+            '% outstanding',
+            '% fully diluted',
+            'Invested',
+            'Consideration',
+          ],
           rows: s.holders.map((h) => ({
             Holder: h.name,
             Shares: h.fullyDilutedShares,
             '% outstanding': Number(h.pctOutstanding.toFixed(2)),
             '% fully diluted': Number(h.pctFullyDiluted.toFixed(2)),
             Invested: Math.round(h.invested),
+            // Without this the model sees Invested: 0 and reports it as nothing
+            // having been contributed. The shares were paid for — with the
+            // product, not with money.
+            Consideration:
+              h.nonCashConsiderations.length > 0
+                ? h.nonCashConsiderations.join(' + ')
+                : h.invested > 0
+                  ? 'cash'
+                  : '',
           })),
         };
       },

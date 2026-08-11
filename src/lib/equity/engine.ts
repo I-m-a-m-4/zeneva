@@ -16,6 +16,11 @@
  * - **Percentages are derived, never accumulated.** Each percentage is computed
  *   from integer counts against a single denominator, so a rounding error in one
  *   row cannot propagate into the next.
+ * - **`invested` means cash in, not shares × price.** Shares issued for IP or
+ *   for services are issued at par so the certificate has a price, but no money
+ *   changed hands. Counting par value as investment tells the founder who built
+ *   the company from nothing that they put in ₦1,000, and it hands them a
+ *   liquidation preference they never paid for. See `investedCash`.
  */
 
 import { differenceInCalendarMonths } from 'date-fns';
@@ -23,6 +28,7 @@ import type {
   CapTableSummary,
   ClassPosition,
   ClassSummary,
+  Consideration,
   Convertible,
   DateLike,
   EquityRecord,
@@ -31,6 +37,8 @@ import type {
   InvestmentOffer,
   Issuance,
   OptionGrant,
+  RevenueInputs,
+  RevenueValuation,
   RoundModel,
   RoundModelHolder,
   ShareClass,
@@ -44,6 +52,28 @@ import { isKind } from './types';
 
 /** Guard against a pathological input spinning the waterfall's convergence loop forever. */
 const MAX_WATERFALL_ITERATIONS = 50;
+
+/**
+ * Considerations that actually moved money into the company.
+ *
+ * `conversion` counts: a SAFE or note converting to shares represents cash that
+ * came in earlier, at the point the instrument was signed. `ip` and `services`
+ * do not — those shares are paid for with work, and the par value on the
+ * certificate is a legal formality, not a cheque.
+ */
+const CASH_CONSIDERATIONS = new Set<Consideration>(['cash', 'conversion']);
+
+/**
+ * Cash paid for an issuance. Zero where the consideration was not money.
+ *
+ * Records written before `consideration` existed are treated as cash, which
+ * preserves their previous value; the founding issuance is explicitly `ip`
+ * (see `seedFoundingCapTable`) so it correctly contributes nothing.
+ */
+function investedCash(iss: Issuance, shares: number): number {
+  const consideration: Consideration = iss.consideration ?? 'cash';
+  return CASH_CONSIDERATIONS.has(consideration) ? shares * num(iss.pricePerShare) : 0;
+}
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -321,6 +351,11 @@ export function buildCapTable(records: EquityRecord[], asOf: Date = new Date()):
   };
 
   // --- issuances -----------------------------------------------------------
+  // Tracks how each holder paid, so the UI can say "issued for IP" where the
+  // Invested column is empty. Without this the founder row is a bare dash and
+  // reads as missing data rather than as the fact that no cash was ever due.
+  const considerationsByHolder = new Map<string, Set<Consideration>>();
+
   for (const iss of ix.issuances) {
     if (!onOrBefore(iss.issueDate)) continue;
     if (!classById.has(iss.shareClassId)) {
@@ -336,9 +371,14 @@ export function buildCapTable(records: EquityRecord[], asOf: Date = new Date()):
       iss.stakeholderId,
       iss.shareClassId,
       s,
-      s * num(iss.pricePerShare),
+      investedCash(iss, s),
       vestedShares(iss.vesting, s, asOf),
     );
+    if (s > 0) {
+      const seen = considerationsByHolder.get(iss.stakeholderId) ?? new Set<Consideration>();
+      seen.add(iss.consideration ?? 'cash');
+      considerationsByHolder.set(iss.stakeholderId, seen);
+    }
   }
 
   // --- transfers -----------------------------------------------------------
@@ -505,6 +545,11 @@ export function buildCapTable(records: EquityRecord[], asOf: Date = new Date()):
       convertibleShares,
       fullyDilutedShares: outstanding + optionShares + convertibleShares,
       invested,
+      // Only the non-cash ones: this exists to explain an empty Invested cell,
+      // and 'cash' never needs explaining.
+      nonCashConsiderations: [...(considerationsByHolder.get(id) ?? [])]
+        .filter((c) => !CASH_CONSIDERATIONS.has(c))
+        .sort(),
       votes,
       pctOutstanding: pct(outstanding, outstandingShares),
       pctFullyDiluted: pct(outstanding + optionShares + convertibleShares, fullyDilutedShares),
@@ -902,6 +947,101 @@ export function valuationForStake(amount: number, pct: number): number | null {
   // amount / postMoney = pct  =>  postMoney = amount / pct; preMoney = postMoney - amount
   const postMoney = a / (p / 100);
   return postMoney - a;
+}
+
+/**
+ * Sensible bounds for an early-stage SaaS ARR multiple.
+ *
+ * Public SaaS trades at roughly 5-10x ARR; private early-stage deals land wider,
+ * and African SaaS generally prices below US comparables. Outside this band the
+ * number is not wrong so much as undefendable, which is what the warning says.
+ */
+const ARR_MULTIPLE_FLOOR = 1;
+const ARR_MULTIPLE_CEILING = 15;
+export const DEFAULT_ARR_MULTIPLE = 5;
+
+/**
+ * Value the company from what it actually earns.
+ *
+ * The question this answers is "we have real revenue now — what is that worth",
+ * and the trap it exists to avoid is answering it with the revenue figure
+ * itself. Cumulative revenue is money that has already been spent or banked; it
+ * is a record of the past, not a price for the future. What an investor prices
+ * is the **run rate** — the annualised value of the subscriptions currently
+ * active — against a multiple.
+ *
+ * So: `valuation = (MRR x 12) x multiple + cash raised`.
+ *
+ * Cash raised is added rather than folded into the multiple because it is an
+ * asset the company holds outright, and because keeping it separate means
+ * raising money visibly moves the valuation without pretending the operating
+ * business grew.
+ */
+export function revenueValuation(
+  inputs: RevenueInputs,
+  multiple: number,
+  fullyDilutedShares: number,
+): RevenueValuation {
+  const mrr = Math.max(0, num(inputs.mrr));
+  const m = Math.max(0, num(multiple));
+  const capitalRaised = Math.max(0, num(inputs.capitalRaised));
+
+  const arr = mrr * 12;
+  const enterpriseValue = arr * m;
+  const valuation = enterpriseValue + capitalRaised;
+  const shares = intShares(fullyDilutedShares);
+
+  const warnings: string[] = [];
+
+  if (mrr <= 0) {
+    warnings.push(
+      inputs.lifetimeRevenue > 0
+        ? 'No subscription is currently active, so the run rate is zero. Revenue you have already collected does not carry forward into a valuation — this method has nothing to price until there is a live subscription.'
+        : 'There is no recurring revenue yet, so this method cannot produce a figure. Until then any valuation is a founder estimate.',
+    );
+  }
+
+  if (inputs.payingCustomers > 0 && inputs.payingCustomers < 5) {
+    warnings.push(
+      `The whole run rate rests on ${inputs.payingCustomers} paying ${
+        inputs.payingCustomers === 1 ? 'customer' : 'customers'
+      }. One cancellation moves this valuation a long way, and an investor will discount it heavily for that concentration.`,
+    );
+  }
+
+  if (m > 0 && (m < ARR_MULTIPLE_FLOOR || m > ARR_MULTIPLE_CEILING)) {
+    warnings.push(
+      `A ${m}x multiple sits outside the ${ARR_MULTIPLE_FLOOR}-${ARR_MULTIPLE_CEILING}x range early-stage SaaS normally trades in. You can argue for it, but be ready to.`,
+    );
+  }
+
+  if (inputs.lifetimeRevenue > 0 && arr > 0 && inputs.lifetimeRevenue < arr / 4) {
+    warnings.push(
+      'The run rate is well ahead of what has actually been collected, because it annualises subscriptions that have only just started. That is the normal way to read early growth, but it is a projection.',
+    );
+  }
+
+  const parts = [
+    `MRR ${Math.round(mrr).toLocaleString()} x 12 = ARR ${Math.round(arr).toLocaleString()}`,
+    `x ${m} multiple = ${Math.round(enterpriseValue).toLocaleString()}`,
+  ];
+  if (capitalRaised > 0) {
+    parts.push(`+ ${Math.round(capitalRaised).toLocaleString()} raised = ${Math.round(valuation).toLocaleString()}`);
+  }
+  parts.push(
+    `Lifetime revenue collected to date: ${Math.round(inputs.lifetimeRevenue).toLocaleString()} (recorded for context — not part of the valuation)`,
+  );
+
+  return {
+    arr,
+    multiple: m,
+    enterpriseValue,
+    capitalRaised,
+    valuation,
+    pricePerShare: shares > 0 && valuation > 0 ? valuation / shares : null,
+    basis: `${parts.join('; ')}. As of ${inputs.asOf.toLocaleDateString()}.`,
+    warnings,
+  };
 }
 
 // ---------------------------------------------------------------------------

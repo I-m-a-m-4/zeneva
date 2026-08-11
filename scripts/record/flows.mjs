@@ -81,6 +81,13 @@ export async function posFlow(page, ctx = {}) {
   await page.goto('/sales/pos/select-products');
   await page.caption('Tap to add. Stock and totals update instantly.', 4200);
 
+  // Wait for the grid before framing it. `punch` gives an anchor 1.5s and then
+  // gives up, because a camera move is decoration and must never cost the run —
+  // but that budget is for a page already on screen, and here the products are
+  // still arriving. The first click needs the same element anyway, so this waits
+  // for something the flow was about to wait for regardless.
+  await page.find({ css: ADD, nth: 0 });
+
   // Punch in on the grid before the first tap, so the viewer sees *what* is
   // being added rather than a cursor crossing a wall of cards. 1.3 is the
   // ceiling worth using: the camera is an upscale of captured frames, not a

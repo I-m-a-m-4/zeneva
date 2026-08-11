@@ -3,6 +3,9 @@
 How Zeneva's Android releases get signed, and how to fix the
 "signed with the wrong key" rejection if it comes back.
 
+Stack context for the Android target is in [`technology.md`](technology.md) §2
+and §5; this file is the signing detail.
+
 ## The two keys
 
 Play App Signing means there are two separate keys. Confusing them is the

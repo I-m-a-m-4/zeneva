@@ -33,6 +33,7 @@ import { launch } from './browser.mjs';
 import { Page, sleep } from './page.mjs';
 import { Recorder, hasFfmpeg, probe } from './capture.mjs';
 import { mixAudio, resolveMusic, synthBed } from './audio.mjs';
+import { synthNarration, DEFAULT_VOICE, VOICES } from './narrate.mjs';
 import { FLOWS, FLOW_ROUTES, FLOW_CARDS } from './flows.mjs';
 import { parseRecipe, recipeToFlow, recipeRoutes, parseCardOverrides } from './recipe.mjs';
 import { readControl, resetLive, writeJson } from './control.mjs';
@@ -110,6 +111,10 @@ function parseArgs(argv) {
      */
     bed: true,
     musicVolume: 0.28, musicVolumeSet: false, clickSfx: true, typingSfx: true,
+    // Narration is opt-in because it costs API calls against a real key. The
+    // take is identical without it, so nothing silently starts spending.
+    narrate: false, voice: DEFAULT_VOICE, voiceStyle: null,
+    timings: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -129,6 +134,9 @@ function parseArgs(argv) {
       case '--format': out.format = next(); break;
       case '--music': out.music = next(); break;
       case '--music-volume': out.musicVolume = Number(next()); out.musicVolumeSet = true; break;
+      case '--narrate': out.narrate = true; break;
+      case '--voice': out.voice = next(); out.narrate = true; break;
+      case '--voice-style': out.voiceStyle = next(); out.narrate = true; break;
       // Keeps its documented meaning — "skip the bed, keep the ticks" — which now
       // has to turn off the synthesised one too, or the flag would stop working.
       case '--no-music': out.music = null; out.bed = false; break;
@@ -139,6 +147,7 @@ function parseArgs(argv) {
       case '--headed': out.headed = true; break;
       case '--commit': out.commit = true; break;
       case '--keep-frames': out.keepFrames = true; break;
+      case '--timings': out.timings = true; break;
       case '-h': case '--help': out.help = true; break;
       default:
         if (a.startsWith('--')) throw new Error(`unknown flag ${a}`);
@@ -194,6 +203,7 @@ Zeneva marketing recorder
               count). Off by default: a take is read-only unless you ask.
   --headed    show the browser while recording
   --keep-frames  keep the raw JPEG sequence
+  --timings   print wall-clock per stage (launch · login · warm · flow · encode)
   --browser   path to chrome.exe / msedge.exe
 
 Audio:
@@ -206,6 +216,25 @@ Audio:
   --no-click-sfx        skip click ticks
   --no-typing-sfx       skip keystroke ticks
   --silent              no audio at all
+
+Narration (speaks the captions — needs GEMINI_API_KEY):
+  --narrate             speak every caption the take shows, each line landing on
+                        the frame it was written for. Off by default: it is the
+                        one option that spends money, one request per caption.
+  --voice <name>        Charon | Kore | Puck | Aoede | Fenrir | Leda
+                        (default: Charon — warm and measured.) Implies --narrate.
+  --voice-style "..."   how to read it: "slower, and a little drier". Gemini TTS
+                        takes direction in the prompt, not as a parameter, so this
+                        is prepended to each line. Implies --narrate.
+
+  The captions are already the script, so narration adds no writing — it speaks
+  the sentences the flow was going to put on screen anyway. With music, the bed
+  ducks under the voice automatically and lifts again in the gaps. Lines are
+  cached per take, so re-scoring the same footage does not pay for TTS twice.
+
+  With no key, the take records and scores exactly as it would have; the recorder
+  logs one line saying narration was skipped. A missing key costs you a voice
+  track, not a video.
 
   Everything is synthesised — nothing to download, nothing to license. With no
   --music, takes get a quiet ambient pad, because clicks over pure silence sound
@@ -434,9 +463,57 @@ function buildZooms(marks, toVideoTime) {
   return out;
 }
 
+/**
+ * Wall-clock spent in each stage of a take, printed with `--timings`.
+ *
+ * Speed work on this thing has been wrong twice from reasoning about which part
+ * "must" be slow — the JPEG quality lever was found by measuring, not by
+ * thinking about it. So the stages are timed rather than estimated: launch,
+ * login, warm, the flow itself, encode and score. Only the flow's own duration
+ * is a creative decision; everything else is overhead and fair game to cut.
+ */
+/**
+ * Routes already compiled by the dev server during this run.
+ *
+ * Module-level, not per-take: the compile it saves happens in the server
+ * process, so a route stays warm for every later take regardless of which
+ * browser asked for it. See the call site in `record()`.
+ */
+const warmed = new Set();
+
+/** A dev server compiles on demand; a built one does not need warming. */
+function isLocal(url) {
+  try {
+    const h = new URL(url).hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+function stopwatch() {
+  const marks = [];
+  let last = performance.now();
+  return {
+    lap(label) {
+      const now = performance.now();
+      marks.push([label, (now - last) / 1000]);
+      last = now;
+    },
+    report() {
+      const total = marks.reduce((s, [, v]) => s + v, 0);
+      return marks
+        .map(([l, v]) => `${l} ${v.toFixed(1)}s`)
+        .concat(`total ${total.toFixed(1)}s`)
+        .join(' · ');
+    },
+  };
+}
+
 async function record(opts, flowId, device, theme, creds, live) {
   const dev = DEVICES[device];
   const stamp = `${flowId}-${dev.id}-${theme}`;
+  const clock = stopwatch();
   log('');
   log(`── ${stamp} ─────────────────────────────────`);
 
@@ -472,19 +549,39 @@ async function record(opts, flowId, device, theme, creds, live) {
     // pausing there parks a filled-in password on screen for the live view.
     state.phase = 'signing in';
     ctl.publish();
+    clock.lap('launch');
     await login(page, creds);
+    clock.lap('login');
 
     // Compile every route this flow touches before the camera rolls. In dev,
     // Next.js builds a route on first request, which is seconds of empty shell —
     // recorded mid-flow it looks like the app hanging. Warming pays the same cost
     // off camera. Harmless in production, where the routes are already built.
-    const routes = registry.routes[flowId] ?? [];
-    if (routes.length) {
+    /*
+     * …but only once per run, and never against a built server.
+     *
+     * What warming actually defeats is the *dev server's* on-demand compile, and
+     * that cache lives in the server process — not in this browser. So every take
+     * after the first was re-proving a compile that was already done, once per
+     * device and theme. Measured on a two-take pos batch: warm was 5.9s on take
+     * one and 0.0s on take two, which is the whole of the saving.
+     * `warmed` is module-level for exactly that reason.
+     *
+     * A production URL never needs it at all, since the routes are prebuilt.
+     *
+     * The cost of being wrong here is small and self-correcting: if the dev
+     * server restarted mid-batch, the first navigation of the flow eats one
+     * compile. That is a slower take, not a broken one.
+     */
+    const routes = (registry.routes[flowId] ?? []).filter((r) => !warmed.has(r));
+    if (routes.length && isLocal(opts.url)) {
       state.phase = 'warming';
       ctl.setStep(`compiling ${routes.length} route(s)`);
       log(`warming ${routes.length} route(s)…`);
       await page.warm(routes);
+      for (const r of routes) warmed.add(r);
     }
+    clock.lap('warm');
 
     // Cursor + capture only start once we are past the credential screen.
     await page.zen(`mode(${JSON.stringify(dev.mobile ? 'touch' : 'desktop')})`);
@@ -508,6 +605,7 @@ async function record(opts, flowId, device, theme, creds, live) {
     await recorder.start();
     state.phase = 'recording';
     ctl.setStep('rolling');
+    clock.lap('capture start');
     log('capturing…');
 
     const flow = registry.flows[flowId];
@@ -538,6 +636,7 @@ async function record(opts, flowId, device, theme, creds, live) {
     const stats = await recorder.stop();
     state.phase = 'encoding';
     ctl.setStep('encoding video');
+    clock.lap('flow');
     // Painted vs written is the number worth watching: they used to differ by
     // 4x, which is what the stutter was. Any large gap here means the page
     // genuinely is not painting, not that the recorder is dropping frames.
@@ -580,6 +679,7 @@ async function record(opts, flowId, device, theme, creds, live) {
       } : null,
       zooms,
     });
+    clock.lap('encode');
 
     /*
      * A supplied track wins; otherwise the synth stands in.
@@ -593,6 +693,26 @@ async function record(opts, flowId, device, theme, creds, live) {
       ? resolveMusic(opts.music, flowId)
       : (synth ? await synthBed(path.join(opts.outDir, '.frames')) : null);
 
+    /**
+     * The voice-over, synthesised from the captions this take actually showed.
+     *
+     * After the bed is resolved and before the mix, because it is the slow step:
+     * one network round trip per line. It is also the step allowed to fail — a
+     * missing key or a dead API returns null and the take is scored exactly as it
+     * was before narration existed.
+     */
+    const narrationFile = opts.narrate
+      ? await synthNarration({
+          lines: page.marks.narration.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
+          dir: opts.outDir,
+          stamp,
+          voice: opts.voice,
+          style: opts.voiceStyle,
+          duration: recorder.videoSeconds,
+          log,
+        })
+      : null;
+
     const scored = await mixAudio({
       videoPath: silentFile,
       outPath: outFile,
@@ -605,17 +725,20 @@ async function record(opts, flowId, device, theme, creds, live) {
       musicVolume: synth && !opts.musicVolumeSet ? 0.22 : opts.musicVolume,
       clicks: opts.clickSfx ? page.marks.clicks.map(toVideoTime) : [],
       keys: opts.typingSfx ? page.marks.keys.map(toVideoTime) : [],
+      narration: narrationFile,
     });
 
     if (scored.scored) {
       rmSync(silentFile, { force: true });
       log(`scored — ${scored.clicks} click${scored.clicks === 1 ? '' : 's'}, `
         + `${scored.keys} keystroke${scored.keys === 1 ? '' : 's'}`
+        + (scored.narrated ? ', narrated' : '')
         + (synth ? ', ambient bed' : scored.music ? `, bed: ${scored.music}` : ', no music bed'));
     } else {
       // Silent take: the encode already wrote the finished video, just name it.
       renameSync(silentFile, outFile);
     }
+    clock.lap('score');
 
     const info = await probe(outFile).catch(() => null);
 
@@ -629,6 +752,10 @@ async function record(opts, flowId, device, theme, creds, live) {
         duration: recorder.videoSeconds,
         clicks: page.marks.clicks.map(toVideoTime),
         keys: page.marks.keys.map(toVideoTime),
+        // The spoken script, with the instant each line landed. This is what
+        // lets a re-score re-narrate without re-shooting — the caption timings
+        // die with the frame sequence otherwise.
+        narration: page.marks.narration.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
         // Not read back by add-audio — recorded so a re-score can see where the
         // camera was, since a beat that lands mid-punch reads differently from
         // one on a static frame.
@@ -644,6 +771,7 @@ async function record(opts, flowId, device, theme, creds, live) {
       log(`  ${info.width}×${info.height} · ${info.seconds.toFixed(1)}s · `
         + `${info.frames} frames @ ${info.fps} · ${(info.bytes / 1e6).toFixed(1)} MB`);
     }
+    if (opts.timings) log(`  ${clock.report()}`);
     state.phase = 'done';
     ctl.setStep('finished');
     return { ok: true, file: outFile, info };
@@ -741,6 +869,14 @@ async function main() {
   const flows = expand(opts.flow, Object.keys(registry.flows));
   const devices = expand(opts.device, Object.keys(DEVICES), { alias: ['both'] });
   const themes = expand(opts.theme, ['light', 'dark'], { alias: ['both'] });
+
+  // Checked here rather than at the synthesis call, for the same reason a recipe
+  // is validated before Chrome launches: a mistyped voice would otherwise record
+  // the whole take and then fail once per caption, and the operator would read
+  // six identical API errors instead of "there is no voice called that".
+  if (opts.narrate && !VOICES.some((v) => v.id === opts.voice)) {
+    throw new Error(`unknown voice "${opts.voice}" — try: ${VOICES.map((v) => v.id).join(', ')}`);
+  }
 
   mkdirSync(opts.outDir, { recursive: true });
   // Clear last run's pause flag and stale frame before anything can read them.

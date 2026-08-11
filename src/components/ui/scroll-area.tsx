@@ -18,6 +18,11 @@ const ScrollArea = React.forwardRef<
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
+    {/* Horizontal too, or wide content inside a ScrollArea has no visible way
+        to reach its right-hand edge — a table's action column ends up crushed
+        off-screen on a phone. Radix only paints a scrollbar for an axis that
+        actually overflows, so this is inert on content that fits. */}
+    <ScrollBar orientation="horizontal" />
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>
 ))

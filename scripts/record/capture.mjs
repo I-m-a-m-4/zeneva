@@ -445,6 +445,15 @@ export class Recorder {
      * two-minute take. The operator is waiting for this, so the time is worth
      * more than the last few percent of bitrate efficiency.
      */
+    /*
+     * Measured, so it does not get "optimised" again: on a 205MB / 1962-frame
+     * take this stage is 18.3s, and 8.2s of that is MJPEG *decode*. Swapping the
+     * encoder does not touch it — h264_qsv came out at 19.7s and h264_mf at
+     * 20.4s, both slower than libx264 veryfast, and `-threads 8` /
+     * `-filter_complex_threads 8` land inside run-to-run noise. Dropping the
+     * camera filter entirely saves under a second. The stage is decode-bound and
+     * already at its floor; the time worth cutting is upstream of here.
+     */
     const codec = webm
       ? ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf + 12), '-row-mt', '1',
          '-deadline', 'realtime', '-cpu-used', '4']

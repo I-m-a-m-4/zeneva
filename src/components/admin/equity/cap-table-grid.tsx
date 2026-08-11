@@ -23,7 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { money, percent, shares as fmtShares } from '@/lib/equity/format';
+import { investedLabel, money, percent, shares as fmtShares } from '@/lib/equity/format';
 import type { CapTableSummary, HolderRow } from '@/lib/equity/types';
 
 export type OwnershipBasis = 'outstanding' | 'fullyDiluted';
@@ -92,6 +92,7 @@ export function CapTableGrid({
       'Convertibles (est.)',
       'Fully diluted shares',
       `Invested (${summary.currency})`,
+      'Consideration',
       '% outstanding',
       '% fully diluted',
       '% votes',
@@ -109,6 +110,13 @@ export function CapTableGrid({
       h.convertibleShares,
       h.fullyDilutedShares,
       Math.round(h.invested),
+      // Without this column a zero in Invested is indistinguishable from a blank
+      // one once the file leaves the app.
+      h.nonCashConsiderations.length > 0
+        ? h.nonCashConsiderations.join(' + ')
+        : h.invested > 0
+          ? 'cash'
+          : '',
       h.pctOutstanding.toFixed(4),
       h.pctFullyDiluted.toFixed(4),
       h.pctVotes.toFixed(4),
@@ -268,7 +276,14 @@ export function CapTableGrid({
                   {h.invested > 0 ? (
                     money(h.invested, summary.currency)
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    /* An empty cell here means no cash was ever paid, which for a
+                       founder who built the product is the correct answer — not
+                       missing data. Saying which non-cash consideration it was
+                       stops the dash reading as a gap, and stops par value
+                       reading as an investment that was never made. */
+                    <span className="text-muted-foreground">
+                      {investedLabel(h.invested, h.nonCashConsiderations, summary.currency)}
+                    </span>
                   )}
                 </TableCell>
 
@@ -299,7 +314,11 @@ export function CapTableGrid({
               )}
               <TableCell className="text-right tabular-nums">{fmtShares(denominator)}</TableCell>
               <TableCell className="text-right tabular-nums">
-                {money(summary.totalInvested, summary.currency)}
+                {summary.totalInvested > 0 ? (
+                  money(summary.totalInvested, summary.currency)
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {percent(rows.reduce((sum, h) => sum + pctFor(h), 0))}
@@ -313,6 +332,21 @@ export function CapTableGrid({
         <p className="text-xs text-muted-foreground">
           Fully diluted includes {fmtShares(summary.poolUnallocated)} unallocated option pool shares,
           which belong to no holder yet and so appear only in the total.
+        </p>
+      )}
+
+      {/* Stated once here rather than as a tooltip on every row. Without it a
+          bootstrapped cap table looks like one where somebody forgot to enter
+          the money — and the alternative, showing par value as if it were an
+          investment, is worse: it invents a cash contribution and, in the exit
+          waterfall, a liquidation preference nobody paid for. */}
+      {summary.holders.some((h) => h.nonCashConsiderations.length > 0) && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium">Invested</span> is cash actually paid into the company.
+          Shares issued for IP or for services show what they were issued for instead of a figure —
+          those shares are assigned at par value so the certificate has a price, but no money
+          changed hands, and counting par value as investment would overstate both what was put in
+          and what gets paid back first on an exit.
         </p>
       )}
     </div>

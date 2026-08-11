@@ -284,7 +284,11 @@ export interface ClassPosition {
   shareClassId: string;
   shareClassName: string;
   shares: number;
-  /** Total paid in for this position. The liquidation preference base. */
+  /**
+   * Cash actually paid in for this position, and the liquidation preference
+   * base. Shares issued for IP or services contribute nothing here — they are
+   * issued at par for legal form, not bought.
+   */
   invested: number;
   /** Vested portion, where the underlying issuances carry vesting terms. */
   vested: number;
@@ -306,6 +310,12 @@ export interface HolderRow {
   /** outstandingShares + optionShares + convertibleShares. */
   fullyDilutedShares: number;
   invested: number;
+  /**
+   * Distinct non-cash considerations behind this holder's shares — `['ip']` for
+   * a founder who assigned the product they built. Present so an empty Invested
+   * cell can say *why* it is empty instead of reading as missing data.
+   */
+  nonCashConsiderations: Consideration[];
   votes: number;
   /** Percent of issued & outstanding. */
   pctOutstanding: number;
@@ -347,6 +357,7 @@ export interface CapTableSummary {
   convertiblesAsConverted: number;
   fullyDilutedShares: number;
 
+  /** Cash paid in across every holder. Zero for a bootstrapped company. */
   totalInvested: number;
   totalVotes: number;
 
@@ -400,6 +411,58 @@ export interface InvestmentOffer {
   /**
    * Plain-language flags — an outsized stake for the money, a price under the
    * floor, a valuation that has not been updated in a long time.
+   */
+  warnings: string[];
+}
+
+/**
+ * Live trading figures fed in from the platform's own books.
+ *
+ * Kept as a plain input struct rather than read from Firestore inside the engine
+ * so this file stays pure and the caller decides what a "purchase" is and how a
+ * foreign-currency one converts.
+ */
+export interface RevenueInputs {
+  /** Every subscription payment Zeneva has ever collected, in the settings currency. */
+  lifetimeRevenue: number;
+  /** The trailing twelve months of it. */
+  trailingTwelveMonthRevenue: number;
+  /** Monthly recurring revenue from currently-active subscriptions. */
+  mrr: number;
+  /** Number of paying customers behind the MRR. */
+  payingCustomers: number;
+  /** Cash raised from closed funding rounds — sits on the balance sheet. */
+  capitalRaised: number;
+  /** When the underlying figures were read. */
+  asOf: Date;
+}
+
+/**
+ * A revenue-multiple valuation, with every term of the arithmetic exposed.
+ *
+ * Deliberately not a single number. The whole failure mode this guards against
+ * is treating cumulative revenue as a valuation — so the shape forces the
+ * caller to render `arr`, `multiple` and `capitalRaised` separately rather than
+ * showing one figure whose derivation is invisible.
+ */
+export interface RevenueValuation {
+  /** mrr x 12 — the run rate investors price on. */
+  arr: number;
+  /** The multiple applied to ARR. */
+  multiple: number;
+  /** arr x multiple. The operating business's worth on this method. */
+  enterpriseValue: number;
+  /** Cash from closed rounds, added because it is an asset the company holds. */
+  capitalRaised: number;
+  /** enterpriseValue + capitalRaised. */
+  valuation: number;
+  /** valuation / fullyDilutedShares, or null with no shares issued. */
+  pricePerShare: number | null;
+  /** A sentence recording the arithmetic, ready to store as `Valuation.basis`. */
+  basis: string;
+  /**
+   * Why this figure should be treated with caution — no revenue at all, a run
+   * rate built on one customer, a multiple outside any defensible range.
    */
   warnings: string[];
 }
