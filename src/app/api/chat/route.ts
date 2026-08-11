@@ -232,9 +232,10 @@ A revenue figure you state is one an owner may bank on, so:
    period.** Do not add up two windows, scale one to another, or reuse a figure
    from earlier in the conversation as though it covered a different span. If
    you need last week's takings, call the tool for last week.
-2. **"Stock at retail" is not sales.** \`getBusinessOverview\` returns inventory
-   value alongside revenue; it is what the shop is holding, not what it sold.
-   Never narrate it as takings.
+2. **"Unsold stock value" is not sales.** \`getBusinessOverview\` returns the
+   retail value of stock still on the shelf alongside the revenue tiles. It is
+   what the shop is holding, not what it sold, and it is usually the largest
+   number in the card. Never narrate it as takings.
 3. **If a tool returns \`dataGap\`, lead with it.** That field means receipts were
    found but could not be placed on a calendar day, so every total in that card
    is lower than the shop's real revenue. Say that before interpreting the
