@@ -198,6 +198,43 @@ function slimProduct(p: any) {
   };
 }
 
+type Stat = { label: string; value: any; format?: 'currency' | 'percent' | 'number' | 'text' };
+
+/**
+ * Build the card half of a `PRODUCT_TABLE` result.
+ *
+ * Five tools answer questions that are *about products* — reorder list, margins,
+ * best and worst sellers, stockout forecast — but used to return only `columns`
+ * and `rows`, so the chat rendered a spreadsheet where the owner expected the
+ * product cards they see everywhere else in the app. These results now carry
+ * both shapes: `products` for the card view, `columns`/`rows` untouched for the
+ * table view, and the reader picks. Keeping the table payload byte-identical is
+ * deliberate — the toggle can always fall back to the view that already worked.
+ *
+ * `stats` is the tool-specific half of each card: whatever figures made the row
+ * worth showing. It is a generic label/value/format list so ProductCard renders
+ * it without knowing which tool produced it.
+ *
+ * `p` may be undefined: a top seller can be deleted from the catalogue while its
+ * receipts survive, and the name on the receipt is then all that is left. Those
+ * are marked `deleted` so the card can say so instead of showing a real product
+ * priced at zero with no stock.
+ */
+function productCards(entries: Array<{ p?: any; name?: string; stats: Stat[] }>) {
+  return entries.map(({ p, name, stats }) =>
+    p
+      ? { ...slimProduct(p), stats }
+      : {
+          id: `deleted:${name ?? 'unknown'}`,
+          name: name ?? 'Unnamed',
+          sku: null, category: null, categoryType: 'product',
+          price: null, costPrice: null, stock: null, lowStockThreshold: 5,
+          imageUrl: null, baseUnit: null, expiryDate: null,
+          deleted: true, stats,
+        },
+  );
+}
+
 type Ctx = { db: Firestore; businessId: string; currency: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -835,10 +872,18 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             .filter((x) => x.perDay > 0 && x.gap > 0)
             .sort((a, b) => b.cost - a.cost);
           return {
-            type: 'TABLE',
+            type: 'PRODUCT_TABLE',
             title: `Reorder to ${targetDaysOfCover} days of cover`,
             currency,
             estimatedTotalCost: round2(rows.reduce((s, r) => s + r.cost, 0)),
+            products: productCards(rows.slice(0, limit ?? 15).map((x) => ({
+              p: x.p,
+              stats: [
+                { label: 'Sells/day', value: round2(x.perDay), format: 'number' },
+                { label: 'Order', value: x.gap, format: 'number' },
+                { label: 'Est. cost', value: round2(x.cost), format: 'currency' },
+              ],
+            }))),
             columns: ['Product', 'In stock', 'Sells/day', 'Order', 'Est. cost'],
             rows: rows.slice(0, limit ?? 15).map((x) => ({
               Product: x.p.name, 'In stock': x.p.stock ?? 0,
@@ -860,6 +905,9 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           const rows = (await allProducts())
             .filter((p) => p.costPrice != null && (p.price ?? 0) > 0)
             .map((p) => ({
+              // Kept so the card view can show the real product; the table
+              // rows below still read only the derived figures.
+              p,
               name: p.name,
               price: p.price, cost: p.costPrice,
               marginPct: round2(((p.price - p.costPrice) / p.price) * 100),
@@ -868,10 +916,18 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             .sort((a, b) => (sort === 'lowest' ? a.marginPct - b.marginPct : b.marginPct - a.marginPct));
           const losses = rows.filter((r) => r.marginPct <= 0);
           return {
-            type: 'TABLE',
+            type: 'PRODUCT_TABLE',
             title: sort === 'lowest' ? 'Thinnest margins' : 'Best margins',
             currency,
             sellingAtALoss: losses.length,
+            products: productCards(rows.slice(0, limit ?? 15).map((r) => ({
+              p: r.p,
+              stats: [
+                { label: 'Cost', value: r.cost, format: 'currency' },
+                { label: 'Margin', value: r.marginPct, format: 'percent' },
+                { label: 'Profit/unit', value: r.profitPerUnit, format: 'currency' },
+              ],
+            }))),
             columns: ['Product', 'Cost', 'Price', 'Margin', 'Profit/unit'],
             rows: rows.slice(0, limit ?? 15).map((r) => ({
               Product: r.name, Cost: r.cost, Price: r.price,
@@ -1221,10 +1277,23 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           const ranked = [...totals.entries()]
             .sort(([, a], [, b]) => (rankBy === 'quantity' ? b.quantity - a.quantity : b.revenue - a.revenue))
             .slice(0, topN ?? 10);
+          // Receipt items carry only a name, so the card view needs the real
+          // product doc. allProducts() is memoised per request, so this is free
+          // whenever anything else in the same turn already loaded the
+          // catalogue, and one collection read when nothing has.
+          const catalogue = new Map((await allProducts()).map((p) => [p.id, p]));
           return {
-            type: 'TABLE',
+            type: 'PRODUCT_TABLE',
             title: `Top sellers — ${label}`,
             currency,
+            products: productCards(ranked.map(([id, r]) => ({
+              p: catalogue.get(id),
+              name: r.name,
+              stats: [
+                { label: 'Units sold', value: r.quantity, format: 'number' },
+                { label: 'Revenue', value: round2(r.revenue), format: 'currency' },
+              ],
+            }))),
             columns: ['#', 'Product', 'Units', 'Revenue'],
             rows: ranked.map(([, r], i) => ({ '#': i + 1, Product: r.name, Units: r.quantity, Revenue: round2(r.revenue) })),
           };
@@ -1252,14 +1321,25 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               totals.set(item.productId, row);
             }
           }
-          const ranked = [...totals.values()].sort((a, b) => a.quantity - b.quantity).slice(0, topN ?? 10);
+          // `.entries()`, not `.values()` — the productId is what joins these
+          // receipt-derived rows back to the catalogue for the card view.
+          const ranked = [...totals.entries()].sort(([, a], [, b]) => a.quantity - b.quantity).slice(0, topN ?? 10);
+          const catalogue = new Map((await allProducts()).map((p) => [p.id, p]));
           return {
-            type: 'TABLE',
+            type: 'PRODUCT_TABLE',
             title: `Slowest movers — ${label}`,
             currency,
             note: 'Products with zero sales are not listed here — use getDeadStock for those.',
+            products: productCards(ranked.map(([id, r]) => ({
+              p: catalogue.get(id),
+              name: r.name,
+              stats: [
+                { label: 'Units sold', value: r.quantity, format: 'number' },
+                { label: 'Revenue', value: round2(r.revenue), format: 'currency' },
+              ],
+            }))),
             columns: ['Product', 'Units', 'Revenue'],
-            rows: ranked.map((r) => ({ Product: r.name, Units: r.quantity, Revenue: round2(r.revenue) })),
+            rows: ranked.map(([, r]) => ({ Product: r.name, Units: r.quantity, Revenue: round2(r.revenue) })),
           };
         } catch (e: any) { return fail('Failed to get slow movers', e); }
       },
@@ -2080,10 +2160,19 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             };
           }
 
+          const catalogue = new Map(products.map((p) => [p.id, p]));
           return {
-            type: 'TABLE',
+            type: 'PRODUCT_TABLE',
             title: `Projected to run out within ${withinDays} days`,
             currency,
+            products: productCards(rows.map((r) => ({
+              p: catalogue.get(r.id),
+              name: r.name,
+              stats: [
+                { label: 'Sold/day', value: r.perDay, format: 'number' },
+                { label: 'Days left', value: r.daysLeft, format: 'number' },
+              ],
+            }))),
             // `columns` are display labels used directly as row keys by
             // DataTable — not {key,label} objects.
             columns: ['Product', 'In stock', 'Sold/day', 'Days left'],

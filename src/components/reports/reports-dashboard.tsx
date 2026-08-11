@@ -145,7 +145,14 @@ export default function ReportsDashboard() {
         const totalSales = rangeTotals?.totalSales ?? receipts.length;
         const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
         const inventoryValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
-        const totalProductsSold = receipts.reduce((sum, r) => sum + r.items.length, 0);
+        // Units, not lines. This used to be `sum + r.items.length`, which counted
+        // a sale of twelve of one product as 1 — so the "Products Sold" card here
+        // disagreed with the same figure on the dashboard and the admin board,
+        // both of which sum `quantity` (dashboard/page.tsx:157,
+        // admin-imamshaffy/page.tsx:2487). The optional chaining matches those
+        // two as well: a receipt written without `items` threw here.
+        const totalProductsSold = receipts.reduce(
+            (sum, r) => sum + (r.items?.reduce((q, i) => q + (i.quantity || 0), 0) || 0), 0);
 
         /**
          * True when the range holds more receipts than REPORT_RECEIPT_LIMIT

@@ -8,72 +8,29 @@
  * Firestore and React, and the arithmetic in the engine is worth being able to
  * reason about without either.
  *
- * ## Which "revenue"
- *
- * The admin dashboard carries two figures that both get called revenue, and only
- * one of them is Zeneva's:
- *
- * - **`platformGmv`** — the sum of tenant receipts. That is what the shops using
- *   Zeneva sold to *their* customers. It is not Zeneva's money and belongs
- *   nowhere near Zeneva's valuation. (`admin-imamshaffy/page.tsx` labels it
- *   "Total Revenue" in one card, which is a mislabel, not a second source.)
- * - **`purchases`** — subscription payments made *to* Zeneva. That is the
- *   company's revenue, and it is what this module reads.
- *
- * ## Why MRR is derived from plans, not from payments
- *
- * The obvious MRR — sum the last 30 days of purchases — is wrong in both
- * directions. An annual subscriber who paid in January contributes nothing in
- * March despite still being a paying customer, and a subscriber who just paid
- * twelve months up front contributes twelve months of revenue to a single month.
- * So MRR here counts *currently-active paid subscriptions* at list price, which
- * is what the number is supposed to mean.
+ * The definitions themselves — which collection is Zeneva's revenue, how a
+ * dollar payment converts, which accounts are the company's own, and why MRR is
+ * read off live plans rather than recent payments — live in
+ * `src/lib/platform-revenue.ts`, shared with the admin dashboard so the two
+ * cannot quote different revenue. Read that first. What is left here is the
+ * Firestore read, the trailing-twelve-month window, and the cap-table-specific
+ * pieces (capital raised from closed rounds).
  */
 
 import * as React from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 import { useFirestore, useUser } from '@/firebase';
-import { PLAN_MONTHLY_PRICE, effectivePlan, type PlanId } from '@/lib/plan';
+import {
+  INTERNAL_ACCOUNT_EMAILS,
+  billingCurrencyByBusiness,
+  subscriptionRunRate,
+  toNgn,
+  type SubscriberLike,
+} from '@/lib/platform-revenue';
 import type { EquityRecord, RevenueInputs } from './types';
 import { isKind } from './types';
 import { toDate } from './engine';
-
-/**
- * USD to NGN, for folding dollar subscriptions into one currency.
- *
- * Hardcoded, and therefore wrong the moment the rate moves — which is why
- * `usdConverted` is reported back to the UI, so a valuation resting on a stale
- * rate says so instead of looking precise. The existing dashboard hardcodes
- * 1500 in `getStandardMRR`; kept identical so the two pages agree.
- */
-export const NGN_PER_USD = 1500;
-
-/**
- * Accounts belonging to the company itself.
- *
- * Their payments are test transactions, not sales, and a plan they sit on is not
- * a subscription. Counting either would inflate a valuation with the founder's
- * own money — the one error in this file that would flatter rather than
- * understate, which is exactly the kind to guard against.
- *
- * The same two addresses are hardcoded in `admin-imamshaffy/page.tsx` (search
- * `excludedEmails`) for the SaaS metrics cards. If one list changes the other
- * must too, or the dashboard and the valuation will quote different revenue.
- */
-export const INTERNAL_ACCOUNT_EMAILS = ['belloimam431@gmail.com', 'bimex4@gmail.com'];
-
-/** Money as recorded on a purchase, normalised to NGN. */
-function toNgn(amount: number, currency: string | undefined): number {
-  const value = Number(amount);
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return (currency ?? 'NGN').toUpperCase() === 'USD' ? value * NGN_PER_USD : value;
-}
-
-/** Monthly list price of a plan, in NGN. */
-function monthlyPriceNgn(plan: PlanId): number {
-  return PLAN_MONTHLY_PRICE[plan]?.NGN ?? 0;
-}
 
 export interface PurchaseLike {
   amount?: number;
@@ -83,14 +40,11 @@ export interface PurchaseLike {
   timestamp?: any;
 }
 
-export interface BusinessLike {
-  id: string;
-  plan?: string | null;
-  accessLevel?: string | null;
-  trialExpiresAt?: any;
-  status?: string | null;
-  ownerId?: string | null;
-}
+/**
+ * Same shape the run-rate helper takes, aliased so this module's own signatures
+ * read in its own terms.
+ */
+export type BusinessLike = SubscriberLike;
 
 export interface RevenueSnapshot extends RevenueInputs {
   /** Purchase documents counted. Shown so a zero can be told from a failed read. */
@@ -167,31 +121,13 @@ export function computeRevenueSnapshot({
     if (at && at >= twelveMonthsAgo && at <= asOf) trailingTwelveMonthRevenue += ngn;
   }
 
-  // MRR from who is subscribed right now, at list price. `effectivePlan` already
-  // returns 'starter' for a lapsed paid plan, so an expired subscription drops
-  // out without a second expiry check here.
-  let mrr = 0;
-  let activeSubscriptions = 0;
-  let lifetimeAccounts = 0;
-
-  for (const b of businesses) {
-    if (b.status === 'deleted') continue;
-    if (b.ownerId && internalOwnerIds.has(b.ownerId)) continue;
-
-    // Lifetime access reports as 'business' but never pays again. Counting it at
-    // ₦30,000/month would invent recurring revenue that does not exist.
-    if (b.accessLevel === 'lifetime') {
-      lifetimeAccounts += 1;
-      continue;
-    }
-
-    const plan = effectivePlan(b);
-    const price = monthlyPriceNgn(plan);
-    if (price <= 0) continue;
-
-    mrr += price;
-    activeSubscriptions += 1;
-  }
+  // MRR from who is subscribed right now, at list price — the same helper the
+  // admin dashboard's SaaS tiles use, so the two surfaces cannot disagree.
+  const { mrr, activeSubscriptions, lifetimeAccounts } = subscriptionRunRate({
+    businesses,
+    internalOwners: internalOwnerIds,
+    billingCurrencies: billingCurrencyByBusiness(purchases),
+  });
 
   // Only closed rounds. A planned round is a hope, and adding its cash to the
   // valuation would price money that has not arrived.

@@ -153,6 +153,15 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { rankBusinesses } from '@/lib/outreach-scoring';
+// Zeneva's own revenue definitions. Shared with the cap table's valuation card
+// so the dashboard and the valuation cannot quote different figures.
+import {
+  internalOwnerIds,
+  billingCurrencyByBusiness,
+  purchasePlanMonthlyNgn,
+  subscriptionRunRate,
+  toNgn,
+} from '@/lib/platform-revenue';
 import { LOCALES, resolveLocale, getLocaleDefinition } from '@/lib/i18n/config';
 import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -269,16 +278,6 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
     // counted on the server rather than taken from the loaded array.
     const checkoutAttemptsTotal = useCollectionCount('checkout_attempts');
 
-    const getStandardMRR = (planName: string, pCurrency: string) => {
-        const name = (planName || '').toLowerCase();
-        const isUSD = pCurrency === 'USD';
-        if (name.includes('business')) {
-            return isUSD ? 20 * 1500 : 30000;
-        } else {
-            return isUSD ? 7 * 1500 : 10000;
-        }
-    };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
@@ -303,11 +302,11 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardDescription className="text-xs">Total Revenue</CardDescription>
-                            <CardTitle className="text-2xl font-bold">₦{totalSubscriptionRevenue.toLocaleString()}</CardTitle>
+                            <CardDescription className="text-xs">Subscription Revenue</CardDescription>
+                            <CardTitle className="text-2xl font-bold">₦{Math.round(totalSubscriptionRevenue).toLocaleString()}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Gross subscription fees collected to date.</p>
+                            <p className="text-[10px] text-muted-foreground">Zeneva's own subscription fees collected to date. Not platform GMV — that is what merchants sold. Dollar payments converted at ₦1,500/$1.</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -316,7 +315,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                             <CardTitle className="text-2xl font-bold">₦{(payingBusinessesCount > 0 ? Math.round(totalSubscriptionRevenue / payingBusinessesCount) : 0).toLocaleString()}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Calculated as: Total Revenue / Paying Customers</p>
+                            <p className="text-[10px] text-muted-foreground">Calculated as: Subscription Revenue / Paying Customers</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -337,13 +336,17 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                                         <TableHead>Plan</TableHead>
                                         <TableHead>Currency</TableHead>
                                         <TableHead className="text-right">Paid Amount</TableHead>
-                                        <TableHead className="text-right">Standard MRR</TableHead>
+                                        <TableHead className="text-right">Plan price / mo</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {validPurchases.map((p, index) => {
                                         const biz = businesses?.find(b => b.id === p.businessId);
-                                        const standardMrr = getStandardMRR(p.plan, p.currency);
+                                        // What this plan bills monthly on the price list the
+                                        // customer is billed against — not this row's share of
+                                        // MRR. The list is all-time, so several rows can belong
+                                        // to one subscription and they do not sum to MRR.
+                                        const planMonthly = purchasePlanMonthlyNgn(p.plan, p.currency);
                                         return (
                                             <TableRow key={p.id || index}>
                                                 <TableCell className="font-medium max-w-[180px] truncate" title={biz?.name || 'Unknown Business'}>{biz?.name || 'Unknown Business'}</TableCell>
@@ -353,7 +356,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                                                     {p.currency === 'USD' ? '$' : '₦'}{p.amount.toLocaleString()}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono font-semibold text-emerald-500">
-                                                    ₦{standardMrr.toLocaleString()}
+                                                    ₦{planMonthly.toLocaleString()}
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -1735,7 +1738,10 @@ function BusinessIntelDialog({
                             { label: 'Products', icon: Package, value: productCount, color: 'text-foreground' },
                             { label: 'Total Stock Units', icon: Layers, value: totalStock.toLocaleString(), color: 'text-foreground' },
                             { label: 'Units Sold', icon: ShoppingCart, value: unitsSold.toLocaleString(), color: 'text-foreground' },
-                            { label: 'Total Revenue', icon: DollarSign, value: `${currency}${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-emerald-500' },
+                            // "Sales", not "Revenue": this is what the shop sold, in the
+                            // shop's own currency. Zeneva's revenue is the subscription
+                            // figure on the dashboard, and one word kept the two apart.
+                            { label: 'Total Sales', icon: DollarSign, value: `${currency}${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-emerald-500' },
                         ].map(({ label, icon: Icon, value, color }) => (
                             <div key={label} className="rounded-xl border bg-card p-3 space-y-1">
                                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide flex items-center gap-1">
@@ -2483,16 +2489,21 @@ function AdminDashboardContent({
         const revenueGeneratingBusinessIds = new Set((convertedReceipts || []).map(r => r.businessId));
         const revenueGeneratingBusinessesCount = revenueGeneratingBusinessIds.size;
 
-        const excludedEmails = ['belloimam431@gmail.com', 'bimex4@gmail.com'];
-        const excludedUserIds = new Set(allUsers.filter(u => u.email && excludedEmails.includes(u.email.toLowerCase())).map(u => u.id));
-        
+        // The company's own accounts. Their payments are test transactions and the
+        // plans they sit on are not subscriptions, so both are left out of every
+        // revenue figure below. The address list lives in `@/lib/platform-revenue`
+        // so this page and the cap table's valuation exclude the same accounts.
+        const excludedUserIds = internalOwnerIds(allUsers);
+
         const validPurchases = (purchases || []).filter(p => {
             const biz = activeBusinesses.find(b => b.id === p.businessId);
             if (biz && excludedUserIds.has(biz.ownerId)) return false;
             return true;
         });
 
-        const totalSubscriptionRevenue = validPurchases.reduce((sum, p) => sum + p.amount, 0);
+        // Normalised to NGN. `amount` is stored in whatever currency the customer
+        // paid, so summing it raw adds $30 to ₦30,000 and reports ₦30,030.
+        const totalSubscriptionRevenue = validPurchases.reduce((sum, p) => sum + toNgn(p.amount, p.currency), 0);
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
 
@@ -2501,25 +2512,17 @@ function AdminDashboardContent({
             return payingBusinessIds.has(b.id);
         });
 
-        const thirtyDaysAgo = subDays(new Date(), 30);
-        const recentPurchases = (purchases || []).filter(p => {
-            const pDate = p.timestamp?.toDate ? p.timestamp.toDate() : (p.timestamp?.seconds ? new Date(p.timestamp.seconds * 1000) : new Date(0));
-            return pDate > thirtyDaysAgo;
+        // MRR is read off the subscriptions that are live right now, at list price
+        // — not summed from the last 30 days of payments, which is wrong in both
+        // directions: an annual subscriber who paid in January contributes nothing
+        // in March despite still paying us, and one who just paid twelve months up
+        // front contributes a year of revenue to a single month. Same helper the
+        // cap table's valuation card uses, so the two cannot disagree.
+        const { mrr, activeSubscriptions: activePaidSubscriptions } = subscriptionRunRate({
+            businesses: activeBusinesses,
+            internalOwners: excludedUserIds,
+            billingCurrencies: billingCurrencyByBusiness(validPurchases),
         });
-
-        const getStandardMRR = (planName: string, pCurrency: string) => {
-            const name = (planName || '').toLowerCase();
-            const isUSD = pCurrency === 'USD';
-            if (name.includes('business')) {
-                return isUSD ? 20 * 1500 : 30000;
-            } else {
-                return isUSD ? 7 * 1500 : 10000;
-            }
-        };
-
-        const mrr = recentPurchases.reduce((sum, p) => {
-            return sum + getStandardMRR(p.plan, p.currency);
-        }, 0);
         const arr = mrr * 12;
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
@@ -2531,10 +2534,12 @@ function AdminDashboardContent({
         }, {} as Record<string, number>);
         const newUserGrowth = Object.entries(usersByDate).map(([date, count]) => ({ date, 'New Users': count }));
 
-        const revenueByDate = (purchases || []).reduce((acc, purchase) => {
+        // Same NGN normalisation and same exclusions as the total above, so the
+        // chart and the tile cannot tell different stories.
+        const revenueByDate = validPurchases.reduce((acc, purchase) => {
             if (purchase.timestamp?.seconds) {
                 const date = format(new Date(purchase.timestamp.seconds * 1000), 'MMM d');
-                acc[date] = (acc[date] || 0) + purchase.amount;
+                acc[date] = (acc[date] || 0) + toNgn(purchase.amount, purchase.currency);
             }
             return acc;
         }, {} as Record<string, number>);
@@ -2547,7 +2552,10 @@ function AdminDashboardContent({
         }, {} as Record<string, number>);
         const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5);
 
-        const activeSubscriptions = payingBusinesses?.length || 0;
+        // Businesses on a live paid plan — the base the MRR above rests on. Not the
+        // same as `payingBusinesses`, which is everyone who has ever paid and so
+        // includes subscriptions that have since lapsed.
+        const activeSubscriptions = activePaidSubscriptions;
 
         const trialingBusinessIds = new Set((activeBusinesses || []).filter(b => b.trialExpiresAt?.toDate() > now && (b.plan === 'starter' || !b.plan)).map(b => b.id));
         const trialingUsers = activeUsers.filter(u => u.businessId && trialingBusinessIds.has(u.businessId)).length;
@@ -2655,7 +2663,6 @@ function AdminDashboardContent({
             uniqueDownloaders: downloadClicks?.length || 0,
             downloadStats,
             payingBusinesses,
-            recentPurchases,
             validPurchases,
             revenueGeneratingBusinessesCount
         };
@@ -3342,13 +3349,16 @@ function AdminDashboardContent({
                                 </CardContent>
                             </Card>
 
+                            {/* Zeneva's own money, not the merchants'. This card used to
+                                repeat platformGmv under the title "Total Revenue", which
+                                read as though every naira the shops took was ours. */}
                             <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-pink-500/20" onClick={() => {
-                                setCertificateModalState({ open: true, title: 'Total Revenue', description: `The total revenue recorded.`, value: `₦${analyticsData.platformGmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: Check });
+                                setCertificateModalState({ open: true, title: 'Subscription Revenue', description: `Zeneva's own subscription fees collected to date, across all plans.`, value: `₦${analyticsData.totalSubscriptionRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: Check });
                             }}>
                                 <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-transparent pointer-events-none" />
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex justify-between items-center text-lg">
-                                        Total Revenue
+                                        Subscription Revenue
                                         <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-full group-hover:bg-pink-200 transition-colors">
                                             <Check className="h-5 w-5 text-pink-600 dark:text-pink-500" />
                                         </div>
@@ -3356,9 +3366,9 @@ function AdminDashboardContent({
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600">
-                                        <CurrencyAmount symbol="₦" amount={analyticsData.platformGmv} hideFraction={true} className="items-center" symbolClassName="text-[0.55em] font-medium opacity-70 mr-1" />
+                                        <CurrencyAmount symbol="₦" amount={analyticsData.totalSubscriptionRevenue} hideFraction={true} className="items-center" symbolClassName="text-[0.55em] font-medium opacity-70 mr-1" />
                                     </p>
-                                    <p className="text-sm text-muted-foreground mt-2">Total gross revenue</p>
+                                    <p className="text-sm text-muted-foreground mt-2">Zeneva's own revenue</p>
                                     <p className="text-xs text-pink-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
                                 </CardContent>
                             </Card>

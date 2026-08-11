@@ -54,6 +54,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
 import { withFirestoreRetry } from '@/firebase/retry';
+import { toNgn } from '@/lib/platform-revenue';
 import type { BusinessInstance, Receipt, UserProfile } from '@/types';
 import { toDate } from './user-primitives';
 
@@ -528,7 +529,17 @@ export function BillingSection({
 
     const paid = useMemo(() => byTime(purchases.rows, 'timestamp'), [purchases.rows]);
     const tried = useMemo(() => byTime(attempts.rows, 'timestamp'), [attempts.rows]);
-    const lifetimeValue = useMemo(() => paid.reduce((s, p) => s + (p.amount || 0), 0), [paid]);
+    // Normalised to NGN before summing. The rows below each render in the
+    // currency they were paid in, but a total cannot: adding a $30 payment to a
+    // ₦30,000 one and stamping ₦ on the result reports ₦30,030.
+    const lifetimeValue = useMemo(
+        () => paid.reduce((s, p) => s + toNgn(p.amount, p.currency), 0),
+        [paid],
+    );
+    const anyUsd = useMemo(
+        () => paid.some((p) => (p.currency || 'NGN').toUpperCase() === 'USD'),
+        [paid],
+    );
 
     const busy = purchases.isLoading || attempts.isLoading;
     const err = purchases.error || attempts.error;
@@ -537,7 +548,11 @@ export function BillingSection({
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Stat label="Payments" value={busy ? '—' : paid.length} />
-                <Stat label="Lifetime value" value={busy ? '—' : money(lifetimeValue)} />
+                <Stat
+                    label="Lifetime value"
+                    value={busy ? '—' : money(lifetimeValue)}
+                    hint={anyUsd ? 'Dollar payments converted at ₦1,500/$1' : undefined}
+                />
                 <Stat label="Checkout attempts" value={busy ? '—' : tried.length} hint="Started, not necessarily paid" />
                 <Stat
                     label="Current plan"

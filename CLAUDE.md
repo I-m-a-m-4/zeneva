@@ -176,3 +176,34 @@ heredocs, `git commit -F -`, and anything POSIX. In PowerShell:
 - `&&` and `||` do not exist — use `;` and `if ($?)`.
 - Never use `>` to write binary; it inserts a BOM and corrupts the file.
   Use `cmd /c "... > file"` instead.
+
+## Secrets — never open the file, only learn the name
+
+Every tool result is transmitted to the model provider in full. Reading a file
+that holds a live credential publishes that credential, and no later edit or
+deletion un-sends it. So: **never open a file that contains a secret value.**
+
+That covers `.env`, `.env.local`, `.env.*.local`, `.env.production`,
+`key.properties`, `*.jks`/`*.keystore`, `*serviceAccount*.json`,
+`firebase-adminsdk*.json`, `AuthKey_*.p8`, `*.p12`, `*.pem`. These are denied
+in `~/.claude/settings.json`, but the rule is the point, not the enforcement.
+
+To work with a secret you only ever need its **name**, never its value:
+
+```bash
+cat .env.example                       # names only, safe and readable
+grep -rho 'process\.env\.[A-Z0-9_]*' src | sort -u
+grep -c PAYSTACK_SECRET_KEY .env.local  # confirm presence without printing it
+```
+
+`.env.example`, `.env.sample`, and `.env.template` are deliberately *not*
+denied — they are the sanctioned way to see what a deployment expects.
+
+If a value genuinely must be verified, the owner checks it outside the session
+and reports only yes/no. Never echo, `cat`, or print a credential into a
+transcript, and never paste one into the chat — a key that has appeared in a
+session is burned and must be rotated.
+
+The deny list only constrains the `Read` tool. `cat .env.local` through Bash or
+PowerShell is not blocked by it, so treat shell reads of these paths as equally
+off-limits.

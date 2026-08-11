@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import {
   Package, DollarSign, Users, Sparkles, CheckCircle2, XCircle,
-  AlertTriangle, TrendingUp, ArrowRight, ReceiptText,
+  AlertTriangle, TrendingUp, ArrowRight, ReceiptText, LayoutGrid, Table2,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -60,9 +60,12 @@ function ProductCard({
   const stock = product.stock ?? 0;
   const threshold = product.lowStockThreshold ?? 5;
   const isService = product.categoryType === 'service';
-  const negative = stock < 0;
-  const out = !isService && stock <= 0;
-  const low = !isService && stock > 0 && stock <= threshold;
+  // A deleted product carries null stock, which `?? 0` turns into a convincing
+  // "Out of stock" badge. It has no stock state at all — suppress all three.
+  const deleted = Boolean(product.deleted);
+  const negative = !deleted && stock < 0;
+  const out = !deleted && !isService && stock <= 0;
+  const low = !deleted && !isService && stock > 0 && stock <= threshold;
 
   const clickable = Boolean(onPick);
 
@@ -103,6 +106,12 @@ function ProductCard({
           {isService && (
             <span className="text-[10px] px-1.5 py-0 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">Service</span>
           )}
+          {/* A best seller can be deleted from the catalogue while its receipts
+              survive, so the ranking still has a row for it. Saying so beats
+              rendering a real-looking card priced at zero with no stock. */}
+          {product.deleted && (
+            <span className="text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground border border-border/60">No longer in catalogue</span>
+          )}
           {negative && (
             <span className="text-[10px] px-1.5 py-0 rounded bg-red-500/10 text-red-500 border border-red-500/20">Negative stock</span>
           )}
@@ -114,20 +123,41 @@ function ProductCard({
           )}
         </div>
 
-        <div className="flex items-end justify-between mt-auto pt-1">
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-foreground">{fmtMoney(product.price, currency)}</span>
-            {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
+        {!product.deleted && (
+          <div className="flex items-end justify-between mt-auto pt-1">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-foreground">{fmtMoney(product.price, currency)}</span>
+              {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
+            </div>
+            {!isService && (
+              <span className={cn(
+                'text-[11px] font-medium',
+                negative || out ? 'text-red-500' : low ? 'text-amber-600' : 'text-muted-foreground',
+              )}>
+                {stock} in stock
+              </span>
+            )}
           </div>
-          {!isService && (
-            <span className={cn(
-              'text-[11px] font-medium',
-              negative || out ? 'text-red-500' : low ? 'text-amber-600' : 'text-muted-foreground',
-            )}>
-              {stock} in stock
-            </span>
-          )}
-        </div>
+        )}
+
+        {/* The tool-specific half of a PRODUCT_TABLE card: whatever figures made
+            this row worth showing — margin, units sold, days left. Generic
+            label/value/format so one card serves all five tools. */}
+        {Array.isArray(product.stats) && product.stats.length > 0 && (
+          <div className="border-t border-border/40 pt-1.5 mt-auto space-y-0.5">
+            {product.stats.map((s: any) => (
+              <div key={s.label} className="flex items-baseline justify-between gap-2 text-[10px]">
+                <span className="text-muted-foreground truncate">{s.label}</span>
+                <span className={cn(
+                  'font-medium tabular-nums shrink-0',
+                  typeof s.value === 'number' && s.value < 0 ? 'text-red-500' : 'text-foreground',
+                )}>
+                  {s.value == null ? '—' : fmtTile(s, currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Extra facts some tools attach — shown only when present. */}
         {(product.daysOfCover != null || product.capitalTiedUp != null || product.daysRemaining != null) && (
@@ -200,6 +230,124 @@ function ProductGrid({ result, onPick }: { result: any; onPick?: (p: any) => voi
           Value at risk: <strong className="text-foreground">{fmtMoney(result.totalValueAtRisk, result.currency)}</strong>
         </p>
       )}
+      {/*
+        * PRODUCT_TABLE footers. These used to render only in DataTable, so
+        * switching a reorder list or a margin analysis to cards silently dropped
+        * its headline figure — the total to spend, the count selling below cost.
+        * Card and table view must carry the same conclusions or the toggle
+        * changes the answer rather than the layout.
+        */}
+      {result.estimatedTotalCost != null && (
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Estimated cost: <strong className="text-foreground">{fmtMoney(result.estimatedTotalCost, result.currency)}</strong>
+        </p>
+      )}
+      {result.sellingAtALoss > 0 && (
+        <p className="text-[11px] mt-2 flex items-center gap-1.5 text-red-500">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            <strong>{result.sellingAtALoss}</strong> item{result.sellingAtALoss === 1 ? '' : 's'} selling at or below cost.
+          </span>
+        </p>
+      )}
+      {result.note && <p className="text-[11px] text-muted-foreground mt-1.5">{result.note}</p>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Card / table switch
+//
+// Five tools answer product questions with figures that suit a table — margin,
+// units sold, days to stockout — but the owner asked about a *product*, and a
+// product looks like a card everywhere else in Zeneva. So those results ship
+// both halves (see productCards() in api/chat/tools.ts) and default to cards,
+// with a way back to the table for anyone comparing numbers down a column.
+//
+// The control is deliberately quiet: two small icons, faded until hovered or
+// focused, no label, no border. It is a preference, not a call to action.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RESULT_VIEW_KEY = 'zeneva-zen-result-view';
+type ResultView = 'cards' | 'table';
+
+function useResultView(): [ResultView, (v: ResultView) => void] {
+  const [view, setView] = React.useState<ResultView>('cards');
+
+  // Read after mount rather than in the initial state: the server render has no
+  // localStorage, and a first client render that disagrees with it is a
+  // hydration mismatch that throws the whole tree away.
+  React.useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(RESULT_VIEW_KEY);
+      if (stored === 'table' || stored === 'cards') setView(stored);
+    } catch {
+      // Private mode or a full quota. Losing a view preference is not worth
+      // breaking the result render over — the default stands.
+    }
+  }, []);
+
+  const choose = React.useCallback((v: ResultView) => {
+    setView(v);
+    try { window.localStorage.setItem(RESULT_VIEW_KEY, v); } catch { /* see above */ }
+  }, []);
+
+  return [view, choose];
+}
+
+function ViewToggle({ view, onChange }: { view: ResultView; onChange: (v: ResultView) => void }) {
+  const options: Array<{ id: ResultView; Icon: typeof LayoutGrid; label: string }> = [
+    { id: 'cards', Icon: LayoutGrid, label: 'Show as cards' },
+    { id: 'table', Icon: Table2, label: 'Show as table' },
+  ];
+  return (
+    <div className="flex items-center justify-end mb-1.5">
+      <div
+        role="group"
+        aria-label="Result format"
+        className="flex items-center gap-0.5 opacity-30 hover:opacity-100 focus-within:opacity-100 transition-opacity"
+      >
+        {options.map(({ id, Icon, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            title={label}
+            aria-label={label}
+            aria-pressed={view === id}
+            className={cn(
+              'p-1 rounded-md transition-colors',
+              view === id
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Icon className="w-3.5 h-3.5" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductResultSwitch({ result, onPick }: { result: any; onPick?: (p: any) => void }) {
+  const [view, setView] = useResultView();
+
+  const hasCards = Boolean(result.products?.length);
+  const hasTable = Boolean(result.rows?.length);
+
+  // With only one half there is nothing to switch between, so no control is
+  // offered. PRODUCT_LIST results have no rows; a PRODUCT_TABLE whose products
+  // all failed to join the catalogue has no cards.
+  if (hasCards && !hasTable) return <ProductGrid result={result} onPick={onPick} />;
+  if (!hasCards) return <DataTable result={result} />;
+
+  return (
+    <div className="w-full">
+      <ViewToggle view={view} onChange={setView} />
+      {view === 'table'
+        ? <DataTable result={result} />
+        : <ProductGrid result={result} onPick={onPick} />}
     </div>
   );
 }
@@ -1038,7 +1186,13 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
     case 'WALKTHROUGH':
       return <WalkthroughCard result={output} />;
     case 'PRODUCT_LIST':
-      return <ProductGrid result={output} onPick={onPick} />;
+      // Routed through the switch so a long list can also be read as a table.
+      // With no `rows` on the result the switch renders the grid and hides the
+      // control, so this is the same output it always produced.
+      return <ProductResultSwitch result={output} onPick={onPick} />;
+    case 'PRODUCT_TABLE':
+      // Product-shaped answers that also carry table columns. Cards by default.
+      return <ProductResultSwitch result={output} onPick={onPick} />;
     case 'PRODUCT_PICKER':
       return <ProductPicker result={output} onPick={onPick} />;
     case 'CUSTOMER_LIST':

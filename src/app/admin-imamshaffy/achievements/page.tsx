@@ -8,6 +8,11 @@ import { Trophy, Users, DollarSign, Sparkles, ShoppingBag, Store, Star, ArrowUpR
 import type { Receipt, Product, BusinessInstance, UserProfile } from '@/types';
 import Confetti from '@/components/shared/confetti';
 import { cn } from '@/lib/utils';
+import {
+  billingCurrencyByBusiness,
+  internalOwnerIds,
+  subscriptionRunRate,
+} from '@/lib/platform-revenue';
 import { adminApiFetch } from '@/lib/admin-api';
 
 // =================================================================
@@ -182,22 +187,17 @@ export default function AchievementsPage() {
     const retentionPercentage = totalOldUsers > 0 ? Math.round((activeWithin7Days / totalOldUsers) * 100) : 100;
 
     // Calculate MRR and ARR
-    const recentPurchases = (purchases || []).filter((p: any) => {
-        const pDate = p.timestamp?.toDate ? p.timestamp.toDate() : (p.timestamp?.seconds ? new Date(p.timestamp.seconds * 1000) : new Date(0));
-        return pDate > thirtyDaysAgo;
+    //
+    // Read off the subscriptions that are live right now rather than summed from
+    // the last 30 days of payments: an annual subscriber who paid in January
+    // contributes nothing in March despite still paying us, and one who just paid
+    // a year up front contributes twelve months to a single month. Shared with the
+    // admin dashboard and the cap table valuation so all three agree.
+    const { mrr } = subscriptionRunRate({
+        businesses: businesses || [],
+        internalOwners: internalOwnerIds(users || []),
+        billingCurrencies: billingCurrencyByBusiness(purchases || []),
     });
-
-    const getStandardMRR = (planName: string, pCurrency: string) => {
-        const name = (planName || '').toLowerCase();
-        const isUSD = pCurrency === 'USD';
-        if (name.includes('business')) {
-            return isUSD ? 20 * 1500 : 30000;
-        } else {
-            return isUSD ? 7 * 1500 : 10000;
-        }
-    };
-
-    const mrr = recentPurchases.reduce((sum: number, p: any) => sum + getStandardMRR(p.plan, p.currency), 0);
     const arr = mrr * 12;
 
     return {
