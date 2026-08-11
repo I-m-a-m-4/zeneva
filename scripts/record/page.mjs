@@ -761,9 +761,33 @@ export class Page {
     return this.zen(`caption(${JSON.stringify(text ?? '')}${ms ? `,${ms}` : ''})`);
   }
 
-  async card(title, sub, cta, holdMs = 2100) {
-    await this.zen(`card(${JSON.stringify(title)},${JSON.stringify(sub ?? '')},${JSON.stringify(cta ?? '')})`);
-    await sleep(holdMs);
+  /**
+   * Play a title screen and hold on it.
+   *
+   * Takes a whole slide — `{title, subtitle, cta, ms, motion, image}` — which is
+   * what every caller already has in hand. The positional form is still accepted
+   * because it is the one the README documents for hand-written flows, and a
+   * coded flow that wants a mid-film card should not have to build an object.
+   *
+   * `motion` and `image` are passed through untouched. Validating them is
+   * `recipe.mjs`'s job on the way in; by here they have already been checked on
+   * the recorder's side of the process boundary.
+   */
+  async card(title, sub, cta, holdMs = 2100, opts = null) {
+    const s = title && typeof title === 'object' ? title : null;
+    const text = s ? s.title : title;
+    const subtitle = s ? s.subtitle : sub;
+    const button = s ? s.cta : cta;
+    const hold = s ? (s.ms ?? 2100) : holdMs;
+    const look = s ? { motion: s.motion, image: s.image } : (opts || {});
+    await this.zen(
+      `card(${JSON.stringify(text ?? '')},${JSON.stringify(subtitle ?? '')},`
+      + `${JSON.stringify(button ?? '')},${JSON.stringify({
+        motion: look.motion || undefined,
+        image: look.image || undefined,
+      })})`
+    );
+    await sleep(hold);
   }
 
   async clearCard() {

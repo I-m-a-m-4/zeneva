@@ -155,12 +155,70 @@ export function parseRecipe(raw) {
   };
 }
 
+/*
+ * Slide motions, and the still-image check.
+ *
+ * This list is the twin of `SLIDE_MOTIONS` in `src/lib/marketing/slides.ts`; a
+ * motion added there and not here is rejected at the boundary rather than played
+ * wrong. Unlike the TypeScript side — which clips and defaults, because it is
+ * cleaning up after a model — this side throws, for the same reason `text()`
+ * throws on an over-long title: by the time a value reaches the recorder it has
+ * already been through one validator, so anything invalid here came from a
+ * hand-written file and its author wants to be told.
+ */
+const MOTIONS = ['rise', 'wipe', 'zoom', 'split'];
+const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_IMAGE_CHARS = 4_000_000;
+
+function motion(raw, where) {
+  if (raw == null || raw === '') return 'rise';
+  if (typeof raw !== 'string' || !MOTIONS.includes(raw)) {
+    throw new Error(`${where} motion: must be one of ${MOTIONS.join(', ')}`);
+  }
+  return raw;
+}
+
+/**
+ * A slide's background still, or null.
+ *
+ * Only a self-contained `data:` image. A remote URL is refused on purpose: the
+ * recording browser is signed into a real business, so a slide that fetches from
+ * someone else's host leaks when a take ran and lets an outage there blank a
+ * frame mid-shoot. The base64 body is scanned before it is handed to a browser —
+ * a `data:` URI is the one place a stray quote would escape the `url("...")` it
+ * gets interpolated into.
+ */
+function image(raw, where) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw !== 'string') throw new Error(`${where} image: must be a data: URI string`);
+  const comma = raw.indexOf(',');
+  if (!raw.startsWith('data:') || comma < 0) {
+    throw new Error(`${where} image: must be a data: URI, not a URL`);
+  }
+  const header = raw.slice(5, comma);
+  if (!header.endsWith(';base64')) throw new Error(`${where} image: must be base64-encoded`);
+  const mime = header.slice(0, -7).toLowerCase();
+  if (!IMAGE_MIME.includes(mime)) {
+    throw new Error(`${where} image: ${mime || 'no type'} is not one of ${IMAGE_MIME.join(', ')}`);
+  }
+  const body = raw.slice(comma + 1);
+  if (!body) throw new Error(`${where} image: empty`);
+  if (body.length > MAX_IMAGE_CHARS) {
+    throw new Error(`${where} image: ${Math.round(body.length / 1000)}kB of base64 exceeds the `
+      + `${MAX_IMAGE_CHARS / 1000}kB cap`);
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body)) throw new Error(`${where} image: not valid base64`);
+  return `data:${mime};base64,${body}`;
+}
+
 function card(raw, where) {
   return {
     title: text(raw?.title, `${where} card title`, 70),
     subtitle: text(raw?.subtitle, `${where} card subtitle`, 90),
     cta: text(raw?.cta, `${where} card cta`, 40),
     ms: ms(raw?.ms, 2200, `${where} card`),
+    motion: motion(raw?.motion, `${where} card`),
+    image: image(raw?.image, `${where} card`),
   };
 }
 
@@ -242,7 +300,7 @@ export function recipeToFlow(recipe) {
       switch (s.kind) {
         case 'goto':    await page.goto(s.route); await page.hold(s.settle); break;
         case 'caption': await page.caption(s.text, s.ms); await page.hold(Math.min(s.ms, 1400)); break;
-        case 'card':    await page.card(s.title, s.subtitle, s.cta, s.ms); await page.clearCard(); break;
+        case 'card':    await page.card(s); await page.clearCard(); break;
         case 'click':   await page.click(s.spec, { settle: s.settle }); break;
         case 'clickTo': await page.clickTo(s.spec, s.path, { settle: s.settle }); break;
         case 'hover':   await page.hover(s.spec, s.settle); break;

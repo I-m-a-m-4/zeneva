@@ -10,6 +10,7 @@ import {
     cleanRecordUrl, recipeId, recipeToWire,
     type JobStatus, type Recipe, type RecorderStatus, type RecorderTake,
 } from '@/lib/marketing/recorder';
+import { cleanSlideImage, MAX_SLIDE_IMAGE_CHARS } from '@/lib/marketing/slides';
 
 /**
  * Drives `scripts/record/record.mjs` from the admin Marketing Studio.
@@ -232,7 +233,14 @@ function writeRecipe(raw: unknown): string[] {
  *
  * An entry whose value is `null` is passed through untouched: that is how the
  * operator says "no opening card", and dropping it would silently restore the
- * default they just removed.
+ * default they just removed. Nothing here rewrites a card for the same reason —
+ * "not mentioned", "removed" and "overridden" are three different instructions
+ * and normalising them here would lose one.
+ *
+ * The exception is a slide's image, which is checked now rather than later. It is
+ * the only field an operator can make enormous by accident — a phone photo is
+ * several megabytes of base64 — and the difference between a clear message and a
+ * recorder that dies half a minute in is worth one early call.
  */
 function writeCards(raw: unknown): string[] {
     if (raw === null || raw === undefined) return [];
@@ -241,6 +249,20 @@ function writeCards(raw: unknown): string[] {
         if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
         return 'open' in (v as object) || 'end' in (v as object);
     });
+    for (const [flow, v] of entries) {
+        for (const which of ['open', 'end'] as const) {
+            const slide = (v as Record<string, unknown>)[which];
+            if (!slide || typeof slide !== 'object') continue;
+            const img = (slide as Record<string, unknown>).image;
+            if (img === null || img === undefined || img === '') continue;
+            if (!cleanSlideImage(img)) {
+                throw new Error(
+                    `${flow} ${which}: the slide image must be a PNG, JPEG or WebP upload under `
+                    + `${Math.round(MAX_SLIDE_IMAGE_CHARS / 1000)}kB once encoded.`
+                );
+            }
+        }
+    }
     if (!entries.length) return [];
     mkdirSync(path.dirname(CARDS_FILE), { recursive: true });
     writeFileSync(CARDS_FILE, JSON.stringify(Object.fromEntries(entries), null, 2), 'utf8');

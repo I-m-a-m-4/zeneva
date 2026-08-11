@@ -22,7 +22,7 @@
  * the overlay is purely what the camera sees.
  */
 (function () {
-  if (window.__zen && window.__zen.__v === 7) return;
+  if (window.__zen && window.__zen.__v === 8) return;
 
   var NS = 'http://www.w3.org/2000/svg';
   var Z = 2147483000;
@@ -541,27 +541,124 @@
     }
   }
 
-  function card(title, sub, cta) {
+  /*
+   * The title screens.
+   *
+   * `motion` chooses how the words arrive and `image` puts a still behind them.
+   * Both are optional, and absent means what this function has always drawn:
+   * `rise` over the dark radial scrim. A take recorded before these existed and
+   * one recorded after, from the same copy, are the same film — every existing
+   * preset, recipe and `--cards` file omits both fields.
+   *
+   * The per-motion tables below hold only the *starting* transform and the
+   * transition for each of the three lines; the shared code fades the scrim in
+   * and lets everything settle to its resting position on the next frame. Adding
+   * a motion is one more entry here plus one in `slides.ts` and `recipe.mjs`.
+   *
+   * Everything the caller supplies lands in `textContent` or in a
+   * `background-image:url(...)` for a data URI that `cleanSlideImage` has already
+   * checked. Nothing reaches `innerHTML` — a slide can be written by a model, and
+   * a model's words are content, never markup.
+   */
+  var EASE = 'cubic-bezier(.22,1,.36,1)';
+  var MOTIONS = {
+    // The original, to the character. `all .6s` and the .12s/.24s stagger are
+    // what shipped, so a re-record of an old take is frame-for-frame the same.
+    rise: {
+      title: ['translateY(18px)', 'all .6s ' + EASE],
+      sub: ['translateY(18px)', 'all .6s ' + EASE + ' .12s'],
+      cta: ['translateY(18px)', 'all .6s ' + EASE + ' .24s'],
+    },
+    // The panel does the revealing, so the words themselves do not move: they
+    // just stop being invisible as it passes over them.
+    wipe: {
+      title: ['none', 'opacity .26s ease .30s'],
+      sub: ['none', 'opacity .26s ease .44s'],
+      cta: ['none', 'opacity .26s ease .58s'],
+      panel: true,
+    },
+    // One unit settling, not three lines arriving — the stagger is deliberately
+    // absent here or it reads as a wobble rather than a push.
+    zoom: {
+      stack: ['scale(1.085)', 'opacity .7s ease,transform .9s ' + EASE],
+      title: ['none', 'opacity .5s ease .05s'],
+      sub: ['none', 'opacity .5s ease .16s'],
+      cta: ['none', 'opacity .5s ease .28s'],
+    },
+    split: {
+      title: ['translateX(-64px)', 'all .68s ' + EASE],
+      sub: ['translateX(64px)', 'all .68s ' + EASE + ' .08s'],
+      cta: ['translateY(16px)', 'all .6s ' + EASE + ' .26s'],
+    },
+  };
+
+  function card(title, sub, cta, opts) {
     if (!cardWrap) return;
     while (cardWrap.firstChild) cardWrap.removeChild(cardWrap.firstChild);
+    var o = opts || {};
+    var m = MOTIONS[o.motion] || MOTIONS.rise;
+    var image = typeof o.image === 'string' && o.image.indexOf('data:image/') === 0 ? o.image : null;
+
     var scrim = el('div',
       'position:absolute;inset:0;background:radial-gradient(ellipse at 50% 42%,rgba(12,13,17,.9),rgba(6,7,9,.97));' +
       'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;' +
-      'opacity:0;transition:opacity .5s ease;',
+      'opacity:0;transition:opacity .5s ease;overflow:hidden;',
       cardWrap
     );
+
+    // A photograph, if one was uploaded: full-bleed under a vertical scrim dark
+    // enough to keep white text legible over anything, with a slow push so the
+    // still does not read as a frozen video. The push runs longer than any hold
+    // `cleanSlide` allows, so it never visibly finishes and snaps.
+    var pic = null;
+    if (image) {
+      pic = el('div',
+        'position:absolute;inset:0;background-image:url("' + image + '");background-size:cover;' +
+        'background-position:center;transform:scale(1.075);transition:transform 9s linear;',
+        scrim
+      );
+      el('div',
+        'position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,7,9,.52),rgba(6,7,9,.7) 46%,rgba(6,7,9,.88));',
+        scrim
+      );
+    }
+
+    // The wipe panel, above the picture and below the words.
+    var panel = null;
+    if (m.panel) {
+      panel = el('div',
+        'position:absolute;top:0;bottom:0;left:0;width:130%;background:linear-gradient(90deg,' +
+        'rgba(244,113,37,0),#f47125 18%,#f47125 82%,rgba(244,113,37,0));' +
+        'transform:translateX(-110%);transition:transform 1.05s cubic-bezier(.65,0,.35,1);',
+        scrim
+      );
+    }
+
+    // One stack for the three lines, so a motion can move them together. The
+    // flex properties are the scrim's own, moved inward: `align-items:center` and
+    // the 18px gap laid out the same column before this wrapper existed.
+    var stack = el('div',
+      'position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;' +
+      'opacity:' + (m.stack ? '0' : '1') + ';'
+      + (m.stack ? 'transform:' + m.stack[0] + ';transition:' + m.stack[1] + ';' : ''),
+      scrim
+    );
+
     var mark = el('div',
       'font-family:"Bricolage Grotesque",Inter,sans-serif;font-weight:800;letter-spacing:-.03em;' +
       'font-size:clamp(30px,4.4vw,74px);color:#f47125;text-shadow:0 0 60px rgba(244,113,37,.34);' +
-      'opacity:0;transform:translateY(18px);transition:all .6s cubic-bezier(.22,1,.36,1);',
-      scrim
+      'text-align:center;max-width:88vw;' +
+      'opacity:0;transform:' + m.title[0] + ';transition:' + m.title[1] + ';',
+      stack
     );
-    mark.textContent = title;
+    mark.textContent = title || '';
+    // An image-only slide would otherwise reserve a line's worth of empty space.
+    if (!title) mark.style.display = 'none';
+
     var s2 = el('div',
       'color:rgba(255,255,255,.82);font-size:clamp(15px,1.7vw,27px);font-weight:400;text-align:center;' +
-      'max-width:74vw;opacity:0;transform:translateY(18px);' +
-      'transition:all .6s cubic-bezier(.22,1,.36,1) .12s;',
-      scrim
+      'max-width:74vw;opacity:0;transform:' + m.sub[0] + ';transition:' + m.sub[1] + ';',
+      stack
     );
     s2.textContent = sub || '';
     var btn = null;
@@ -569,16 +666,20 @@
       btn = el('div',
         'margin-top:12px;padding:13px 30px;border-radius:11px;background:#f47125;color:#fff;' +
         'font-weight:600;font-size:clamp(14px,1.25vw,20px);box-shadow:0 14px 40px rgba(244,113,37,.4);' +
-        'opacity:0;transform:translateY(18px);transition:all .6s cubic-bezier(.22,1,.36,1) .24s;',
-        scrim
+        'opacity:0;transform:' + m.cta[0] + ';transition:' + m.cta[1] + ';',
+        stack
       );
       btn.textContent = cta;
     }
+
     requestAnimationFrame(function () {
       scrim.style.opacity = '1';
-      mark.style.opacity = '1'; mark.style.transform = 'translateY(0)';
-      s2.style.opacity = '1'; s2.style.transform = 'translateY(0)';
-      if (btn) { btn.style.opacity = '1'; btn.style.transform = 'translateY(0)'; }
+      if (pic) pic.style.transform = 'scale(1)';
+      if (panel) panel.style.transform = 'translateX(110%)';
+      if (m.stack) { stack.style.opacity = '1'; stack.style.transform = 'none'; }
+      mark.style.opacity = '1'; mark.style.transform = 'none';
+      s2.style.opacity = '1'; s2.style.transform = 'none';
+      if (btn) { btn.style.opacity = '1'; btn.style.transform = 'none'; }
     });
     return scrim;
   }
@@ -603,7 +704,7 @@
 
   // ---------------------------------------------------------------- API
   window.__zen = {
-    __v: 7,
+    __v: 8,
 
     mount: function () { mount(); return true; },
 
@@ -673,7 +774,7 @@
     halo: function (rect) { halo(rect, !!rect); return true; },
 
     caption: caption,
-    card: function (t, s2, cta) { card(t, s2, cta); return true; },
+    card: function (t, s2, cta, opts) { card(t, s2, cta, opts); return true; },
     clearCard: clearCard,
 
     find: function (spec) { return find(spec); },

@@ -19,11 +19,6 @@ const slides = [
     headline: <>Empower your business<br />to scale endlessly</>,
   },
   {
-    video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053636/zeneva/zeneva_welcome_signup_video_3.mp4',
-    poster: '/signup-video-3-poster.jpg',
-    headline: <>Get detailed insights,<br />in real-time</>,
-  },
-  {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053621/zeneva/zeneva_welcome_signup_video_2.mp4',
     poster: '/signup-video-2-poster.jpg',
     headline: <>Manage your inventory<br />with absolute ease</>,

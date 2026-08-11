@@ -633,7 +633,7 @@ async function record(opts, flowId, device, theme, creds, live) {
     // one path for coded flows and recipes alike. See registry.cards.
     if (cards.open) {
       ctl.setStep('opening card');
-      await page.card(cards.open.title, cards.open.subtitle, cards.open.cta, cards.open.ms);
+      await page.card(cards.open);
       await page.clearCard();
     }
 
@@ -647,7 +647,7 @@ async function record(opts, flowId, device, theme, creds, live) {
     if (released) await sleep(released.ms + 120);
     if (cards.end) {
       ctl.setStep('closing card');
-      await page.card(cards.end.title, cards.end.subtitle, cards.end.cta, cards.end.ms);
+      await page.card(cards.end);
     }
     await sleep(500);
 

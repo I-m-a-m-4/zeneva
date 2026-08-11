@@ -1,17 +1,24 @@
 /**
  * Shared contract between the recorder control panel and the route that runs it.
  *
- * Deliberately no `'use client'` and no imports: the UI reads these lists to draw
- * its controls, and `/api/admin/record` reads the *same* lists to validate what
- * arrives. One definition means a flow the UI can offer is exactly a flow the
+ * Deliberately no `'use client'` and no runtime imports: the UI reads these lists
+ * to draw its controls, and `/api/admin/record` reads the *same* lists to validate
+ * what arrives. One definition means a flow the UI can offer is exactly a flow the
  * route will accept — a second copy would eventually drift, and the failure mode
  * of that drift is an allow-list with a hole in it.
+ *
+ * The one import is `SlideMotion`, and it is `import type`, so it is erased at
+ * build and this file still pulls nothing into either bundle. The alternative was
+ * writing the motion union out a second time here, which is the exact drift the
+ * paragraph above is about.
  *
  * The recorder itself (`scripts/record/`) is a standalone Node CLI and does not
  * import this file. It has its own `FLOWS` map, which is the real source of
  * truth; `FLOWS` here must be kept in step with it. Nothing in `src/` is on the
  * recorder's code path, which is what keeps the CLI deletable.
  */
+
+import type { SlideMotion } from './slides';
 
 export const FLOW_IDS = ['pos', 'inventory', 'zen'] as const;
 export const DEVICE_IDS = ['desktop', 'mobile'] as const;
@@ -106,11 +113,22 @@ export type RecipeStep =
   | { kind: 'punch'; to?: number; spec?: TargetSpec; ms?: number }
   | { kind: 'wide'; ms?: number };
 
+/**
+ * A title screen.
+ *
+ * `motion` and `image` are optional and stay that way: every preset, recipe and
+ * saved card written before slides existed omits them, and must keep playing
+ * exactly as it did. Absent `motion` means `rise`, the look the overlay has
+ * always drawn. See `./slides` for the catalogue and the validators.
+ */
 export type TitleCard = {
   title: string;
   subtitle?: string;
   cta?: string;
   ms?: number;
+  motion?: SlideMotion;
+  /** A `data:image/...;base64` still, full-bleed behind the words. */
+  image?: string | null;
 };
 
 export type Recipe = {
