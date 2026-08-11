@@ -1827,8 +1827,12 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           ]);
           const sum = (rows: any[], k: string) => rows.reduce((s, r) => s + (r[k] ?? 0), 0);
           const retail = products.reduce((s, p) => s + Math.max(0, p.stock ?? 0) * (p.price ?? 0), 0);
-          const low = products.filter((p) => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length;
-          const negative = products.filter((p) => (p.stock ?? 0) < 0).length;
+          // Stock counts exclude services: they sit in the same collection and
+          // carry stock 0 because the field is shared, so counting them makes
+          // every service read as "out of stock". See `isServiceItem`.
+          const stocked = products.filter((p) => !isServiceItem(p));
+          const low = stocked.filter((p) => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length;
+          const negative = stocked.filter((p) => (p.stock ?? 0) < 0).length;
           return {
             type: 'METRICS',
             title: 'Business snapshot',
@@ -1837,7 +1841,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               count('Sales today', todayRows.length),
               money('Revenue this month', sum(monthRows, 'total')),
               money('Profit this month', sum(monthRows, 'profit')),
-              money('Stock at retail', retail),
+              money('Unsold stock value', retail),
               count('Low stock items', low),
             ],
             flags: [
