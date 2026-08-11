@@ -123,6 +123,24 @@ function ProductRowSkeleton() {
 
 const PRODUCTS_PER_PAGE = 60;
 
+/**
+ * A service has no stock to run out of.
+ *
+ * Services sit in the same collection as products and carry `stock: 0` because
+ * the field is shared, not because there is none left. So every stock-health
+ * check has to skip them — counting a haircut as "out of stock" tells the owner
+ * to restock something that was never stocked, and buries the products that
+ * genuinely did run out.
+ *
+ * Module-level on purpose: the stock filter, the health tiles and the health
+ * table all need the same answer, and this used to be defined inside one memo
+ * where the other two could not reach it.
+ */
+const isService = (p: Product) =>
+  p.categoryType === 'service' ||
+  p.category?.toLowerCase() === 'service' ||
+  p.category?.toLowerCase() === 'services';
+
 function InventoryPageSkeleton() {
   return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -250,9 +268,7 @@ function InventoryPageContent() {
       valid = valid.filter(p => p.category === categoryFilter);
     }
 
-    // 4. Stock Status (Services are usually 0 stock but shouldn't trigger 'Out of Stock' filters)
-    const isService = (p: Product) => p.categoryType === 'service' || p.category?.toLowerCase() === 'service' || p.category?.toLowerCase() === 'services';
-
+    // 4. Stock Status — services are skipped, see `isService`.
     if (stockFilter === 'out-of-stock') {
       valid = valid.filter(p => !isService(p) && (p.stock || 0) === 0);
     } else if (stockFilter === 'debt') {
@@ -292,10 +308,14 @@ function InventoryPageContent() {
     let missing = 0, oos = 0, low = 0, neg = 0, total = 0;
     products.forEach(p => {
       let isUnhealthy = false;
+      // A missing image is worth flagging on a service too — it still shows on
+      // the storefront. The three stock counts below are not: see `isService`.
       if (!p.imageUrl) { missing++; isUnhealthy = true; }
-      if (p.stock === 0) { oos++; isUnhealthy = true; }
-      if (p.stock !== undefined && p.stock > 0 && p.stock <= 5) { low++; isUnhealthy = true; }
-      if (p.stock !== undefined && p.stock < 0) { neg++; isUnhealthy = true; }
+      if (!isService(p)) {
+        if (p.stock === 0) { oos++; isUnhealthy = true; }
+        if (p.stock !== undefined && p.stock > 0 && p.stock <= 5) { low++; isUnhealthy = true; }
+        if (p.stock !== undefined && p.stock < 0) { neg++; isUnhealthy = true; }
+      }
       if (isUnhealthy) total++;
     });
     return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total };
@@ -303,16 +323,19 @@ function InventoryPageContent() {
 
   const displayedProducts = React.useMemo(() => {
     if (activeTab === 'all') return filteredProducts;
-    
-    // Health tab filtering
+
+    // Health tab filtering. Mirrors healthMetrics above exactly — a tile that
+    // counts 4 and a table that lists 7 is worse than either alone.
     return filteredProducts.filter(p => {
       if (healthFilter === 'missing-image') return !p.imageUrl;
-      if (healthFilter === 'out-of-stock') return p.stock === 0;
-      if (healthFilter === 'low-stock') return p.stock !== undefined && p.stock > 0 && p.stock <= 5;
-      if (healthFilter === 'negative') return p.stock !== undefined && p.stock < 0;
-      
+      if (healthFilter === 'out-of-stock') return !isService(p) && p.stock === 0;
+      if (healthFilter === 'low-stock') return !isService(p) && p.stock !== undefined && p.stock > 0 && p.stock <= 5;
+      if (healthFilter === 'negative') return !isService(p) && p.stock !== undefined && p.stock < 0;
+
       // 'all' health issues
-      return !p.imageUrl || p.stock === 0 || (p.stock !== undefined && p.stock > 0 && p.stock <= 5) || (p.stock !== undefined && p.stock < 0);
+      if (!p.imageUrl) return true;
+      if (isService(p)) return false;
+      return p.stock === 0 || (p.stock !== undefined && p.stock > 0 && p.stock <= 5) || (p.stock !== undefined && p.stock < 0);
     });
   }, [filteredProducts, activeTab, healthFilter]);
 
