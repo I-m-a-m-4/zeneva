@@ -135,6 +135,18 @@ interface POSContextType {
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
+/**
+ * How many of the newest online orders the context's real-time listener holds.
+ *
+ * The consumers only ever look at a slice: the layout's new-order alert wants
+ * the latest pending order, the dashboard sums the range it has selected, and
+ * the online-orders page runs its own query for the table. Pulling the entire
+ * subcollection on every attach re-billed the store's whole order history each
+ * time the listener (re)connected; keeping the newest 200 keeps any realistically
+ * open order visible while capping the read.
+ */
+const ONLINE_ORDERS_LISTENER_LIMIT = 200;
+
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
@@ -187,6 +199,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // If no previous sync, default to 24 hours ago to catch recent changes on first load
     return stored || (Date.now() - 24 * 60 * 60 * 1000);
   });
+
+  /**
+   * Delta-sync bookkeeping, held in refs rather than read out of state.
+   *
+   * `refreshData` used to list `lastSyncedTimestamp` in its dependency array
+   * while also calling `setLastSyncedTimestamp` on every successful pass. That
+   * handed the callback a fresh identity after each sync — and the "Initial
+   * Delta Sync" effect further down lists `refreshData` as a dependency, so it
+   * tore down, re-armed its 2s timer and synced again. Forever, for as long as
+   * the app stayed open.
+   *
+   * The old `isSyncing` guard could not stop it, because the silent path skips
+   * `setIsSyncing` entirely (both calls are behind `if (!silent)`), so the flag
+   * never became true on the path that was looping. `syncInFlightRef` is set on
+   * both paths and is what actually prevents overlapping runs.
+   *
+   * This mattered financially: Firestore bills a minimum of one document read
+   * per query even when the query matches nothing, so three delta queries every
+   * ~2.5s charged reads all day on a session that was doing nothing at all.
+   */
+  const lastSyncedTimestampRef = useRef(lastSyncedTimestamp);
+  const syncInFlightRef = useRef(false);
 
   // 🌐 INTELLIGENT CONNECTIVITY ENGINE
   // navigator.onLine can give false positives (e.g. connected to a WiFi hotspot with no cellular data)
@@ -471,7 +505,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialCustomers, isLoading: isLoadingCustomers, mutate: mutateCustomers } = useCollection<Customer>(customersQuery);
 
 
-  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders')) : null), [canFetchSubData, businessId, firestore]);
+  // Online orders are the last remaining real-time listener on this context —
+  // its three siblings above are all disabled. Bounded to the newest
+  // ONLINE_ORDERS_LISTENER_LIMIT instead of the whole subcollection: the layout's
+  // alert effect only needs the latest pending order, the dashboard only counts
+  // orders inside the selected date range, and the online-orders page runs its
+  // own (also bounded) query for the full table. A status filter cannot be
+  // added here — it would need a composite index and would miss orders whose
+  // status the snapshot page is about to flip.
+  const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ONLINE_ORDERS_LISTENER_LIMIT)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
   const allProducts = useMemo(() => {
@@ -697,13 +739,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // --- Functions ---
   const refreshData = useCallback(async (silent = false) => {
     const isOnline = isRealOnline;
-    if (!user || !businessId || !firestore || isSyncing || !isOnline) return;
-    
+    if (!user || !businessId || !firestore || !isOnline) return;
+    // Guards on the ref, not on `isSyncing`: the silent path never sets that
+    // state, so it was unprotected against overlapping runs.
+    if (syncInFlightRef.current) return;
+
+    syncInFlightRef.current = true;
     if (!silent) setIsSyncing(true);
     try {
       // Delta Sync: Only fetch documents updated since our last check
       // This turns 10,000 reads into 1-10 reads.
-      const lastCheck = new Date(lastSyncedTimestamp);
+      const lastCheck = new Date(lastSyncedTimestampRef.current);
       
       const pQuery = query(collection(firestore, "products"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
@@ -759,6 +805,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
         });
       }
       const now = Date.now();
+      // Ref first so the next call reads the new window even within this tick;
+      // the state copy is kept for anything rendering the last-sync time.
+      lastSyncedTimestampRef.current = now;
       setLastSyncedTimestamp(now);
       secureStorage.setItem('pos_last_synced_timestamp', now);
 
@@ -770,9 +819,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
       if (!silent) console.error("Delta Sync Failed:", error);
     } finally {
+      syncInFlightRef.current = false;
       if (!silent) setIsSyncing(false);
     }
-  }, [businessId, firestore, isSyncing, lastSyncedTimestamp, toast, isRealOnline]);
+  }, [businessId, firestore, toast, isRealOnline, user]);
 
   const fetchInitialReceipts = useCallback(async () => {
     if (!user || !businessId || !firestore || !isRealOnline) return;
@@ -2123,15 +2173,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [isMounted, businessId, firestore, isRealOnline, user]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
+  // Runs once per online session. The "no-op → reconnect → effect re-fires"
+  // dance is all this needs: a per-mount latch would break the legitimate
+  // retry after a lost connection, while keeping `refreshData` out of the deps
+  // stops the setLastSyncedTimestamp → new identity → re-arm cycle that used to
+  // re-query every ~2.5s for the lifetime of the session.
   useEffect(() => {
     if (!businessId || !isRealOnline || !firestore) return;
 
+    let cancelled = false;
     const timeout = setTimeout(() => {
-      refreshData(true); // Run silently to avoid flickering or showing messages
+      if (!cancelled) refreshData(true); // Run silently to avoid flickering or showing messages
     }, 2000);
 
-    return () => clearTimeout(timeout);
-  }, [businessId, isRealOnline, firestore, refreshData]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, isRealOnline, firestore]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);

@@ -24,7 +24,19 @@ import { format } from 'date-fns';
  * The hook handles:
  *   - Tab visibility changes (pauses when hidden, resumes on focus)
  *   - Page unloads (`beforeunload`) to flush the final partial session
- *   - Heartbeat every 60 s while the tab is visible (keeps `lastSeen` fresh)
+ *   - Heartbeat every 2 minutes while the tab is visible (keeps `lastSeen` fresh)
+ *
+ * Write cadence: a 30-second heartbeat meant ~2,880 `updateDoc` calls per user
+ * per 8-hour day, and this is the app's highest-frequency write path.
+ * `totalUsageSeconds` is an `increment` of elapsed time, not a tick counter, so
+ * the interval only decides how stale `lastSeen` can get — accumulated time
+ * stays exact at any cadence because `pauseSession` and the `beforeunload`
+ * handler both flush.
+ *
+ * The ceiling is the presence indicator: `user-primitives.tsx` calls a user
+ * online when `lastSeen` is under 5 minutes old, so a 5-minute heartbeat would
+ * sit exactly on that boundary and blink active users offline. 2 minutes stays
+ * comfortably inside the window and still cuts the write rate 4x.
  */
 export function useSessionTracker(userId: string | null | undefined) {
   const sessionStartRef = useRef<number | null>(null);
@@ -106,7 +118,7 @@ export function useSessionTracker(userId: string | null | undefined) {
     const startHeartbeat = () => {
       heartbeatRef.current = setInterval(() => {
         flush('heartbeat');
-      }, 30_000); // every 30 seconds
+      }, 2 * 60_000); // every 2 minutes — see the cadence note in the file header
     };
 
     const stopHeartbeat = () => {

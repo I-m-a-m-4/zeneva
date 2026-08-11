@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, updateDoc, limit, getAggregateFromServer, count, sum } from 'firebase/firestore';
 import type { OnlineOrder } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { Loader2, Globe, MoreHorizontal, CheckCircle, Clock, Info, XCircle, Doll
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import RefreshButton from '@/components/shared/refresh-button';
+import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,26 +56,66 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | 
     cancelled: 'destructive',
 }
 
+/**
+ * How many orders the table lists. The listener was previously unbounded, so
+ * every attach re-billed the store's entire order history. The lifetime figures
+ * on the stat cards come from a server-side aggregation instead, so bounding
+ * this only affects how far back the table scrolls.
+ */
+const ONLINE_ORDERS_PAGE_LIMIT = 200;
+
 export default function OnlineOrdersPage() {
     const { business, isLoading: isPosLoading, currencySymbol, triggerRefresh } = usePOS();
     const firestore = useFirestore();
     const { toast } = useToast();
 
     const onlineOrdersQuery = useMemoFirebase(
-        () => business?.id ? query(collection(firestore, 'businessInstances', business.id, 'onlineOrders'), orderBy('createdAt', 'desc')) : null,
+        () => business?.id ? query(collection(firestore, 'businessInstances', business.id, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ONLINE_ORDERS_PAGE_LIMIT)) : null,
         [business?.id, firestore]
     );
 
     const { data: onlineOrders, isLoading: isLoadingOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
     const isLoading = isPosLoading || isLoadingOrders;
 
-    const analytics = React.useMemo(() => {
-        if (!onlineOrders) return { totalRevenue: 0, totalOrders: 0, averageOrderValue: 0 };
-        const totalRevenue = onlineOrders.reduce((sum, order) => sum + order.total, 0);
-        const totalOrders = onlineOrders.length;
-        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-        return { totalRevenue, totalOrders, averageOrderValue };
-    }, [onlineOrders]);
+    /**
+     * Lifetime totals, computed on the server.
+     *
+     * These three cards used to be derived by reducing over every document the
+     * listener had downloaded, which is why the listener was unbounded — the
+     * table shows the newest orders, but the cards claimed to cover all of them.
+     * An aggregation query returns the same numbers without transferring (or
+     * billing for) a single order document, so the table can be bounded above
+     * without the cards quietly becoming "last 200 orders".
+     */
+    const [analytics, setAnalytics] = React.useState({ totalRevenue: 0, totalOrders: 0, averageOrderValue: 0 });
+
+    // Recomputed when a new order lands (the newest id changes), not on every
+    // snapshot: a status edit does not move revenue or the order count.
+    const newestOrderId = onlineOrders?.[0]?.id;
+
+    React.useEffect(() => {
+        if (!business?.id || !firestore) return;
+        let cancelled = false;
+
+        getAggregateFromServer(
+            collection(firestore, 'businessInstances', business.id, 'onlineOrders'),
+            { totalOrders: count(), totalRevenue: sum('total') }
+        ).then(snap => {
+            if (cancelled) return;
+            const totalOrders = snap.data().totalOrders || 0;
+            const totalRevenue = snap.data().totalRevenue || 0;
+            setAnalytics({
+                totalOrders,
+                totalRevenue,
+                averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+            });
+        }).catch(() => {
+            // Aggregation is a nicety; a failure here must not blank the page.
+            // The table below is driven by its own listener and is unaffected.
+        });
+
+        return () => { cancelled = true; };
+    }, [business?.id, firestore, newestOrderId]);
     
     const handleStatusChange = async (orderId: string, status: OnlineOrder['status']) => {
         if (!business?.id) return;

@@ -25,13 +25,14 @@ import {
   ShieldCheck,
   Printer
 } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc, where } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { safeToDate, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { startOfDay, endOfDay } from 'date-fns';
+import { NOTIFICATION_FETCH_LIMIT } from '@/lib/lifecycle-notifications';
 
 interface TerminalAlert {
   id: string;
@@ -153,12 +154,24 @@ export default function TerminalAlertsPage() {
   }, [currentUserProfile?.id, firestore, date]);
 
 
+  // `soundEnabled`, `isLoading` and `alerts.length` are read inside the snapshot
+  // handler below but must not be listener dependencies: every snapshot sets
+  // `alerts` and clears `isLoading`, so listing them re-ran this effect, which
+  // detached and re-attached the listener — and an attach bills every matching
+  // document again. Held in refs so the listener attaches once per user.
+  const soundEnabledRef = React.useRef(soundEnabled);
+  const isLoadingRef = React.useRef(isLoading);
+  const alertCountRef = React.useRef(0);
+  React.useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+  React.useEffect(() => { isLoadingRef.current = isLoading; }, [isLoading]);
+
   React.useEffect(() => {
     if (!currentUserProfile?.id || !firestore) return;
 
     const q = query(
       collection(firestore, `users/${currentUserProfile.id}/notifications`),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(NOTIFICATION_FETCH_LIMIT)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -183,10 +196,11 @@ export default function TerminalAlertsPage() {
       });
 
       // Play alert sound if a new payment alert arrives and we aren't loading first batch
-      if (!isLoading && newAlerts.length > alerts.length && soundEnabled) {
+      if (!isLoadingRef.current && newAlerts.length > alertCountRef.current && soundEnabledRef.current) {
         audioRef.current?.play().catch(err => console.log('Audio playback prevented:', err));
       }
 
+      alertCountRef.current = newAlerts.length;
       setAlerts(newAlerts);
       setIsLoading(false);
     }, (error) => {
@@ -195,7 +209,7 @@ export default function TerminalAlertsPage() {
     });
 
     return () => unsubscribe();
-  }, [currentUserProfile?.id, firestore, soundEnabled, isLoading, alerts.length]);
+  }, [currentUserProfile?.id, firestore]);
 
   // Compute total received via Terminal today
   const dailyTransferReceived = React.useMemo(() => {

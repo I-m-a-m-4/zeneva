@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/components/ui/button';
 import { Bot, HelpCircle, Loader2, Send, MessageSquare, Search as SearchIcon, ShieldCheck, Monitor, Cloud, Github, Zap, Lock, CreditCard, Users, History, Settings, TrendingUp, Info, Paperclip, Mic, Image as ImageIcon, Play, Pause, Trash2, X, Check, CheckCheck, Clock, Reply, ChevronDown } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, setDoc, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, setDoc, orderBy, limit, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +30,14 @@ import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic
 import { useI18n } from '@/context/i18n-context';
 import { ToastAction } from '@/components/ui/toast';
 import { idToken } from '@/lib/id-token';
+
+/**
+ * How many messages of a support thread are loaded. The listener was
+ * unbounded, so a long-running ticket re-downloaded its entire history every
+ * time the thread was opened. 200 covers any realistic conversation; older
+ * messages stay in Firestore and are still visible to the admin side.
+ */
+const SUPPORT_MESSAGE_LIMIT = 200;
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: string[] }[] = [
   // --- CATEGORY: OFFLINE & SYNC (5) ---
@@ -585,8 +593,12 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         }
     }, [threads, isLoadingThreads]);
     
+    // Bounded to the most recent SUPPORT_MESSAGE_LIMIT messages. Fetched
+    // descending and reversed for display below: the thread renders oldest to
+    // newest, so an ascending limit would have kept the *oldest* messages and
+    // hidden the part of the conversation anyone actually needs.
     const messagesQuery = useMemoFirebase(
-        () => (firestore && thread) ? query(collection(firestore, 'supportThreads', thread.id, 'messages'), orderBy('createdAt', 'asc')) : null,
+        () => (firestore && thread) ? query(collection(firestore, 'supportThreads', thread.id, 'messages'), orderBy('createdAt', 'desc'), limit(SUPPORT_MESSAGE_LIMIT)) : null,
         [firestore, thread]
     );
 
@@ -614,7 +626,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     }, [previewUrl]);
 
     const allMessages = React.useMemo(() => {
-        return [...(messages || []), ...optimisticMessages];
+        // messagesQuery fetches newest-first so the limit keeps recent history;
+        // flip it back to chronological for the thread view.
+        const chronological = [...(messages || [])].reverse();
+        return [...chronological, ...optimisticMessages];
     }, [messages, optimisticMessages]);
 
     const scrollToBottom = React.useCallback((behavior: ScrollBehavior = 'smooth') => {

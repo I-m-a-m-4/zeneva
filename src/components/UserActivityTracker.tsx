@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { getCountryFromIP } from '@/lib/utils';
 import { useAuth, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, getDoc, writeBatch, increment } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, onSnapshot, writeBatch, increment } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { usePathname } from 'next/navigation';
 import { AppConfig } from '@/lib/config';
@@ -75,6 +75,16 @@ export function UserActivityTracker() {
     const firstSessionRef = useRef<boolean>(false);
     const firstSessionClaimedRef = useRef<string | null>(null);
 
+    // Fed by the revocation listener below. `null` means it has not reported
+    // yet, which is why the flush distinguishes "known absent" from "unknown"
+    // before deciding whether to stamp createdAt.
+    const sessionDocExistsRef = useRef<boolean | null>(null);
+    const sessionRevokedRef = useRef<boolean>(false);
+    // Resolves on the listener's first report. The flush awaits it so a brand
+    // new session still gets its createdAt stamped — the listener is already
+    // attached by then, so this costs the same wait the old getDoc did.
+    const sessionReadyRef = useRef<Promise<void> | null>(null);
+
     // Record every navigation immediately; the flush below drains this buffer.
     useEffect(() => {
         if (!pathname) return;
@@ -90,6 +100,69 @@ export function UserActivityTracker() {
             sessionLogRef.current.push({ path: pathname, at });
         }
     }, [pathname]);
+
+    /**
+     * Session revocation watch.
+     *
+     * This was a `getDoc(sessionRef)` inside the heartbeat flush, which polled
+     * the document every 5 minutes for as long as a user stayed signed in. A
+     * listener bills one read when it attaches and then only when the document
+     * actually changes, and "sign out this device" from Settings now takes
+     * effect the moment it is toggled rather than on the next poll.
+     *
+     * Deliberately its own effect keyed on [auth, firestore]: the flush effect
+     * below also depends on `pathname`, so attaching here would tear the
+     * listener down and re-attach it — re-billing the read — on every
+     * navigation.
+     */
+    useEffect(() => {
+        if (!auth || !firestore) return;
+
+        let unsubscribeDoc: (() => void) | null = null;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            unsubscribeDoc?.();
+            unsubscribeDoc = null;
+            sessionDocExistsRef.current = null;
+            sessionRevokedRef.current = false;
+
+            if (!user) return;
+
+            const sessionIdKey = `zeneva_session_id_${user.uid}`;
+            let sessionId = sessionStorage.getItem(sessionIdKey);
+            if (!sessionId) {
+                sessionId = crypto.randomUUID();
+                sessionStorage.setItem(sessionIdKey, sessionId);
+            }
+
+            let markReady = () => {};
+            sessionReadyRef.current = new Promise<void>((resolve) => { markReady = resolve; });
+
+            unsubscribeDoc = onSnapshot(
+                doc(firestore, 'users', user.uid, 'sessions', sessionId),
+                (snap) => {
+                    sessionDocExistsRef.current = snap.exists();
+                    sessionRevokedRef.current = !!snap.data()?.revoked;
+                    markReady();
+                    if (sessionRevokedRef.current) {
+                        sessionStorage.removeItem(sessionIdKey);
+                        signOut(auth).catch(() => {});
+                    }
+                },
+                () => {
+                    // Permission errors are expected here: sign-out clears auth
+                    // before the listener is torn down. Release the flush either
+                    // way so a listener that never reports cannot stall it.
+                    markReady();
+                }
+            );
+        });
+
+        return () => {
+            unsubscribeAuth();
+            unsubscribeDoc?.();
+        };
+    }, [auth, firestore]);
 
     useEffect(() => {
         if (!auth || !firestore) return;
@@ -122,15 +195,26 @@ export function UserActivityTracker() {
                 // - Never updated this session
                 // - It's been > 5 minutes
                 if (!lastUpdate || now - parseInt(lastUpdate) > 5 * 60 * 1000) {
-                    // Check if session is revoked only when we're going to update
-                    const sessionSnap = await getDoc(sessionRef);
-                    if (sessionSnap.exists() && sessionSnap.data().revoked) {
-                        await signOut(auth);
-                        sessionStorage.removeItem(sessionIdKey);
-                        return;
+                    // Give the listener a moment to report before deciding
+                    // anything from its refs; capped so an offline client still
+                    // flushes its page views instead of hanging here.
+                    if (sessionReadyRef.current) {
+                        await Promise.race([
+                            sessionReadyRef.current,
+                            new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+                        ]);
                     }
 
-                    const sessionExists = sessionSnap.exists();
+                    // Revocation state comes from the listener rather than a read
+                    // per flush. It signs out on its own, so this is just a guard
+                    // against writing on the way down.
+                    if (sessionRevokedRef.current) return;
+
+                    // `null` means the listener still has not reported. Treating
+                    // unknown as "does not exist" would stamp a fresh createdAt
+                    // over the real one, so let the merge keep the stored value
+                    // and only set it when the doc is known to be absent.
+                    const sessionKnownMissing = sessionDocExistsRef.current === false;
                     const batch = writeBatch(firestore);
                     
                     const isTauriEnv = typeof window !== 'undefined' && (
@@ -156,6 +240,23 @@ export function UserActivityTracker() {
                         }
                     }
 
+                    // ——— Page-visit behavior tracking ———
+                    // Drains the routes accumulated since the last flush. These
+                    // fields ride along on the heartbeat's own set() below: as a
+                    // separate batch.set(userRef, …) they were billed as a second
+                    // write despite touching the same document. Field semantics
+                    // are unchanged — same set(), same merge, same keys.
+                    const pageViewFields: Record<string, any> = {};
+                    const pending = pendingRef.current;
+                    if (pending.length > 0) {
+                        const totals = new Map<string, number>();
+                        pending.forEach(p => totals.set(p.key, (totals.get(p.key) || 0) + 1));
+                        pendingRef.current = [];
+
+                        totals.forEach((count, key) => { pageViewFields[`pageViews.${key}`] = increment(count); });
+                        pageViewFields.pagesVisited = increment([...totals.values()].reduce((a, b) => a + b, 0));
+                    }
+
                     batch.set(userRef, {
                         lastSeen: serverTimestamp(),
                         status: 'active',
@@ -167,15 +268,20 @@ export function UserActivityTracker() {
                         // admin language breakdown costs nothing beyond the
                         // existing heartbeat.
                         language: localeRef.current,
-                        lastPage: pathname || '/'
+                        lastPage: pathname || '/',
+                        ...pageViewFields,
                     }, { merge: true });
 
                     batch.set(sessionRef, {
                         sessionId,
                         userAgent: navigator.userAgent,
                         lastSeen: serverTimestamp(),
-                        createdAt: sessionExists ? sessionSnap.data().createdAt : serverTimestamp(),
-                        revoked: false,
+                        // merge:true keeps whatever is already stored, so these
+                        // two only need writing when the document is new.
+                        // Preserving createdAt is what the removed read was for,
+                        // and re-asserting revoked:false on every heartbeat could
+                        // undo a revocation that landed mid-flush.
+                        ...(sessionKnownMissing ? { createdAt: serverTimestamp(), revoked: false } : {}),
                         deviceInfo: {
                             platform: navigator?.platform || 'Unknown',
                             vendor: navigator?.vendor || 'Unknown',
@@ -183,24 +289,10 @@ export function UserActivityTracker() {
                         }
                     }, { merge: true });
 
-                    // ——— Page-visit behavior tracking ———
-                    // Drains the routes accumulated since the last flush into the
-                    // same batch, so behavior costs nothing beyond the existing
-                    // 5-minute heartbeat. pageViews is a per-route counter on the
-                    // user doc; the journey doc keeps the ordered route log for the
-                    // whole session (first-session onboarding, top pages, funnels).
-                    const pending = pendingRef.current;
-                    if (pending.length > 0) {
-                        const totals = new Map<string, number>();
-                        pending.forEach(p => totals.set(p.key, (totals.get(p.key) || 0) + 1));
-                        pendingRef.current = [];
-
-                        const pageViewUpdate: Record<string, any> = {};
-                        totals.forEach((count, key) => { pageViewUpdate[`pageViews.${key}`] = increment(count); });
-                        pageViewUpdate.pagesVisited = increment([...totals.values()].reduce((a, b) => a + b, 0));
-                        batch.set(userRef, pageViewUpdate, { merge: true });
-                    }
-
+                    // The journey doc keeps the ordered route log for the whole
+                    // session (first-session onboarding, top pages, funnels).
+                    // Per-route counters are not written here — they ride on the
+                    // heartbeat's own set() above, as `pageViewFields`.
                     const routeLog = sessionLogRef.current.slice(-400);
                     if (routeLog.length > 0) {
                         const journeyRef = doc(firestore, 'users', user.uid, 'journey', sessionId);

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, writeBatch } from 'firebase/firestore';
 import { usePOS } from '@/context/pos-context';
 import type { UserNotification, AdminNotification } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Markdown } from '@/components/ai-insights/markdown';
 import { openExternal } from '@/lib/platform';
-import { collapseDuplicateNotifications } from '@/lib/lifecycle-notifications';
+import { collapseDuplicateNotifications, NOTIFICATION_FETCH_LIMIT } from '@/lib/lifecycle-notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -25,14 +25,18 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Same bound as the bell listener in the app layout — see
+  // NOTIFICATION_FETCH_LIMIT. This page duplicates both of the layout's
+  // queries, so visiting it attaches a second copy of each; unbounded, that was
+  // a second full download of the platform-wide broadcast collection.
   const userNotificationsQuery = useMemoFirebase(
-    () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
+    () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc'), limit(NOTIFICATION_FETCH_LIMIT)) : null),
     [firestore, currentUserProfile?.id]
   );
   const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
 
   const adminNotificationsQuery = useMemoFirebase(
-    () => (currentUserProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
+    () => (currentUserProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc'), limit(NOTIFICATION_FETCH_LIMIT)) : null),
     [currentUserProfile, firestore]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);

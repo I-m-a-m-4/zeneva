@@ -48,6 +48,7 @@ import {
   lifecycleNotificationId,
   toDateOrNull,
   collapseDuplicateNotifications,
+  NOTIFICATION_FETCH_LIMIT,
 } from '@/lib/lifecycle-notifications';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
@@ -213,7 +214,10 @@ export default function AuthenticatedLayout({
   React.useEffect(() => {
     if (!firestore || !user) return;
     const broadcastsRef = collection(firestore, 'ceo_broadcasts');
-    const q = query(broadcastsRef, orderBy('createdAt', 'desc'));
+    // limit(1): only `snapshot.docs[0]` is ever read below, but without the
+    // limit the listener downloaded — and billed — every broadcast ever sent,
+    // on every session.
+    const q = query(broadcastsRef, orderBy('createdAt', 'desc'), limit(1));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) return;
@@ -360,14 +364,19 @@ export default function AuthenticatedLayout({
     return '/';
   }, []);
 
+  // Both listeners are bounded on the server, not just in the `.slice(0, 20)`
+  // below. This layout is persistent, so an unbounded query here re-downloaded
+  // — and re-billed — the whole collection on every attach, for every session.
+  // `notifications` is the platform-wide collection, so that cost was
+  // (every announcement ever sent) × (every tenant), growing permanently.
   const userNotificationsQuery = useMemoFirebase(
-    () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc')) : null),
+    () => (currentUserProfile ? query(collection(firestore, `users/${currentUserProfile.id}/notifications`), orderBy('createdAt', 'desc'), limit(NOTIFICATION_FETCH_LIMIT)) : null),
     [firestore, currentUserProfile?.id]
   );
   const { data: userNotifications, isLoading: isLoadingUserNotifications } = useCollection<UserNotification>(userNotificationsQuery);
 
   const adminNotificationsQuery = useMemoFirebase(
-    () => (currentUserProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')) : null),
+    () => (currentUserProfile ? query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc'), limit(NOTIFICATION_FETCH_LIMIT)) : null),
     [currentUserProfile, firestore]
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);

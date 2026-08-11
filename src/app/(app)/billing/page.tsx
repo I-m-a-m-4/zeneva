@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { BusinessInstance, SubscriptionHistory, UserProfile } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,7 +86,10 @@ function BillingPage() {
 
   const subscriptionHistoryQuery = useMemoFirebase(() => {
     if (!currentBusiness?.id || !firestore) return null;
-    return query(collection(firestore, 'businessInstances', currentBusiness.id, 'subscription_history'), orderBy('timestamp', 'desc'));
+    // Bounded: the page renders this as a flat list with no pagination, and a
+    // long-lived account accumulates a row per renewal. Newest 50 is well past
+    // what anyone scrolls, and the ordering already puts them first.
+    return query(collection(firestore, 'businessInstances', currentBusiness.id, 'subscription_history'), orderBy('timestamp', 'desc'), limit(50));
   }, [currentBusiness?.id, firestore]);
   const { data: subscriptionHistory, isLoading: isHistoryLoading } = useCollection<SubscriptionHistory>(subscriptionHistoryQuery);
   

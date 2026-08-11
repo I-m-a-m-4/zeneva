@@ -4,11 +4,11 @@
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getAggregateFromServer, count, sum } from 'firebase/firestore';
 import type { Receipt } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2, Bot } from 'lucide-react';
+import { DollarSign, FileText, Package, PieChart, ShoppingCart, Users, Download, Loader2, Bot, Info } from 'lucide-react';
 import SalesOverTimeChart from './sales-over-time-chart';
 import TopProductsChart from './top-products-chart';
 import { DateRangePicker } from './date-range-picker';
@@ -52,6 +52,19 @@ function PlaceholderChart({ title, description }: { title: string, description: 
     );
 };
 
+/**
+ * How many receipts the charts and tables below load for the selected range.
+ *
+ * The listener used to be unbounded: opening Reports on a busy store pulled
+ * every receipt in the window, and re-pulled them on each range change. The
+ * headline figures come from a server-side aggregation instead, so this bound
+ * only limits how much detail the charts draw — and `businessId ASC +
+ * createdAt DESC` is already a deployed index, so ordering newest-first costs
+ * nothing. Ordering matters: without an explicit orderBy, Firestore's implicit
+ * ascending order would make a limit keep the *oldest* receipts in range.
+ */
+const REPORT_RECEIPT_LIMIT = 2000;
+
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading } = usePOS();
     const firestore = useFirestore();
@@ -75,21 +88,81 @@ export default function ReportsDashboard() {
             toDate.setHours(23, 59, 59, 999);
             q = query(q, where('createdAt', '<=', toDate));
         }
-        return q;
+        // Newest-first, then bounded — see REPORT_RECEIPT_LIMIT.
+        return query(q, orderBy('createdAt', 'desc'), limit(REPORT_RECEIPT_LIMIT));
     }, [business?.id, firestore, date]);
 
     const { data: receipts, isLoading: isLoadingReceipts } = useCollection<Receipt>(receiptsQuery);
-    
+
     const isLoading = isPosLoading || isLoadingReceipts;
+
+    /**
+     * Range totals, computed on the server.
+     *
+     * Revenue and sales count must cover the whole selected range, not just the
+     * REPORT_RECEIPT_LIMIT receipts the charts loaded, so they come from an
+     * aggregation query — which returns the numbers without transferring, or
+     * billing for, a single receipt document.
+     */
+    const [rangeTotals, setRangeTotals] = React.useState<{ totalRevenue: number; totalSales: number } | null>(null);
+
+    React.useEffect(() => {
+        if (!business?.id || !firestore) return;
+        let cancelled = false;
+        setRangeTotals(null);
+
+        let q = query(collection(firestore, 'receipts'), where('businessId', '==', business.id));
+        if (date?.from) q = query(q, where('createdAt', '>=', date.from));
+        if (date?.to) {
+            const toDate = new Date(date.to);
+            toDate.setHours(23, 59, 59, 999);
+            q = query(q, where('createdAt', '<=', toDate));
+        }
+
+        getAggregateFromServer(q, { totalSales: count(), totalRevenue: sum('total') })
+            .then(snap => {
+                if (cancelled) return;
+                setRangeTotals({
+                    totalSales: snap.data().totalSales || 0,
+                    totalRevenue: snap.data().totalRevenue || 0,
+                });
+            })
+            .catch(() => {
+                // Falls back to the figures derived from the loaded receipts
+                // below; never blanks the page.
+            });
+
+        return () => { cancelled = true; };
+    }, [business?.id, firestore, date]);
 
     const reportData = React.useMemo(() => {
         if (isLoading || !receipts || !products || !customers) return null;
 
-        const totalRevenue = receipts.reduce((sum, r) => sum + r.total, 0);
-        const totalSales = receipts.length;
+        // Prefer the server aggregation, which covers the entire range; the
+        // reduce over loaded receipts is the fallback for when it has not
+        // resolved yet or failed.
+        const totalRevenue = rangeTotals?.totalRevenue ?? receipts.reduce((sum, r) => sum + r.total, 0);
+        const totalSales = rangeTotals?.totalSales ?? receipts.length;
         const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
         const inventoryValue = products.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
         const totalProductsSold = receipts.reduce((sum, r) => sum + r.items.length, 0);
+
+        /**
+         * True when the range holds more receipts than REPORT_RECEIPT_LIMIT
+         * loaded, so everything derived by reducing over `receipts` — products
+         * sold, both charts, recent sales, top customers — describes the newest
+         * REPORT_RECEIPT_LIMIT sales rather than the whole range.
+         *
+         * Revenue and sales count are unaffected: they come from the server
+         * aggregation above and stay exact at any range size.
+         *
+         * This is surfaced in the UI rather than papered over. `sum()` needs a
+         * scalar field and a receipt's items are an array, so there is no
+         * server-side way to total units; denormalising a count at sale time
+         * would only cover new receipts and would make the figure quietly wrong
+         * for historical ones instead of visibly partial.
+         */
+        const isPartialRange = rangeTotals !== null && rangeTotals.totalSales > receipts.length;
 
         return {
             totalRevenue,
@@ -98,9 +171,11 @@ export default function ReportsDashboard() {
             inventoryValue,
             totalCustomers: customers.length,
             totalProductsSold,
+            isPartialRange,
+            loadedReceiptCount: receipts.length,
         }
 
-    }, [receipts, products, customers, isLoading]);
+    }, [receipts, products, customers, isLoading, rangeTotals]);
     
     const handleDownloadImage = async () => {
         const element = dashboardRef.current;
@@ -156,17 +231,29 @@ export default function ReportsDashboard() {
                         value={`${currencySymbol}${reportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0.00'}`}
                         icon={FileText}
                     />
-                    <ReportStatCard 
-                        title="Products Sold"
+                    <ReportStatCard
+                        title={reportData?.isPartialRange ? 'Products Sold (partial)' : 'Products Sold'}
                         value={reportData?.totalProductsSold.toLocaleString() || '0'}
                         icon={Package}
                     />
-                    <ReportStatCard 
+                    <ReportStatCard
                         title="Total Customers"
                         value={reportData?.totalCustomers.toLocaleString() || '0'}
                         icon={Users}
                     />
                 </div>
+
+                {reportData?.isPartialRange && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                        <Info className="h-4 w-4 shrink-0 mt-px" />
+                        <p>
+                            <span className="font-semibold">Total Revenue</span> and <span className="font-semibold">Total Sales</span> cover
+                            this entire range. This range holds {reportData.totalSales.toLocaleString()} sales, so
+                            Products Sold, the charts, recent sales and top customers below are based on the
+                            most recent {reportData.loadedReceiptCount.toLocaleString()}. Choose a shorter range to include every sale.
+                        </p>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <div className="lg:col-span-3">

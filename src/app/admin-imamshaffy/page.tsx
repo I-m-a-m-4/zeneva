@@ -114,6 +114,7 @@ import {
     deleteDoc,
     onSnapshot,
     limit,
+    getCountFromServer,
 } from 'firebase/firestore';
 import { format, formatDistanceToNow, subDays, differenceInDays, startOfDay, endOfDay } from 'date-fns';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -225,7 +226,37 @@ const PIE_CHART_COLORS = {
     Lifetime: '#10b981' // Emerald
 };
 
-function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, payingBusinessesCount, businesses }: { 
+/**
+ * Total size of a collection, counted on the server.
+ *
+ * The admin log listeners are bounded to ADMIN_LOG_LIMIT rows, so the headings
+ * that used to read `rows.length` would now stop at the limit and misreport the
+ * platform totals. An aggregation query bills a fraction of a read no matter how
+ * large the collection is, instead of one read per document, and it is what lets
+ * those listeners be bounded without the numbers changing.
+ *
+ * Returns null until it resolves (and if it fails), so callers fall back to the
+ * loaded row count rather than flashing a zero.
+ */
+function useCollectionCount(path: string, isCollectionGroup = false): number | null {
+    const firestore = useFirestore();
+    const [total, setTotal] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (!firestore) return;
+        let cancelled = false;
+
+        getCountFromServer(isCollectionGroup ? collectionGroup(firestore, path) : collection(firestore, path))
+            .then(snap => { if (!cancelled) setTotal(snap.data().count); })
+            .catch(() => { /* falls back to the loaded row count */ });
+
+        return () => { cancelled = true; };
+    }, [firestore, path, isCollectionGroup]);
+
+    return total;
+}
+
+function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, payingBusinessesCount, businesses }: {
     open: boolean; 
     onOpenChange: (open: boolean) => void; 
     validPurchases: any[]; 
@@ -234,6 +265,10 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
     payingBusinessesCount: number; 
     businesses: BusinessInstance[] | null;
 }) {
+    // The attempts list is capped at ADMIN_LOG_LIMIT rows, so the tab heading is
+    // counted on the server rather than taken from the loaded array.
+    const checkoutAttemptsTotal = useCollectionCount('checkout_attempts');
+
     const getStandardMRR = (planName: string, pCurrency: string) => {
         const name = (planName || '').toLowerCase();
         const isUSD = pCurrency === 'USD';
@@ -289,7 +324,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                 <Tabs defaultValue="transactions" className="w-full mt-4">
                     <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                         <TabsTrigger value="transactions" className="snap-start shrink-0">Active Transactions ({validPurchases.length})</TabsTrigger>
-                        <TabsTrigger value="attempts" className="snap-start shrink-0">Checkout Click Attempts ({checkoutAttempts.length})</TabsTrigger>
+                        <TabsTrigger value="attempts" className="snap-start shrink-0">Checkout Click Attempts ({checkoutAttemptsTotal ?? checkoutAttempts.length})</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="transactions" className="space-y-4 mt-2">
@@ -1874,6 +1909,15 @@ function AdminDashboardContent({
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    // Platform totals for the tab headings. The listeners feeding these tables
+    // are capped at ADMIN_LOG_LIMIT rows, so the headings are counted on the
+    // server; each falls back to the loaded row count until it resolves.
+    const applicationsTotal = useCollectionCount('job_applications');
+    const grantsTotal = useCollectionCount('grants');
+    const storefrontSharesTotal = useCollectionCount('storefront_shares');
+    const receiptSharesTotal = useCollectionCount('receipt_shares');
+    const onlineOrdersTotal = useCollectionCount('onlineOrders', true);
+
     const normalizeTimestamp = (ts: any) => {
         if (!ts) return { toDate: () => new Date() };
         if (typeof ts.toDate === 'function') return ts;
@@ -1908,7 +1952,9 @@ function AdminDashboardContent({
         });
     }, [receipts, businesses]);
 
-    const systemBroadcastsQuery = useMemoFirebase(() => query(collection(firestore, 'system_broadcasts'), orderBy('createdAt', 'desc')), [firestore]);
+    // Bounded: the Comms Center renders this as a newest-first history list with
+    // no pagination, and every broadcast ever sent accumulates here.
+    const systemBroadcastsQuery = useMemoFirebase(() => query(collection(firestore, 'system_broadcasts'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const { data: systemBroadcasts } = useCollection<any>(systemBroadcastsQuery);
 
     const [grantEmail, setGrantEmail] = useState('');
@@ -3013,7 +3059,7 @@ function AdminDashboardContent({
                     </TabsTrigger>
                     <TabsTrigger value="storefront-orders" className="gap-2 snap-start shrink-0">
                         <Store className="h-4 w-4" />
-                        Storefronts & Orders ({onlineOrders.length})
+                        Storefronts & Orders ({onlineOrdersTotal ?? onlineOrders.length})
                     </TabsTrigger>
                     <TabsTrigger value="usage" className="gap-2 snap-start shrink-0">
                         <Timer className="h-4 w-4" />
@@ -4093,7 +4139,7 @@ function AdminDashboardContent({
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Briefcase className="h-5 w-5 text-primary" />
-                                Talent Acquisitions ({applications?.length || 0})
+                                Talent Acquisitions ({applicationsTotal ?? applications?.length ?? 0})
                             </CardTitle>
                             <CardDescription>
                                 Review and manage job applications for Zeneva roles.
@@ -4177,7 +4223,7 @@ function AdminDashboardContent({
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Trophy className="h-5 w-5 text-primary" />
-                                    Verified Business Grants ({grants?.length || 0})
+                                    Verified Business Grants ({grantsTotal ?? grants?.length ?? 0})
                                 </CardTitle>
                                 <CardDescription>
                                     Publish and manage verified grant opportunities shown to business owners on the platform.
@@ -4281,7 +4327,7 @@ function AdminDashboardContent({
                                 <Card className="p-4 space-y-4">
                                     <h3 className="font-bold text-base flex items-center gap-2">
                                         <Globe className="h-4 w-4 text-primary" />
-                                        Storefront Link Shares ({storefrontShares.length})
+                                        Storefront Link Shares ({storefrontSharesTotal ?? storefrontShares.length})
                                     </h3>
                                     <div className="max-h-[350px] overflow-y-auto border rounded-md">
                                         <Table>
@@ -4321,7 +4367,7 @@ function AdminDashboardContent({
                                 <Card className="p-4 space-y-4">
                                     <h3 className="font-bold text-base flex items-center gap-2">
                                         <Share2 className="h-4 w-4 text-primary" />
-                                        Receipt Shares ({receiptShares.length})
+                                        Receipt Shares ({receiptSharesTotal ?? receiptShares.length})
                                     </h3>
                                     <div className="max-h-[350px] overflow-y-auto border rounded-md">
                                         <Table>
@@ -4358,7 +4404,7 @@ function AdminDashboardContent({
                             <div className="mt-8 space-y-4">
                                 <h3 className="font-bold text-base flex items-center gap-2">
                                     <ShoppingCart className="h-4 w-4 text-primary" />
-                                    Incoming Storefront Online Orders ({onlineOrders.length})
+                                    Incoming Storefront Online Orders ({onlineOrdersTotal ?? onlineOrders.length})
                                 </h3>
                                 <div className="border rounded-md overflow-hidden">
                                     <Table>
@@ -4710,22 +4756,56 @@ const reviveTimestamps = (obj: any): any => {
     return obj;
 };
 
+/**
+ * How many rows the append-only admin logs load.
+ *
+ * These collections (job applications, grants, checkout attempts, storefront and
+ * receipt shares, storefront orders) only ever feed a scrolling table, so they
+ * are bounded to the newest ADMIN_LOG_LIMIT rows. Every one of them is ordered
+ * newest-first first: Firestore's implicit order is *ascending*, so a bare
+ * limit() would have pinned these tables to the oldest rows in the collection
+ * and frozen out everything recent.
+ *
+ * The tab headings show collection totals, which no longer match what is loaded,
+ * so those come from getCountFromServer instead — a count bills a fraction of a
+ * read regardless of collection size, rather than one read per document.
+ *
+ * The platform-wide analytics listeners (users, businessInstances, products,
+ * receipts, purchases, branches) are deliberately NOT bounded: they back
+ * lifetime per-business figures — activation ("10+ products and 1+ sale ever"),
+ * GMV, AOV, units sold, churn — and truncating them would quietly report wrong
+ * numbers rather than fewer. Fixing those properly means reading the
+ * per-business stats/overall rollup instead of every receipt; see the note on
+ * ADMIN_ANALYTICS_LISTENERS below.
+ */
+const ADMIN_LOG_LIMIT = 250;
+
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
 
     const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
-    const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc')), [firestore]);
-    const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc')), [firestore]);
+    const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
+    // Deliberately unbounded: one doc per visitor (not per click), and it backs
+    // an all-time platform breakdown, so a limit would silently change the
+    // windows/macos/android split. It is also not growing — its only writer is
+    // api/download/[platform], which is still a disabled .bak route.
     const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
     const branchesQuery = useMemoFirebase(() => query(collection(firestore, 'branches')), [firestore]);
-    const checkoutAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'checkout_attempts')), [firestore]);
-    const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares')), [firestore]);
-    const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares')), [firestore]);
-    const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders')), [firestore]);
+    const checkoutAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'checkout_attempts'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    // NOTE: the orderBy on a collectionGroup needs a COLLECTION_GROUP-scoped
+    // index on onlineOrders.createdAt — Firestore only auto-creates single-field
+    // indexes at COLLECTION scope. It is declared in firestore.indexes.json, so
+    // `firebase deploy --only firestore:indexes` must land BEFORE this ships or
+    // this listener throws. Deploying an index first is safe: it is additive and
+    // does not affect the running app.
+    const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
 
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);

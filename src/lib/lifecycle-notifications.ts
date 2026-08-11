@@ -37,6 +37,23 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Minimum spacing between any two lifecycle messages, in days. */
 export const LIFECYCLE_MIN_GAP_DAYS = 7;
 
+/**
+ * How many notification documents any listener may pull down.
+ *
+ * The notification listeners are attached in the persistent app layout, so they
+ * live for the whole session and re-bill on every attach. `notifications` is the
+ * platform-wide broadcast collection, which means an unbounded query there cost
+ * (every announcement ever sent) × (every tenant, every session) and grew with
+ * each announcement — permanently. Both listeners are capped here, on the
+ * server side, rather than trimmed after the download.
+ *
+ * Deliberately larger than the 20 the bell dropdown shows: the notifications
+ * page renders the full list, and "mark all read" / "clear all" act on whatever
+ * was fetched. 50 keeps those honest for any realistic backlog while still
+ * bounding the read.
+ */
+export const NOTIFICATION_FETCH_LIMIT = 50;
+
 /** What the running client looks like, for stages whose copy depends on it. */
 export type LifecycleContext = {
   /** Inside a Tauri shell (desktop or mobile) rather than a browser. */
