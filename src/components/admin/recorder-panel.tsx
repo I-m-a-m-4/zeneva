@@ -20,6 +20,7 @@ import { adminApiFetch, AdminApiError, adminApiBase } from '@/lib/admin-api';
 import { RecorderLive } from '@/components/admin/recorder-live';
 import { RecorderRecipe } from '@/components/admin/recorder-recipe';
 import { FlowTitleCards } from '@/components/admin/recorder-cards';
+import { RecorderTrim } from '@/components/admin/recorder-trim';
 import {
   FLOWS, DEVICES, FLOW_IDS, DEVICE_IDS, THEME_IDS, FPS_RANGE, QUALITY_RANGE,
   VOICE_IDS, VOICES, VOICE_STYLE_MAX,
@@ -1032,13 +1033,17 @@ export function RecorderPanel() {
                   <Trash2 className="h-3 w-3" /> Close
                 </Button>
               </div>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video
-                key={preview.url}
-                src={preview.url}
-                controls
-                autoPlay
-                className="mx-auto max-h-[70vh] w-auto max-w-full rounded-lg bg-black"
+              {/* The player lives inside the trimmer: watching a take and deciding
+                  where to cut it are the same act, so they are the same control. */}
+              <RecorderTrim
+                name={preview.name}
+                url={preview.url}
+                onCut={(result) => {
+                  // Show the cut, not the take it came from — the next thing anyone
+                  // does is check whether the cut is right before saving it.
+                  void refresh();
+                  void openPreview(result.take);
+                }}
               />
             </div>
           )}
