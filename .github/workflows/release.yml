@@ -19,6 +19,11 @@ env:
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+  # Web Push certificate public key. Missing here meant every native build
+  # inlined it as undefined, so use-fcm.ts bailed before getToken and no
+  # installed app ever registered a device — the push system looked wired but
+  # had nothing to send to.
+  NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
   NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID }}
   NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID }}
   NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY }}
@@ -79,6 +84,14 @@ jobs:
             exit 1
           fi
           echo "Firebase config present."
+
+          # Deliberately a warning, not a failure: a build with no VAPID key is
+          # a working app that cannot receive push notifications, which is worth
+          # shouting about but not worth blocking a release over. Promote this to
+          # `exit 1` once the secret is set and expected to stay set.
+          if [ -z "$NEXT_PUBLIC_FIREBASE_VAPID_KEY" ]; then
+            echo "::warning::NEXT_PUBLIC_FIREBASE_VAPID_KEY is missing - this build will install fine but can never register a device for push notifications."
+          fi
 
       - name: Build frontend
         env:
