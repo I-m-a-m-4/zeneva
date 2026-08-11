@@ -65,9 +65,44 @@ service cloud.firestore {
               get(/databases/$(database)/documents/businessInstances/$(businessId)).data.get('status', 'active') in ['active', 'trialing']);
     }
 
+    // The default a role gets when its user document carries no explicit entry
+    // for `permission`. Deliberately asymmetric, because the two directions have
+    // very different costs. `record_sales` and `view_customers` are what the POS
+    // needs; every staff role legitimately holds them, and denying one to a
+    // legacy or unrecognised role would stop that person selling. UserRole is
+    // only 'admin' | 'manager' | 'vendor_operator' in src/types.ts while the
+    // helpers above enumerate seven strings, so an unlisted role in live data is
+    // unlikely but not impossible — those two stay on for any member.
+    //
+    // Everything else — manage_inventory today, any permission added later —
+    // defaults to manager and above. That is the direction that must fail
+    // closed: a new permission name nobody has granted yet is denied to staff
+    // rather than handed to them.
+    function rolePermits(permission) {
+      return permission in ['record_sales', 'view_customers'] ||
+             getCurrentUserRole() in ['admin', 'manager', 'owner', 'super-admin'];
+    }
+
+    // Tri-state, and the middle state is the point. `permissions` is optional on
+    // the user document (src/types.ts: `permissions?: Record<string, boolean>`),
+    // so the map being absent cannot mean "denied" without locking out every
+    // account created before per-permission grants existed — but it must not
+    // mean "allowed" either, which is what `.get(permission, true) != false`
+    // used to do. That default handed every permission to every role: a
+    // `vendor_operator` with no map passed hasPermission('manage_inventory')
+    // and could write products straight to Firestore, even though the UI has
+    // always hidden that from them. Explicit false denies, explicit true
+    // allows, absent falls through to the role default above — which is the
+    // same tri-state the client already computes
+    // (`permissions?.manage_inventory ?? (role === 'admin' || role === 'manager')`
+    // in the inventory pages), so a button the UI hides is now also a write
+    // the rules refuse.
     function hasPermission(permission) {
       return isSuperAdmin() ||
-             getUserData().get('permissions', {}).get(permission, true) != false;
+             (isUserAuthenticated() &&
+              (getUserData().get('permissions', {}).get(permission, 'unset') is bool
+                 ? getUserData().get('permissions', {}).get(permission, false) == true
+                 : rolePermits(permission)));
     }
 
     // True when this update leaves every field in `fields` exactly as it was.
@@ -221,8 +256,56 @@ service cloud.firestore {
 
       match /onlineOrders/{orderId} {
          allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
-         // Public storefront checkout — anonymous shoppers place orders.
-         allow create: if true;
+
+         // Public storefront checkout — anonymous shoppers place orders, so this
+         // is the one create in the whole ruleset with no authentication behind
+         // it. It used to be `if true`, which let anyone on the internet write
+         // arbitrary documents into any tenant's order list: forge a paid order
+         // for goods they never bought, or loop the endpoint and run the owner's
+         // Firestore bill up. The gate is now the shape of the document plus the
+         // storefront actually being switched on.
+         //
+         // `status` is pinned to 'pending'. A client asserting 'paid' is the
+         // forgery — the old checkout flow verified the Paystack reference and
+         // then wrote 'paid' from the browser, which an attacker simply skips.
+         // The Paystack webhook uses the Admin SDK and bypasses rules, so that
+         // is where 'paid' belongs when the storefront is restored.
+         //
+         // hasOnly() means adding a field to OnlineOrder needs a matching edit
+         // here or the create starts failing.
+         allow create: if request.resource.data.keys().hasOnly([
+                            'businessId', 'customerId', 'customerName', 'customerEmail',
+                            'customerPhone', 'customerAddress', 'items', 'total',
+                            'shippingDetails', 'status', 'paymentMethod',
+                            'paymentReference', 'createdAt'
+                          ]) &&
+                          request.resource.data.keys().hasAll([
+                            'businessId', 'customerName', 'customerEmail',
+                            'items', 'total', 'status', 'paymentMethod', 'createdAt'
+                          ]) &&
+                          request.resource.data.businessId == businessId &&
+                          request.resource.data.status == 'pending' &&
+                          request.resource.data.paymentMethod in ['Paystack', 'Bank Transfer'] &&
+                          request.resource.data.createdAt == request.time &&
+                          request.resource.data.total is number &&
+                          request.resource.data.total >= 0 &&
+                          request.resource.data.total <= 100000000 &&
+                          request.resource.data.items is list &&
+                          request.resource.data.items.size() > 0 &&
+                          request.resource.data.items.size() <= 200 &&
+                          request.resource.data.customerName is string &&
+                          request.resource.data.customerName.size() > 0 &&
+                          request.resource.data.customerName.size() <= 200 &&
+                          request.resource.data.customerEmail is string &&
+                          request.resource.data.customerEmail.size() <= 320 &&
+                          request.resource.data.get('customerPhone', '') is string &&
+                          request.resource.data.get('customerPhone', '').size() <= 40 &&
+                          request.resource.data.get('customerAddress', '') is string &&
+                          request.resource.data.get('customerAddress', '').size() <= 1000 &&
+                          exists(/databases/$(database)/documents/businessInstances/$(businessId)) &&
+                          get(/databases/$(database)/documents/businessInstances/$(businessId))
+                            .data.get('settings', {}).get('publicStore', {}).get('enabled', false) == true;
+
          allow update: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
          allow delete: if false;
       }
@@ -409,6 +492,44 @@ service cloud.firestore {
 
     match /admin_analytics/{docId} {
       allow read, write: if isSuperAdmin();
+    }
+
+    // Phone-push delivery records behind the Push Analytics tab on
+    // /admin-imamshaffy/notifications. Written by the Admin SDK at send time (which
+    // bypasses these rules); the owner reads them, and a recipient may do exactly
+    // one thing — count their own open.
+    //
+    // The narrow `update` below is what lets a tapped notification register without
+    // a server round trip: a new API route would 404 until zeneva.space redeploys,
+    // and `scripts/prepare-tauri.mjs` deletes src/app/api wholesale for the native
+    // builds, so the phone apps could never reach one.
+    match /push_campaigns/{campaignId} {
+      allow read, write: if isSuperAdmin();
+
+      // Nudge the open counter and nothing else. `hasOnly` bounds which fields may
+      // move and the equality bounds how far, so the worst a caller can do is
+      // over-report their own opens — inherent to click tracking, and the reason
+      // the board derives unique openers from the recipient rows instead.
+      allow update: if isUserAuthenticated()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickCount', 'lastClickAt'])
+                    && request.resource.data.clickCount is int
+                    && request.resource.data.clickCount == resource.data.get('clickCount', 0) + 1;
+
+      // One row per person, carrying the name and email as they were at send time.
+      // Cross-tenant by nature — a broadcast reaches every business — so an
+      // ordinary user may only ever touch the row whose id is their own uid.
+      match /recipients/{recipientId} {
+        allow read, write: if isSuperAdmin();
+
+        allow read: if isUserAuthenticated() && request.auth.uid == recipientId;
+        allow create: if isUserAuthenticated() && request.auth.uid == recipientId
+                      && request.resource.data.keys().hasOnly(['userId', 'clickCount', 'clickedAt', 'lastClickedAt'])
+                      && request.resource.data.userId == recipientId;
+        allow update: if isUserAuthenticated() && request.auth.uid == recipientId
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['clickCount', 'clickedAt', 'lastClickedAt']);
+        allow delete: if false;
+      }
     }
 
     // Metered by the server via the Admin SDK, which bypasses these rules.
