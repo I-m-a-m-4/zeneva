@@ -16,6 +16,7 @@ import { Product } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
 import { useBusiness, usePOS } from '@/context/pos-context';
+import { productLimit } from '@/lib/plan';
 import Link from 'next/link';
 
 interface ImportDialogProps {
@@ -43,11 +44,6 @@ const HEADER_MAPPINGS: { [key: string]: string[] } = {
   imageUrl: ['Image URL', 'ImageURL', 'Image Link', 'Image Src', 'Image', 'Images', 'Image 1'],
 };
 
-const PRODUCT_LIMITS = {
-  starter: 500,
-  pro: 1500,
-  business: Infinity,
-};
 
 export default function ImportDialog({ isOpen, onOpenChange, onSuccess, businessId, products }: ImportDialogProps) {
   const { toast } = useToast();
@@ -151,8 +147,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         return;
     }
     
-    const currentPlan = business.plan || 'starter';
-    const limit = PRODUCT_LIMITS[currentPlan as keyof typeof PRODUCT_LIMITS] || 500;
+    const limit = productLimit(business);
     const currentProductCount = products.length;
 
     if (limit !== Infinity && currentProductCount + parsedData.length > limit) {

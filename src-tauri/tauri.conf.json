@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:9007",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "node scripts/tauri-prebuild.mjs && node scripts/tauri-postbuild.mjs && node scripts/post-build-cleanup.mjs"
+    "beforeBuildCommand": "node scripts/tauri-prebuild.mjs && node scripts/tauri-postbuild.mjs && node scripts/post-build-cleanup.mjs && node scripts/patch-android-manifest.mjs"
   },
   "app": {
     "windows": [
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://cdn.jsdelivr.net; connect-src 'self' https: wss: blob:; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com https://www.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
+      "csp": "default-src 'self' tauri: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://cdn.jsdelivr.net; connect-src 'self' https: wss: blob:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com https://www.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
     }
   },
   "bundle": {

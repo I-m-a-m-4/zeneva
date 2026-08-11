@@ -34,7 +34,7 @@ export function ProductTour() {
         steps: [
           {
             popover: {
-              title: "Welcome to Zeneva! 🎉",
+              title: "Welcome to Zeneva",
               description: "Your store is officially set up. Let's take a quick 3-step tour to help you get started.",
               side: "left",
               align: "start"

@@ -59,8 +59,103 @@ import {
 } from '@/components/ui/alert-dialog';
 import PageTitle from '@/components/shared/page-title';
 import { usePOS } from '@/context/pos-context';
+import { staffLimit } from '@/lib/plan';
 import { useBranch } from '@/context/branch-context';
 
+
+/**
+ * The per-user actions menu.
+ *
+ * Extracted so the table (sm and up) and the mobile card list render exactly
+ * the same menu — the two layouts show the same data in different shapes, and
+ * duplicating this block is how they drift apart.
+ */
+function UserActionsMenu({
+    user,
+    currentUserId,
+    currentUserProfile,
+    openMenuUserId,
+    setOpenMenuUserId,
+    setUserToUpdate,
+    setUserRoleToUpdate,
+    setUserPermissionsToUpdate,
+}: any) {
+    return (
+        <DropdownMenu modal={false} open={openMenuUserId === user.id} onOpenChange={(open: boolean) => setOpenMenuUserId(open ? user.id : null)}>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    aria-haspopup="true"
+                    size="icon"
+                    variant="ghost"
+                    disabled={currentUserId === user.id}
+                >
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Toggle menu</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                {user.status === 'inactive' ? (
+                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserToUpdate({ user, action: 'activate' })}>
+                        <UserCheck className="mr-2 h-4 w-4" /> Activate User
+                    </DropdownMenuItem>
+                ) : (
+                    <>
+                        {currentUserProfile?.role === 'admin' && user.role !== 'admin' && (
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="cursor-pointer">
+                                    <Shield className="mr-2 h-4 w-4" /> Change Role
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                        <DropdownMenuItem
+                                            disabled={user.role === 'manager'}
+                                            onSelect={() => setUserRoleToUpdate({ user, newRole: 'manager' })}
+                                        >
+                                            <ShieldCheck className="mr-2 h-4 w-4" /> Manager
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            disabled={user.role === 'vendor_operator'}
+                                            onSelect={() => setUserRoleToUpdate({ user, newRole: 'vendor_operator' })}
+                                        >
+                                            <ShieldAlert className="mr-2 h-4 w-4" /> Vendor Operator
+                                        </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                        )}
+                        {currentUserProfile?.role === 'admin' && (
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserPermissionsToUpdate(user)}>
+                                <Shield className="mr-2 h-4 w-4" /> Manage Permissions
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={() => setUserToUpdate({ user, action: 'deactivate' })}>
+                            <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                        </DropdownMenuItem>
+                    </>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function UserCardSkeleton() {
+    return (
+        <div className="rounded-lg border p-3">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-4 w-3/4" />
+                </div>
+                <Skeleton className="h-8 w-8 shrink-0" />
+            </div>
+            <div className="mt-2 flex gap-2">
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-6 w-16" />
+            </div>
+        </div>
+    );
+}
 
 function UserRowSkeleton() {
     return (
@@ -106,6 +201,11 @@ function UsersPageSkeleton() {
                         </div>
                     </CardHeader>
                     <CardContent>
+                        <div className="grid gap-3 sm:hidden">
+                            <UserCardSkeleton />
+                            <UserCardSkeleton />
+                        </div>
+                        <div className="hidden sm:block">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -121,6 +221,7 @@ function UsersPageSkeleton() {
                                 <UserRowSkeleton />
                             </TableBody>
                         </Table>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card className="md:col-span-2">
@@ -195,7 +296,7 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     }, [users, currentUserId, activeBranchId, businessId]);
 
     const totalUsers = (users?.length || 0) + (invitations?.length || 0);
-    const planLimit = businessInstance?.plan === 'business' ? 1000000 : (businessInstance?.plan === 'pro' ? 5 : 1);
+    const planLimit = staffLimit(businessInstance);
     const isLimitReached = totalUsers >= planLimit;
 
     const handleRevokeInvitation = async () => {
@@ -367,6 +468,12 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     </CardHeader>
                     <CardContent>
                         {isLoading ? (
+                            <>
+                            <div className="grid gap-3 sm:hidden">
+                                <UserCardSkeleton />
+                                <UserCardSkeleton />
+                            </div>
+                            <div className="hidden sm:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -382,7 +489,53 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                     <UserRowSkeleton />
                                 </TableBody>
                             </Table>
+                            </div>
+                            </>
                         ) : staffUsers && staffUsers.length > 0 ? (
+                            <>
+                            {/* Mobile: a card per user. The table below has five
+                                columns and cannot fit a phone without scrolling
+                                sideways, which hides the Actions column exactly
+                                where it is most needed. */}
+                            <div className="grid gap-3 sm:hidden">
+                                {staffUsers.map((user) => (
+                                    <div key={user.id} className="rounded-lg border p-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium truncate">{user.name}</p>
+                                                {user.email && (
+                                                    <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                                                )}
+                                            </div>
+                                            <div className="shrink-0 -mr-2 -mt-1">
+                                                <UserActionsMenu
+                                                    user={user}
+                                                    currentUserId={currentUserId}
+                                                    currentUserProfile={currentUserProfile}
+                                                    openMenuUserId={openMenuUserId}
+                                                    setOpenMenuUserId={setOpenMenuUserId}
+                                                    setUserToUpdate={setUserToUpdate}
+                                                    setUserRoleToUpdate={setUserRoleToUpdate}
+                                                    setUserPermissionsToUpdate={setUserPermissionsToUpdate}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                                                {user.role.replace('_', ' ')}
+                                            </Badge>
+                                            <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
+                                                {user.status || 'active'}
+                                            </Badge>
+                                            {currentUserId === user.id && (
+                                                <span className="text-xs text-muted-foreground">You</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="hidden sm:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -411,66 +564,23 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu modal={false} open={openMenuUserId === user.id} onOpenChange={(open) => setOpenMenuUserId(open ? user.id : null)}>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button
-                                                            aria-haspopup="true"
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            disabled={currentUserId === user.id}
-                                                        >
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                            <span className="sr-only">Toggle menu</span>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        {user.status === 'inactive' ? (
-                                                            <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserToUpdate({ user, action: 'activate' })}>
-                                                                <UserCheck className="mr-2 h-4 w-4" /> Activate User
-                                                            </DropdownMenuItem>
-                                                        ) : (
-                                                            <>
-                                                                {currentUserProfile?.role === 'admin' && user.role !== 'admin' && (
-                                                                    <DropdownMenuSub>
-                                                                        <DropdownMenuSubTrigger className="cursor-pointer">
-                                                                            <Shield className="mr-2 h-4 w-4" /> Change Role
-                                                                        </DropdownMenuSubTrigger>
-                                                                        <DropdownMenuPortal>
-                                                                            <DropdownMenuSubContent>
-                                                                                <DropdownMenuItem 
-                                                                                    disabled={user.role === 'manager'}
-                                                                                    onSelect={() => setUserRoleToUpdate({ user, newRole: 'manager' })}
-                                                                                >
-                                                                                    <ShieldCheck className="mr-2 h-4 w-4" /> Manager
-                                                                                </DropdownMenuItem>
-                                                                                <DropdownMenuItem 
-                                                                                    disabled={user.role === 'vendor_operator'}
-                                                                                    onSelect={() => setUserRoleToUpdate({ user, newRole: 'vendor_operator' })}
-                                                                                >
-                                                                                    <ShieldAlert className="mr-2 h-4 w-4" /> Vendor Operator
-                                                                                </DropdownMenuItem>
-                                                                            </DropdownMenuSubContent>
-                                                                        </DropdownMenuPortal>
-                                                                    </DropdownMenuSub>
-                                                                )}
-                                                                {currentUserProfile?.role === 'admin' && (
-                                                                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setUserPermissionsToUpdate(user)}>
-                                                                        <Shield className="mr-2 h-4 w-4" /> Manage Permissions
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                <DropdownMenuItem className="cursor-pointer text-destructive" onSelect={() => setUserToUpdate({ user, action: 'deactivate' })}>
-                                                                    <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                                                                </DropdownMenuItem>
-                                                            </>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                <UserActionsMenu
+                                                    user={user}
+                                                    currentUserId={currentUserId}
+                                                    currentUserProfile={currentUserProfile}
+                                                    openMenuUserId={openMenuUserId}
+                                                    setOpenMenuUserId={setOpenMenuUserId}
+                                                    setUserToUpdate={setUserToUpdate}
+                                                    setUserRoleToUpdate={setUserRoleToUpdate}
+                                                    setUserPermissionsToUpdate={setUserPermissionsToUpdate}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
+                            </div>
+                            </>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
                                 <User className="h-12 w-12 text-muted-foreground" />
@@ -490,6 +600,36 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                         {isLoading ? (
                             <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
                         ) : displayInvitations && displayInvitations.length > 0 ? (
+                            <>
+                            {/* Mobile: card per invitation, same reasoning as the staff list. */}
+                            <div className="grid gap-3 sm:hidden">
+                                {displayInvitations.map(invitation => (
+                                    <div key={invitation.id} className="rounded-lg border p-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium truncate">{invitation.email}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Invited {invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'just now'}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                className="shrink-0"
+                                                onClick={() => setInvitationToRevoke(invitation)}
+                                                aria-label={`Revoke invitation for ${invitation.email}`}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <div className="mt-2">
+                                            <Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="hidden sm:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -514,6 +654,8 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                     ))}
                                 </TableBody>
                             </Table>
+                            </div>
+                            </>
                         ) : (
                             <div className="text-center text-muted-foreground p-8">
                                 <Mail className="mx-auto h-12 w-12 opacity-50" />

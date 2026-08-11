@@ -5,7 +5,7 @@ import { useUser, useFirestore } from '@/firebase';
 import { terminalListenerErrorHandler } from '@/firebase/retry';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -14,21 +14,35 @@ import { usePOS } from '@/context/pos-context';
 import Admin2FAGate from '@/components/admin/admin-2fa-gate';
 import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
+/**
+ * `primary` marks the four links that get a slot in the mobile bottom bar.
+ * Everything else lives behind "More".
+ *
+ * The bar used to render all of them, which was already tight at nine and would
+ * be unusable at eleven — icons shrink, labels truncate, and the tap targets
+ * stop being reliably distinguishable on a phone.
+ */
 const navLinks = [
-  { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin-imamshaffy/users', label: 'Users', icon: Users },
+  { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard, primary: true },
+  { href: '/admin-imamshaffy/users', label: 'Users', icon: Users, primary: true },
+  { href: '/admin-imamshaffy/investors', label: 'Cap Table', icon: PieChart },
   { href: '/admin-imamshaffy/achievements', label: 'Achievements', icon: Crown },
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
-  { href: '/admin-imamshaffy/notifications', label: 'Alerts', icon: Bell },
-  { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare },
+  { href: '/admin-imamshaffy/marketing', label: 'Studio', icon: Clapperboard },
+  { href: '/admin-imamshaffy/notifications', label: 'Alerts', icon: Bell, primary: true },
+  { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare, primary: true },
   { href: '/admin-imamshaffy/ai-usage', label: 'AI Usage', icon: Zap },
   { href: '/admin-imamshaffy/developer-logs', label: 'Dev Logs', icon: Bug },
 ];
+
+const primaryNavLinks = navLinks.filter((link) => link.primary);
+const overflowNavLinks = navLinks.filter((link) => !link.primary);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -41,6 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isDarkMode = resolvedTheme === 'dark';
 
   const [unreadErrorCount, setUnreadErrorCount] = useState(0);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { notify } = useNativeNotifications();
 
   useEffect(() => {
@@ -186,6 +201,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return pathname.startsWith(href);
   };
 
+  // Highlights the "More" trigger when the current page is one of the links
+  // hidden behind it, so the mobile bar still shows where you are.
+  const isOverflowActive = overflowNavLinks.some((link) => isLinkActive(link.href));
+
   if (isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-0 h-full bg-background">
@@ -285,10 +304,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Admin2FAGate>
         </main>
 
-        {/* Mobile Bottom Navigation — hidden on desktop */}
+        {/* Mobile Bottom Navigation — four primary links plus a "More" sheet.
+            Rendering all ten here would leave each one about 10% of the screen. */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-background/95 backdrop-blur-md h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around items-center h-16">
-            {navLinks.map((link) => {
+            {primaryNavLinks.map((link) => {
               const active = isLinkActive(link.href);
               return (
                 <Link
@@ -300,11 +320,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <link.icon
                       className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')}
                     />
-                    {link.label === 'Dev Logs' && unreadErrorCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] text-white font-bold">
-                        {unreadErrorCount > 9 ? '9+' : unreadErrorCount}
-                      </span>
-                    )}
                   </div>
                   <span
                     className={cn(
@@ -317,6 +332,84 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </Link>
               );
             })}
+
+            <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="flex flex-col items-center justify-center flex-1 h-full"
+                  aria-label="More admin sections"
+                >
+                  <div className="relative mb-0.5">
+                    <MoreHorizontal
+                      className={cn(
+                        'h-5 w-5',
+                        isOverflowActive ? 'text-primary' : 'text-muted-foreground'
+                      )}
+                    />
+                    {/* Dev Logs lives inside the sheet now, so its unread count has
+                        to surface on the trigger or it becomes invisible on mobile. */}
+                    {unreadErrorCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] text-white font-bold">
+                        {unreadErrorCount > 9 ? '9+' : unreadErrorCount}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-[10px] leading-none',
+                      isOverflowActive ? 'text-primary font-semibold' : 'text-muted-foreground'
+                    )}
+                  >
+                    More
+                  </span>
+                </button>
+              </SheetTrigger>
+
+              <SheetContent side="bottom" className="rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
+                <SheetHeader className="text-left">
+                  <SheetTitle>More sections</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 grid grid-cols-3 gap-3 pb-4">
+                  {overflowNavLinks.map((link) => {
+                    const active = isLinkActive(link.href);
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setIsMoreOpen(false)}
+                        className={cn(
+                          'flex flex-col items-center gap-2 rounded-xl border p-4 transition-colors',
+                          active ? 'border-primary bg-primary/10' : 'hover:bg-accent'
+                        )}
+                      >
+                        <div className="relative">
+                          <link.icon
+                            className={cn(
+                              'h-5 w-5',
+                              active ? 'text-primary' : 'text-muted-foreground'
+                            )}
+                          />
+                          {link.label === 'Dev Logs' && unreadErrorCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] text-white font-bold">
+                              {unreadErrorCount > 9 ? '9+' : unreadErrorCount}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={cn(
+                            'text-center text-[11px] leading-tight',
+                            active ? 'font-semibold text-primary' : 'text-muted-foreground'
+                          )}
+                        >
+                          {link.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </nav>
       </div>

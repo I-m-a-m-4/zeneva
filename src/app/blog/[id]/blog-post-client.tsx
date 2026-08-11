@@ -11,15 +11,10 @@ import {
   collection, 
   query, 
   where, 
-  limit, 
-  orderBy,
+  limit,
   getDocs
 } from 'firebase/firestore';
-import { 
-  useFirestore, 
-  useCollection, 
-  useMemoFirebase 
-} from '@/firebase';
+import { useFirestore } from '@/firebase';
 import type { BlogPost } from '@/types';
 import MarketingHeader from '@/components/layout/marketing-header';
 import MarketingFooter from '@/components/layout/marketing-footer';
@@ -56,7 +51,45 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeProvider } from '@/components/theme-provider';
-import { allBlogPosts, StaticBlogPost } from '@/lib/blog-data';
+import { allBlogPosts, getRelatedPosts } from '@/lib/blog-data';
+
+// Plan promo shown at the end of every article.
+//
+// The numbers are copied from two places and must be changed with them, not
+// guessed at here: the limits come from `PRODUCT_LIMITS` / `STAFF_LIMITS` /
+// `AI_DAILY_LIMITS` in `src/lib/plan.ts`, the prices from the constants at the
+// top of `src/app/pricing/pricing-content.tsx`. Both currencies are printed
+// because this page has no locale detection — the pricing page picks one by
+// timezone, a static article cannot.
+//
+// Deliberately absent: any "join thousands of retailers" line. The block this
+// replaced claimed a customer count nothing in the codebase can support, which
+// is the kind of copy that costs more trust than it wins.
+const PLAN_PROMO = [
+  {
+    name: 'Starter',
+    price: 'Free forever',
+    detail: '50 products, 1 user, 20 Zen AI questions a day. No trial clock, no card.',
+  },
+  {
+    name: 'Pro',
+    price: '₦10,000 / $10 a month',
+    detail: '1,500 products, 5 staff accounts, 100 Zen AI questions a day.',
+    highlight: true,
+  },
+  {
+    name: 'Business',
+    price: '₦30,000 / $30 a month',
+    detail: 'Unlimited products, unlimited staff, 500 Zen AI questions a day.',
+  },
+];
+
+// Rough reading time, on the same ~1000-characters-a-minute rule the rest of
+// the page already used. Static posts carry `content` as optional, so a post
+// still awaiting a body reads as 1 min rather than crashing on `.length`.
+function readingMinutes(content?: string): number {
+  return Math.ceil((content?.length || 0) / 1000) + 1;
+}
 
 export default function BlogPostClient({ initialPostData }: { initialPostData?: any }) {
   const params = useParams();
@@ -117,17 +150,21 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
     return () => observer.disconnect();
   }, [post, headings]);
 
-  // Fetch related posts
-  const relatedQuery = useMemoFirebase(
-    () => query(
-      collection(firestore, 'blogPosts'),
-      where('published', '==', true),
-      orderBy('createdAt', 'desc'),
-      limit(6)
-    ),
-    [firestore]
-  );
-  const { data: relatedPosts } = useCollection<BlogPost>(relatedQuery);
+  // Related posts come from the static catalogue, not Firestore.
+  //
+  // This used to subscribe to `blogPosts` where published == true. Every one of
+  // the 26 articles lives in `blog-data.ts`, and that collection is empty, so
+  // the subscription returned nothing and both the sidebar "Related" list and
+  // any end-of-article link rendered blank on every post — a dead end for the
+  // reader and a missing internal link for crawlers. `getRelatedPosts` reads
+  // the same catalogue the page itself was built from, prefers the current
+  // post's category, backfills across categories so the strip is never short,
+  // and is seeded off the slug so server and client agree (no hydration
+  // mismatch) and a crawl sees a stable link graph.
+  //
+  // It also drops a live collection listener from a public marketing page,
+  // which was billing reads on every visit for results nobody could see.
+  const relatedPosts = React.useMemo(() => getRelatedPosts(id, 3), [id]);
 
   React.useEffect(() => {
     if (!firestore || !id) return;
@@ -360,17 +397,84 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                 </div>
               </div>
 
-              {/* Next Steps CTA */}
-              <div className="mt-24 rounded-[2.5rem] bg-slate-100 text-slate-900 p-8 md:p-16 relative overflow-hidden group border border-dashed border-slate-200">
-                <div className="absolute inset-0 grid-lines opacity-10 pointer-events-none"></div>
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
-                  <div className="max-w-md">
-                    <h3 className="text-3xl md:text-4xl font-black tracking-tight mb-4 leading-tight text-slate-950">Ready to transform your retail operations?</h3>
-                    <p className="text-slate-600 font-medium text-lg">Join the thousands of retailers using Zeneva to automate profit and scale without limits.</p>
+              {/* Continue reading.
+                  The sidebar version of this is hidden below `lg`, so on a
+                  phone — where most of this traffic lands — the article used to
+                  end with a pricing pitch and no next article at all. */}
+              {relatedPosts.length > 0 && (
+                <div className="mt-24 pt-10 border-t border-slate-100">
+                  <div className="flex items-baseline justify-between mb-8">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Continue reading</p>
+                    <Link href="/blog" className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">
+                      All articles
+                    </Link>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                    <Link href="/pricing" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-8 pb-2.5 pl-8 shadow-sm text-center">View Pricing</Link>
-                    <Link href="/about/our-mission" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-8 py-2.5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200 shadow-sm text-center">Our Mission</Link>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    {relatedPosts.map((p) => (
+                      <Link
+                        key={p.slug}
+                        href={`/blog/${p.slug}`}
+                        className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 hover:border-slate-300 hover:shadow-sm transition-all"
+                      >
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                          {p.category}
+                        </span>
+                        <h3 className="text-base font-bold leading-snug text-slate-900 mb-3">
+                          {p.title}
+                        </h3>
+                        <p className="text-sm text-slate-500 leading-relaxed line-clamp-3 mb-6">
+                          {p.excerpt}
+                        </p>
+                        <div className="mt-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-900 group-hover:gap-2.5 transition-all">
+                          Read · {readingMinutes(p.content)} min
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Plans */}
+              <div className="mt-24 rounded-[2.5rem] bg-slate-100 text-slate-900 p-8 md:p-16 relative overflow-hidden border border-dashed border-slate-200">
+                <div className="absolute inset-0 grid-lines opacity-10 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <div className="max-w-2xl mb-10">
+                    <h3 className="text-3xl md:text-4xl font-black tracking-tight mb-4 leading-tight text-slate-950">
+                      Run this on Zeneva
+                    </h3>
+                    <p className="text-slate-600 font-medium text-lg">
+                      Stock, sales, staff and receipts in one place — on the shop PC, on your phone, and offline when the network drops. Start free and move up only when the shop outgrows the caps.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3 mb-10">
+                    {PLAN_PROMO.map((plan) => (
+                      <div
+                        key={plan.name}
+                        className={cn(
+                          'rounded-2xl p-6 border bg-white',
+                          plan.highlight ? 'border-slate-900 shadow-sm' : 'border-slate-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-950">{plan.name}</p>
+                          {plan.highlight && (
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                              Most picked
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-slate-900 mb-3">{plan.price}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed">{plan.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+                    <Link href="/signup" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-8 pb-2.5 pl-8 shadow-sm text-center">Start free</Link>
+                    <Link href="/pricing" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-8 py-2.5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200 shadow-sm text-center">Compare plans</Link>
+                    <p className="text-xs text-slate-500 font-medium sm:ml-2">No card needed for Starter.</p>
                   </div>
                 </div>
               </div>
@@ -458,15 +562,15 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                   <div className="pt-10 border-t border-slate-100">
                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Related</p>
                     <div className="flex flex-col gap-8">
-                       {relatedPosts?.filter(p => p.id !== post.id).slice(0, 3).map(p => (
-                         <Link key={p.id} href={`/blog/${p.id}`} className="group block">
+                       {relatedPosts.map(p => (
+                         <Link key={p.slug} href={`/blog/${p.slug}`} className="group block">
                             <h4 className="text-sm font-bold leading-snug text-slate-600 group-hover:text-slate-900 transition-colors mb-2">
                                {p.title}
                             </h4>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                               <span>{p.createdAt ? format(p.createdAt.toDate(), 'MMM d') : 'Recent'}</span>
+                               <span>{p.category}</span>
                                <span>·</span>
-                               <span>{Math.ceil(p.content.length / 1000) + 1} MIN</span>
+                               <span>{readingMinutes(p.content)} MIN</span>
                             </div>
                          </Link>
                        ))}

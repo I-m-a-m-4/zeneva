@@ -16,11 +16,15 @@ import {
 import { LucideIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BranchSwitcher } from '@/components/layout/branch-switcher';
+import { useI18n } from '@/context/i18n-context';
 
 interface NavItem {
     href: string;
     icon: LucideIcon;
+    /** English, and the source of the `tour-nav-mobile-*` ids ProductTour targets. */
     label: string;
+    /** Translation key for what the user actually reads. */
+    labelKey?: string;
 }
 
 interface MobileBottomNavProps {
@@ -32,7 +36,10 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ navItems, moreNavItems, isLoading, userEmail }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+
+  const labelFor = (item: NavItem) => (item.labelKey ? t(item.labelKey) : item.label);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-background/95 backdrop-blur-md border-t border-border z-40 md:hidden no-print">
@@ -56,7 +63,7 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading, use
               >
                 <item.icon className={cn('h-6 w-6 mb-1', isActive ? 'text-primary' : 'text-muted-foreground')} />
                 <span className={cn('text-xs', isActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>
-                  {item.label}
+                  {labelFor(item)}
                 </span>
               </Link>
             );
@@ -68,11 +75,11 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading, use
             <SheetTrigger asChild>
               <button className="flex flex-col items-center justify-center flex-1 h-full">
                 <Menu className='h-6 w-6 mb-1 text-muted-foreground' />
-                <span className='text-xs text-muted-foreground'>More</span>
+                <span className='text-xs text-muted-foreground'>{t('nav.more')}</span>
               </button>
             </SheetTrigger>
             <SheetContent side="bottom" className="h-[65%] flex flex-col p-4 sm:p-6">
-              <SheetHeader className="pb-2 text-left">
+              <SheetHeader className="pb-2 text-start">
                 <SheetTitle>More Options</SheetTitle>
               </SheetHeader>
                 <div className="flex-1 overflow-y-auto">
@@ -91,7 +98,7 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading, use
                                         )}
                                     >
                                         <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
-                                        <span>{item.label}</span>
+                                        <span>{labelFor(item)}</span>
                                     </Link>
                                 </li>
                             )

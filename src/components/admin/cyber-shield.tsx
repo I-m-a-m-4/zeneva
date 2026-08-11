@@ -60,7 +60,18 @@ import {
     Crosshair,
     Radar
 } from 'lucide-react';
-import { deleteBusinessUsersAuth } from '@/actions/admin-actions';
+import { deleteBusinessUsersAuth, revokeUserSessions } from '@/actions/admin-actions';
+import { idToken } from '@/lib/id-token';
+import {
+    detectEntitlementAbuse,
+    detectIdentityAnomalies,
+    detectDataIntegrityAnomalies,
+    detectPostureIssues,
+    healthScore,
+    postureLevel,
+    type Threat,
+    type Severity,
+} from '@/lib/threat-rules';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { 
     multiFactor,
@@ -195,6 +206,8 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
     const [isDestroying, setIsDestroying] = useState(false);
     const [destructionProgress, setDestructionProgress] = useState(0);
     const [destructionStatus, setDestructionStatus] = useState('');
+    /** Firestore purged but the Firebase Auth accounts survived — they can still sign in. */
+    const [authCleanupSkipped, setAuthCleanupSkipped] = useState(false);
 
 
     // MFA Enrollment State
@@ -226,6 +239,19 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
 
     const logsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'terminationLogs'), orderBy('terminatedAt', 'desc'), limit(10)) : null, [firestore]);
     const { data: terminationLogs } = useCollection<any>(logsQuery);
+
+    // Receipt feed for the integrity rules (R3). Capped at 200 and ordered
+    // newest-first: tampering shows up in fresh writes, and an unbounded read
+    // across every tenant is a bill, not a feature. `receipts` is top-level, so
+    // this is a plain ordered query on the default single-field index — no
+    // composite index required.
+    const receiptsQuery = useMemoFirebase(
+        () => firestore
+            ? query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc'), limit(200))
+            : null,
+        [firestore],
+    );
+    const { data: recentReceipts } = useCollection<any>(receiptsQuery);
 
     const filteredBusinesses = useMemo(() => {
         if (!allBusinesses) return [];
@@ -415,6 +441,11 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
         setIsDestroying(true);
         setDestructionProgress(5);
         setDestructionStatus('Locating entity in grid...');
+        // Reset per-run, or one failed cleanup would flag every later purge.
+        setAuthCleanupSkipped(false);
+        // Local mirror: React state set later in this same async run is not readable
+        // from this closure, so the completion branch has to consult the local.
+        let authSkipped = false;
 
         try {
             // 1. Target the business instance directly
@@ -478,9 +509,16 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                 const uids = usersSnap.docs.map(d => d.id);
                 setDestructionStatus('Deauthorizing user identities (Auth Cleanup)...');
                 try {
-                    await deleteBusinessUsersAuth(uids);
+                    await deleteBusinessUsersAuth(uids, await idToken());
                 } catch (authErr) {
+                    // Deliberately continues: a Firestore user with no Auth record is a
+                    // normal state, so a failure here must not abort the purge. But it
+                    // must not be silent either — in the Tauri app this call is a stub
+                    // that always throws, which would otherwise leave orphaned Auth
+                    // accounts that can still sign in, with nothing on screen saying so.
                     console.error("Auth deauthorization partial failure:", authErr);
+                    authSkipped = true;
+                    setAuthCleanupSkipped(true);
                 }
 
                 for (const userDoc of usersSnap.docs) {
@@ -541,13 +579,20 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
             }
 
             setDestructionProgress(100);
-            setDestructionStatus('Entity Terminated');
+            setDestructionStatus(authSkipped ? 'Entity Terminated — Auth accounts remain' : 'Entity Terminated');
 
-            toast({ 
-                title: "Destruction Complete", 
-                description: "Business and all associated nodes have been scrubbed from the grid.",
-                className: "bg-black text-emerald-500 border-emerald-500/50 font-mono"
-            });
+            toast(authSkipped
+                ? {
+                    variant: 'destructive',
+                    title: "Purged, but Auth accounts survived",
+                    description: "Firestore data is gone, but the Firebase Auth logins could not be deleted and can still sign in. Finish this from the web admin panel at zeneva.space.",
+                    duration: 12000,
+                }
+                : {
+                    title: "Destruction Complete",
+                    description: "Business and all associated nodes have been scrubbed from the grid.",
+                    className: "bg-black text-emerald-500 border-emerald-500/50 font-mono"
+                });
 
             // Log the destruction to a special global log if possible
             try {
@@ -580,13 +625,133 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
         }
     };
 
-    const securityMatrix = useMemo(() => {
-        const suspiciousCount = allUsers?.filter(u => u.status === 'suspended').length || 0;
-        
-        if (suspiciousCount > 3) return { level: 'CRITICAL', score: 28, color: 'text-rose-600', from: 'from-rose-600', variant: 'destructive' as const };
-        if (suspiciousCount > 0) return { level: 'CAUTION', score: 62, color: 'text-amber-600', from: 'from-amber-600', variant: 'outline' as const };
-        return { level: 'OPTIMAL', score: 94, color: 'text-emerald-600', from: 'from-emerald-600', variant: 'default' as const };
+    // ── Live threat detection ────────────────────────────────────────────────
+    //
+    // The old score was theatre: three hard-coded numbers keyed off a suspended
+    // count, so the board read "OPTIMAL 94%" while an account sat on a
+    // self-issued lifetime plan. Everything below is derived from the data the
+    // admin panel has already loaded, so a real finding moves the number.
+    //
+    // Product and staff counts are the one thing the props do not carry. They
+    // are counted with aggregation queries (`getCountFromServer`), billed at one
+    // read per query rather than one per document, and only for businesses on a
+    // capped plan — the owner pays for every read (see MEMORY).
+
+    const [capCounts, setCapCounts] = useState<{
+        products: Record<string, number>;
+        staff: Record<string, number>;
+        paidBusinessIds: Set<string> | null;
+        scannedAt: Date | null;
+    }>({ products: {}, staff: {}, paidBusinessIds: null, scannedAt: null });
+    const [isScanning, setIsScanning] = useState(false);
+    const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+    const staffCounts = useMemo(() => {
+        // Derivable from props at no cost.
+        const counts: Record<string, number> = {};
+        for (const u of allUsers || []) {
+            if (!u.businessId) continue;
+            counts[u.businessId] = (counts[u.businessId] || 0) + 1;
+        }
+        return counts;
     }, [allUsers]);
+
+    const runDeepScan = async () => {
+        if (!firestore || !allBusinesses) return;
+        setIsScanning(true);
+        try {
+            const products: Record<string, number> = {};
+            // Only capped plans can be over a cap, so Business/lifetime tenants
+            // are skipped entirely rather than counted and discarded.
+            const capped = allBusinesses.filter(b => {
+                if (b.accessLevel === 'lifetime') return false;
+                return b.plan !== 'business';
+            });
+
+            for (const b of capped) {
+                try {
+                    const snap = await getCountFromServer(
+                        query(collection(firestore, 'products'), where('businessId', '==', b.id)),
+                    );
+                    products[b.id] = snap.data().count;
+                } catch {
+                    // A single failed count must not abort the whole sweep.
+                }
+            }
+
+            // Every business with a payment on record. One full read of
+            // `purchases` per scan, which is small and only on demand — it is
+            // what lets R1 tell a real customer from a self-written plan field.
+            const paidBusinessIds = new Set<string>();
+            try {
+                const purchaseSnap = await getDocs(collection(firestore, 'purchases'));
+                purchaseSnap.forEach(d => {
+                    const bid = d.data()?.businessId;
+                    if (bid) paidBusinessIds.add(bid);
+                });
+            } catch {
+                // Leave the set empty rather than failing the scan; the rule
+                // below would then over-report, so bail out of it instead.
+            }
+
+            setCapCounts({
+                products,
+                staff: staffCounts,
+                paidBusinessIds: paidBusinessIds.size > 0 ? paidBusinessIds : null,
+                scannedAt: new Date(),
+            });
+            toast({
+                title: 'Deep scan complete',
+                description: `${capped.length} capped ${capped.length === 1 ? 'entity' : 'entities'} checked against plan limits.`,
+            });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Scan failed', description: err?.message || 'Unknown error.' });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const threats = useMemo<Threat[]>(() => {
+        const found: Threat[] = [
+            ...detectEntitlementAbuse(allBusinesses || [], capCounts.products, staffCounts, capCounts.paidBusinessIds),
+            ...detectIdentityAnomalies(allUsers || [], allBusinesses || []),
+            ...detectDataIntegrityAnomalies(recentReceipts || []),
+            ...detectPostureIssues({
+                mfaEnabled: mfaStatus.enabled,
+                suspendedCount: allUsers?.filter(u => u.status === 'suspended').length || 0,
+                totalUsers: allUsers?.length || 0,
+            }),
+        ];
+        const order: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        return found
+            .filter(t => !dismissed.has(t.id))
+            .sort((a, b) => order[a.severity] - order[b.severity]);
+    }, [allBusinesses, allUsers, recentReceipts, capCounts, staffCounts, mfaStatus.enabled, dismissed]);
+
+    const criticalCount = threats.filter(t => t.severity === 'critical').length;
+
+    const securityMatrix = useMemo(() => {
+        const score = healthScore(threats);
+        const { level, tone } = postureLevel(score);
+        const color =
+            tone === 'ok' ? 'text-emerald-600'
+            : tone === 'medium' ? 'text-amber-600'
+            : 'text-rose-600';
+        return { level, score, color };
+    }, [threats]);
+
+    const handleRevokeSessions = async (userId: string, who: string) => {
+        if (!window.confirm(`Revoke every active session for ${who}? They will be signed out on all devices.`)) return;
+        setIsRevoking(userId);
+        try {
+            await revokeUserSessions(userId, await idToken());
+            toast({ title: 'Sessions revoked', description: `${who} has been signed out everywhere.` });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Revoke failed', description: err?.message || 'Unknown error.' });
+        } finally {
+            setIsRevoking(null);
+        }
+    };
 
     return (
         <div className="space-y-6 relative overflow-hidden">
@@ -642,9 +807,21 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                     <div className="w-full space-y-2 mt-8">
                         <div className="flex justify-between text-[9px] font-bold text-muted-foreground">
                             <span>Threat Density</span>
-                            <span>Low</span>
+                            <span>
+                                {threats.length === 0
+                                    ? 'Clear'
+                                    : `${threats.length} open${criticalCount > 0 ? ` · ${criticalCount} critical` : ''}`}
+                            </span>
                         </div>
-                        <Progress value={24} className="h-1 bg-muted" indicatorClassName="bg-primary" />
+                        <Progress
+                            value={100 - securityMatrix.score}
+                            className="h-1 bg-muted"
+                            indicatorClassName={cn(
+                                criticalCount > 0 ? 'bg-rose-600'
+                                : threats.length > 0 ? 'bg-amber-500'
+                                : 'bg-emerald-600',
+                            )}
+                        />
                     </div>
                 </Card>
 
@@ -674,33 +851,126 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                         onClick={() => !mfaStatus.enabled && setIsMfaModalOpen(true)}
                     />
                     
-                    {/* Active Network Monitor */}
-                    <Card className="md:col-span-3 border-border/50 p-4 bg-white/50 backdrop-blur-sm">
-                        <div className="flex items-center justify-between mb-4">
+                    {/* Live Threat Board — real findings, not a status animation */}
+                    <Card className="md:col-span-3 border-border/50 bg-white/50 backdrop-blur-sm">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b">
                             <div className="flex items-center gap-2">
-                                <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-bold text-muted-foreground">Active Network Status</span>
+                                <Crosshair className={cn(
+                                    "h-3.5 w-3.5",
+                                    criticalCount > 0 ? "text-rose-600 animate-pulse" : "text-emerald-500",
+                                )} />
+                                <span className="text-[11px] font-bold text-foreground/90">Threat Board</span>
+                                {threats.length > 0 && (
+                                    <Badge variant={criticalCount > 0 ? 'destructive' : 'outline'} className="h-4 px-1.5 text-[9px] font-bold">
+                                        {threats.length}
+                                    </Badge>
+                                )}
                             </div>
-                            <p className="text-[11px] font-black text-primary/80 uppercase">
-                                zeneva.space - Certified Result
-                            </p>
+                            <div className="flex items-center gap-2">
+                                {capCounts.scannedAt && (
+                                    <span className="text-[9px] text-muted-foreground font-medium">
+                                        Plan limits checked {formatDistanceToNow(capCounts.scannedAt, { addSuffix: true })}
+                                    </span>
+                                )}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-[10px] font-bold"
+                                    onClick={runDeepScan}
+                                    disabled={isScanning || !allBusinesses}
+                                >
+                                    {isScanning
+                                        ? <><RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />Scanning</>
+                                        : <><Radar className="h-3 w-3 mr-1.5" />Deep scan</>}
+                                </Button>
+                            </div>
                         </div>
-                        <div className="h-28 overflow-hidden relative">
-                             <div className="space-y-1.5">
-                                {allBusinesses?.slice(0, 4).map((b, i) => (
-                                    <div key={i} className="flex items-center gap-4 text-[11px] border-l-2 border-primary/20 pl-4 py-1.5 hover:bg-muted/50 transition-colors cursor-default">
-                                        <span className={cn("font-bold min-w-[60px] font-mono", i === 0 ? "text-primary" : "text-muted-foreground")}>
-                                            Online
-                                        </span>
-                                        <span className="text-foreground font-bold">{b.name}</span>
-                                        <ArrowRight className="h-2.5 w-2.5 text-muted-foreground/30" />
-                                        <span className="text-muted-foreground/50 truncate max-w-[200px]">{b.email}</span>
-                                        <span className="text-[9px] font-bold ml-auto bg-muted px-2 py-0.5 rounded text-muted-foreground">{b.id.slice(0, 8)}</span>
+
+                        {threats.length === 0 ? (
+                            <div className="flex items-center gap-3 p-6">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                                <div>
+                                    <p className="text-xs font-bold text-foreground/90">No anomalies detected</p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                        Entitlements, roles and recent sales all consistent.
+                                        {!capCounts.scannedAt && ' Run a deep scan to include plan-limit checks.'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="max-h-[340px] overflow-y-auto divide-y">
+                                {threats.map(t => (
+                                    <div key={t.id} className="p-3 hover:bg-muted/40 transition-colors">
+                                        <div className="flex items-start gap-3">
+                                            <Badge
+                                                variant={t.severity === 'critical' ? 'destructive' : 'outline'}
+                                                className={cn(
+                                                    "h-4 px-1.5 text-[8px] font-bold uppercase shrink-0 mt-0.5",
+                                                    t.severity === 'high' && "border-orange-500/40 text-orange-700 bg-orange-50",
+                                                    t.severity === 'medium' && "border-amber-500/40 text-amber-700 bg-amber-50",
+                                                    t.severity === 'low' && "border-border text-muted-foreground",
+                                                )}
+                                            >
+                                                {t.severity}
+                                            </Badge>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline gap-2 flex-wrap">
+                                                    <p className="text-[11px] font-bold text-foreground/90">{t.title}</p>
+                                                    <span className="text-[9px] font-mono text-muted-foreground/60">{t.rule}</span>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground mt-0.5">{t.detail}</p>
+                                                <p className="text-[10px] text-foreground/70 mt-1">
+                                                    <span className="font-bold">{t.subject}</span>
+                                                    {t.businessId && (
+                                                        <span className="font-mono text-muted-foreground/50 ml-1.5">
+                                                            {t.businessId.slice(0, 8)}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                <p className="text-[10px] text-primary/80 mt-1.5 flex items-start gap-1">
+                                                    <ArrowRight className="h-2.5 w-2.5 mt-0.5 shrink-0" />
+                                                    {t.action}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col gap-1 shrink-0">
+                                                {t.rule === 'R2 Identity' && t.subjectId !== 'platform' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-6 px-2 text-[9px] font-bold"
+                                                        disabled={isRevoking === t.subjectId}
+                                                        onClick={() => handleRevokeSessions(t.subjectId, t.subject)}
+                                                    >
+                                                        {isRevoking === t.subjectId
+                                                            ? <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                                                            : 'Revoke'}
+                                                    </Button>
+                                                )}
+                                                {t.id === 'pos-mfa' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-6 px-2 text-[9px] font-bold"
+                                                        onClick={() => setIsMfaModalOpen(true)}
+                                                    >
+                                                        Enrol
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 px-2 text-[9px] text-muted-foreground"
+                                                    onClick={() => setDismissed(prev => new Set(prev).add(t.id))}
+                                                    title="Hide until reload"
+                                                >
+                                                    Dismiss
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
-                             </div>
-                             <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background/80 to-transparent" />
-                        </div>
+                            </div>
+                        )}
                     </Card>
                 </div>
             </div>

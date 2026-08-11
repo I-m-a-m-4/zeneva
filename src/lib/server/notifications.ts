@@ -14,7 +14,17 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
             return;
         }
 
-        const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+        // use-fcm.ts writes the token as both the doc id and a `token` field, so fall
+        // back to the id — a missing field would otherwise put `undefined` in the array
+        // and make the send throw.
+        const tokens = tokensSnapshot.docs
+            .map(doc => doc.data().token || doc.id)
+            .filter(Boolean) as string[];
+
+        if (tokens.length === 0) {
+            console.log(`No usable FCM tokens for user ${userId}`);
+            return;
+        }
 
         // 2. Send multicast message
         const message = {
@@ -31,7 +41,7 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
             tokens: tokens,
         };
 
-        const response = await adminMessaging.sendMulticast(message);
+        const response = await adminMessaging.sendEachForMulticast(message);
 
         // 3. Cleanup invalid tokens
         if (response.failureCount > 0) {

@@ -29,8 +29,15 @@ import {   syncProductsToOffline,
   removeActionFromOfflineQueue,
   getMonthlyRevenue,
   clearAllTables,
-  deleteReceiptFromOffline
+  deleteReceiptFromOffline,
+  syncProfileToOffline,
+  getCachedProfile,
+  syncUsersToOffline,
+  getCachedUsers,
+  syncAuditLogsToOffline,
+  getCachedAuditLogs
 } from '@/lib/sqlite-sync';
+import { isNativeApp, isMobileApp } from '@/lib/platform';
 
 import { 
   POS_CART_KEY, 
@@ -45,6 +52,7 @@ import {
   POS_HELD_SALES_KEY
 } from '@/lib/constants';
 import { safeToDate } from '@/lib/utils';
+import { isSubscriptionActive as resolveSubscriptionActive } from '@/lib/plan';
 import { useBranch } from './branch-context';
 
 interface POSContextType {
@@ -143,6 +151,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isConfettiActive, setIsConfettiActive] = useState(false);
   const hasShownSyncToast = useRef(false);
   const hasHydratedRef = useRef(false);
+  /**
+   * True once the local cache reads have settled, whatever they returned.
+   *
+   * hasHydratedRef flips synchronously at the top of the hydration effect, so it
+   * says "hydration started", not "finished". Anything that has to distinguish a
+   * genuinely empty cache from one that simply has not loaded yet - the receipt
+   * backfill below - needs this instead.
+   */
+  const [isCacheHydrated, setIsCacheHydrated] = useState(false);
+  /** refreshKey value the receipt backfill last ran for; -1 means never. */
+  const lastReceiptBackfillKeyRef = useRef(-1);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFullSyncingCustomers, setIsFullSyncingCustomers] = useState(false);
   const [isFullSyncingProducts, setIsFullSyncingProducts] = useState(false);
@@ -329,9 +348,39 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
 
   // Sync to local storage for fast subsequent loads
+  /**
+   * On desktop, SQLite is the durable store - so the bulk collections do not go
+   * to localStorage at all.
+   *
+   * Writing them there was what broke offline launch for larger businesses: the
+   * encrypted product/customer/receipt blobs exhausted the ~5MB origin quota,
+   * secureStorage swallows the resulting QuotaExceededError, and the small
+   * profile write that carries businessId failed silently. Without businessId
+   * nothing can address the SQLite cache, so a fully-populated database looked
+   * empty until a reconnect refetched the profile.
+   *
+   * Mobile is also Tauri and hydrates from the same SQLite tables, but it keeps
+   * writing localStorage too: that is the path the user confirmed still loads
+   * offline, and its datasets are the ones that fit today.
+   */
+  const isDesktopApp = isNativeApp() && !isMobileApp();
+
   useEffect(() => {
-    if (currentUserProfile) secureStorage.setItem(USER_PROFILE_KEY, currentUserProfile);
+    if (currentUserProfile) {
+      secureStorage.setItem(USER_PROFILE_KEY, currentUserProfile);
+      if (isNativeApp()) syncProfileToOffline(currentUserProfile);
+    }
   }, [currentUserProfile]);
+
+  // Restores businessId offline. The main hydration effect below returns early
+  // on a null businessId *before* setting hasHydratedRef, so it re-runs on its
+  // own once this lands.
+  useEffect(() => {
+    if (!isNativeApp() || !user?.uid || offlineProfile?.id === user.uid) return;
+    getCachedProfile(user.uid).then(p => {
+      if (p) setOfflineProfile(p);
+    });
+  }, [user?.uid, offlineProfile?.id]);
 
   useEffect(() => {
     secureStorage.setItem('pos_queued_actions', queuedActions);
@@ -339,30 +388,27 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [queuedActions]);
 
   useEffect(() => {
-    secureStorage.setItem('pos_synced_products', syncedProducts);
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (!isTauri) idb.set('pos_synced_products', syncedProducts);
-  }, [syncedProducts]);
+    if (!isDesktopApp) secureStorage.setItem('pos_synced_products', syncedProducts);
+    if (!isNativeApp()) idb.set('pos_synced_products', syncedProducts);
+  }, [syncedProducts, isDesktopApp]);
 
   useEffect(() => {
-    secureStorage.setItem('pos_synced_customers', syncedCustomers);
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (!isTauri) idb.set('pos_synced_customers', syncedCustomers);
-  }, [syncedCustomers]);
+    if (!isDesktopApp) secureStorage.setItem('pos_synced_customers', syncedCustomers);
+    if (!isNativeApp()) idb.set('pos_synced_customers', syncedCustomers);
+  }, [syncedCustomers, isDesktopApp]);
 
   useEffect(() => {
-    secureStorage.setItem('pos_synced_receipts', syncedReceipts);
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (!isTauri) idb.set('pos_synced_receipts', syncedReceipts);
-  }, [syncedReceipts]);
- 
-  useEffect(() => {
-    secureStorage.setItem('pos_synced_users', syncedUsers);
-  }, [syncedUsers]);
+    if (!isDesktopApp) secureStorage.setItem('pos_synced_receipts', syncedReceipts);
+    if (!isNativeApp()) idb.set('pos_synced_receipts', syncedReceipts);
+  }, [syncedReceipts, isDesktopApp]);
 
   useEffect(() => {
-    secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs);
-  }, [syncedAuditLogs]);
+    if (!isDesktopApp) secureStorage.setItem('pos_synced_users', syncedUsers);
+  }, [syncedUsers, isDesktopApp]);
+
+  useEffect(() => {
+    if (!isDesktopApp) secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs);
+  }, [syncedAuditLogs, isDesktopApp]);
 
   useEffect(() => {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
@@ -798,13 +844,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, user, isRealOnline]);
 
-  // Effect to pull initial historical receipts once on startup if the local array is empty.
+  /**
+   * Backfill historical receipts, but only when the local cache is genuinely empty.
+   *
+   * The comment always said "once on startup if the local array is empty" - the
+   * emptiness check was just never there, so every launch spent 200 reads
+   * re-fetching receipts SQLite already held. refreshData's delta sync picks up
+   * anything new and the daily full sync keeps history complete, so this is only
+   * needed for a first login or a cleared cache. An explicit refresh
+   * (refreshKey > 0) still forces it.
+   */
   useEffect(() => {
-    const isOnline = isRealOnline;
-    if (user && businessId && firestore && isOnline) {
-      fetchInitialReceipts();
-    }
-  }, [businessId, firestore, fetchInitialReceipts, refreshKey, user, isRealOnline]);
+    if (!user || !businessId || !firestore || !isRealOnline) return;
+    if (!isCacheHydrated) return;
+    // At most one backfill per refreshKey: the fetch itself changes
+    // syncedReceipts.length, which re-runs this effect.
+    if (lastReceiptBackfillKeyRef.current === refreshKey) return;
+    if (syncedReceipts.length > 0 && refreshKey === 0) return;
+    lastReceiptBackfillKeyRef.current = refreshKey;
+    fetchInitialReceipts();
+  }, [businessId, firestore, fetchInitialReceipts, refreshKey, user, isRealOnline, isCacheHydrated, syncedReceipts.length]);
 
   const fetchInitialUsers = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -870,7 +929,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
         } else {
           const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
           allFetched = [...allFetched, ...batch];
-          
+
+          // Persist each page as it lands, the way fetchFullReceipts does. State
+          // alone is not durable, and the full_customers_sync stamp below would
+          // otherwise certify a sync that never reached disk - the 24h gate then
+          // suppresses the re-sync that would have fixed it.
+          await syncCustomersToOffline(businessId, batch);
+
           setSyncedCustomers(prev => {
             const merged = [...prev];
             batch.forEach(nc => {
@@ -935,7 +1000,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
         } else {
           const batch = snap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
           allFetched = [...allFetched, ...batch];
-          
+
+          // Same reason as the customer loop: persist the page before the
+          // full_products_sync stamp can claim it was persisted.
+          await syncProductsToOffline(businessId, batch);
+
           setSyncedProducts(prev => {
             const merged = [...prev];
             batch.forEach(np => {
@@ -1135,8 +1204,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 ? Timestamp.fromDate(clientDate!)
                 : serverTimestamp();
 
-
-              batch.set(rRef, { 
+              batch.set(rRef, {
                 ...action.payload.receiptData, 
                 businessId: businessId, 
                 createdAt: dateVal 
@@ -1410,8 +1478,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const addToQueue = useCallback((action: any, description: string) => {
-    const isSubscriptionActive = business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true;
-    if (!isSubscriptionActive) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'Your subscription has expired.' }); return null; }
+    // Writes are never blocked by an expired date. The free plan does not
+    // expire, and a lapsed paid plan downgrades to it rather than locking the
+    // shop out mid-sale. Paid features are gated individually via effectivePlan.
+    if (!resolveSubscriptionActive(business)) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'This business is no longer active.' }); return null; }
     
     // --- RBAC Permission Check ---
     const effectiveProfile = currentUserProfile || offlineProfile;
@@ -1833,11 +1903,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => { secureStorage.setItem(POS_DISCOUNT_KEY, discount); }, [discount]);
   useEffect(() => { secureStorage.setItem(POS_PAYMENT_METHOD_KEY, paymentMethod); }, [paymentMethod]);
   useEffect(() => { secureStorage.setItem(POS_AUTO_PRINT_KEY, autoPrint); }, [autoPrint]);
-  useEffect(() => { secureStorage.setItem('pos_synced_products', syncedProducts); }, [syncedProducts]);
-  useEffect(() => { secureStorage.setItem('pos_synced_customers', syncedCustomers); }, [syncedCustomers]);
-  useEffect(() => { secureStorage.setItem('pos_synced_receipts', syncedReceipts); }, [syncedReceipts]);
-  useEffect(() => { secureStorage.setItem('pos_synced_users', syncedUsers); }, [syncedUsers]);
-  useEffect(() => { secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs); }, [syncedAuditLogs]);
+  // The five bulk collections used to be written here as well as in the guarded
+  // effects near the top of the provider. This copy was unguarded, so on desktop
+  // it put the multi-megabyte blobs straight back into localStorage and undid
+  // both the quota fix and the reclaim below. SQLite is the durable store there.
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
   useEffect(() => { secureStorage.setItem('pos_queued_actions', queuedActions); }, [queuedActions]);
 
@@ -1908,19 +1977,53 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       });
       
-       // 2. Hydrate POS from SQLite for instant start
-      getCachedProducts(businessId).then(p => { if (p.length > 0) setSyncedProducts(p); });
-      getCachedCustomers(businessId).then(c => { if (c.length > 0) setSyncedCustomers(c); });
-      getCachedReceipts(businessId, 10000).then(r => { if (r.length > 0) setSyncedReceipts(r); });
-      getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); });
-      getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); });
+       // 2. Hydrate POS from SQLite for instant start.
+       //
+       // Each read also reclaims the localStorage blob it supersedes, but only
+       // once SQLite has actually returned rows for this business - so there is
+       // never a moment where the data lives in neither store. This frees the
+       // quota on installs upgrading from the build that wrote both.
+      const reclaim = (key: string, hasRows: boolean) => {
+        if (isDesktopApp && hasRows) secureStorage.removeItem(key);
+      };
+
+      Promise.all([
+        getCachedProducts(businessId).then(p => {
+          if (p.length > 0) setSyncedProducts(p);
+          reclaim('pos_synced_products', p.length > 0);
+        }),
+        getCachedCustomers(businessId).then(c => {
+          if (c.length > 0) setSyncedCustomers(c);
+          reclaim('pos_synced_customers', c.length > 0);
+        }),
+        getCachedReceipts(businessId, 10000).then(r => {
+          if (r.length > 0) setSyncedReceipts(r);
+          reclaim('pos_synced_receipts', r.length > 0);
+        }),
+        getCachedUsers(businessId).then(u => {
+          if (u.length > 0) setSyncedUsers(u);
+          reclaim('pos_synced_users', u.length > 0);
+        }),
+        getCachedAuditLogs(businessId).then(l => {
+          if (l.length > 0) {
+            setSyncedAuditLogs(
+              l.sort((a: AuditLog, b: AuditLog) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime())
+            );
+          }
+          reclaim('pos_synced_audit_logs', l.length > 0);
+        }),
+        getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); }),
+        getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); }),
+      ]).finally(() => setIsCacheHydrated(true));
     } else {
       // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
-      idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); });
-      idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); });
-      idb.get<Receipt[]>('pos_synced_receipts').then(r => { if (r && r.length > 0) setSyncedReceipts(r); });
+      Promise.all([
+        idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); }),
+        idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); }),
+        idb.get<Receipt[]>('pos_synced_receipts').then(r => { if (r && r.length > 0) setSyncedReceipts(r); }),
+      ]).finally(() => setIsCacheHydrated(true));
     }
-  }, [isMounted, businessId, processQueue, isRealOnline]);
+  }, [isMounted, businessId, processQueue, isRealOnline, isDesktopApp]);
 
 
   useEffect(() => {
@@ -1938,6 +2041,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         // to prevent data bleeding between accounts
         nuclearReset();
         hasHydratedRef.current = false; // Allow the new user's data to be hydrated
+        setIsCacheHydrated(false);
+        lastReceiptBackfillKeyRef.current = -1;
       }
       setLastUserId(effectiveUserId); 
     }
@@ -1963,16 +2068,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [processQueue, queuedActions, isQueueProcessing, isRealOnline]);
   
   // SQLite Continuity Sync
+  //
+  // These are the *unfiltered* memos on purpose. The branch-filtered `products` /
+  // `customers` / `receipts` are what the UI renders, but persisting those means a
+  // multi-branch business only ever caches whichever branch happened to be active,
+  // and relaunching offline on another branch shows nothing.
   useEffect(() => {
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    if (isTauri && businessId) {
-      if (products && products.length > 0) syncProductsToOffline(businessId, products);
-      if (customers && customers.length > 0) syncCustomersToOffline(businessId, customers);
-      if (receipts && receipts.length > 0) syncReceiptsToOffline(businessId, receipts);
-      if (business) syncBusinessToOffline(business);
-      if (stats) syncStatsToOffline(businessId, stats);
-    }
-  }, [businessId, products, customers, receipts, business, stats]);
+    if (!isNativeApp() || !businessId) return;
+    if (allProducts && allProducts.length > 0) syncProductsToOffline(businessId, allProducts);
+    if (allCustomers && allCustomers.length > 0) syncCustomersToOffline(businessId, allCustomers);
+    if (allReceipts && allReceipts.length > 0) syncReceiptsToOffline(businessId, allReceipts);
+    if (users && users.length > 0) syncUsersToOffline(businessId, users);
+    if (auditLogs && auditLogs.length > 0) syncAuditLogsToOffline(businessId, auditLogs);
+    if (business) syncBusinessToOffline(business);
+    if (stats) syncStatsToOffline(businessId, stats);
+  }, [businessId, allProducts, allCustomers, allReceipts, users, auditLogs, business, stats]);
 
   useEffect(() => {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
@@ -2028,20 +2138,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const tax = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
   const total = useMemo(() => subtotal + tax - discount, [subtotal, tax, discount]);
 
+  // branch-context listens for this and otherwise only catches up via a 1.5s poll,
+  // which shows stale branch data for a beat after entering or leaving impersonation.
+  const notifyImpersonationChange = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('zeneva_impersonation_change'));
+  }, []);
+
   const impersonateUser = useCallback((userId: string) => {
     setImpersonatedUserId(userId);
     sessionStorage.setItem('zeneva_impersonated_user_id', userId);
+    notifyImpersonationChange();
     toast({ title: 'Impersonating User', description: 'Redirecting to their view...' });
     triggerRefresh();
-  }, [toast, triggerRefresh]);
+  }, [toast, triggerRefresh, notifyImpersonationChange]);
 
   const stopImpersonation = useCallback(() => {
     setImpersonatedUserId(null);
     sessionStorage.removeItem('zeneva_impersonated_user_id');
+    notifyImpersonationChange();
     toast({ title: 'Impersonation Ended', description: 'Returning to your administrator view.' });
     nuclearReset();
     triggerRefresh();
-  }, [toast, nuclearReset, triggerRefresh]);
+  }, [toast, nuclearReset, triggerRefresh, notifyImpersonationChange]);
 
   const holdCurrentSale = useCallback((notes?: string) => {
     if (cart.length === 0) return;
@@ -2091,12 +2210,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const voidReceipt = useCallback(async (receiptId: string) => {
     // 1. Optimistic local state updates
     setSyncedReceipts(prev => prev.filter(r => r.id !== receiptId));
-    try {
-      const currentSynced = secureStorage.getItem<any[]>('pos_synced_receipts') || [];
-      const updatedSynced = currentSynced.filter(r => r.id !== receiptId);
-      secureStorage.setItem('pos_synced_receipts', updatedSynced);
-    } catch (err) {
-      console.error("Failed to update secureStorage for voided receipt:", err);
+    // Desktop has no receipts blob in localStorage - step 2 below is its removal
+    // path - so skip it rather than recreating the key we just reclaimed.
+    if (!isDesktopApp) {
+      try {
+        const currentSynced = secureStorage.getItem<any[]>('pos_synced_receipts') || [];
+        const updatedSynced = currentSynced.filter(r => r.id !== receiptId);
+        secureStorage.setItem('pos_synced_receipts', updatedSynced);
+      } catch (err) {
+        console.error("Failed to update secureStorage for voided receipt:", err);
+      }
     }
 
     // 2. Local SQLite removal
@@ -2116,7 +2239,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       title: "Receipt Voided",
       description: "The sale has been voided and will be removed globally.",
     });
-  }, [addToQueue, toast]);
+  }, [addToQueue, toast, isDesktopApp]);
 
 
 
@@ -2361,7 +2484,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isOnline: isRealOnline,
 
     stats, 
-    isSubscriptionActive: business ? (business.accessLevel === 'lifetime' || (business.trialExpiresAt && safeToDate(business.trialExpiresAt).getTime() > Date.now())) : true
+    isSubscriptionActive: resolveSubscriptionActive(business)
   }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

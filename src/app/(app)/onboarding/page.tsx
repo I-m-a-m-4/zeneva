@@ -261,7 +261,7 @@ export default function OnboardingPage() {
       // 3. Create Welcome Notification
       const notifRef = doc(collection(firestore, `users/${authUser.uid}/notifications`));
       batch.set(notifRef, {
-          title: "Welcome to Zeneva! 🎉",
+          title: "Welcome to Zeneva",
           body: `Hi ${currentUserProfile?.name || 'there'}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
           createdAt: serverTimestamp(),
           read: false,

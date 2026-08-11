@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePOS } from '@/context/pos-context';
+import { hasProFeatures } from '@/lib/plan';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -235,7 +236,7 @@ export default function TerminalAlertsPage() {
   };
 
   const hasLifetimeAccess = business?.accessLevel === 'lifetime';
-  const hasAccess = business?.plan === 'business' || business?.plan === 'pro' || hasLifetimeAccess;
+  const hasAccess = hasProFeatures(business);
 
   const displayedAlerts = hasAccess ? filteredAlerts : MOCK_STARTER_ALERTS;
   const displayedCash = hasAccess ? dailyCash : 245000;

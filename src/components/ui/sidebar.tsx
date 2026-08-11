@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { useI18n } from "@/context/i18n-context"
 import {
   Tooltip,
   TooltipContent,
@@ -160,7 +161,7 @@ const Sidebar = React.forwardRef<
 >(
   (
     {
-      side = "left",
+      side,
       variant = "sidebar",
       collapsible = "icon",
       className,
@@ -170,6 +171,11 @@ const Sidebar = React.forwardRef<
     ref
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { dir } = useI18n()
+    // The desktop rail is a flex child, so it follows `dir` on its own. The
+    // mobile Sheet is fixed-position, so its edge has to be resolved here or
+    // it slides in from the left even in Arabic.
+    const resolvedSide = side ?? (dir === "rtl" ? "right" : "left")
 
     if (isMobile) {
       return (
@@ -183,7 +189,7 @@ const Sidebar = React.forwardRef<
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
               } as React.CSSProperties
             }
-            side={side}
+            side={resolvedSide}
           >
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -311,7 +317,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "flex w-full items-center gap-3 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-primary transition-all focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:font-medium hover:bg-muted group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:py-2",
+  "flex w-full items-center gap-3 overflow-hidden rounded-md p-2 text-start text-sm outline-none ring-primary transition-all focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:font-medium hover:bg-muted group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:py-2",
   {
     variants: {
       size: {
@@ -345,6 +351,8 @@ const SidebarMenuButton = React.forwardRef<
   ) => {
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
+    const { dir } = useI18n()
+    const isRtl = dir === "rtl"
 
     const button = (
       <Comp
@@ -365,7 +373,7 @@ const SidebarMenuButton = React.forwardRef<
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent
-          side="right"
+          side={isRtl ? "left" : "right"}
           align="center"
           sideOffset={10}
           hidden={state !== "collapsed" || isMobile}

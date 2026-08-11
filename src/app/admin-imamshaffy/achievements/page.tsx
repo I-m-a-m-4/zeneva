@@ -8,6 +8,7 @@ import { Trophy, Users, DollarSign, Sparkles, ShoppingBag, Store, Star, ArrowUpR
 import type { Receipt, Product, BusinessInstance, UserProfile } from '@/types';
 import Confetti from '@/components/shared/confetti';
 import { cn } from '@/lib/utils';
+import { adminApiFetch } from '@/lib/admin-api';
 
 // =================================================================
 // AchievementModal Component
@@ -123,14 +124,20 @@ export default function AchievementsPage() {
   const [adminData, setAdminData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const fetchAdminData = async () => {
       try {
-          const res = await fetch('/api/admin/metrics');
-          const data = await res.json();
+          setLoadError(null);
+          // adminApiFetch, not a bare relative fetch: in the Tauri bundle a relative
+          // path resolves against tauri://localhost and 404s. It also attaches the
+          // ID token the endpoint now requires.
+          const data = await adminApiFetch('/api/admin/metrics');
           const revivedData = reviveTimestamps(data);
           setAdminData(revivedData);
-      } catch (error) {
+      } catch (error: any) {
           console.error('Failed to fetch admin data:', error);
+          setLoadError(error?.message || 'Could not load platform metrics.');
       } finally {
           setIsLoading(false);
       }
@@ -415,6 +422,22 @@ export default function AchievementsPage() {
       <div className="flex h-[80vh] items-center justify-center">
         <Loader className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-4 text-lg">Loading Achievements...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-3 px-6 text-center">
+        <Trophy className="h-8 w-8 text-muted-foreground" />
+        <p className="text-lg font-semibold">Could not load achievements</p>
+        <p className="max-w-sm text-sm text-muted-foreground">{loadError}</p>
+        <button
+          onClick={() => { setIsLoading(true); fetchAdminData(); }}
+          className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          Try again
+        </button>
       </div>
     );
   }

@@ -12,6 +12,7 @@ import PlanDistributionChart from '@/components/admin/charts/PlanDistributionCha
 import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
+import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import {
     Card,
     CardContent,
@@ -90,6 +91,7 @@ import {
     Timer,
     RefreshCw,
     Share2,
+    Languages,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -149,6 +151,8 @@ import {
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { rankBusinesses } from '@/lib/outreach-scoring';
+import { LOCALES, resolveLocale, getLocaleDefinition } from '@/lib/i18n/config';
 import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
@@ -161,6 +165,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CyberShield from '@/components/admin/cyber-shield';
+import UninstallTracker from '@/components/admin/uninstall-tracker';
+// Shared with the standalone /users directory and detail pages. These used to be
+// module-private copies here; a second copy is how the two surfaces drift apart.
+import {
+    UserPresence,
+    formatDuration,
+    toDate,
+    userLanguage,
+} from '@/components/admin/user-detail/user-primitives';
+import {
+    UserUsageDetailDialog,
+    type UsageSession,
+} from '@/components/admin/user-detail/usage-insights';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -197,33 +214,6 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string, va
         </CardContent>
     </Card>
 );
-
-const UserPresence = ({ lastSeen }: { lastSeen: any }) => {
-    if (!lastSeen?.toDate) {
-        return <span className="text-muted-foreground text-xs">Never</span>;
-    }
-    const lastSeenDate = lastSeen.toDate();
-    const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-
-    const isOnline = lastSeenDate > fiveMinutesAgo;
-
-    return (
-        <div className="flex items-center gap-2">
-            {isOnline ? (
-                <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                </span>
-            ) : (
-                <span className="relative flex h-2.5 w-2.5">
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted-foreground/50"></span>
-                </span>
-            )}
-            <span className="text-xs text-muted-foreground">{formatDistanceToNow(lastSeenDate, { addSuffix: true })}</span>
-        </div>
-    );
-};
 
 const PIE_CHART_COLORS = {
     Healthy: '#22c55e', // Bright Green
@@ -742,20 +732,84 @@ function ZenevaMilestoneDialog({ open, onOpenChange, daysActive, totalSales, tot
 
 // ======================== USAGE ANALYTICS TAB COMPONENT ========================
 
-function formatDuration(seconds: number): string {
-    if (!seconds || seconds < 1) return '0s';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    if (h > 0) return `${h}h ${m}m`;
-    if (m > 0) return `${m}m ${s}s`;
-    return `${s}s`;
+// ======================== BEHAVIOR / PAGE-VISIT ANALYTICS ========================
+
+/**
+ * One session's ordered route log, written by UserActivityTracker to
+ * `users/{uid}/journey/{sessionId}`. Read here with a collection-group query.
+ */
+interface JourneyDoc {
+    id: string;
+    uid?: string;
+    sessionId?: string;
+    startedAt?: any;
+    endedAt?: any;
+    routes?: { path: string; at: number }[];
+    isFirstSession?: boolean;
+    deviceType?: string;
 }
 
+/**
+ * Collapses dynamic segments so `/customers/AbC123...` and `/customers/XyZ789...`
+ * aggregate into one `/customers/:id` row instead of a long tail of single hits.
+ * Mirrors routeKey() in UserActivityTracker, but keeps slashes for display.
+ */
+function pageLabel(path: string): string {
+    const cleaned = String(path || '').split('?')[0].split('#')[0];
+    const segments = cleaned.split('/').filter(Boolean);
+    if (!segments.length) return '/';
+    const normalised = segments.map(seg =>
+        (seg.length >= 16 || /^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(seg)) ? ':id' : seg
+    );
+    return '/' + normalised.join('/');
+}
+
+const RANGE_OPTIONS = [
+    { days: 1, label: 'Last 24 hours' },
+    { days: 7, label: 'Last 7 days' },
+    { days: 30, label: 'Last 30 days' },
+    { days: 90, label: 'Last 90 days' },
+    { days: 0, label: 'All time' },
+] as const;
+
 function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; businesses: BusinessInstance[] }) {
+    const firestore = useFirestore();
     const [sortField, setSortField] = useState<'usage' | 'name' | 'lastSeen'>('usage');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
     const [drillUser, setDrillUser] = useState<UserProfile | null>(null);
+    const [journeys, setJourneys] = useState<JourneyDoc[]>([]);
+    const [journeysLoading, setJourneysLoading] = useState(true);
+
+    // Time window driving every behavior figure on this tab. 0 = all time.
+    const [rangeDays, setRangeDays] = useState<number>(30);
+    // Filters for the first-run list, so it is queryable rather than a top-N peek.
+    const [signupSearch, setSignupSearch] = useState('');
+    const [signupFilter, setSignupFilter] = useState<'all' | 'activated' | 'inactive'>('all');
+
+    // Every session's route log, across all users. Capped so a large tenant
+    // can't turn opening this tab into an unbounded read.
+    useEffect(() => {
+        if (!firestore) return;
+        let cancelled = false;
+        setJourneysLoading(true);
+
+        withFirestoreRetry(
+            () => getDocs(query(collectionGroup(firestore, 'journey'), limit(2000))),
+            { label: 'Page-visit journeys' },
+        )
+            .then(snap => {
+                if (cancelled) return;
+                setJourneys(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+            })
+            .catch(err => {
+                if (!cancelled) console.error('Failed to load page-visit journeys', err);
+            })
+            .finally(() => {
+                if (!cancelled) setJourneysLoading(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [firestore]);
 
     const todayStart = startOfDay(new Date());
 
@@ -770,6 +824,161 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
     const totalUsageSeconds = usersWithUsage.reduce((sum, u) => sum + (u.totalUsageSeconds ?? 0), 0);
     const avgSessionSeconds = usersWithUsage.length > 0 ? Math.round(totalUsageSeconds / usersWithUsage.length) : 0;
     const totalHours = Math.round(totalUsageSeconds / 3600);
+
+    /**
+     * Everything derived from the route logs: which pages get used, when, and
+     * what a brand-new signup actually does on their first run.
+     */
+    const behavior = useMemo(() => {
+        const now = Date.now();
+        // rangeDays 0 means all time; everything below keys off this one window
+        // so the range selector drives every figure on the tab, not just a chart.
+        const windowStart = rangeDays > 0 ? now - rangeDays * 24 * 60 * 60 * 1000 : 0;
+
+        // ── Top pages + traffic buckets, from every route entry in range ──
+        const pageCounts = new Map<string, number>();
+        const viewsByBucket = new Map<string, number>();
+        const usersByBucket = new Map<string, Set<string>>();
+        let totalViews = 0;
+
+        // Sub-day ranges are bucketed hourly; anything longer, daily. Otherwise a
+        // 24h view collapses into one or two columns and shows nothing.
+        const hourly = rangeDays === 1;
+        const bucketKey = (ms: number) => format(new Date(ms), hourly ? 'yyyy-MM-dd HH' : 'yyyy-MM-dd');
+
+        for (const j of journeys) {
+            const uid = j.uid || '';
+            for (const r of j.routes ?? []) {
+                const at = typeof r?.at === 'number' ? r.at : 0;
+                if (!at || at < windowStart) continue;
+                const label = pageLabel(r.path);
+                pageCounts.set(label, (pageCounts.get(label) || 0) + 1);
+                totalViews++;
+
+                const key = bucketKey(at);
+                viewsByBucket.set(key, (viewsByBucket.get(key) || 0) + 1);
+                if (uid) {
+                    if (!usersByBucket.has(key)) usersByBucket.set(key, new Set());
+                    usersByBucket.get(key)!.add(uid);
+                }
+            }
+        }
+
+        const topPages = [...pageCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 12)
+            .map(([page, views]) => ({ page, views }));
+
+        // Fill every bucket in the window so a quiet day reads as a zero rather
+        // than closing the gap and implying continuous traffic. All-time falls
+        // back to 90 days of buckets so the axis stays readable.
+        const dailySeries: { date: string; views: number; users: number }[] = [];
+        const bucketCount = hourly ? 24 : Math.min(rangeDays || 90, 90);
+        const step = hourly ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+        for (let i = bucketCount - 1; i >= 0; i--) {
+            const ms = now - i * step;
+            const key = bucketKey(ms);
+            dailySeries.push({
+                date: format(new Date(ms), hourly ? 'HH:00' : 'MMM d'),
+                views: viewsByBucket.get(key) || 0,
+                users: usersByBucket.get(key)?.size || 0,
+            });
+        }
+
+        // ── First-run behavior ──
+        // Earliest journey per user is their first run, regardless of window.
+        const firstJourneyByUid = new Map<string, JourneyDoc>();
+        for (const j of journeys) {
+            if (!j.uid) continue;
+            const started = toDate(j.startedAt)?.getTime() ?? j.routes?.[0]?.at ?? 0;
+            const existing = firstJourneyByUid.get(j.uid);
+            const existingStart = existing
+                ? (toDate(existing.startedAt)?.getTime() ?? existing.routes?.[0]?.at ?? 0)
+                : Infinity;
+            if (!existing || started < existingStart) firstJourneyByUid.set(j.uid, j);
+        }
+
+        // Every signup in the window — no top-N cap; the list is filtered and
+        // scrolled in the UI instead.
+        const signupsInRange = users
+            .filter(u => (toDate(u.createdAt)?.getTime() ?? 0) >= windowStart)
+            .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0))
+            .map(u => {
+                const first = firstJourneyByUid.get(u.id);
+                const steps = (first?.routes ?? [])
+                    .map(r => ({ label: pageLabel(r.path), at: r.at }))
+                    // Collapse immediate repeats so a refresh doesn't read as a step.
+                    .filter((s, i, arr) => i === 0 || s.label !== arr[i - 1].label);
+                return {
+                    user: u,
+                    steps,
+                    startedAt: toDate(first?.startedAt),
+                    signedUpAt: toDate(u.createdAt),
+                    isFirstSession: first?.isFirstSession === true,
+                };
+            });
+
+        // Activation = signed up AND opened at least one tracked page.
+        const activated = signupsInRange.filter(s => s.steps.length > 0);
+        const activationRate = signupsInRange.length
+            ? Math.round((activated.length / signupsInRange.length) * 100)
+            : 0;
+        // One page then gone — the clearest bounce signal we have.
+        const bounced = activated.filter(s => s.steps.length === 1).length;
+        const avgFirstRunDepth = activated.length
+            ? Math.round((activated.reduce((n, s) => n + s.steps.length, 0) / activated.length) * 10) / 10
+            : 0;
+
+        // Where new users land first, and where they go next.
+        const entryCounts = new Map<string, number>();
+        for (const s of activated) {
+            const entry = s.steps[0]?.label;
+            if (entry) entryCounts.set(entry, (entryCounts.get(entry) || 0) + 1);
+        }
+        const entryPages = [...entryCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([page, count]) => ({ page, count }));
+
+        const activeUids = new Set<string>();
+        for (const j of journeys) {
+            const started = toDate(j.startedAt)?.getTime() ?? j.routes?.[0]?.at ?? 0;
+            if (started >= windowStart && j.uid) activeUids.add(j.uid);
+        }
+
+        return {
+            topPages,
+            dailySeries,
+            hourly,
+            totalViews,
+            avgViewsPerUser: activeUids.size ? Math.round(totalViews / activeUids.size) : 0,
+            signupsInRange,
+            newSignupCount: signupsInRange.length,
+            activatedCount: activated.length,
+            activationRate,
+            bounced,
+            avgFirstRunDepth,
+            entryPages,
+            activeUsers: activeUids.size,
+            sessionsTracked: journeys.length,
+        };
+    }, [journeys, users, rangeDays]);
+
+    const rangeLabel = RANGE_OPTIONS.find(o => o.days === rangeDays)?.label ?? 'Last 30 days';
+
+    // The first-run list after the search box and status filter are applied.
+    const visibleSignups = useMemo(() => {
+        const q = signupSearch.trim().toLowerCase();
+        return behavior.signupsInRange.filter(s => {
+            if (signupFilter === 'activated' && s.steps.length === 0) return false;
+            if (signupFilter === 'inactive' && s.steps.length > 0) return false;
+            if (!q) return true;
+            return (
+                (s.user.name || '').toLowerCase().includes(q) ||
+                (s.user.email || '').toLowerCase().includes(q)
+            );
+        });
+    }, [behavior.signupsInRange, signupSearch, signupFilter]);
 
     // Per-user rows
     const sortedUsers = useMemo(() => {
@@ -828,6 +1037,341 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Behavior KPIs — everything below is derived from the route logs */}
+            {/* Range selector — drives every behavior figure below */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-base font-bold">Behavior Analytics</h3>
+                    <p className="text-xs text-muted-foreground">
+                        Page-visit data for {rangeLabel.toLowerCase()}.
+                    </p>
+                </div>
+                <Select value={String(rangeDays)} onValueChange={v => setRangeDays(Number(v))}>
+                    <SelectTrigger className="w-[190px]">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {RANGE_OPTIONS.map(o => (
+                            <SelectItem key={o.days} value={String(o.days)}>{o.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Page Views</CardTitle>
+                        <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{behavior.totalViews.toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {rangeLabel} · {behavior.sessionsTracked.toLocaleString()} sessions tracked
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Views / Active User</CardTitle>
+                        <Layers className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{behavior.avgViewsPerUser.toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Depth per user who showed up</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                        <UserCheck className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{behavior.activeUsers}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Opened at least one page</p>
+                    </CardContent>
+                </Card>
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Activation Rate</CardTitle>
+                        <PartyPopper className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-primary">{behavior.activationRate}%</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {behavior.activatedCount} of {behavior.newSignupCount} signups opened a page
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {journeysLoading ? (
+                <Card>
+                    <CardContent className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+                        <Loader className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Loading page-visit behavior…</span>
+                    </CardContent>
+                </Card>
+            ) : behavior.totalViews === 0 && behavior.newSignupCount === 0 ? (
+                <Card>
+                    <CardContent className="py-16 text-center">
+                        <BarChart2 className="mx-auto h-8 w-8 text-muted-foreground/40" />
+                        <p className="mt-3 text-sm font-medium">No page-visit data in this range</p>
+                        <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
+                            Behavior tracking starts once users open the app on a build that includes it.
+                            Existing users will begin reporting on their next session.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                    {/* Traffic over time */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5 text-primary" />
+                                Traffic — {rangeLabel}
+                            </CardTitle>
+                            <CardDescription>
+                                Page views against the number of distinct users producing them. A views line that
+                                climbs while users stays flat means the same people are going deeper, not that more
+                                people arrived.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[280px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ReLineChart data={behavior.dailySeries}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis dataKey="date" fontSize={11} tickLine={false} axisLine={false} />
+                                        <YAxis yAxisId="left" fontSize={11} tickLine={false} axisLine={false} />
+                                        <YAxis yAxisId="right" orientation="right" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                                        <ReTooltip contentStyle={{ fontSize: 12 }} />
+                                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                                        <Line
+                                            yAxisId="left"
+                                            type="monotone"
+                                            dataKey="views"
+                                            name="Page views"
+                                            stroke="hsl(var(--primary))"
+                                            strokeWidth={2}
+                                            dot={false}
+                                        />
+                                        <Line
+                                            yAxisId="right"
+                                            type="monotone"
+                                            dataKey="users"
+                                            name="Distinct users"
+                                            stroke="#22c55e"
+                                            strokeWidth={2}
+                                            strokeDasharray="4 3"
+                                            dot={false}
+                                        />
+                                    </ReLineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Most visited pages */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <BarChart2 className="h-5 w-5 text-primary" />
+                                Most Visited Pages — {rangeLabel}
+                            </CardTitle>
+                            <CardDescription>
+                                Where users actually spend their clicks. Dynamic routes are grouped, so
+                                <code className="mx-1 rounded bg-muted px-1 text-[11px]">/customers/:id</code>
+                                counts every customer detail view as one row.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[360px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ReBarChart data={behavior.topPages} layout="vertical" margin={{ left: 40, right: 16 }}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                                        <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                                        <YAxis
+                                            type="category"
+                                            dataKey="page"
+                                            width={150}
+                                            fontSize={11}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <ReTooltip
+                                            formatter={(v: any) => [`${Number(v).toLocaleString()} views`, 'Views']}
+                                            contentStyle={{ fontSize: 12 }}
+                                        />
+                                        <Bar dataKey="views" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                                    </ReBarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* First-run behavior for brand new users */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <PartyPopper className="h-5 w-5 text-primary" />
+                                New User First Run
+                                <Badge variant="secondary" className="ml-1 text-[10px]">
+                                    {visibleSignups.length} of {behavior.newSignupCount}
+                                </Badge>
+                            </CardTitle>
+                            <CardDescription>
+                                The exact page sequence each new signup followed on their first session — the clearest
+                                read on whether onboarding lands or people bounce off it. Showing every signup in
+                                {' '}{rangeLabel.toLowerCase()}, searchable by name or email.
+                            </CardDescription>
+
+                            {/* Insight strip: the summary the raw list can't give you */}
+                            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-lg border bg-muted/30 p-2.5">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Activated</p>
+                                    <p className="text-lg font-bold">{behavior.activationRate}%</p>
+                                    <p className="text-[10px] text-muted-foreground">opened ≥1 page</p>
+                                </div>
+                                <div className="rounded-lg border bg-muted/30 p-2.5">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Never opened</p>
+                                    <p className="text-lg font-bold">{behavior.newSignupCount - behavior.activatedCount}</p>
+                                    <p className="text-[10px] text-muted-foreground">signed up, no session</p>
+                                </div>
+                                <div className="rounded-lg border bg-muted/30 p-2.5">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Bounced</p>
+                                    <p className="text-lg font-bold">{behavior.bounced}</p>
+                                    <p className="text-[10px] text-muted-foreground">one page, then left</p>
+                                </div>
+                                <div className="rounded-lg border bg-muted/30 p-2.5">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">First-run depth</p>
+                                    <p className="text-lg font-bold">{behavior.avgFirstRunDepth}</p>
+                                    <p className="text-[10px] text-muted-foreground">avg pages visited</p>
+                                </div>
+                            </div>
+
+                            {/* Where new users land first */}
+                            {behavior.entryPages.length > 0 && (
+                                <div className="mt-3 rounded-lg border p-3">
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        First page opened
+                                    </p>
+                                    <div className="mt-2 space-y-1.5">
+                                        {behavior.entryPages.map(e => (
+                                            <div key={e.page} className="flex items-center gap-2">
+                                                <span className="w-40 shrink-0 truncate font-mono text-[11px]">{e.page}</span>
+                                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full rounded-full bg-primary"
+                                                        style={{ width: `${Math.round((e.count / behavior.entryPages[0].count) * 100)}%` }}
+                                                    />
+                                                </div>
+                                                <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                                                    {e.count}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Query controls */}
+                            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        value={signupSearch}
+                                        onChange={e => setSignupSearch(e.target.value)}
+                                        placeholder="Search name or email…"
+                                        className="h-9 pl-8 text-sm"
+                                    />
+                                </div>
+                                <Select value={signupFilter} onValueChange={(v: any) => setSignupFilter(v)}>
+                                    <SelectTrigger className="h-9 w-full text-sm sm:w-[190px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All signups</SelectItem>
+                                        <SelectItem value="activated">Activated only</SelectItem>
+                                        <SelectItem value="inactive">Never opened a page</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="max-h-[520px] space-y-3 overflow-y-auto">
+                            {visibleSignups.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-muted-foreground">
+                                    {behavior.newSignupCount === 0
+                                        ? `No signups in ${rangeLabel.toLowerCase()}.`
+                                        : 'No signups match this search or filter.'}
+                                </p>
+                            ) : visibleSignups.map(({ user: u, steps, startedAt, signedUpAt, isFirstSession }) => (
+                                <div key={u.id} className="rounded-lg border p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold">{u.name || u.email}</p>
+                                            <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                                        </div>
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                            <div className="flex items-center gap-2">
+                                                {steps.length === 0 ? (
+                                                    <Badge variant="outline" className="border-destructive/40 text-[10px] text-destructive">
+                                                        Never opened
+                                                    </Badge>
+                                                ) : steps.length === 1 ? (
+                                                    <Badge variant="outline" className="border-amber-500/40 text-[10px] text-amber-600">
+                                                        Bounced
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="border-primary/40 text-[10px] text-primary">
+                                                        {steps.length} pages
+                                                    </Badge>
+                                                )}
+                                                {isFirstSession && (
+                                                    <Badge variant="secondary" className="text-[10px]">First session</Badge>
+                                                )}
+                                            </div>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {signedUpAt ? `Joined ${formatDistanceToNow(signedUpAt, { addSuffix: true })}` : 'Join date unknown'}
+                                            </span>
+                                            {startedAt && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    First seen {formatDistanceToNow(startedAt, { addSuffix: true })}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {steps.length === 0 ? (
+                                        <p className="mt-2 text-xs italic text-muted-foreground">
+                                            Signed up but has not opened a tracked page yet.
+                                        </p>
+                                    ) : (
+                                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                            {steps.slice(0, 12).map((s, i) => (
+                                                <span key={`${s.at}-${i}`} className="flex items-center gap-1.5">
+                                                    {i > 0 && <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />}
+                                                    <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px]">
+                                                        {s.label}
+                                                    </span>
+                                                </span>
+                                            ))}
+                                            {steps.length > 12 && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    +{steps.length - 12} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </>
+            )}
 
             {/* Per-User Table */}
             <Card>
@@ -935,344 +1479,8 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
 }
 
 // ======================== PER-USER USAGE DRILL-DOWN ========================
-
-interface UsageSession {
-    id: string;
-    startedAt?: any;
-    endedAt?: any;
-    lastSeen?: any;
-    createdAt?: any;
-    durationSeconds?: number;
-    date?: string;
-    userAgent?: string;
-    revoked?: boolean;
-    deviceInfo?: { platform?: string; vendor?: string; language?: string };
-}
-
-function toDate(value: any): Date | null {
-    if (!value) return null;
-    try {
-        const d = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
-        return isNaN(d.getTime()) ? null : d;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Deep-dive into one user's usage.
- *
- * Reads `users/{id}/sessions` - written by useSessionTracker on every session
- * end and by UserActivityTracker on each heartbeat - and derives the daily
- * pattern, streaks and device mix from it. Loaded on open rather than with the
- * table, so opening the tab still costs one query instead of one per user.
- */
-function UserUsageDetailDialog({
-    user, business, open, onOpenChange,
-}: {
-    user: UserProfile | null;
-    business: BusinessInstance | undefined;
-    open: boolean;
-    onOpenChange: (v: boolean) => void;
-}) {
-    const firestore = useFirestore();
-    const [sessions, setSessions] = useState<UsageSession[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [loadError, setLoadError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!open || !user || !firestore) return;
-
-        let cancelled = false;
-        setIsLoading(true);
-        setLoadError(null);
-
-        (async () => {
-            try {
-                const snap = await withFirestoreRetry(
-                    () => getDocs(query(
-                        collection(firestore, 'users', user.id, 'sessions'),
-                        limit(500),
-                    )),
-                    { label: `Usage sessions for ${user.name}` },
-                );
-                if (cancelled) return;
-                setSessions(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
-            } catch (err: any) {
-                if (cancelled) return;
-                console.error('Failed to load usage sessions', err);
-                setLoadError(err?.message || 'Could not load session history.');
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
-        })();
-
-        return () => { cancelled = true; };
-    }, [open, user, firestore]);
-
-    const stats = useMemo(() => {
-        const withDuration = sessions.filter(s => (s.durationSeconds ?? 0) > 0);
-
-        // Group into days using the session's own `date` when present, falling
-        // back to the start time. Heartbeat docs carry neither and are ignored.
-        const byDay = new Map<string, number>();
-        for (const s of withDuration) {
-            const started = toDate(s.startedAt) || toDate(s.createdAt);
-            const key = s.date || (started ? format(started, 'yyyy-MM-dd') : null);
-            if (!key) continue;
-            byDay.set(key, (byDay.get(key) || 0) + (s.durationSeconds ?? 0));
-        }
-
-        const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-        const longest = withDuration.reduce(
-            (best, s) => ((s.durationSeconds ?? 0) > (best?.durationSeconds ?? 0) ? s : best),
-            null as UsageSession | null,
-        );
-
-        // Current streak: consecutive days with any usage, counting back from
-        // the most recent active day (today or yesterday still counts as live).
-        let streak = 0;
-        if (days.length) {
-            const active = new Set(days.map(d => d[0]));
-            const cursor = new Date();
-            if (!active.has(format(cursor, 'yyyy-MM-dd'))) cursor.setDate(cursor.getDate() - 1);
-            while (active.has(format(cursor, 'yyyy-MM-dd'))) {
-                streak++;
-                cursor.setDate(cursor.getDate() - 1);
-            }
-        }
-
-        const last30 = days.slice(-30);
-        const activeDays = days.length;
-        const avgPerActiveDay = activeDays
-            ? Math.round(days.reduce((s, d) => s + d[1], 0) / activeDays)
-            : 0;
-
-        // Busiest hour of day, so support knows when this user is actually working.
-        const byHour = new Array(24).fill(0);
-        for (const s of withDuration) {
-            const started = toDate(s.startedAt) || toDate(s.createdAt);
-            if (started) byHour[started.getHours()] += s.durationSeconds ?? 0;
-        }
-        const peakHour = byHour.some(v => v > 0) ? byHour.indexOf(Math.max(...byHour)) : null;
-
-        const devices = new Map<string, number>();
-        for (const s of sessions) {
-            const platform = s.deviceInfo?.platform || 'Unknown';
-            devices.set(platform, (devices.get(platform) || 0) + 1);
-        }
-
-        return {
-            sessionCount: withDuration.length,
-            activeDays,
-            avgPerActiveDay,
-            longest,
-            streak,
-            peakHour,
-            chartData: last30.map(([date, seconds]) => ({
-                date: format(new Date(`${date}T00:00:00`), 'MMM d'),
-                minutes: Math.round(seconds / 60),
-            })),
-            devices: [...devices.entries()].sort((a, b) => b[1] - a[1]),
-            recent: [...sessions]
-                .sort((a, b) => {
-                    const at = toDate(a.startedAt) || toDate(a.createdAt) || toDate(a.lastSeen);
-                    const bt = toDate(b.startedAt) || toDate(b.createdAt) || toDate(b.lastSeen);
-                    return (bt?.getTime() ?? 0) - (at?.getTime() ?? 0);
-                })
-                .slice(0, 15),
-        };
-    }, [sessions]);
-
-    if (!user) return null;
-
-    const lastSeenDate = toDate(user.lastSeen);
-    const joinedDate = toDate(user.createdAt);
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Timer className="h-5 w-5 text-primary" />
-                        {user.name} — Usage Insights
-                    </DialogTitle>
-                    <DialogDescription>
-                        {user.email}
-                        {business?.name ? ` · ${business.name}` : ''}
-                        {joinedDate ? ` · Joined ${format(joinedDate, 'PP')}` : ''}
-                    </DialogDescription>
-                </DialogHeader>
-
-                {/* Headline numbers come from the user doc, so they render even
-                    while the session history is still loading. */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Card className="p-3">
-                        <p className="text-xs text-muted-foreground font-bold">Total Usage</p>
-                        <p className="text-xl font-bold mt-1">{formatDuration(user.totalUsageSeconds ?? 0)}</p>
-                    </Card>
-                    <Card className="p-3">
-                        <p className="text-xs text-muted-foreground font-bold">Active Days</p>
-                        <p className="text-xl font-bold mt-1">{isLoading ? '—' : stats.activeDays}</p>
-                    </Card>
-                    <Card className="p-3">
-                        <p className="text-xs text-muted-foreground font-bold">Current Streak</p>
-                        <p className="text-xl font-bold mt-1">
-                            {isLoading ? '—' : `${stats.streak} day${stats.streak === 1 ? '' : 's'}`}
-                        </p>
-                    </Card>
-                    <Card className="p-3">
-                        <p className="text-xs text-muted-foreground font-bold">Avg / Active Day</p>
-                        <p className="text-xl font-bold mt-1">
-                            {isLoading ? '—' : formatDuration(stats.avgPerActiveDay)}
-                        </p>
-                    </Card>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    <div>
-                        <Label className="text-xs text-muted-foreground font-bold">Last Seen</Label>
-                        <p className="font-medium mt-1">
-                            {lastSeenDate ? formatDistanceToNow(lastSeenDate, { addSuffix: true }) : 'Never'}
-                        </p>
-                    </div>
-                    <div>
-                        <Label className="text-xs text-muted-foreground font-bold">Device</Label>
-                        <p className="font-medium mt-1">{user.deviceType || 'Unknown'}</p>
-                    </div>
-                    <div>
-                        <Label className="text-xs text-muted-foreground font-bold">App Version</Label>
-                        <p className="font-medium mt-1">{user.appVersion || 'Unknown'}</p>
-                    </div>
-                    <div>
-                        <Label className="text-xs text-muted-foreground font-bold">Peak Hour</Label>
-                        <p className="font-medium mt-1">
-                            {isLoading || stats.peakHour === null
-                                ? '—'
-                                : `${String(stats.peakHour).padStart(2, '0')}:00`}
-                        </p>
-                    </div>
-                </div>
-
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-12 gap-3 text-muted-foreground">
-                        <Loader className="h-5 w-5 animate-spin" />
-                        Loading session history…
-                    </div>
-                ) : loadError ? (
-                    <div className="flex items-center gap-2 py-8 text-sm text-destructive justify-center">
-                        <AlertTriangle className="h-4 w-4" />
-                        {loadError}
-                    </div>
-                ) : stats.sessionCount === 0 ? (
-                    <div className="text-center py-10 text-sm text-muted-foreground">
-                        No completed sessions recorded yet. Per-session history starts once the user
-                        closes the app at least once on v3.0.0 or later.
-                    </div>
-                ) : (
-                    <>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Daily Usage (last 30 active days)</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[220px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <ReBarChart data={stats.chartData}>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis dataKey="date" fontSize={11} tickLine={false} axisLine={false} />
-                                            <YAxis
-                                                fontSize={11}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 11 }}
-                                            />
-                                            <ReTooltip
-                                                formatter={(v: any) => [`${v} min`, 'Usage']}
-                                                contentStyle={{ fontSize: 12 }}
-                                            />
-                                            <Bar dataKey="minutes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                                        </ReBarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Session Summary</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Recorded sessions</span>
-                                        <span className="font-semibold">{stats.sessionCount}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Longest session</span>
-                                        <span className="font-semibold">
-                                            {formatDuration(stats.longest?.durationSeconds ?? 0)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Avg session length</span>
-                                        <span className="font-semibold">
-                                            {formatDuration(Math.round(
-                                                sessions.reduce((s, x) => s + (x.durationSeconds ?? 0), 0) /
-                                                Math.max(stats.sessionCount, 1),
-                                            ))}
-                                        </span>
-                                    </div>
-                                    {stats.devices.map(([platform, count]) => (
-                                        <div key={platform} className="flex justify-between">
-                                            <span className="text-muted-foreground">{platform}</span>
-                                            <span className="font-semibold">{count} session{count === 1 ? '' : 's'}</span>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Recent Sessions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="max-h-[260px] overflow-y-auto">
-                                        <Table>
-                                            <TableHeader className="sticky top-0 bg-background">
-                                                <TableRow>
-                                                    <TableHead className="text-xs">When</TableHead>
-                                                    <TableHead className="text-xs">Duration</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {stats.recent.map(s => {
-                                                    const when = toDate(s.startedAt) || toDate(s.createdAt) || toDate(s.lastSeen);
-                                                    return (
-                                                        <TableRow key={s.id}>
-                                                            <TableCell className="text-xs">
-                                                                {when ? format(when, 'PPp') : '—'}
-                                                            </TableCell>
-                                                            <TableCell className="text-xs font-mono">
-                                                                {s.durationSeconds
-                                                                    ? formatDuration(s.durationSeconds)
-                                                                    : <span className="text-muted-foreground">active</span>}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </>
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
+// UsageSession, toDate and UserUsageDetailDialog now live in
+// '@/components/admin/user-detail/*' so the standalone /users pages share them.
 
 // ==============================================================================
 
@@ -1292,6 +1500,11 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                         <div className='col-span-2'>
                             <Label className="text-xs text-muted-foreground font-bold">Business Name</Label>
                             <p className="font-medium text-lg">{business?.name || 'N/A'}</p>
+                        </div>
+
+                        <div className='col-span-2'>
+                            <Label className="text-xs text-muted-foreground font-bold">Business Category</Label>
+                            <p className="font-medium">{business?.settings?.industry || 'N/A'}</p>
                         </div>
 
                         <div>
@@ -1367,10 +1580,25 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </div>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground font-bold">Login Location (IP)</Label>
+                            {/* Labelled "Login Location (IP)" until now, but the value
+                                is `country` and `UserProfile.ip` has no writer anywhere
+                                in the app — so the label promised an address that was
+                                never going to appear. */}
+                            <Label className="text-xs text-muted-foreground font-bold">Login Location</Label>
                             <div className="mt-1 flex items-center gap-1.5 font-medium">
                                 <Globe className="h-4 w-4 text-primary" />
                                 <span>{user.country || 'Unknown'}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="text-xs text-muted-foreground font-bold">App Language</Label>
+                            <div className="mt-1 flex items-center gap-1.5 font-medium">
+                                <Languages className="h-4 w-4 text-violet-500" />
+                                {(() => {
+                                    const lang = userLanguage(user.language);
+                                    if (!lang) return <span>Unknown</span>;
+                                    return <span>{lang.nativeLabel} <span className="text-xs text-muted-foreground">({lang.label})</span></span>;
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -2068,6 +2296,49 @@ function AdminDashboardContent({
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
+        // Language adoption, counted per user rather than per business: two staff
+        // in the same shop can read Zeneva in different languages. The field is
+        // written by UserActivityTracker on its existing 5-minute heartbeat, so
+        // this adds no reads - `users` is already loaded for this memo.
+        //
+        // A user who has not checked in since language tracking shipped has no
+        // field yet. That is reported as its own bucket instead of being folded
+        // into English, which would overstate English every time.
+        const languageUsers = (users || []).filter(u => u.status !== 'deleted');
+        const languageCounts: Record<string, number> = {};
+        const businessIdsByLanguage: Record<string, Set<string>> = {};
+
+        languageUsers.forEach(u => {
+            const key = resolveLocale(u.language) ?? 'unreported';
+            languageCounts[key] = (languageCounts[key] || 0) + 1;
+            if (!businessIdsByLanguage[key]) businessIdsByLanguage[key] = new Set<string>();
+            if (u.businessId) businessIdsByLanguage[key].add(u.businessId);
+        });
+
+        const languageData = [
+            ...LOCALES.map(def => ({
+                code: def.code as string,
+                name: def.label,
+                nativeName: def.nativeLabel,
+                flag: def.flag as string | null,
+                value: languageCounts[def.code] || 0,
+            })),
+            {
+                code: 'unreported',
+                name: 'Not reported',
+                nativeName: 'No check-in since tracking shipped',
+                flag: null,
+                value: languageCounts.unreported || 0,
+            },
+        ]
+            .filter(entry => entry.value > 0)
+            .map(entry => ({
+                ...entry,
+                share: languageUsers.length ? Math.round((entry.value / languageUsers.length) * 100) : 0,
+                businesses: activeBusinesses.filter(b => businessIdsByLanguage[entry.code]?.has(b.id)),
+            }))
+            .sort((a, b) => b.value - a.value);
+
         const industryData = Object.entries(industryCounts)
             .map(([name, value]) => ({ 
                 name, 
@@ -2079,11 +2350,44 @@ function AdminDashboardContent({
         const businessesWithProductsList = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0);
         const businessesWithSalesList = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0);
 
+        // Ranked outreach queue. Everything the scorer needs is already indexed
+        // above, so this is a cheap projection rather than another pass over the
+        // raw collections. See src/lib/outreach-scoring.ts for the model.
+        const scoredLeads = rankBusinesses(
+            activeBusinesses.map(b => {
+                const owner = (users || []).find(u => u.businessId === b.id && u.role === 'admin')
+                    || (users || []).find(u => u.businessId === b.id);
+                return {
+                    id: b.id,
+                    businessName: b.name,
+                    ownerEmail: owner?.email ?? null,
+                    ownerName: owner?.name ?? null,
+                    plan: b.plan ?? null,
+                    accessLevel: b.accessLevel ?? null,
+                    status: b.status ?? null,
+                    trialExpiresAt: b.trialExpiresAt,
+                    createdAt: b.createdAt,
+                    productCount: (productsByBusiness[b.id] || []).length,
+                    receiptCount: (receiptsByBusiness[b.id] || []).length,
+                };
+            }),
+            (users || []).map(u => ({
+                id: u.id,
+                businessId: u.businessId,
+                email: u.email,
+                name: u.name,
+                lastSeen: u.lastSeen,
+                totalUsageSeconds: u.totalUsageSeconds ?? null,
+                pagesVisited: u.pagesVisited ?? null,
+            })),
+        );
+
         return {
             totalActiveBusinesses: activeBusinesses.length,
             activatedBusinessesCount: activatedBusinessesList.length,
             activatedBusinessesList,
             atRiskBusinesses,
+            scoredLeads,
             payingBusinessesCount: payingBusinessesList.length,
             payingBusinessesList,
             healthDistribution,
@@ -2101,6 +2405,8 @@ function AdminDashboardContent({
                 ...c,
                 businesses: activeBusinesses.filter(b => (b.settings?.country || 'Pending Onboarding') === c.name)
             })),
+            languageData,
+            languageTrackedUsers: languageUsers.length,
             industryData: industryData.map(i => ({
                 ...i,
                 businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Pending Onboarding') === i.name)
@@ -2290,27 +2596,14 @@ function AdminDashboardContent({
             return acc;
         }, { windows: 0, macos: 0, android: 0, totalClicks: 0 });
 
-        // --- NEW METRICS ---
-        const todayStart = startOfDay(new Date());
-        const transactionsToday = (convertedReceipts || []).filter(r => {
-            if (!r.createdAt || !r.createdAt.toDate) return false;
-            return r.createdAt.toDate() >= todayStart;
-        }).length;
-        
-        const offlineReceiptsCount = (convertedReceipts || []).filter(r => r.isOffline).length;
-        const offlineSyncRate = totalReceipts > 0 ? (offlineReceiptsCount / totalReceipts) * 100 : 0;
-
-        const barcodeReceiptsCount = (convertedReceipts || []).filter(r => r.wasScanned).length;
-        const featureAdoptionBarcode = totalReceipts > 0 ? (barcodeReceiptsCount / totalReceipts) * 100 : 0;
-
-        const digitalReceiptsCount = (convertedReceipts || []).filter(r => r.receiptMethod === 'digital').length;
-        const featureAdoptionDigitalReceipt = totalReceipts > 0 ? (digitalReceiptsCount / totalReceipts) * 100 : 0;
+        // Operations & adoption metrics now live in OperationsAdoptionPanel, which
+        // scopes them to the reader's chosen timeframe instead of all-time.
 
         return {
-            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold, 
-            totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers, 
-            newUserGrowth, revenueGrowth, categoryData, activeSubscriptions, 
-            trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue, 
+            totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold,
+            totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers,
+            newUserGrowth, revenueGrowth, categoryData, activeSubscriptions,
+            trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue,
             richestBusiness, topPerformers, allPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
             earliestBusiness, daysActive,
             uniqueDownloaders: downloadClicks?.length || 0,
@@ -2318,11 +2611,7 @@ function AdminDashboardContent({
             payingBusinesses,
             recentPurchases,
             validPurchases,
-            revenueGeneratingBusinessesCount,
-            transactionsToday,
-            offlineSyncRate,
-            featureAdoptionBarcode,
-            featureAdoptionDigitalReceipt
+            revenueGeneratingBusinessesCount
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
@@ -2622,7 +2911,8 @@ function AdminDashboardContent({
             // Trigger FCM Native Push Notification to all active users/devices
             try {
                 const { broadcastNotification } = await import('@/actions/notifications');
-                const pushResult = await broadcastNotification(broadcastTitle, broadcastMessage, broadcastLink || '/');
+                const { idToken } = await import('@/lib/id-token');
+                const pushResult = await broadcastNotification(broadcastTitle, broadcastMessage, broadcastLink || '/', await idToken());
                 if (pushResult.success) {
                     toast({ variant: 'success', title: 'Broadcast Sent!', description: `Announcement stored and pushed: ${pushResult.message}` });
                 } else {
@@ -2825,53 +3115,12 @@ function AdminDashboardContent({
                     </div>
                     </Card>
 
-                    {/* NEW METRICS: Feature Adoption & Operations */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Activity className="h-5 w-5 text-primary" />
-                                Operations & Feature Adoption
-                            </CardTitle>
-                        </CardHeader>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4">
-                            <StatCard 
-                                title="Today's Transactions" 
-                                value={analyticsData.transactionsToday.toLocaleString()} 
-                                icon={ShoppingCart} 
-                                description="Sales processed today" 
-                            />
-                            <StatCard 
-                                title="Offline Sync Rate" 
-                                value={`${analyticsData.offlineSyncRate.toFixed(1)}%`} 
-                                icon={Layers} 
-                                description="Sales created offline" 
-                            />
-                            <StatCard 
-                                title="Scanner Adoption" 
-                                value={`${analyticsData.featureAdoptionBarcode.toFixed(1)}%`} 
-                                icon={Check} 
-                                description="Receipts using barcode scanner" 
-                            />
-                            <StatCard 
-                                title="Digital Receipts" 
-                                value={`${analyticsData.featureAdoptionDigitalReceipt.toFixed(1)}%`} 
-                                icon={FileText} 
-                                description="Shared via Email/WhatsApp" 
-                            />
-                            <StatCard 
-                                title="Storefront Shares" 
-                                value={storefrontShares.length} 
-                                icon={Globe} 
-                                description="Store links clicked/shared" 
-                            />
-                            <StatCard 
-                                title="Receipt Link Shares" 
-                                value={receiptShares.length} 
-                                icon={Share2} 
-                                description="Receipt links shared" 
-                            />
-                        </div>
-                    </Card>
+                    {/* Operations & feature adoption — tiles plus their own trend, profile and sharing charts. */}
+                    <OperationsAdoptionPanel
+                        receipts={convertedReceipts || []}
+                        storefrontShares={storefrontShares}
+                        receiptShares={receiptShares}
+                    />
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <Card>
@@ -3129,6 +3378,56 @@ function AdminDashboardContent({
                         <Card className="hover:shadow-md transition-shadow">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
+                                    <Languages className="h-5 w-5 text-violet-500" />
+                                    Language Adoption
+                                </CardTitle>
+                                <CardDescription>
+                                    Which language each of the {platformAnalytics.languageTrackedUsers.toLocaleString()} tracked users reads Zeneva in. Click a language to view its businesses.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[250px] pr-4">
+                                    <div className="space-y-4">
+                                        {platformAnalytics.languageData.length === 0 && (
+                                            <p className="text-sm text-muted-foreground">No users have checked in yet.</p>
+                                        )}
+                                        {platformAnalytics.languageData.map((item) => (
+                                            <div
+                                                key={item.code}
+                                                className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border cursor-pointer group"
+                                                onClick={() => setDetailModalState({
+                                                    open: true,
+                                                    title: `Businesses using ${item.name}`,
+                                                    description: `Businesses with at least one user reading Zeneva in ${item.name}.`,
+                                                    businesses: item.businesses,
+                                                })}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <span className="flex items-center justify-center w-6 h-6 group-hover:scale-110 transition-transform">
+                                                        {item.flag
+                                                            ? <img src={`https://flagcdn.com/w40/${item.flag}.png`} alt="" className="w-6 h-4 rounded-sm object-cover inline-block" />
+                                                            : <span className="text-xl">🌐</span>}
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-sm truncate">{item.nativeName}</p>
+                                                        <p className="text-xs text-muted-foreground truncate">{item.name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-xs text-muted-foreground font-mono">{item.share}%</span>
+                                                    <Badge variant="secondary" className="font-mono">{item.value}</Badge>
+                                                    <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
                                     <Globe className="h-5 w-5 text-emerald-500" />
                                     Country Presence
                                 </CardTitle>
@@ -3243,6 +3542,8 @@ function AdminDashboardContent({
                             </a>
                         </CardContent>
                     </Card>
+
+                    <UninstallTracker />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
@@ -3360,6 +3661,7 @@ function AdminDashboardContent({
                                                     <TableHead>Business Name</TableHead>
                                                     <TableHead>Plan</TableHead>
                                                     <TableHead>Device</TableHead>
+                                                    <TableHead>Language</TableHead>
                                                     <TableHead>Activity</TableHead>
                                                     <TableHead>Actions</TableHead>
                                                 </TableRow>
@@ -3394,6 +3696,18 @@ function AdminDashboardContent({
                                                                 ) : (
                                                                     <span className="text-muted-foreground text-xs">Unknown</span>
                                                                 )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {(() => {
+                                                                    const lang = userLanguage(user.language);
+                                                                    if (!lang) return <span className="text-muted-foreground text-xs">Unknown</span>;
+                                                                    return (
+                                                                        <Badge variant="outline" className="flex items-center gap-1.5 w-fit text-xs font-normal">
+                                                                            <img src={`https://flagcdn.com/w40/${lang.flag}.png`} alt="" className="w-4 h-3 rounded-sm object-cover" />
+                                                                            <span>{lang.nativeLabel}</span>
+                                                                        </Badge>
+                                                                    );
+                                                                })()}
                                                             </TableCell>
                                                             <TableCell>
                                                                 <UserPresence lastSeen={user.lastSeen} />
@@ -3748,6 +4062,7 @@ function AdminDashboardContent({
                 <TabsContent value="followups" className="space-y-6">
                     <FollowUpCenter 
                         atRiskBusinesses={platformAnalytics.atRiskBusinesses}
+                        scoredLeads={platformAnalytics.scoredLeads}
                         users={users || []}
                         conversionRate={platformAnalytics.conversionRate}
                         churnRiskCount={platformAnalytics.churnRiskList.length}

@@ -12,6 +12,7 @@ import { collection, doc, addDoc, serverTimestamp, writeBatch, query, where, get
 import { Loader2 } from 'lucide-react';
 import type { BusinessInstance, CartItem, OnlineOrder } from '@/types';
 import usePaystack from '@/hooks/use-paystack';
+import { apiBase } from '@/lib/platform';
 import { sendReceiptEmail } from '@/lib/email';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
@@ -122,7 +123,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
             const exchangeRate = business?.settings?.usdToNgnRate || 1500;
             const expectedPaystackAmount = isUSD ? Math.round(total * exchangeRate * 100) : Math.round(total * 100);
 
-            const verifyResponse = await fetch('https://zeneva.space/api/paystack/verify-transaction', {
+            const verifyResponse = await fetch(`${apiBase()}/api/paystack/verify-transaction`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -216,6 +217,10 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
     }
 
     const hasBankDetails = business?.settings?.paymentBankName && business.settings?.paymentBankAccountId;
+    // Same expression as the local inside handlePlaceOrder (line ~164). The JSX
+    // below referenced `hasPaystack` three times but only that function-scoped
+    // copy existed, so rendering the dialog threw a ReferenceError.
+    const hasPaystack = business?.settings?.paystackSubaccount && business.settings.paystackSubaccount.length > 5;
     const currencySymbol = business?.settings?.currency === 'USD' ? '$' : '₦';
     if (!business) return null;
 

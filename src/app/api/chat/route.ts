@@ -1,22 +1,53 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
-import { adminFirestore } from '@/firebase/admin';
+import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createZenTools } from './tools';
+import { aiDailyLimit, effectivePlan } from '@/lib/plan';
+import {
+  AI_DAILY_COLLECTION,
+  aiDailyDocId,
+  classifyPrompt,
+  extractKeywords,
+} from '@/lib/ai-analytics';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECURITY: Prompt Injection & Jailbreak Detection
+//
+// Two-sided problem. A pattern that is too loose blocks a shopkeeper mid-sale
+// with an accusation of hacking, and a hard 400 gives them no way round it; too
+// tight and the obvious attacks sail through. Both failures were live here:
+//
+//   - `/ignore (all |previous )?instructions/` permitted exactly ONE adjective,
+//     so "ignore all previous instructions" — the most common injection string
+//     in existence — did not match.
+//   - `/DAN/` was unanchored and case-sensitive, which blocked every owner
+//     stocking DANGOTE cement, sugar, flour or salt. In this market that is not
+//     an edge case.
+//
+// Anything added here must be checked both ways: does it catch the attack, and
+// does it survive a product catalogue full of shouty brand names?
 // ─────────────────────────────────────────────────────────────────────────────
 const INJECTION_PATTERNS = [
-  /ignore (all |previous |above |prior )?instructions/i,
-  /forget (what|everything|all|your|the)/i,
+  // Adjectives stack ("all previous", "any prior"), so allow a run of them
+  // rather than one. Bounded to keep it away from a whole sentence.
+  /\b(ignore|disregard|forget)\s+(?:\w+\s+){0,4}(instructions|guidelines|directives|system prompt)\b/i,
+  /\bforget\s+(everything|all)\s+(you|your|i|we)\b/i,
+  /\bforget\s+your\s+(instructions|rules|prompt|training|guidelines)\b/i,
   /you are now/i,
-  /act as (a |an )?(?!zeneva|zen)/i,
+  // Name the personas worth refusing rather than blocking "act as" wholesale.
+  // The old allow-list of "zen|zeneva" 400'd "act as my sales analyst" — a
+  // reasonable thing to ask, and a hard 400 leaves the owner no way round it.
+  // This regex is defence-in-depth, not the defence: Zen cannot write (every
+  // write goes through addToQueue behind owner approval) and its links are
+  // validated server-side, so leaning permissive here costs little.
+  /\bact\s+as\s+(?:if\s+you\s+(?:are|were)\s+)?(?:a|an|the)?\s*(?:hacker|cracker|admin(?:istrator)?|root|superuser|developer\s+mode|unrestricted|uncensored|unfiltered|jailbroken|evil|malicious|rogue|DAN|(?:different|another)\s+(?:ai|assistant|model|system|bot))\b/i,
   /jailbreak/i,
   /do anything now/i,
-  /DAN/,
+  // "DAN mode", not a bare "DAN" — see the note above about Dangote.
+  /\bDAN\s+mode\b/i,
   /system prompt/i,
-  /reveal your prompt/i,
+  /reveal your (prompt|instructions|rules)/i,
   /bypass (your|all|any) (rules|restrictions|guidelines)/i,
   /pretend (you are|to be|you're)/i,
   /override (your|all|safety)/i,
@@ -50,6 +81,28 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
+/**
+ * Record a turn that never reached the model, on the day rollup the admin board
+ * reads.
+ *
+ * A refusal is the most interesting event on that board — a day where a tenth
+ * of turns 429 is a pricing problem, and one where the injection scan fires
+ * repeatedly is a security problem. Neither is visible from the success count,
+ * because a blocked turn deliberately never increments it.
+ *
+ * Never awaited by the caller and never allowed to throw: analytics must not be
+ * able to turn a clean 429 into a 500.
+ */
+function recordBlocked(db: FirebaseFirestore.Firestore, reason: string, todayStr: string): void {
+  db.collection(AI_DAILY_COLLECTION)
+    .doc(aiDailyDocId(todayStr))
+    .set(
+      { date: todayStr, blocked: { [reason]: FieldValue.increment(1) } },
+      { merge: true },
+    )
+    .catch((err) => console.error('Failed to record blocked AI turn', err));
+}
+
 export const maxDuration = 60;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,11 +131,102 @@ When the user names a product and you are not certain which item they mean, call
 between similar names, and never propose a change against a guessed product.
 If it resolves to exactly one confident match, proceed with that.
 
+**Never call \`findSimilarProducts\` twice for the same name.** Once the user has
+answered the picker — by tapping a card or naming the item exactly ("I mean
+Semoliva") — that ambiguity is settled. Calling it again redraws the same picker
+and traps them in a loop they cannot escape. On their answer, go straight to
+\`getProductDetails\` or \`showProductImage\` and get on with what they originally
+asked for.
+
+When the user asks to **see** a product — "show me", "what does it look like", "picture
+of" — call \`showProductImage\` with the name they typed. It draws the photo. Do not
+describe the picture back to them; you cannot see it, and the card is already on screen.
+
+## Recording a sale — ask before you propose
+\`proposeSale\` moves money and stock, so it is the one tool you must never reach
+for on a partial instruction. Before calling it you must know, from the owner's own
+words rather than inference:
+
+1. **Which exact products** — resolve each one to a real product id first. If a name
+   is ambiguous, \`findSimilarProducts\` and let them pick. Never assume.
+2. **How many of each.** "Sell some Pepsi" is not a quantity. Ask.
+3. **The payment method** — Cash, Card, Bank Transfer or Invoice. Never default to Cash.
+4. **The customer**, if they mentioned one, or if the sale is on Invoice (an invoice
+   with no customer cannot be chased). Otherwise a walk-in sale needs no customer.
+5. **Any discount**, as an amount off, only if they raised one.
+
+Ask for whatever is missing in **one short message** — a numbered list of questions,
+not an interrogation spread over five turns. Confirm the lines back to them ("2 ×
+Pepsi 50cl, paid by Card — record it?") and only set \`confirmedByOwner: true\` once
+they have actually said yes. If they change one detail, re-confirm the whole sale.
+
+Check stock while you are resolving the products. If a line exceeds what is on hand,
+say so and ask whether to reduce the quantity or record the delivery first — do not
+propose a sale you already know will be refused.
+
+## The day's trading and getting them to a page
+"How did we do today", "end of day", "close off", "today's takings" — call
+\`getDailyReport\`. It draws the takings, profit, transaction count and payment
+split in one card, with links through to the full report. Don't assemble the same
+answer out of \`getSalesMetrics\` plus three other calls.
+
+When the owner wants to *be somewhere* — "open my reports", "where do I change
+that", "take me to inventory" — call \`linkToPage\` with the path and a short label.
+It renders a button they can tap. Only the app's own pages are allowed; never
+invent a URL, and never paste a raw path into your prose as if it were clickable.
+
+## "How do I …" — teach, never shrug
+When the owner asks how to *do* something — bulk import, record a sale, take a
+refund, add staff, run a stock count, set up loyalty — call \`explainHowTo\`. It
+returns the real steps for that screen with a link at the bottom.
+
+**Never answer a how-to by naming a page and stopping.** "You'll find it on the
+Inventory page, look for an Import option" is the answer a manual gives; they
+asked you because they wanted to be walked through it. And never write the steps
+out yourself — a walkthrough for a screen that does not look like that sends
+them hunting for a button that isn't there. If there is genuinely no walkthrough
+for what they asked, say what you do know in one line and link the page, once.
+
+Some things are not pages at all: bulk import is a dialog on Inventory, not a
+route. \`linkToPage\` will quietly land them on the nearest real page — do not
+apologise about a URL, and never surface a path like \`/inventory/import\` in
+your prose.
+
+## Looking forward — project, don't refuse, don't invent
+Owners ask where the business is heading, and that is a fair question about
+their own data. Refusing outright is unhelpful and wrong. **Never say you
+cannot make predictions.**
+
+Instead, call \`forecastRevenue\` — it fits a line to the real daily takings and
+returns its own confidence. Related: \`getGrowthRate\` for "are we growing and
+how fast", \`forecastStockout\` for "what runs out next".
+
+Three rules when you answer:
+
+1. **Never produce a projection without calling the tool.** No mental
+   arithmetic on a revenue figure, ever. The tool refuses when the history is
+   too thin, and that refusal is the correct answer — pass it on plainly and
+   say what would make a projection possible.
+2. **Quote the tool's own confidence.** It grades itself from "reasonable" to
+   "illustrative only". A ten-year question on a few months of till data lands
+   at the bottom of that scale — give the figure, then say plainly it is a
+   run-rate that assumes nothing changes, not a forecast.
+3. **Never dress a projection as a promise.** No "you will make X". Say "at the
+   current run-rate, about X — and here is what that assumes".
+
+If someone pushes for a longer horizon than the data supports, give them the
+number the tool produces *with* its caveat rather than refusing again. The
+honest version of "I can't know" is a stated assumption, not a closed door.
+
 ## Answering well
 - **Lead with the answer.** One direct sentence, then the supporting detail.
 - **Do not re-list data that a tool already rendered.** Tool results draw their own
-  cards, tables and stat tiles in the UI. Repeating the rows as text duplicates
+  cards, tables, charts and stat tiles in the UI. Repeating the rows as text duplicates
   everything on screen. Instead, interpret: what stands out, what it means, what to do.
+- **Some tools draw a chart.** \`getSalesTrend\`, \`getPeakHours\` and
+  \`getCategoryBreakdown\` render as a line, bar and pie chart respectively, with their
+  own headline figures beneath. Never transcribe the plotted points — describe the
+  shape (rising, flat, one spike) and name only the figures the chart does not show.
 - Call out anomalies without being asked — negative stock, items selling below cost,
   sudden dips. The owner may not know to ask.
 - Use short markdown: **bold** for figures that matter, \`-\` bullets, \`##\` only for
@@ -98,26 +242,63 @@ velocity, then propose a restock. Explain briefly what you are checking as you g
 
 
 export async function POST(req: Request) {
-  const url = new URL(req.url);
-  const qBusinessId = url.searchParams.get('businessId');
-  const qUserId = url.searchParams.get('userId');
-
   const json = await req.json();
-  const { messages, data } = json as { messages: UIMessage[]; data?: any };
+  const { messages } = json as { messages: UIMessage[]; data?: any };
 
-  let businessId = req.headers.get('x-business-id') || json.businessId || qBusinessId;
-  let userId = req.headers.get('x-user-id') || json.userId || qUserId;
-
-  if (!businessId && data) {
-    const dataObj = Array.isArray(data) ? data[0] : data;
-    businessId = dataObj?.businessId || businessId;
-    userId = dataObj?.userId || userId;
+  // ── SECURITY LAYER 1: Verified identity ──
+  //
+  // `businessId` used to be read from the body/query/headers and trusted. It is
+  // the only scope the 41 tools honour, so a caller who edited it read another
+  // tenant's sales, customers and margins in full — and did it against someone
+  // else's AI quota. The client may no longer state who it is: identity comes
+  // from the Firebase ID token, and the tenant comes from that uid's own user
+  // document server-side. Nothing in the request body influences either.
+  if (!adminAuth) {
+    return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  // ── SECURITY LAYER 1: Auth validation ──
-  if (!businessId || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: missing businessId or userId.' }), {
+  const authHeader = req.headers.get('authorization') || '';
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!bearer) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: sign in again to continue.' }), {
       status: 401, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let userId: string;
+  try {
+    // checkRevoked so a hard-killed account loses Zen AI immediately rather
+    // than at the next token refresh.
+    const decoded = await adminAuth.verifyIdToken(bearer, true);
+    userId = decoded.uid;
+  } catch {
+    return new Response(JSON.stringify({ error: 'Unauthorized: your session expired. Sign in again.' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const db = adminFirestore;
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const callerSnap = await db.collection('users').doc(userId).get();
+  const caller = callerSnap.data();
+  const businessId: string | undefined = caller?.businessId;
+
+  if (!callerSnap.exists || !businessId) {
+    return new Response(JSON.stringify({ error: 'No business is linked to this account.' }), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (caller?.status === 'suspended') {
+    return new Response(JSON.stringify({ error: 'This account is suspended.' }), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
     });
   }
 
@@ -127,23 +308,21 @@ export async function POST(req: Request) {
     });
   }
 
+  // UTC day, shared by the quota reset and the analytics rollup so a turn is
+  // never counted against one date and charted under another.
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // ── SECURITY LAYER 2: Prompt injection scan on the latest user message ──
   const lastUserMessage = messages.filter((m: any) => m.role === 'user').at(-1);
-  if (lastUserMessage && detectInjection(textOf(lastUserMessage))) {
+  const promptText = textOf(lastUserMessage);
+  if (lastUserMessage && detectInjection(promptText)) {
+    recordBlocked(db, 'injection', todayStr);
     return new Response(JSON.stringify({ error: 'Blocked: Potential prompt injection detected.' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
 
   // ── SECURITY LAYER 3: Rate Limiting & Quotas ──
-  const db = adminFirestore;
-  if (!db) {
-    return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const todayStr = new Date().toISOString().split('T')[0];
   const GLOBAL_LIMIT = 1500;
 
   // 1. Global Check
@@ -158,6 +337,7 @@ export async function POST(req: Request) {
   }
 
   if (globalCount >= GLOBAL_LIMIT) {
+    recordBlocked(db, 'global_limit', todayStr);
     return new Response(JSON.stringify({ error: 'Global daily AI limit reached. Please try again tomorrow.' }), {
       status: 429, headers: { 'Content-Type': 'application/json' },
     });
@@ -173,13 +353,13 @@ export async function POST(req: Request) {
   }
 
   const businessData = businessDoc.data();
-  const plan = businessData?.plan || 'starter';
+  const plan = effectivePlan(businessData);
   // Tool results carry the currency so cards render the right symbol.
   const currency = businessData?.settings?.currency || 'NGN';
   
-  let dailyLimit = 20;
-  if (plan === 'pro') dailyLimit = 100;
-  if (plan === 'business' || businessData?.accessLevel === 'lifetime') dailyLimit = 500;
+  // Allowance follows the plan actually in force, so a lapsed Pro/Business
+  // subscription drops back to the free tier's daily cap.
+  const dailyLimit = aiDailyLimit(businessData);
 
   let businessCount = 0;
   if (businessData?.aiUsageCurrentDate === todayStr) {
@@ -193,6 +373,7 @@ export async function POST(req: Request) {
     if (bonusCredits > 0) {
       useBonusCredit = true;
     } else {
+      recordBlocked(db, 'plan_limit', todayStr);
       return new Response(JSON.stringify({ error: `Daily AI limit of ${dailyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until tomorrow.` }), {
         status: 429, headers: { 'Content-Type': 'application/json' },
       });
@@ -212,23 +393,53 @@ export async function POST(req: Request) {
     modelMessages = await convertToModelMessages(normalised as UIMessage[]);
   } catch (e: any) {
     console.error('Failed to convert chat history:', e);
+    recordBlocked(db, 'bad_history', todayStr);
     return new Response(JSON.stringify({ error: 'This chat history could not be read. Start a new chat.' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  // Latency is measured around the whole stream, so it is what the owner
+  // actually waited for rather than time-to-first-token.
+  const startedAt = Date.now();
+
   const result = streamText({
     model: google('gemini-2.5-flash'),
     system: `${SYSTEM_PROMPT}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
     messages: modelMessages,
-    stopWhen: stepCountIs(10),
-    onFinish: async () => {
+    // Every tool call costs a step, and a real question ("how did last month
+    // compare, and what should I reorder?") legitimately spends several before
+    // the model has anything to say. At 10 the budget ran out mid-work and the
+    // stream ended with cards on screen and no prose under them — which reads
+    // as Zen ignoring the question. 24 leaves room to finish and still bounds
+    // a runaway loop.
+    stopWhen: stepCountIs(24),
+    onFinish: async ({ toolCalls, usage }) => {
       // Increment usage atomically
       try {
         const batch = db.batch();
         batch.set(globalRef, { date: todayStr, count: FieldValue.increment(1) }, { merge: true });
-        
+
         const updates: any = {};
+
+        /*
+         * Per-tool call counts, for the "uses" figure on /ai-insights/use-cases.
+         * One turn can call several tools, so count them rather than adding one
+         * per request. Dotted keys in `update()` address nested fields, which is
+         * what we want here — tool names are plain identifiers with no dots.
+         */
+        const toolCounts: Record<string, number> = {};
+        for (const call of toolCalls ?? []) {
+          const name = call?.toolName;
+          // A dot or slash in the key would silently write a nested field, so
+          // only ever count names that look like the identifiers they are.
+          if (typeof name === 'string' && /^[A-Za-z]+$/.test(name)) {
+            toolCounts[name] = (toolCounts[name] ?? 0) + 1;
+          }
+        }
+        for (const [name, n] of Object.entries(toolCounts)) {
+          updates[`aiToolUsageCounts.${name}`] = FieldValue.increment(n);
+        }
         if (businessData?.aiUsageCurrentDate !== todayStr) {
           updates.aiUsageCurrentDate = todayStr;
           updates.aiUsageCount = 1;
@@ -241,6 +452,62 @@ export async function POST(req: Request) {
         }
 
         batch.update(businessRef, updates);
+
+        /*
+         * Platform-wide day rollup for the admin AI board.
+         *
+         * A separate document per day rather than fields on the business: the
+         * board needs "what did everyone ask on Tuesday", and answering that
+         * from per-business documents means reading every tenant on every load.
+         * One document per day is one read per day charted.
+         *
+         * Written as NESTED MAPS, not the dotted keys used on `businessRef`
+         * above. `update()` reads a dotted string as a field path; `set()` does
+         * not, and would create a field literally named "tools.queryProducts"
+         * that no reader here looks for. This is a `set(..., {merge: true})`
+         * because the day document does not exist until the first turn of the
+         * day, so it must upsert.
+         *
+         * Derived signals only — see `src/lib/ai-analytics.ts` for why no
+         * prompt text is ever written here.
+         */
+        const toolMap: Record<string, any> = {};
+        for (const [name, n] of Object.entries(toolCounts)) {
+          toolMap[name] = FieldValue.increment(n);
+        }
+        const keywordMap: Record<string, any> = {};
+        for (const word of extractKeywords(promptText)) {
+          keywordMap[word] = FieldValue.increment(1);
+        }
+
+        const daily: Record<string, any> = {
+          date: todayStr,
+          count: FieldValue.increment(1),
+          intents: { [classifyPrompt(promptText)]: FieldValue.increment(1) },
+          hours: { [String(new Date().getUTCHours())]: FieldValue.increment(1) },
+          plans: { [/^[A-Za-z_-]+$/.test(plan) ? plan : 'unknown']: FieldValue.increment(1) },
+          latencyMsTotal: FieldValue.increment(Date.now() - startedAt),
+        };
+
+        // Doc ids are opaque; keep the ones that look like ids out of caution
+        // so a stray character cannot produce an unreadable map key.
+        if (/^[A-Za-z0-9_-]{1,128}$/.test(businessId)) {
+          daily.businesses = { [businessId]: FieldValue.increment(1) };
+        }
+        if (Object.keys(toolMap).length) daily.tools = toolMap;
+        if (Object.keys(keywordMap).length) daily.keywords = keywordMap;
+        if (Object.keys(toolCounts).some((n) => n.startsWith('propose'))) {
+          daily.proposalTurns = FieldValue.increment(1);
+        }
+        // `usage` is undefined on some provider errors; a missing token count
+        // should leave the running total alone rather than add NaN to it.
+        const inTok = (usage as any)?.inputTokens ?? (usage as any)?.promptTokens;
+        const outTok = (usage as any)?.outputTokens ?? (usage as any)?.completionTokens;
+        if (Number.isFinite(inTok)) daily.tokensIn = FieldValue.increment(inTok);
+        if (Number.isFinite(outTok)) daily.tokensOut = FieldValue.increment(outTok);
+
+        batch.set(db.collection(AI_DAILY_COLLECTION).doc(aiDailyDocId(todayStr)), daily, { merge: true });
+
         await batch.commit();
       } catch (err) {
         console.error('Failed to increment AI usage', err);
@@ -259,6 +526,13 @@ export async function POST(req: Request) {
     // useless when a tool blows up on the owner's own data.
     onError: (error) => {
       console.error('Zen AI stream error:', error);
+      // A turn that failed mid-stream still consumed quota and still cost the
+      // owner money, so the board needs it — otherwise a broken tool reads as
+      // a quiet day.
+      db.collection(AI_DAILY_COLLECTION)
+        .doc(aiDailyDocId(todayStr))
+        .set({ date: todayStr, errors: FieldValue.increment(1) }, { merge: true })
+        .catch(() => {});
       if (error == null) return 'Unknown error.';
       if (typeof error === 'string') return error;
       if (error instanceof Error) return error.message;

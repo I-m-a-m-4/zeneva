@@ -5,6 +5,7 @@ import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
+import { hasProFeatures } from "@/lib/plan";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useBusiness } from '@/context/pos-context';
@@ -18,6 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { logAuditEvent } from '@/lib/audit';
+import { useI18n } from '@/context/i18n-context';
+import { formatNumber, formatDateTime } from '@/lib/i18n/format';
 
 
 function ReviewPageContent() {
@@ -27,6 +30,7 @@ function ReviewPageContent() {
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
+    const { t, locale } = useI18n();
     const [isCompleting, setIsCompleting] = React.useState(false);
     const [shouldSendEmail, setShouldSendEmail] = React.useState(false);
     const searchParams = useSearchParams();
@@ -81,7 +85,7 @@ function ReviewPageContent() {
         if (checkoutStartedRef.current) return;
         
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Cannot complete sale. Missing session data or empty cart.' });
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
             setIsCompleting(false);
             return;
         }
@@ -95,8 +99,8 @@ function ReviewPageContent() {
             if (!isService && (!productFromCache || (productFromCache.stock || 0) < cartItem.quantity)) {
                 toast({
                     variant: 'backorder' as any,
-                    title: 'Backorder Sale',
-                    description: `This sale will record a debt as there is insufficient stock for ${cartItem.product.name}.`
+                    title: t('pos.backorderTitle'),
+                    description: t('pos.backorderDescription', { name: cartItem.product.name })
                 });
             }
         }
@@ -120,8 +124,8 @@ function ReviewPageContent() {
             if (isOutsideHours && operatingHours.preventSalesOutsideHours && !isAdmin) {
                 toast({
                     variant: 'destructive',
-                    title: 'Operating Hours Violation',
-                    description: `Sales are not allowed outside of operating hours (${operatingHours.openTime} - ${operatingHours.closeTime}).`
+                    title: t('pos.operatingHoursTitle'),
+                    description: t('pos.operatingHoursDescription', { open: operatingHours.openTime, close: operatingHours.closeTime })
                 });
                 return;
             }
@@ -226,7 +230,7 @@ function ReviewPageContent() {
                 productUpdates,
                 customerUpdate
             }
-        }, `Recording Sale: ${receiptData.receiptNumber}`);
+        }, t('pos.queueRecordingSale', { number: receiptData.receiptNumber }));
 
         // Queue audit logs for stock adjustment due to sales
         const activeProfile = currentUserProfile || offlineProfile;
@@ -254,7 +258,7 @@ function ReviewPageContent() {
                         reason: 'Sale recorded with an admin-selected date'
                     }
                 }
-            }, `Flagging backdated sale ${displayReceipt.receiptNumber}`);
+            }, t('pos.queueFlaggingBackdated', { number: displayReceipt.receiptNumber }));
         }
 
         cart.forEach(cartItem => {
@@ -283,7 +287,7 @@ function ReviewPageContent() {
                             receiptId: newReceiptId
                         }
                     }
-                }, `Logging sale for service ${cartItem.product.name}`);
+                }, t('pos.queueLoggingService', { name: cartItem.product.name }));
                 return;
             }
             
@@ -307,22 +311,25 @@ function ReviewPageContent() {
                         receiptId: newReceiptId
                     }
                 }
-            }, `Logging sale deduction for ${cartItem.product.name}`);
+            }, t('pos.queueLoggingDeduction', { name: cartItem.product.name }));
         });
 
         // 4. Handle Email Receipt (Try sending immediately if online)
         if (navigator.onLine && shouldSendEmail && selectedCustomer?.email) {
-            const isEmailAllowed = business.plan === 'business' || business.accessLevel === 'lifetime' || business.plan === 'pro';
+            const isEmailAllowed = hasProFeatures(business);
             if (isEmailAllowed) {
-                const numberFormat = new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                // The receipt email prefixes its own currency symbol, so this
+                // formats the bare amount. Uses the seller's chosen locale
+                // rather than the old hardcoded 'en-NG'.
+                const money = (v: number) => formatNumber(v, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const items_html = cart.map(item =>
                     `<tr>
                         <td style="padding: 5px; border-bottom: 1px solid #eee;">
                             <div style="font-weight: bold;">${item.product.name}</div>
-                            <div style="color: #666; font-size: 12px;">${item.quantity} x ${currencySymbol}${numberFormat.format(item.product.price)}</div>
+                            <div style="color: #666; font-size: 12px;">${item.quantity} x ${currencySymbol}${money(item.product.price)}</div>
                         </td>
                         <td style="padding: 5px; text-align: right; border-bottom: 1px solid #eee;">
-                            ${currencySymbol}${numberFormat.format(item.product.price * item.quantity)}
+                            ${currencySymbol}${money(item.product.price * item.quantity)}
                         </td>
                     </tr>`
                 ).join('');
@@ -334,12 +341,12 @@ function ReviewPageContent() {
                     receipt_id: newReceiptId.substring(0, 8),
                     items_html,
                     currency_symbol: currencySymbol,
-                    subtotal: numberFormat.format(secureSubtotal),
-                    tax: numberFormat.format(secureTax),
-                    discount: numberFormat.format(discount),
-                    total: numberFormat.format(secureTotal),
+                    subtotal: money(secureSubtotal),
+                    tax: money(secureTax),
+                    discount: money(discount),
+                    total: money(secureTotal),
                     payment_method: paymentMethod,
-                    date: receiptData.createdAt.toLocaleString()
+                    date: formatDateTime(receiptData.createdAt, locale)
                 }).catch(e => console.error("Email failed:", e));
             }
         }
@@ -384,15 +391,17 @@ function ReviewPageContent() {
 
         toast({
             variant: navigator.onLine ? 'success' : 'default',
-            title: navigator.onLine ? "Sale Recorded" : "Sale Queued (Offline)",
-            description: navigator.onLine ? `Receipt ${receiptData.receiptNumber} generated.` : "Success! This sale is saved locally and will sync to the cloud automatically.",
+            title: navigator.onLine ? t('pos.saleRecorded') : t('pos.saleQueuedOffline'),
+            description: navigator.onLine
+                ? t('pos.saleRecordedDescription', { number: receiptData.receiptNumber })
+                : t('pos.saleQueuedOfflineDescription'),
         });
-        
+
         // Note: We don't set isCompleting(false) here if redirect is happening
         // to prevent the auto-submit useEffect from re-firing.
         // It will be reset when the component unmounts or POS is reset.
 
-    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer]);
+    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer, t, locale]);
 
     // **Auto-Submit Logic**
     // We only want to trigger this ONCE when auto-prompted
@@ -402,18 +411,13 @@ function ReviewPageContent() {
         }
     }, [isAutoPrompted, isCompleting, cart.length, handleCompleteSale]);
 
-    const canSendEmail = React.useMemo(() => {
-        const plan = business?.plan;
-        const access = business?.accessLevel;
-        const allowed = plan === 'business' || access === 'lifetime' || plan === 'pro'; 
-        return allowed;
-    }, [business]);
+    const canSendEmail = React.useMemo(() => hasProFeatures(business), [business]);
 
     if (!mounted) {
         return (
             <div className="flex flex-col items-center justify-center p-12 space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
+                <p className="text-muted-foreground animate-pulse">{t('pos.initializingCheckout')}</p>
             </div>
         );
     }
@@ -421,9 +425,9 @@ function ReviewPageContent() {
     if (cart.length === 0 && !isCompleting) {
         return (
             <div className="text-center">
-                <p>Your cart is empty.</p>
+                <p>{t('pos.cartEmpty')}</p>
                 <Button asChild variant="link">
-                    <Link href="/sales/pos/select-products">Start a new sale</Link>
+                    <Link href="/sales/pos/select-products">{t('pos.startNewSale')}</Link>
                 </Button>
             </div>
         )
@@ -432,14 +436,14 @@ function ReviewPageContent() {
     return (
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
-                <h2 className="text-2xl font-bold mb-4 font-headline no-print">Review Your Sale</h2>
+                <h2 className="text-2xl font-bold mb-4 font-headline no-print">{t('pos.reviewYourSale')}</h2>
                 <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} />
             </div>
             <div className="no-print">
                 <div className="p-4 rounded-lg bg-card border space-y-4">
-                    <h3 className="text-lg font-semibold">Ready to Complete?</h3>
+                    <h3 className="text-lg font-semibold">{t('pos.readyToComplete')}</h3>
                     <p className="text-sm text-muted-foreground">
-                        This will finalize the sale, generate a receipt, and update your inventory. This action works offline.
+                        {t('pos.readyToCompleteBody')}
                     </p>
 
                     {isAdmin && (
@@ -447,9 +451,9 @@ function ReviewPageContent() {
                             <Separator />
                             <div className="flex flex-col gap-2 py-2">
                                 <Label htmlFor="backdate" className="text-sm font-semibold flex flex-col gap-1 cursor-pointer">
-                                    <span>Backdate Sale (Admin/Owner Only)</span>
+                                    <span>{t('pos.backdateSale')}</span>
                                     <span className="font-normal text-muted-foreground text-xs">
-                                        Record a missed sale from a previous date. This action will be flagged in the audit log.
+                                        {t('pos.backdateSaleHint')}
                                     </span>
                                 </Label>
                                 <Input
@@ -468,9 +472,9 @@ function ReviewPageContent() {
                             <Separator />
                             <div className="flex items-center justify-between py-2">
                                 <Label htmlFor="send-email-receipt" className="flex flex-col gap-1 cursor-pointer">
-                                    <span>Email Receipt</span>
+                                    <span>{t('pos.emailReceipt')}</span>
                                     <span className="font-normal text-muted-foreground text-xs">
-                                        Send a copy to {selectedCustomer.email}
+                                        {t('pos.emailReceiptHint', { email: selectedCustomer.email })}
                                     </span>
                                 </Label>
                                 <Switch
@@ -485,7 +489,7 @@ function ReviewPageContent() {
                     <Separator />
                     <div className="flex items-center justify-between py-2">
                         <Label htmlFor="auto-print" className="cursor-pointer font-medium text-sm">
-                            Print Receipt
+                            {t('pos.printReceipt')}
                         </Label>
                         <input
                             type="checkbox"
@@ -498,17 +502,17 @@ function ReviewPageContent() {
 
                     <div className="flex flex-col gap-2 pt-2">
                         <Button size="lg" className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all" onClick={handleCompleteSale} disabled={isCompleting}>
-                            {isCompleting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                            {isCompleting ? 'Finalizing...' : (paymentMethod === 'Invoice' ? 'Issue Professional Invoice' : 'Complete Sale')}
+                            {isCompleting && <Loader2 className="me-2 h-5 w-5 animate-spin" />}
+                            {isCompleting ? t('pos.finalizing') : (paymentMethod === 'Invoice' ? t('pos.issueInvoice') : t('pos.completeSale'))}
                         </Button>
                         <Button size="lg" className="w-full h-12" variant="outline" onClick={() => {
                             holdCurrentSale();
                             router.push('/sales/pos/select-products');
                         }} disabled={isCompleting}>
-                            Park Sale
+                            {t('pos.parkSale')}
                         </Button>
                         <Button size="lg" className="w-full" variant="outline" asChild>
-                            <Link href="/sales/pos/payment">Back to Payment</Link>
+                            <Link href="/sales/pos/payment">{t('pos.backToPayment')}</Link>
                         </Button>
                     </div>
                 </div>
@@ -518,11 +522,12 @@ function ReviewPageContent() {
 }
 
 export default function ReviewPage() {
+    const { t } = useI18n();
     return (
         <React.Suspense fallback={
             <div className="flex flex-col items-center justify-center p-12 space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground animate-pulse">Initializing checkout...</p>
+                <p className="text-muted-foreground animate-pulse">{t('pos.initializingCheckout')}</p>
             </div>
         }>
             <ReviewPageContent />

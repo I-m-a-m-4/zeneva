@@ -35,13 +35,20 @@ import Calculator from '@/components/shared/calculator';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
+import { isPaidPlan } from '@/lib/plan';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
 import { useToast } from '@/hooks/use-toast';
 import Confetti from '@/components/shared/confetti';
 import { AppConfig } from '@/lib/config';
-import { signedOutLandingRoute } from '@/lib/platform';
+import { signedOutLandingRoute, openExternal } from '@/lib/platform';
+import {
+  selectDueLifecycleMessage,
+  lifecycleNotificationId,
+  toDateOrNull,
+  collapseDuplicateNotifications,
+} from '@/lib/lifecycle-notifications';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -57,6 +64,7 @@ import { BranchSwitcher } from '@/components/layout/branch-switcher';
 import { useSessionTracker } from '@/hooks/use-session-tracker';
 import { logErrorToFirestore } from '@/lib/error-logger';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { useI18n } from '@/context/i18n-context';
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     width="20"
@@ -75,29 +83,33 @@ const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+/**
+ * `label` stays English on purpose: it is what builds the `tour-nav-*` DOM ids
+ * that ProductTour targets by selector. `labelKey` is what the user reads.
+ */
 const navItems = [
-  { href: '/dashboard', icon: Home, label: 'Dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/inventory', icon: Package, label: 'Inventory', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/sales/pos/select-products', icon: ShoppingCart, label: 'POS', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/storefront', icon: Paintbrush, label: 'Storefront', roles: ['admin'] },
-  { href: '/online-orders', icon: Globe, label: 'Online Orders', roles: ['admin', 'manager'] },
-  { href: '/receipts', icon: FileText, label: 'Receipts', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/invoices', icon: FileDigit, label: 'Invoices', roles: ['admin', 'manager'] },
-  { href: '/reports', icon: BarChart2, label: 'Reports', roles: ['admin', 'owner'] },
-  { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', roles: ['admin', 'manager'] },
-  { href: '/customers', icon: Users, label: 'Customers', roles: ['admin', 'manager', 'vendor_operator'] },
-  { href: '/terminal-alerts', icon: Bell, label: 'Terminal Alerts', roles: ['admin', 'manager', 'vendor_operator', 'owner'], isNew: true },
-  { href: '/users', icon: UserRound, label: 'Users', roles: ['admin'] },
-  { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', roles: ['admin'] },
+  { href: '/dashboard', icon: Home, label: 'Dashboard', labelKey: 'nav.dashboard', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/inventory', icon: Package, label: 'Inventory', labelKey: 'nav.inventory', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/sales/pos/select-products', icon: ShoppingCart, label: 'POS', labelKey: 'nav.pos', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/storefront', icon: Paintbrush, label: 'Storefront', labelKey: 'nav.storefront', roles: ['admin'] },
+  { href: '/online-orders', icon: Globe, label: 'Online Orders', labelKey: 'nav.onlineOrders', roles: ['admin', 'manager'] },
+  { href: '/receipts', icon: FileText, label: 'Receipts', labelKey: 'nav.receipts', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/invoices', icon: FileDigit, label: 'Invoices', labelKey: 'nav.invoices', roles: ['admin', 'manager'] },
+  { href: '/reports', icon: BarChart2, label: 'Reports', labelKey: 'nav.reports', roles: ['admin', 'owner'] },
+  { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', labelKey: 'nav.zenAi', roles: ['admin', 'manager'] },
+  { href: '/customers', icon: Users, label: 'Customers', labelKey: 'nav.customers', roles: ['admin', 'manager', 'vendor_operator'] },
+  { href: '/terminal-alerts', icon: Bell, label: 'Terminal Alerts', labelKey: 'nav.terminalAlerts', roles: ['admin', 'manager', 'vendor_operator', 'owner'], isNew: true },
+  { href: '/users', icon: UserRound, label: 'Users', labelKey: 'nav.users', roles: ['admin'] },
+  { href: '/audit-log', icon: HistoryIcon, label: 'Audit Log', labelKey: 'nav.auditLog', roles: ['admin'] },
 ];
 
 const bottomLinks = [
-  { href: '/billing', icon: CreditCard, label: 'Billing', roles: ['admin', 'owner'] },
-  { href: '/settings', icon: Settings, label: 'Settings', roles: ['admin', 'owner'] },
-  { href: '/support', icon: LifeBuoy, label: 'Support', roles: ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'] },
+  { href: '/billing', icon: CreditCard, label: 'Billing', labelKey: 'nav.billing', roles: ['admin', 'owner'] },
+  { href: '/settings', icon: Settings, label: 'Settings', labelKey: 'nav.settings', roles: ['admin', 'owner'] },
+  { href: '/support', icon: LifeBuoy, label: 'Support', labelKey: 'nav.support', roles: ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'] },
 ];
 
-const moreNavLinks: { href: string; icon: React.ElementType; label: string; roles: string[]; }[] = [
+const moreNavLinks: { href: string; icon: React.ElementType; label: string; labelKey: string; roles: string[]; }[] = [
   // This is intentionally left empty as items are now in the main nav.
 ];
 
@@ -136,7 +148,7 @@ function AppLoader({ text }: { text: string }) {
         <div className="w-full space-y-4">
           <div className="relative h-1 w-full bg-muted rounded-full overflow-hidden">
              <div 
-               className="absolute inset-y-0 left-0 bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(249,115,22,0.3)]"
+               className="absolute inset-y-0 start-0 bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(249,115,22,0.3)]"
                style={{ width: `${progress}%` }}
              />
           </div>
@@ -162,6 +174,7 @@ export default function AuthenticatedLayout({
   const pathname = rawPathname ? (rawPathname.endsWith('/') && rawPathname !== '/' ? rawPathname.slice(0, -1) : rawPathname) : '';
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { t } = useI18n();
 
   const {
     isLoading,
@@ -175,7 +188,9 @@ export default function AuthenticatedLayout({
     products,
     queuedActions,
     isSubscriptionActive,
-    onlineOrders
+    onlineOrders,
+    isImpersonating,
+    stopImpersonation
   } = usePOS();
 
   // Track how long this user is actively using the app
@@ -227,7 +242,7 @@ export default function AuthenticatedLayout({
           console.warn("Failed to show native notification:", e);
         }
       }
-    });
+    }, terminalListenerErrorHandler('CEO broadcasts', () => unsubscribe()));
 
     return () => unsubscribe();
   }, [firestore, user, notify]);
@@ -368,13 +383,18 @@ export default function AuthenticatedLayout({
       const dateB = safeToDate(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
-    return combined.slice(0, 20);
+    // Accounts created under the old localStorage-guarded schedule have
+    // repeats of the same announcement in Firestore; fold them to the newest
+    // copy. Operational alerts are never folded.
+    return collapseDuplicateNotifications(combined as any[]).slice(0, 20);
   }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
-  const unreadCount = React.useMemo(() => {
-    if (!userNotifications) return 0;
-    return userNotifications.filter(n => !n.read).length;
-  }, [userNotifications]);
+  // Counted off the collapsed list so the bell badge matches the list the user
+  // opens. Mark-all-read and clear-all still act on every raw document.
+  const unreadCount = React.useMemo(
+    () => allNotifications.filter((n: any) => !n.isGlobal && !n.read).length,
+    [allNotifications]
+  );
 
   const handleMarkAsRead = React.useCallback(async () => {
     if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
@@ -445,8 +465,10 @@ export default function AuthenticatedLayout({
       }
     }
 
-    if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
-      window.open(targetLink, '_blank');
+    // See the notifications page: window.open is a no-op in the Tauri webview,
+    // so store links opened from the bell need the shell hand-off too.
+    if (/^https?:\/\//i.test(targetLink)) {
+      await openExternal(targetLink);
     } else {
       router.push(targetLink);
     }
@@ -659,7 +681,10 @@ export default function AuthenticatedLayout({
 
   // 1. Subscription Reminders (3 days before expiry)
   React.useEffect(() => {
-    if (businessInstance && businessInstance.trialExpiresAt && currentUserProfile) {
+    // Only paying customers have something that can lapse. On the free plan
+    // the date is a leftover trial marker and nothing interrupts, so warning
+    // them about "service interruption" would simply be untrue.
+    if (businessInstance && businessInstance.trialExpiresAt && currentUserProfile && isPaidPlan(businessInstance)) {
       const expiryDate = safeToDate(businessInstance.trialExpiresAt);
       const now = new Date();
       const diffTime = expiryDate.getTime() - now.getTime();
@@ -718,99 +743,67 @@ export default function AuthenticatedLayout({
     }
   }, [onlineOrders, lastOnlineOrderId, currentUserProfile, businessInstance, firestore]);
 
-  // 3. Day 3 Onboarding "Chat with the CEO" Notification
+  // 3. Lifecycle ("drip") notifications — CEO Direct Line, companion app.
+  //
+  // The schedule and the eligibility rules live in
+  // src/lib/lifecycle-notifications.ts; this effect only performs the write.
+  // At most ONE message is sent per pass and the delivery record is kept on the
+  // user document rather than in localStorage — that record is what makes the
+  // send idempotent across devices, reinstalls and cleared caches. See the
+  // module header for why the previous localStorage version duplicated.
+  const lifecycleWriteInFlight = React.useRef(false);
   React.useEffect(() => {
-    if (currentUserProfile && firestore) {
-      const userCreatedDate = safeToDate(currentUserProfile.createdAt);
-      const now = new Date();
-      const diffTime = now.getTime() - userCreatedDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (!currentUserProfile || !firestore) return;
+    // A single in-flight write at a time. Guards React Strict Mode's double
+    // effect invocation and the re-render that the write itself triggers.
+    if (lifecycleWriteInFlight.current) return;
 
-      // Trigger if user is on their 3rd day or older and hasn't been notified yet
-      if (diffDays >= 3) {
-        const storageKey = `ceo_day3_notified_${currentUserProfile.id}`;
-        const hasNotified = localStorage.getItem(storageKey);
-        if (!hasNotified) {
-          // Set the key BEFORE writing to Firestore to prevent double-writes
-          // in React Strict Mode (which runs effects twice in dev).
-          localStorage.setItem(storageKey, 'true');
-          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
-            title: "💬 Chat with the CEO",
-            body: "Welcome to your 3rd day on Zeneva! Have questions, feedback, or custom feature requests? Tap here to message Bello Imam directly on the CEO Direct Line.",
-            createdAt: serverTimestamp(),
-            read: false,
-            type: 'ceo_chat',
-            link: '/support'
-          }).catch((err) => {
-            // Rollback the key so it can be retried if the write failed
-            localStorage.removeItem(storageKey);
-            console.error(err);
-          });
-        }
+    const due = selectDueLifecycleMessage({
+      accountCreatedAt: toDateOrNull(currentUserProfile.createdAt),
+      delivered: (currentUserProfile as any).lifecycleNotifications,
+      now: new Date(),
+      context: {
+        isNative: typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__,
+        isMobileUA: typeof navigator !== 'undefined' && /mobile|android|iphone|ipad/i.test(navigator.userAgent),
+      },
+    });
+    if (!due) return;
+
+    lifecycleWriteInFlight.current = true;
+    const userId = currentUserProfile.id;
+    const { stage, message } = due;
+
+    // One batch: the notification and the marker that says it was sent commit
+    // together, so a partial failure cannot leave a delivered message unmarked
+    // (which is what would let it send again on the next mount).
+    const batch = writeBatch(firestore);
+    batch.set(
+      doc(firestore, `users/${userId}/notifications`, lifecycleNotificationId(stage.id)),
+      {
+        title: message.title,
+        body: message.body,
+        createdAt: serverTimestamp(),
+        read: false,
+        type: message.type,
+        link: message.link,
+        ...(message.openExternal ? { openExternal: true } : {}),
       }
-    }
-  }, [currentUserProfile, firestore]);
+    );
+    batch.set(
+      doc(firestore, 'users', userId),
+      { lifecycleNotifications: { [stage.id]: serverTimestamp() } },
+      { merge: true }
+    );
 
-  // 4. Subtle Cross-Platform App Store Native Notification Trigger
-  React.useEffect(() => {
-    if (currentUserProfile && firestore) {
-      const userCreatedDate = safeToDate(currentUserProfile.createdAt);
-      const now = new Date();
-      const diffTime = now.getTime() - userCreatedDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      // Trigger subtly after 5 days of usage (give more breathing room)
-      if (diffDays >= 5) {
-        const storageKey = `app_download_prompt_${currentUserProfile.id}`;
-        const hasPrompted = localStorage.getItem(storageKey);
-        if (!hasPrompted) {
-          const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : '';
-          const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
-          const isAndroidTauri = isTauri && /android/i.test(userAgent);
-
-          // Never show this notification to users on the Android app — they already have it!
-          if (isAndroidTauri) return;
-
-          let notifTitle = '';
-          let notifBody = '';
-          let notifLink = '';
-
-          const playStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
-          const msStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
-
-          if (isTauri || !isMobile) {
-            // User is on Desktop (Windows / Microsoft App) -> Recommend Android Mobile App
-            notifTitle = "📱 Zeneva is also on Android";
-            notifBody = "Manage your business from anywhere. Download the Zeneva Android App on Google Play.";
-            notifLink = playStoreUrl;
-          } else {
-            // User is on Mobile browser -> Recommend Windows Desktop App
-            notifTitle = "💻 Zeneva is also on Windows";
-            notifBody = "Get the full Zeneva experience on your PC. Available now on the Microsoft Store.";
-            notifLink = msStoreUrl;
-          }
-
-          // Set key BEFORE writing to prevent double-triggers in React Strict Mode
-          localStorage.setItem(storageKey, 'true');
-          addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
-            title: notifTitle,
-            body: notifBody,
-            createdAt: serverTimestamp(),
-            read: false,
-            type: 'app_download',
-            link: notifLink,
-            // Flag so the notification handler knows to open this in an external browser
-            openExternal: true,
-          }).then(() => {
-            notify(notifTitle, notifBody, notifLink);
-          }).catch((err) => {
-            localStorage.removeItem(storageKey);
-            console.error(err);
-          });
-        }
-      }
-    }
+    batch
+      .commit()
+      .then(() => {
+        notify(message.title, message.body, message.link);
+      })
+      .catch((err) => {
+        lifecycleWriteInFlight.current = false;
+        console.error('Lifecycle notification failed:', err);
+      });
   }, [currentUserProfile, firestore, notify]);
 
   if (isLoggingOut) {
@@ -845,7 +838,7 @@ export default function AuthenticatedLayout({
           </CardHeader>
           <CardFooter>
             <Button onClick={handleLogout} className="w-full">
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="me-2 h-4 w-4" />
               Logout & Return Home
             </Button>
           </CardFooter>
@@ -880,7 +873,7 @@ export default function AuthenticatedLayout({
           </CardContent>
           <CardFooter>
             <Button onClick={handleLogout} className="w-full">
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="me-2 h-4 w-4" />
               Logout & Return Home
             </Button>
           </CardFooter>
@@ -897,10 +890,20 @@ export default function AuthenticatedLayout({
 
 
   // --- Subscription Guard Configuration ---
+  // Deliberately never triggers on an expired date. Free plans do not expire
+  // and a lapsed paid plan falls back to Starter with the shop still trading,
+  // so `isSubscriptionActive` is only false for a business that has been
+  // removed outright. The card below is that last-resort case.
   const restrictedRoutes = ['/sales', '/storefront', '/ai-insights', '/customers', '/inventory', '/reports', '/receipts', '/online-orders', '/audit-log'];
   const isRestrictedRoute = restrictedRoutes.some(route => pathname.startsWith(route));
   const showSubscriptionBlock = !isSubscriptionActive && isRestrictedRoute && !isLoading;
   // --- End of Subscription Guard Config ---
+
+  // Pages that fill the viewport and manage their own internal scrolling, so the
+  // page frame must not scroll or pad. The Zen AI chat is one: its transcript
+  // and history rail scroll independently and its composer stays pinned.
+  // /ai-insights/use-cases is a normal long page, so it is not full-bleed.
+  const isFullBleedRoute = pathname === '/ai-insights';
 
   const userRole = currentUserProfile?.role;
   const plan = businessInstance?.plan || 'starter';
@@ -1048,7 +1051,7 @@ export default function AuthenticatedLayout({
             <p className="text-sm text-muted-foreground leading-relaxed">
               To protect your business data and security, we have halted all operations for this business.
             </p>
-            <div className="rounded-xl bg-muted/50 p-4 border text-left text-xs font-mono space-y-1">
+            <div className="rounded-xl bg-muted/50 p-4 border text-start text-xs font-mono space-y-1">
               <div className="text-muted-foreground">Reason: Security Hold / Suspicious Activity</div>
               <div className="text-muted-foreground">Reference ID: H-{businessInstance?.id?.substring(0, 8).toUpperCase()}</div>
             </div>
@@ -1113,15 +1116,15 @@ export default function AuthenticatedLayout({
                         <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
                           <SidebarMenuButton
                             asChild
-                            tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
+                            tooltip={{ children: t(link.labelKey), side: 'right', sideOffset: 10 }}
                             isActive={isLinkActive(link.href, pathname)}
                           >
                             <Link href={link.href} className="flex items-center w-full">
                               <link.icon className="h-5 w-5 shrink-0" />
                               <span className="group-data-[state=collapsed]:hidden flex items-center justify-between flex-1 min-w-0">
-                                <span className="truncate">{link.label}</span>
+                                <span className="truncate">{t(link.labelKey)}</span>
                                 {(link as any).isNew && (
-                                  <Badge className="ml-2 h-[18px] px-1.5 bg-orange-500 hover:bg-orange-600 text-[9px] font-bold text-white border-0 shadow-none leading-none rounded">NEW</Badge>
+                                  <Badge className="ms-2 h-[18px] px-1.5 bg-orange-500 hover:bg-orange-600 text-[9px] font-bold text-white border-0 shadow-none leading-none rounded">{t('nav.newBadge')}</Badge>
                                 )}
                               </span>
                             </Link>
@@ -1138,12 +1141,12 @@ export default function AuthenticatedLayout({
                     <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
                       <SidebarMenuButton
                         asChild
-                        tooltip={{ children: link.label, side: 'right', sideOffset: 10 }}
+                        tooltip={{ children: t(link.labelKey), side: 'right', sideOffset: 10 }}
                         isActive={pathname.startsWith(link.href)}
                       >
                         <Link href={link.href}>
                           <link.icon className="h-5 w-5" />
-                          <span className="group-data-[state=collapsed]:hidden">{link.label}</span>
+                          <span className="group-data-[state=collapsed]:hidden">{t(link.labelKey)}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -1184,17 +1187,17 @@ export default function AuthenticatedLayout({
                   <DropdownMenuContent side="right" align="start" className="w-56">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild><Link href="/achievements"><Award className="mr-2 h-4 w-4" />Achievements</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/achievements"><Award className="me-2 h-4 w-4" />Achievements</Link></DropdownMenuItem>
                     {userRole === 'admin' && (
                       <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
                     )}
-                    <DropdownMenuItem asChild><Link href="/support"><LifeBuoy className="mr-2 h-4 w-4" />Support</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/support"><LifeBuoy className="me-2 h-4 w-4" />Support</Link></DropdownMenuItem>
                     {user?.email === 'belloimam431@gmail.com' && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
                           <Link href="/admin-imamshaffy" className="text-orange-600 dark:text-orange-400 font-semibold">
-                            <Bug className="mr-2 h-4 w-4" />
+                            <Bug className="me-2 h-4 w-4" />
                             Admin Panel
                           </Link>
                         </DropdownMenuItem>
@@ -1202,7 +1205,7 @@ export default function AuthenticatedLayout({
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
+                      <LogOut className="me-2 h-4 w-4" />
                       <span>Logout</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1243,7 +1246,7 @@ export default function AuthenticatedLayout({
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
                             <Bell className="h-5 w-5" />
-                            {unreadCount > 0 && <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
+                            {unreadCount > 0 && <span className="absolute top-1 end-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">{unreadCount}</span>}
                           </Button>
                         </DropdownMenuTrigger>
                       </TooltipTrigger>
@@ -1306,7 +1309,7 @@ export default function AuthenticatedLayout({
                       <DropdownMenuItem asChild className="cursor-pointer justify-center">
                         <Link href="/notifications" className="text-xs font-medium">
                           View all
-                          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                          <ChevronRight className="ms-1 h-3.5 w-3.5 rtl:rotate-180" />
                         </Link>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -1340,11 +1343,11 @@ export default function AuthenticatedLayout({
                         </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild><Link href="/achievements"><Award className="mr-2 h-4 w-4" />Achievements</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href="/achievements"><Award className="me-2 h-4 w-4" />Achievements</Link></DropdownMenuItem>
                       {userRole === 'admin' && (
                         <DropdownMenuItem asChild>
                           <Link href="/settings">
-                            <Settings className="mr-2 h-4 w-4" />
+                            <Settings className="me-2 h-4 w-4" />
                             <span>Settings</span>
                           </Link>
                         </DropdownMenuItem>
@@ -1354,7 +1357,7 @@ export default function AuthenticatedLayout({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
                             <Link href="/admin-imamshaffy" className="text-orange-600 dark:text-orange-400 font-semibold">
-                              <Bug className="mr-2 h-4 w-4" />
+                              <Bug className="me-2 h-4 w-4" />
                               <span>Admin Panel</span>
                             </Link>
                           </DropdownMenuItem>
@@ -1362,15 +1365,58 @@ export default function AuthenticatedLayout({
                       )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout}>
-                        <LogOut className="mr-2 h-4 w-4" />
+                        <LogOut className="me-2 h-4 w-4" />
                         <span>Log out</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </header>
-              <main id="app-main-content" className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 md:pb-6 font-body smooth-scroll bg-background relative">
-                <div className={cn("w-full transition-all duration-700 min-h-full pb-32 md:pb-0", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
+              {/*
+                Impersonation banner. Sits between the header and <main> rather than
+                after it: MobileBottomNav is `fixed bottom-0 z-40`, so anything below
+                <main> is hidden behind the nav on phones — which is exactly how the
+                exit affordance went missing on mobile. Sticky so it survives scrolling.
+              */}
+              {isImpersonating && (
+                <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm font-medium text-destructive">
+                  <span>
+                    You are viewing{' '}
+                    <strong>{currentUserProfile?.name || 'another'}</strong>
+                    {currentUserProfile?.name ? "'s" : ''} account.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    aria-label="Exit impersonation and return to the admin panel"
+                    onClick={async () => {
+                      // Must clear the impersonation state BEFORE navigating. The old
+                      // handler only did window.location.href, which left
+                      // sessionStorage set — so the reload dropped straight back into
+                      // the impersonated account.
+                      try {
+                        await stopImpersonation();
+                      } finally {
+                        window.location.href = '/admin-imamshaffy';
+                      }
+                    }}
+                  >
+                    Exit View
+                  </Button>
+                </div>
+              )}
+              <main
+                id="app-main-content"
+                className={cn(
+                  "flex-1 min-w-0 font-body bg-background relative",
+                  // Full-bleed pages own their own scrolling: the chat transcript
+                  // and its history rail scroll, the page frame does not.
+                  isFullBleedRoute
+                    ? "overflow-hidden"
+                    : "overflow-y-auto p-4 sm:p-6 md:pb-6 smooth-scroll"
+                )}
+              >
+                <div className={cn("w-full transition-all duration-700", isFullBleedRoute ? "h-full" : "min-h-full pb-32 md:pb-0", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>
                   {hasRouteAccess ? children : (
                     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6 bg-card rounded-2xl border shadow-sm animate-in fade-in duration-300">
                       <div className="p-4 bg-destructive/10 rounded-full text-destructive mb-4">
@@ -1422,10 +1468,10 @@ export default function AuthenticatedLayout({
                               </svg>
                           </div>
                           <CardTitle className="text-4xl font-extrabold tracking-tight text-foreground">
-                            Trial Expired
+                            Account Inactive
                           </CardTitle>
                           <CardDescription className="text-lg mt-3 px-4">
-                            Your trial period or subscription has ended. To continue using <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span>, please subscribe to a plan.
+                            <span className="font-bold text-foreground">{(businessInstance?.name || 'your business').toLowerCase()}</span> is no longer active. Please contact support to restore access.
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="px-8 pb-10">
@@ -1443,7 +1489,7 @@ export default function AuthenticatedLayout({
                                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Unlock all features instantly with our business-ready plans.</p>
                                <Button asChild className="w-full h-12 shadow-md hover:scale-[1.05] active:scale-95 transition-all duration-300 bg-orange-500 hover:bg-orange-600 font-bold">
                                  <Link href="/billing">
-                                   <ArrowRight className="mr-2 h-4 w-4" />
+                                   <ArrowRight className="me-2 h-4 w-4" />
                                    Review Plans
                                  </Link>
                                </Button>
@@ -1458,12 +1504,6 @@ export default function AuthenticatedLayout({
                   </div>
                 )}
               </main>
-              {currentUserProfile && currentUserProfile.id !== user?.uid && (
-                <div className="bg-destructive/10 border-t border-destructive/20 p-2 text-center text-sm text-destructive font-medium flex items-center justify-center gap-4">
-                  <span>You are viewing {currentUserProfile.name}'s account.</span>
-                  <Button size="sm" variant="destructive" onClick={() => window.location.href = '/admin-imamshaffy'}>Exit View</Button>
-                </div>
-              )}
             </div>
           </div>
           <MobileBottomNav 

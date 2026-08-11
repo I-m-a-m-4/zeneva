@@ -80,6 +80,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
@@ -114,7 +115,7 @@ function ProductRowSkeleton() {
         <Skeleton className="h-6 w-full" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-8 w-8 ml-auto" />
+        <Skeleton className="h-8 w-8 ms-auto" />
       </TableCell>
     </TableRow>
   )
@@ -151,6 +152,7 @@ function InventoryPageContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const { t } = useI18n();
   const { activeBranchId } = useBranch();
   const { 
     products, 
@@ -336,10 +338,14 @@ function InventoryPageContent() {
     addToQueue({
       type: 'delete-product',
       payload: { productIds: selectedProductIds }
-    }, `Deleting ${selectedProductIds.length} product(s)`);
+    }, t('inventory.queueDeleting', { count: selectedProductIds.length }));
 
     // We don't need to manually mutate here because we will filter in the UI based on queuedActions
-    toast({ variant: 'default', title: 'Deletion Queued', description: `${selectedProductIds.length} product(s) will be deleted.` });
+    toast({
+      variant: 'default',
+      title: t('inventory.deletionQueuedTitle'),
+      description: t('inventory.deletionQueuedDescription', { count: selectedProductIds.length }),
+    });
 
     setSelectedProductIds([]);
     setIsDeleteDialogOpen(false);
@@ -371,10 +377,13 @@ function InventoryPageContent() {
                       businessId: business.id,
                       ...(activeBranchId && activeBranchId !== 'all' ? { branchId: activeBranchId } : {})
                     }
-                }, `Importing product: ${item.name}`);
+                }, t('inventory.queueImporting', { name: item.name }));
             });
 
-            toast({ title: "Import Queued", description: `${items.length} products will be added when online.` });
+            toast({
+              title: t('inventory.importQueuedTitle'),
+              description: t('inventory.importQueuedDescription', { count: items.length }),
+            });
             triggerRefresh();
         } else {
             const batch = writeBatch(firestore);
@@ -390,11 +399,14 @@ function InventoryPageContent() {
                 });
             });
             await batch.commit();
-            toast({ title: "Import Successful", description: `${items.length} products added.` });
+            toast({
+              title: t('inventory.importSuccessTitle'),
+              description: t('inventory.importSuccessDescription', { count: items.length }),
+            });
             triggerRefresh();
         }
     } catch (error) {
-        toast({ title: "Import Failed", description: "Could not add products.", variant: 'destructive' });
+        toast({ title: t('inventory.importFailedTitle'), description: t('inventory.importFailedDescription'), variant: 'destructive' });
     } finally {
         setIsLoading(false);
     }
@@ -403,7 +415,7 @@ function InventoryPageContent() {
   const handleExport = async () => {
     if (!business?.id) return;
     
-    toast({ variant: 'default', title: 'Preparing Export', description: 'Fetching all product data...' });
+    toast({ variant: 'default', title: t('inventory.preparingExportTitle'), description: t('inventory.preparingExportDescription') });
 
     try {
       const q = query(collection(firestore, 'products'), where('businessId', '==', business.id));
@@ -435,11 +447,11 @@ function InventoryPageContent() {
       reader.readAsDataURL(blob);
       toast({
         variant: 'success',
-        title: 'Export Complete',
-        description: 'Your product data has been downloaded.',
+        title: t('inventory.exportCompleteTitle'),
+        description: t('inventory.exportCompleteDescription'),
       });
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not fetch data for export.' });
+      toast({ variant: 'destructive', title: t('inventory.exportFailedTitle'), description: t('inventory.exportFailedDescription') });
     }
   };
 
@@ -450,11 +462,11 @@ function InventoryPageContent() {
         <div className="flex flex-col flex-1">
           <div className="relative flex items-center gap-2">
             <div className="relative flex-1 group">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input
                 type="search"
-                placeholder="Search products..."
-                className="w-full rounded-lg bg-background pl-8 ring-offset-background focus-visible:ring-primary h-10"
+                placeholder={t('inventory.searchProducts')}
+                className="w-full rounded-lg bg-background ps-8 ring-offset-background focus-visible:ring-primary h-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => {
@@ -470,7 +482,7 @@ function InventoryPageContent() {
                size="icon"
                className="h-10 w-10 shrink-0 border shadow-sm hover:shadow-md transition-all active:scale-95"
                onClick={() => performSearch(searchTerm)}
-               aria-label="Search"
+               aria-label={t('inventory.searchAria')}
             >
               <Search className="h-4 w-4" />
             </Button>
@@ -482,13 +494,13 @@ function InventoryPageContent() {
                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
                   <Edit className="h-3.5 w-3.5" />
                   <span className="sm:whitespace-nowrap">
-                    Bulk Edit ({selectedProductIds.length})
+                    {t('inventory.bulkEditCount', { count: selectedProductIds.length })}
                   </span>
                 </Button>
                 <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
                   <Trash2 className="h-3.5 w-3.5" />
                   <span className="sm:whitespace-nowrap">
-                    Delete ({selectedProductIds.length})
+                    {t('inventory.deleteCount', { count: selectedProductIds.length })}
                   </span>
                 </Button>
               </>
@@ -498,36 +510,36 @@ function InventoryPageContent() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-9 gap-1" suppressHydrationWarning>
                   <ListFilter className="h-3.5 w-3.5" />
-                  <span>Filter</span>
+                  <span>{t('inventory.filter')}</span>
                   {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">{activeFilterCount}</Badge>
+                    <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ms-1">{activeFilterCount}</Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions & Filters</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('inventory.actionsAndFilters')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
-                  <QrCode className="mr-2 h-4 w-4" /> Search by Barcode
+                  <QrCode className="me-2 h-4 w-4" /> {t('inventory.searchByBarcode')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>{t('inventory.stockStatus')}</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
-                      <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="all">{t('common.all')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="in-stock">{t('inventory.statusInStock')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="low-stock">{t('inventory.statusLowStock')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="out-of-stock">{t('inventory.statusOutOfStock')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="debt">{t('inventory.statusNegative')}</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>{t('inventory.category')}</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="all">{t('inventory.allCategories')}</DropdownMenuRadioItem>
                       {business?.settings?.productCategories?.map((cat: string) => (
                         <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
                       ))}
@@ -535,13 +547,13 @@ function InventoryPageContent() {
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>{t('inventory.sortBy')}</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                      <DropdownMenuRadioItem value="newest">Newest Added</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="stock-desc">Highest Stock First</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="stock-asc">Lowest Stock First</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="newest">{t('inventory.sortNewest')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="name">{t('inventory.sortNameAz')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="stock-desc">{t('inventory.sortStockDescLong')}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="stock-asc">{t('inventory.sortStockAscLong')}</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
@@ -549,7 +561,7 @@ function InventoryPageContent() {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('newest'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                      Clear Filters
+                      {t('inventory.clearFilters')}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -558,19 +570,19 @@ function InventoryPageContent() {
 
             <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
               <Download className="h-3.5 w-3.5" />
-              <span className="sm:whitespace-nowrap">Export</span>
+              <span className="sm:whitespace-nowrap">{t('common.export')}</span>
             </Button>
             {canManageStock && (
               <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
-                <span className="sm:whitespace-nowrap">Import</span>
+                <span className="sm:whitespace-nowrap">{t('common.import')}</span>
               </Button>
             )}
             {canManageStock && (
               <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
                 <Link href="/inventory/debts">
                   <TrendingDown className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">Manage Debts</span>
+                  <span className="sm:whitespace-nowrap">{t('inventory.manageDebts')}</span>
                 </Link>
               </Button>
             )}
@@ -578,7 +590,7 @@ function InventoryPageContent() {
               <Button size="sm" asChild className="h-9 gap-1">
                 <Link href="/inventory/add">
                   <PlusCircle className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">Add Product</span>
+                  <span className="sm:whitespace-nowrap">{t('inventory.addProduct')}</span>
                 </Link>
               </Button>
             )}
@@ -591,15 +603,15 @@ function InventoryPageContent() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="default" size="sm" className="h-9 px-3 gap-2">
                     <Activity className="h-4 w-4" />
-                    <span>{selectedProductIds.length} Selected</span>
+                    <span>{t('inventory.selectedCount', { count: selectedProductIds.length })}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setIsBulkEditDialogOpen(true)}>
-                    <Edit className="mr-2 h-4 w-4" /> Bulk Edit
+                    <Edit className="me-2 h-4 w-4" /> {t('inventory.bulkEdit')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete selected
+                    <Trash2 className="me-2 h-4 w-4" /> {t('inventory.deleteSelected')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -612,41 +624,41 @@ function InventoryPageContent() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Inventory Options</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('inventory.inventoryOptions')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                
+
                 <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
-                  <QrCode className="mr-2 h-4 w-4" /> Scan Barcode
+                  <QrCode className="me-2 h-4 w-4" /> {t('inventory.scanBarcode')}
                 </DropdownMenuItem>
-                
+
                 <DropdownMenuSeparator />
 
                 {/* Mobile Filter Group */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <ListFilter className="mr-2 h-4 w-4" />
-                    Filter & Sort {activeFilterCount > 0 && `(${activeFilterCount})`}
+                    <ListFilter className="me-2 h-4 w-4" />
+                    {t('inventory.filterAndSort')} {activeFilterCount > 0 && `(${activeFilterCount})`}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t('inventory.filterBy')}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Stock Status</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>{t('inventory.stockStatus')}</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
                         <DropdownMenuRadioGroup value={stockFilter} onValueChange={setStockFilter}>
-                          <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="in-stock">In Stock</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="low-stock">Low Stock</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="out-of-stock">Out of Stock</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="debt">Negative Stock (Debt)</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="all">{t('common.all')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="in-stock">{t('inventory.statusInStock')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="low-stock">{t('inventory.statusLowStock')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="out-of-stock">{t('inventory.statusOutOfStock')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="debt">{t('inventory.statusNegative')}</DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Category</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>{t('inventory.category')}</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
                         <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
-                          <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="all">{t('inventory.allCategories')}</DropdownMenuRadioItem>
                           {business?.settings?.productCategories?.map((cat: string) => (
                             <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
                           ))}
@@ -654,13 +666,13 @@ function InventoryPageContent() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Sort By</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>{t('inventory.sortBy')}</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
                         <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                          <DropdownMenuRadioItem value="newest">Newest Added</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="name">Name (A-Z)</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="stock-desc">Highest Stock</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="stock-asc">Lowest Stock</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="newest">{t('inventory.sortNewest')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="name">{t('inventory.sortNameAz')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="stock-desc">{t('inventory.sortStockDesc')}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="stock-asc">{t('inventory.sortStockAsc')}</DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
@@ -668,31 +680,31 @@ function InventoryPageContent() {
                 </DropdownMenuSub>
 
                 <DropdownMenuSeparator />
-                
+
                 <DropdownMenuItem onClick={() => handleExport()}>
-                  <Download className="mr-2 h-4 w-4" /> Export CSV
+                  <Download className="me-2 h-4 w-4" /> {t('inventory.exportCsv')}
                 </DropdownMenuItem>
-                
+
                 {canManageStock && (
                   <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
-                    <Upload className="mr-2 h-4 w-4" /> Import CSV
+                    <Upload className="me-2 h-4 w-4" /> {t('inventory.importCsv')}
                   </DropdownMenuItem>
                 )}
 
                 {canManageStock && (
                   <DropdownMenuItem asChild>
                     <Link href="/inventory/debts">
-                      <TrendingDown className="mr-2 h-4 w-4" /> Manage Debts
+                      <TrendingDown className="me-2 h-4 w-4" /> {t('inventory.manageDebts')}
                     </Link>
                   </DropdownMenuItem>
                 )}
 
                 <DropdownMenuSeparator />
-                
+
                 {canManageStock && (
                   <DropdownMenuItem asChild className="bg-primary text-primary-foreground focus:bg-primary/90">
                     <Link href="/inventory/add">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+                      <PlusCircle className="me-2 h-4 w-4" /> {t('inventory.addNewProduct')}
                     </Link>
                   </DropdownMenuItem>
                 )}
@@ -704,9 +716,9 @@ function InventoryPageContent() {
       <div className="w-full mb-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-md">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="all">All Products</TabsTrigger>
+            <TabsTrigger value="all">{t('inventory.tabAllProducts')}</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
-              Inventory Health
+              {t('inventory.tabHealth')}
               {healthMetrics.total > 0 && <span className="flex h-2 w-2 rounded-full bg-red-500" />}
             </TabsTrigger>
           </TabsList>
@@ -721,7 +733,7 @@ function InventoryPageContent() {
           >
             <CardContent className="p-4 flex flex-col gap-1 text-center">
               <span className="text-2xl font-bold">{healthMetrics.total}</span>
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Issues</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('inventory.healthTotalIssues')}</span>
             </CardContent>
           </Card>
           <Card 
@@ -730,7 +742,7 @@ function InventoryPageContent() {
           >
             <CardContent className="p-4 flex flex-col gap-1 text-center">
               <span className="text-2xl font-bold text-red-600">{healthMetrics.outOfStock}</span>
-              <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">Out of Stock</span>
+              <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">{t('inventory.healthOutOfStock')}</span>
             </CardContent>
           </Card>
           <Card 
@@ -739,7 +751,7 @@ function InventoryPageContent() {
           >
             <CardContent className="p-4 flex flex-col gap-1 text-center">
               <span className="text-2xl font-bold text-orange-600">{healthMetrics.lowStock}</span>
-              <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">Low Stock (≤5)</span>
+              <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">{t('inventory.healthLowStock')}</span>
             </CardContent>
           </Card>
           <Card 
@@ -748,7 +760,7 @@ function InventoryPageContent() {
           >
             <CardContent className="p-4 flex flex-col gap-1 text-center">
               <span className="text-2xl font-bold text-blue-600">{healthMetrics.missingImages}</span>
-              <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">Missing Images</span>
+              <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
             </CardContent>
           </Card>
         </div>
@@ -757,18 +769,18 @@ function InventoryPageContent() {
       <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Products
+            {t('inventory.productsTitle')}
           </CardTitle>
           <CardDescription>
-            Manage your products and view their sales performance.
+            {t('inventory.productsDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
           {(isLoading && displayedProducts.length === 0) || products === null ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
-              <p className="text-muted-foreground animate-pulse font-medium">Scanning inventory catalogs...</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-2 uppercase tracking-widest">Just a moment</p>
+              <p className="text-muted-foreground animate-pulse font-medium">{t('inventory.scanningCatalogs')}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-2 uppercase tracking-widest">{t('inventory.justAMoment')}</p>
             </div>
           ) : (
             displayedProducts && displayedProducts.length > 0 ? (
@@ -782,13 +794,13 @@ function InventoryPageContent() {
                       />
                     </TableHead>
                     <TableHead className="w-16 sm:w-[100px]">
-                      <span className="sr-only">Image</span>
+                      <span className="sr-only">{t('inventory.colImage')}</span>
                     </TableHead>
-                    <TableHead className="font-semibold">Name</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    {canManageStock && <TableHead className="font-semibold">Price</TableHead>}
-                    {canManageStock && <TableHead className="hidden md:table-cell font-semibold">Stock</TableHead>}
-                    <TableHead className="text-right font-semibold pr-6">Actions</TableHead>
+                    <TableHead className="font-semibold">{t('common.name')}</TableHead>
+                    <TableHead className="font-semibold">{t('common.status')}</TableHead>
+                    {canManageStock && <TableHead className="font-semibold">{t('common.price')}</TableHead>}
+                    {canManageStock && <TableHead className="hidden md:table-cell font-semibold">{t('inventory.colStock')}</TableHead>}
+                    <TableHead className="text-end font-semibold pe-6">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -847,17 +859,17 @@ function InventoryPageContent() {
                           </Link>
                           {product.type === 'composite' && (
                             <Badge variant="outline" className="text-[10px] h-4 bg-primary/5 text-primary border-primary/20 gap-1 px-1">
-                              <Layers className="h-2 w-2" /> Bundle
+                              <Layers className="h-2 w-2" /> {t('inventory.bundleBadge')}
                             </Badge>
                           )}
-                          {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">Saving...</Badge>}
+                          {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">{t('common.saving')}</Badge>}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                           <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
                           {((product as any).material || product.variantValue) && (
                             <span className="text-[10px] flex items-center gap-1 opacity-80">
                                • {((product as any).material ? (product as any).material : '')} 
-                               {product.variantValue && <Badge variant="secondary" className="text-[8px] h-3 px-1 ml-0.5 font-normal">{product.variantValue}</Badge>}
+                               {product.variantValue && <Badge variant="secondary" className="text-[8px] h-3 px-1 ms-0.5 font-normal">{product.variantValue}</Badge>}
                             </span>
                           )}
                         </div>
@@ -874,14 +886,14 @@ function InventoryPageContent() {
                             (product.categoryType !== 'service' && product.category?.toLowerCase() !== 'service' && product.category?.toLowerCase() !== 'services') && (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
                           )}
                         >
-                          {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? "Service" : (product.stock || 0) > 0 ? "In Stock" : (product.stock || 0) < 0 ? "Backordered" : "Out of Stock"}
+                          {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? t('inventory.statusService') : (product.stock || 0) > 0 ? t('inventory.statusInStock') : (product.stock || 0) < 0 ? t('inventory.statusBackordered') : t('inventory.statusOutOfStock')}
                         </Badge>
                       </TableCell>
                       {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
                       {canManageStock && (
                         <TableCell className="hidden md:table-cell">
                           {product.categoryType === 'service' ? (
-                            <span className="text-muted-foreground/40 italic">N/A</span>
+                            <span className="text-muted-foreground/40 italic">{t('inventory.notAvailable')}</span>
                           ) : (
                             <>
                               {product.stock || 0} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span>
@@ -889,7 +901,7 @@ function InventoryPageContent() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className="text-right pr-6">
+                      <TableCell className="text-end pe-6">
                         <DropdownMenu modal={false}
                           open={openMenuId === product.id} 
                           onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
@@ -903,15 +915,15 @@ function InventoryPageContent() {
                             {canManageStock && (
                               <>
                                 <DropdownMenuItem onSelect={() => router.push(`/inventory/details?id=${product.id}`)}>
-                                  <Edit className="mr-2 h-4 w-4" /> Full Edit
+                                  <Edit className="me-2 h-4 w-4" /> {t('inventory.fullEdit')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
-                                  <Edit className="mr-2 h-4 w-4" /> Quick Edit
+                                  <Edit className="me-2 h-4 w-4" /> {t('inventory.quickEdit')}
                                 </DropdownMenuItem>
                               </>
                             )}
                             <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
-                              <BarcodeIcon className="mr-2 h-4 w-4" /> Print Barcode
+                              <BarcodeIcon className="me-2 h-4 w-4" /> {t('inventory.printBarcode')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
 
@@ -926,22 +938,22 @@ function InventoryPageContent() {
               <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px]">
                 <PackageOpen className="h-24 w-24 text-muted-foreground/30 mb-4" />
                 <h3 className="text-xl font-semibold">
-                  {activeTab === 'health' ? 'No health issues found' : (searchTerm ? 'No product found' : 'Empty Inventory')}
+                  {activeTab === 'health' ? t('inventory.noHealthIssues') : (searchTerm ? t('inventory.noProductFound') : t('inventory.emptyInventory'))}
                 </h3>
                 <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
-                  {activeTab === 'health' 
-                    ? "Your inventory is looking great! No products match the current health filter."
-                    : (searchTerm ? `Try searching for something else or clear the search.` : 'Start adding products to your shop.')}
+                  {activeTab === 'health'
+                    ? t('inventory.healthyHint')
+                    : (searchTerm ? t('inventory.searchHint') : t('inventory.startAddingHint'))}
                 </p>
                 {activeTab === 'all' && (!searchTerm && stockFilter === 'all' && categoryFilter === 'all') && (
                   <div className="flex gap-2">
                     <Button asChild>
                       <Link href="/inventory/add">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                        <PlusCircle className="me-2 h-4 w-4" /> {t('inventory.addProduct')}
                       </Link>
                     </Button>
                     <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                      <Upload className="mr-2 h-4 w-4" /> Import CSV
+                      <Upload className="me-2 h-4 w-4" /> {t('inventory.importCsv')}
                     </Button>
                   </div>
                 )}
@@ -952,7 +964,7 @@ function InventoryPageContent() {
         {filteredProducts && filteredProducts.length > 0 && (
           <CardFooter className="flex items-center justify-between border-t py-4">
             <div className="text-sm text-muted-foreground">
-              Total <strong>{filteredProducts.length}</strong> products found
+              {t('inventory.totalFound', { count: filteredProducts.length })}
             </div>
           </CardFooter>
         )}
@@ -971,15 +983,15 @@ function InventoryPageContent() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('inventory.deleteConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will queue the deletion of {selectedProductIds.length} products. This is permanent once synced.
+              {t('inventory.deleteConfirmBody', { count: selectedProductIds.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

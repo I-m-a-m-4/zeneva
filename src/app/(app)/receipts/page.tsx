@@ -29,12 +29,14 @@ import { usePOS } from '@/context/pos-context';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import React from "react";
+import { createPortal } from 'react-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
 import { safeToDate } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 
 function ReceiptRowSkeleton() {
   return (
@@ -44,8 +46,8 @@ function ReceiptRowSkeleton() {
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
       <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-      <TableCell className="text-right"><Skeleton className="h-5 w-1/2 ml-auto" /></TableCell>
-      <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-md ml-auto" /></TableCell>
+      <TableCell className="text-end"><Skeleton className="h-5 w-1/2 ms-auto" /></TableCell>
+      <TableCell className="text-end"><Skeleton className="h-8 w-8 rounded-md ms-auto" /></TableCell>
     </TableRow>
   )
 }
@@ -87,6 +89,7 @@ function ReceiptsContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const { t } = useI18n();
 
   const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [startDate, setStartDate] = React.useState('');
@@ -221,7 +224,7 @@ function ReceiptsContent() {
         details: { total: receiptToDelete.total, reason: 'Manual void by user' }
       });
 
-      toast({ title: 'Sale Voided', description: `Receipt ${receiptToDelete.id.substring(0, 8)} has been voided and stock levels restored.`, variant: 'success' });
+      toast({ title: t('receipts.voidedTitle'), description: t('receipts.voidedDescription', { receipt: receiptToDelete.id.substring(0, 8) }), variant: 'success' });
       await voidReceipt(receiptToDelete.id);
     } catch (e: any) {
       console.error("Failed to void sale:", e);
@@ -231,8 +234,8 @@ function ReceiptsContent() {
       await voidReceipt(receiptToDelete.id);
 
       toast({
-        title: 'Offline Void Handled',
-        description: 'The sale was voided locally and the update queued for synchronization.',
+        title: t('receipts.offlineVoidTitle'),
+        description: t('receipts.offlineVoidDescription'),
         variant: 'default'
       });
     } finally {
@@ -247,15 +250,15 @@ function ReceiptsContent() {
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <CardTitle>Transaction History</CardTitle>
-              <CardDescription>A log of all completed sales.</CardDescription>
+              <CardTitle>{t('receipts.historyTitle')}</CardTitle>
+              <CardDescription>{t('receipts.historyDesc')}</CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 no-print w-full md:w-auto">
               <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search sales..."
-                  className="pl-8"
+                  placeholder={t('receipts.searchSales')}
+                  className="ps-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -267,7 +270,7 @@ function ReceiptsContent() {
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                 />
-                <span className="text-muted-foreground text-xs">to</span>
+                <span className="text-muted-foreground text-xs">{t('receipts.dateTo')}</span>
                 <Input
                   type="date"
                   className="w-full sm:w-auto h-9 text-xs"
@@ -281,7 +284,7 @@ function ReceiptsContent() {
                     onClick={() => { setStartDate(''); setEndDate(''); }}
                     className="text-xs text-muted-foreground hover:text-foreground h-9 px-2"
                   >
-                    Clear
+                    {t('receipts.clearDates')}
                   </Button>
                 )}
               </div>
@@ -294,13 +297,13 @@ function ReceiptsContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Receipt ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  <TableHead>{t('receipts.receiptIdCol')}</TableHead>
+                  <TableHead>{t('pos.customer')}</TableHead>
+                  <TableHead>{t('common.date')}</TableHead>
+                  <TableHead>{t('receipts.timeCol')}</TableHead>
+                  <TableHead>{t('receipts.paymentMethodCol')}</TableHead>
+                  <TableHead className="text-end">{t('common.total')}</TableHead>
+                  <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -316,13 +319,13 @@ function ReceiptsContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Receipt ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                    <TableHead>{t('receipts.receiptIdCol')}</TableHead>
+                    <TableHead>{t('pos.customer')}</TableHead>
+                    <TableHead>{t('common.date')}</TableHead>
+                    <TableHead>{t('receipts.timeCol')}</TableHead>
+                    <TableHead>{t('receipts.paymentMethodCol')}</TableHead>
+                    <TableHead className="text-end">{t('common.total')}</TableHead>
+                    <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -335,29 +338,29 @@ function ReceiptsContent() {
                       <TableCell className="font-medium font-mono text-xs whitespace-nowrap">
                         {receipt.receiptNumber || `rec-${(receipt.id || '').substring(0, 8)}`}
                       </TableCell>
-                      <TableCell>{receipt.customer?.name || 'Walk-in'}</TableCell>
+                      <TableCell>{receipt.customer?.name || t('receipts.walkIn')}</TableCell>
                       <TableCell className="whitespace-nowrap">{safeFormatDate(receipt.createdAt)}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{safeFormatTime(receipt.createdAt)}</TableCell>
                       <TableCell>{receipt.paymentMethod || 'N/A'}</TableCell>
-                      <TableCell className="text-right">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="text-end">{currencySymbol}{(receipt.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button aria-haspopup="true" size="icon" variant="ghost">
                               <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
+                              <span className="sr-only">{t('receipts.toggleMenu')}</span>
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('common.actions')}</DropdownMenuLabel>
                             <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push(`/receipts/details?id=${receipt.id}`)}>
-                              <Eye className="mr-2 h-4 w-4" /> View
+                              <Eye className="me-2 h-4 w-4" /> {t('receipts.view')}
                             </DropdownMenuItem>
                             {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setReceiptToDelete(receipt); }}>
-                                  <Trash2 className="mr-2 h-4 w-4" /> Void Sale
+                                  <Trash2 className="me-2 h-4 w-4" /> {t('receipts.voidSale')}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -379,11 +382,11 @@ function ReceiptsContent() {
                   >
                     {isFetchingMore ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading...
+                        <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                        {t('common.loading')}
                       </>
                     ) : (
-                      'Load More Receipts'
+                      t('receipts.loadMore')
                     )}
                   </Button>
                 </div>
@@ -392,30 +395,37 @@ function ReceiptsContent() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
               <Inbox className="h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mt-4">No Transactions Found</h3>
+              <h3 className="text-xl font-semibold mt-4">{t('receipts.noneFound')}</h3>
               <p className="text-muted-foreground mt-2 mb-4">
-                {searchTerm ? 'Try a different search term.' : 'Completed sales will appear here.'}
+                {searchTerm ? t('receipts.noneFoundSearch') : t('receipts.noneFoundHint')}
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={!!receiptToDelete} onOpenChange={(open) => !open && setReceiptToDelete(null)}>
+      {typeof window !== 'undefined' && !!receiptToDelete && createPortal(
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0"
+          onClick={() => !isDeleting && setReceiptToDelete(null)}
+        />,
+        document.body
+      )}
+      <Dialog open={!!receiptToDelete} onOpenChange={(open) => !open && !isDeleting && setReceiptToDelete(null)} modal={false}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Are you sure you want to void this sale?</DialogTitle>
+            <DialogTitle>{t('receipts.voidConfirmTitle')}</DialogTitle>
             <DialogDescription>
-              This will permanently delete receipt <strong>{receiptToDelete?.receiptNumber || `rec-${receiptToDelete?.id.substring(0, 8)}`}</strong>.
-              Stock for all items will be restored and any loyalty points earned will be removed.
-              This action cannot be undone.
+              {t('receipts.voidConfirmBody', {
+                receipt: receiptToDelete?.receiptNumber || `rec-${receiptToDelete?.id.substring(0, 8)}`,
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReceiptToDelete(null)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="outline" onClick={() => setReceiptToDelete(null)} disabled={isDeleting}>{t('common.cancel')}</Button>
             <Button onClick={handleDeleteReceipt} disabled={isDeleting} variant="destructive">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Void Sale
+              {isDeleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+              {t('receipts.voidSale')}
             </Button>
           </DialogFooter>
         </DialogContent>

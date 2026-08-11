@@ -3,9 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link'; // Import Link
 import { usePOS } from '@/context/pos-context';
+import { hasBusinessFeatures } from '@/lib/plan';
 import { useBranch } from '@/context/branch-context';
 import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs } from 'firebase/firestore';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { terminalListenerErrorHandler } from '@/firebase/retry';
 import type { AuditLog } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -192,7 +194,7 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 }
 
 function AuditLogPageContent() {
-    const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs } = usePOS();
+    const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs, isOnline } = usePOS();
     const { activeBranchId } = useBranch();
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -205,6 +207,15 @@ function AuditLogPageContent() {
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(true);
     const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>(() => cachedAuditLogs && cachedAuditLogs.length > 0 ? cachedAuditLogs : []);
+
+    // The initialiser above only sees the cache as it stood on first render, and
+    // the SQLite hydration behind cachedAuditLogs resolves a tick later - so
+    // offline the page would sit empty next to a populated cache. Adopt it when it
+    // arrives; online the listener below overwrites this with fresher data.
+    React.useEffect(() => {
+        if (!cachedAuditLogs || cachedAuditLogs.length === 0) return;
+        setAuditLogs(prev => (prev.length === 0 ? cachedAuditLogs : prev));
+    }, [cachedAuditLogs]);
 
     // Fetch Initial Logs
     React.useEffect(() => {
@@ -220,7 +231,10 @@ function AuditLogPageContent() {
             const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) } as AuditLog));
             setAuditLogs(logs);
             if (snap.docs.length < 50) setHasMore(false);
-        });
+        }, terminalListenerErrorHandler('Audit log', () => {
+            unsubscribe();
+            setHasMore(false);
+        }));
 
         return () => unsubscribe();
     }, [business?.id, firestore]);
@@ -275,7 +289,7 @@ function AuditLogPageContent() {
     }, [auditLogs, actionFilter, searchTerm, activeBranchId, business?.id]);
 
     const handleAnalyze = () => {
-        const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
+        const isBusinessPlan = hasBusinessFeatures(business);
         if (!isBusinessPlan) {
             setIsUpgradeModalOpen(true);
             return;
@@ -298,7 +312,10 @@ function AuditLogPageContent() {
         });
     }
 
-    const isLoading = isPosLoading || (auditLogs.length === 0);
+    // An empty log list only means "still loading" while we are online and can
+    // still fetch. Offline it is the final answer - either the cache is empty or
+    // this business has no logs - so spinning forever hides the empty state.
+    const isLoading = isPosLoading || (auditLogs.length === 0 && isOnline);
 
     return (
         <>

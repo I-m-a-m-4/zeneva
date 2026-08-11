@@ -2,6 +2,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { requireSuperAdmin } from '@/actions/admin-guard';
+import type { ContentStrategyInput, ContentStrategyOutput } from '@/types';
 
 const PlatformStatsSchema = z.object({
   totalUsers: z.number().optional(),
@@ -38,10 +40,16 @@ const ContentStrategyOutputSchema = z.object({
   marketingPitch: z.string().describe('Strategic explanation of why this piece will resonate and convert readers.'),
 });
 
-export type ContentStrategyInput = z.infer<typeof ContentStrategyInputSchema>;
-export type ContentStrategyOutput = z.infer<typeof ContentStrategyOutputSchema>;
-
-export async function generateContentPlan(input: ContentStrategyInput): Promise<ContentStrategyOutput> {
+// The types live in '@/types' and consumers import them from there directly.
+// Do NOT re-export them here: a 'use server' file may only export async
+// functions, and Next's SWC check rejects even a type-only re-export because
+// it cannot tell types from values before stripping them.
+// Server Action = public endpoint. This one is only ever called from the admin
+// dashboard, so it takes the stricter owner check. The guard sits outside the
+// try/catch deliberately: inside it, "Not authorized." would be swallowed and
+// reported to the caller as a transient AI error.
+export async function generateContentPlan(input: ContentStrategyInput, idToken?: string): Promise<ContentStrategyOutput> {
+  await requireSuperAdmin(idToken);
   try {
     const result = await contentStrategyFlow(input);
     return result;

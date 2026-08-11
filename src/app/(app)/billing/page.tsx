@@ -118,7 +118,7 @@ function BillingPage() {
                 {currentBusiness.accessLevel === 'lifetime' ? (
                     <LifetimeAccessStatus />
                 ) : (
-                    <TrialCountdown expiryDate={currentBusiness.trialExpiresAt ? safeToDate(currentBusiness.trialExpiresAt) : null} />
+                    <TrialCountdown business={currentBusiness} />
                 )}
                 
             </div>

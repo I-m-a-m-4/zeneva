@@ -230,9 +230,12 @@ jobs:
         run: npx tauri android init --ci
         continue-on-error: true
 
-      - name: Patch Android Manifest with Camera Permissions
+      # No continue-on-error here on purpose. Camera and microphone permissions
+      # come from this step; a silent failure ships an APK where getUserMedia is
+      # denied with no OS dialog, which is exactly how audio was missing through
+      # 3.1.6. Fail the build instead.
+      - name: Patch Android Manifest with Camera and Microphone Permissions
         run: node scripts/patch-android-manifest.mjs
-        continue-on-error: true
 
       - name: Generate App Icons
         run: npm run tauri icon public/zeneva-app-icon.png

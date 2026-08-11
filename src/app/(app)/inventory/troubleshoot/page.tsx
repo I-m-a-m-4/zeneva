@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { usePOS } from "@/context/pos-context";
+import { hasProFeatures } from "@/lib/plan";
 import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit, Flame, ShieldAlert, Info } from "lucide-react";
 import React, { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,7 @@ import { useFirestore } from "@/firebase";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { idToken } from '@/lib/id-token';
 
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
   if (!issue) return null;
@@ -166,7 +168,7 @@ export default function TroubleshootPage() {
                 sku: p.sku,
             }));
 
-            const result = await productTroubleshoot({ products: sanitizedProducts });
+            const result = await productTroubleshoot({ products: sanitizedProducts }, await idToken());
             
             const dataToSave: AISuggestions = { ...result, createdAt: serverTimestamp() };
 
@@ -204,7 +206,7 @@ export default function TroubleshootPage() {
          )
     }
 
-    const canUseAIFeature = ['pro', 'business'].includes(business?.plan || '') || business?.accessLevel === 'lifetime';
+    const canUseAIFeature = hasProFeatures(business);
 
     const allIssues = [
         { icon: DollarSign, title: "Missing Price", count: analysis.productsWithoutPrice.length, items: analysis.productsWithoutPrice },

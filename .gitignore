@@ -45,6 +45,13 @@ firebase-debug.log
 firestore-debug.log
 android-keystore-backup.json
 
+# marketing recorder output (videos + raw frame sequences)
+/marketing-out
+
+# throwaway capture/encode probes — sample mp4s and wavs from tuning the
+# recorder. Large binaries with no reason to be in history.
+/.tmp-probe
+
 # next-pwa generated service worker artifacts (regenerated on every build)
 public/sw.js
 public/sw.js.map

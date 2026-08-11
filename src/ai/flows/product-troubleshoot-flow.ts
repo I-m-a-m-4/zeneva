@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { requireUser } from '@/actions/admin-guard';
 
 const ProductSchema = z.object({
   id: z.string(),
@@ -43,7 +44,11 @@ const ProductTroubleshootOutputSchema = z.object({
 
 export type ProductTroubleshootOutput = z.infer<typeof ProductTroubleshootOutputSchema>;
 
-export async function productTroubleshoot(input: ProductTroubleshootInput): Promise<ProductTroubleshootOutput> {
+// Server Action = public endpoint. Verify the caller before spending an LLM
+// call on the platform's API key. Token stays out of the input schema so it is
+// never forwarded to the model.
+export async function productTroubleshoot(input: ProductTroubleshootInput, idToken?: string): Promise<ProductTroubleshootOutput> {
+  await requireUser(idToken);
   return productTroubleshootFlow(input);
 }
 

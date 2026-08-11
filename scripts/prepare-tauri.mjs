@@ -8,7 +8,12 @@ const pathsToDelete = [
   'src/app/industries',
   'src/app/blog',
   'src/app/store',
-  'src/app/admin-imamshaffy',
+  // NOTE: 'src/app/admin-imamshaffy' is deliberately NOT deleted.
+  // Deleting it is what made the Admin Panel link dead-end on mobile: the route
+  // was never in the bundle, so it fell through to the root redirect below. The
+  // panel is all client components and static-exports fine; the handful of server
+  // modules it touched are stubbed in `stubs` further down, and everything else
+  // goes over HTTPS to the hosted API via src/lib/admin-api.ts.
   'firestore.rules',
   'firestore.indexes.json',
   'firebase.json',
@@ -42,7 +47,19 @@ foldersToClear.forEach(p => {
   }
 });
 
-// Specific stubs for core app dependencies to satisfy imports
+// Specific stubs for core app dependencies to satisfy imports.
+//
+// `src/actions` and `src/ai` are wiped above because they are 'use server'
+// modules that pull in firebase-admin/genkit, which cannot be statically
+// exported. Anything a *client* component imports from them must be replaced
+// here or the build fails on an unresolved module.
+//
+// The admin-panel stubs below throw rather than silently no-op: these actions
+// have real consequences (deleting auth accounts, emailing every merchant), so
+// a caller must find out it did not happen. Every call site already catches and
+// toasts, so the message is what the operator sees.
+const WEB_ONLY = 'This action is only available in the web admin panel at zeneva.space.';
+
 const stubs = [
     { path: 'src/ai/genkit.ts', content: 'export const ai = {}; export const getAI = () => ({});' },
     { path: 'src/ai/flows/customer-insights-flow.ts', content: 'export const getCustomerInsights = async () => ({ summary: "AI Insights disabled in desktop build", productSuggestions: [], engagementTactics: [] });' },
@@ -50,7 +67,45 @@ const stubs = [
     { path: 'src/ai/flows/product-troubleshoot-flow.ts', content: 'export const productTroubleshoot = async () => ({ solution: "Please connect to the command center via mobile or web for deeper diagnostics.", steps: [], confidence: 0 });' },
     { path: 'src/ai/flows/support-chat-flow.ts', content: 'export const zenevaSupportChat = async () => ({ response: "Direct support stream is available via the web terminal.", citations: [], suggestedActions: [] });' },
     { path: 'src/ai/flows/audit-log-analysis-flow.ts', content: 'export const analyzeAuditLogs = async () => ({ summary: "Security audit stream is encrypted for server-side processing only.", anomalies: [], riskScore: 0 });' },
-    { path: 'src/ai/flows/visual-count-flow.ts', content: 'export const visualCount = async () => ({ count: 0, confidence: 0, details: "Hardware-accelerated visual counting requires active telemetry link." });' }
+    { path: 'src/ai/flows/visual-count-flow.ts', content: 'export const visualCount = async () => ({ count: 0, confidence: 0, details: "Hardware-accelerated visual counting requires active telemetry link." });' },
+
+    // --- Admin panel dependencies (the panel now ships in the bundle) ---
+
+    // content-strategy.tsx calls this; its types live in '@/types' precisely so
+    // they survive this stub.
+    {
+        path: 'src/ai/flows/content-strategy-flow.ts',
+        content: `export async function generateContentPlan() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
+    },
+
+    // cyber-shield.tsx. Auth deletion needs the Admin SDK, so it cannot run here;
+    // the component surfaces a warning that the accounts survived the purge.
+    {
+        path: 'src/actions/admin-actions.ts',
+        content: `export async function deleteBusinessUsersAuth() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function revokeUserSessions() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
+    },
+
+    // admin-imamshaffy/page.tsx dynamically imports broadcastNotification.
+    {
+        path: 'src/actions/notifications.ts',
+        content: `export async function broadcastNotification() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function sendTestNotification() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
+    },
+
+    // uninstall-tracker.tsx imports the UninstallScanResult *type* as well as the
+    // two functions, so the stub has to re-declare it or the build fails on a
+    // missing type rather than a missing function.
+    {
+        path: 'src/actions/uninstalls.ts',
+        content: `export type UninstallChannelStat = {\n  channel: string;\n  total: number;\n  uninstalled: number;\n  rate: number;\n};\n\nexport type UninstallScanResult = {\n  scannedAt: string;\n  totalTokens: number;\n  totalUninstalled: number;\n  byChannel: UninstallChannelStat[];\n};\n\nexport async function scanForUninstalls() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function getUninstallStats(): Promise<UninstallScanResult | null> {\n  return null;\n}\n`,
+    },
+
+    // settings/subscription-section.tsx dynamically imports this. It was already
+    // broken in native builds (the folder is wiped and nothing replaced it); the
+    // stub turns an unresolved-module crash into a message the user can act on.
+    {
+        path: 'src/actions/subscription.ts',
+        content: `export type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };\n\nexport async function activateSubscription(): Promise<UpgradeResult> {\n  return { ok: false, error: 'Please complete your upgrade at zeneva.space.' };\n}\n`,
+    },
 ];
 
 stubs.forEach(s => {

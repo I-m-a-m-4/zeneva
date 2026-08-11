@@ -26,8 +26,10 @@ specialFiles.forEach(file => {
   }
 });
 
+const renamed = [];
 apiFiles.forEach(file => {
   fs.renameSync(file, file + '.bak');
+  renamed.push(file);
 });
 
 console.log('Successfully renamed API routes to .bak to bypass Next.js static export errors completely.');
@@ -35,5 +37,19 @@ console.log('Successfully renamed API routes to .bak to bypass Next.js static ex
 import { execSync } from 'child_process';
 console.log('Starting Next.js static export build...');
 process.env.IS_TAURI = 'true';
-execSync('npm run build', { stdio: 'inherit' });
-console.log('Next.js build finished.');
+
+// The rename above must be undone even when the build throws. Without this, a
+// failed build left every route as a .bak with no route.ts beside it — commit
+// that tree and ~20 endpoints ship as 404s, which is how the Paystack webhooks
+// and /api/upload went missing in production.
+try {
+  execSync('npm run build', { stdio: 'inherit' });
+  console.log('Next.js build finished.');
+} catch (err) {
+  console.error('Next.js build failed — restoring API routes before exiting.');
+  renamed.forEach(file => {
+    const bak = file + '.bak';
+    if (fs.existsSync(bak) && !fs.existsSync(file)) fs.renameSync(bak, file);
+  });
+  throw err;
+}

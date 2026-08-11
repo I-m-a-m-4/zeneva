@@ -25,7 +25,8 @@ export function ClientSideInitializer() {
     // survive, or push notifications break in dev.
     if (process.env.NODE_ENV === 'development' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations()
-        .then((registrations) => {
+        .then(async (registrations) => {
+          let killed = false;
           for (const registration of registrations) {
             const scriptURL =
               registration.active?.scriptURL ??
@@ -33,12 +34,38 @@ export function ClientSideInitializer() {
               registration.installing?.scriptURL ??
               '';
             if (scriptURL.includes('firebase-messaging-sw.js')) continue;
-            registration.unregister().then((ok) => {
-              // An unregistered worker keeps controlling already-open pages
-              // until they are reloaded, so say so rather than reloading here
-              // (an automatic reload races with HMR and can loop).
-              if (ok) console.warn(`[dev] Unregistered stale service worker (${scriptURL || 'unknown script'}). Reload once to drop its cached chunks.`);
-            });
+            const ok = await registration.unregister();
+            if (ok) {
+              killed = true;
+              console.warn(`[dev] Unregistered stale service worker (${scriptURL || 'unknown script'}).`);
+            }
+          }
+
+          /*
+           * Unregistering is not enough on its own. The worker's precached
+           * responses live in Cache Storage, which outlives the registration —
+           * so a reload can still be answered from a chunk built before your
+           * edit, and the page looks like it reverted. Delete the workbox
+           * caches too.
+           *
+           * `firebase-messaging-sw.js` keeps no precache, so nothing it relies
+           * on is in these buckets.
+           */
+          if (typeof caches !== 'undefined') {
+            const keys = await caches.keys();
+            for (const key of keys) {
+              if (/^(workbox|next-|start-url|apis|static-|image|audio|video|font|others|cross-origin)/i.test(key)) {
+                await caches.delete(key);
+                killed = true;
+              }
+            }
+          }
+
+          // An unregistered worker keeps controlling already-open pages until
+          // they are reloaded, so say so rather than reloading here (an
+          // automatic reload races with HMR and can loop).
+          if (killed) {
+            console.warn('[dev] Cleared stale PWA caches. Reload once to pick up your current source.');
           }
         })
         .catch((err) => console.warn('Failed to inspect service workers:', err));

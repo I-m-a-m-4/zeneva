@@ -5,6 +5,9 @@ import MasteringZenevaClient from './mastering-retail-client';
 export const metadata: Metadata = {
   title: 'Mastering Retail Operations: The Zeneva Framework for Success | Zeneva Blog',
   description: 'Scaling a retail business in modern Nigeria requires command over data, inventory shields, and multi-location management. Learn the five pillars of operational excellence.',
+  alternates: {
+    canonical: '/blog/mastering-retail-operations-with-zeneva'
+  },
   openGraph: {
     title: 'Mastering Retail Operations: The Zeneva Framework for Success',
     description: 'The ultimate guide to scaling your retail business in Nigeria with the Zeneva operational framework.',

@@ -9,6 +9,8 @@ import Loader from '@/components/ui/loader';
 import { NavigationEvents } from '@/components/ui/navigation-events';
 import { POSProvider } from '@/context/pos-context';
 import { BranchProvider } from '@/context/branch-context';
+import { I18nProvider } from '@/context/i18n-context';
+import { LocaleSync } from '@/components/shared/locale-sync';
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
 import InstallPrompt from '@/components/pwa/install-prompt';
@@ -29,14 +31,18 @@ const siteUrl = 'https://zeneva.space';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  alternates: {
-    canonical: siteUrl,
-    languages: {
-      'en-US': siteUrl,
-      'en-NG': siteUrl,
-      'x-default': siteUrl,
-    },
-  },
+  // Deliberately no `alternates` here. Next merges metadata shallowly, so a
+  // canonical set on the root layout is inherited by every page that does not
+  // set its own — which told Google that /legal/*, /help-center/guides and the
+  // standalone blog post were all duplicates of the homepage. Each route owns
+  // its canonical; `metadataBase` above lets them be relative.
+  //
+  // There is no hreflang either, and that is correct as things stand: the 11
+  // locales in src/lib/i18n/config.ts are switched client-side from
+  // localStorage and are not URL-addressable, so there is no per-language URL
+  // to point an alternate at. If locale ever moves into the path or a query
+  // param, add hreflang then — claiming it now would point every language at
+  // the same English HTML.
   title: {
     default: 'Zeneva - Advanced Inventory Management & Global POS Operating System',
     template: '%s | Zeneva'
@@ -124,6 +130,25 @@ const jsonLd = {
       name: 'Zeneva',
       url: siteUrl,
       logo: `${siteUrl}/zeneva-og-image.png?v=5`,
+      // Machine-readable form of the CAC badge the footer already renders. The
+      // badge is an image plus sr-only text; this is what actually gives the
+      // registration a chance of being treated as an entity signal.
+      legalName: 'Zeneva',
+      identifier: {
+        '@type': 'PropertyValue',
+        name: 'Corporate Affairs Commission (CAC) Business Number',
+        value: 'BN 9673520',
+      },
+      address: {
+        '@type': 'PostalAddress',
+        addressCountry: 'NG',
+      },
+      // The product UI ships in these locales (src/lib/i18n/config.ts). Stated
+      // here rather than as hreflang because the locales are switched
+      // client-side and have no distinct URLs to point an alternate at.
+      availableLanguage: [
+        'en', 'fr', 'es', 'pt', 'de', 'it', 'ar', 'zh-Hans', 'ja', 'ko', 'hi',
+      ],
       sameAs: [
         'https://x.com/zeneva_retail',
         'https://www.instagram.com/zeneva_pos/',
@@ -149,50 +174,25 @@ const jsonLd = {
       }
     },
     {
-      '@type': 'BreadcrumbList',
-      'itemListElement': [
-        {
-          '@type': 'ListItem',
-          'position': 1,
-          'name': 'Home',
-          'item': siteUrl
-        },
-        {
-          '@type': 'ListItem',
-          'position': 2,
-          'name': 'Pricing',
-          'item': `${siteUrl}/pricing`
-        },
-        {
-          '@type': 'ListItem',
-          'position': 3,
-          'name': 'Download',
-          'item': `${siteUrl}/download`
-        },
-        {
-          '@type': 'ListItem',
-          'position': 4,
-          'name': 'Blog',
-          'item': `${siteUrl}/blog`
-        },
-        {
-          '@type': 'ListItem',
-          'position': 5,
-          'name': 'Contact',
-          'item': `${siteUrl}/contact`
-        },
-        {
-          '@type': 'ListItem',
-          'position': 6,
-          'name': 'Help Center',
-          'item': `${siteUrl}/help-center`
-        },
-        {
-          '@type': 'ListItem',
-          'position': 7,
-          'name': 'Our Mission',
-          'item': `${siteUrl}/about/our-mission`
-        }
+      // This was a BreadcrumbList. It is not one: a breadcrumb describes where
+      // the *current* page sits in the hierarchy, and this is a fixed list of
+      // seven top-level pages emitted from the root layout onto every route.
+      // As a breadcrumb it was both wrong everywhere and in direct conflict
+      // with the real per-page trail (e.g. the one in blog/[id]/page.tsx),
+      // which is how you get breadcrumb rich results dropped sitewide.
+      // SiteNavigationElement is the correct type for a global nav.
+      '@type': 'SiteNavigationElement',
+      '@id': `${siteUrl}/#nav`,
+      'name': ['Home', 'Pricing', 'Download', 'Blog', 'Contact', 'Help Center', 'Use Cases', 'Our Mission'],
+      'url': [
+        siteUrl,
+        `${siteUrl}/pricing`,
+        `${siteUrl}/download`,
+        `${siteUrl}/blog`,
+        `${siteUrl}/contact`,
+        `${siteUrl}/help-center`,
+        `${siteUrl}/use-cases`,
+        `${siteUrl}/about/our-mission`,
       ]
     }
   ]
@@ -206,7 +206,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
+    <html lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="QGYrHkSlC71065ymk6dZc6DFesm14JeSPw-myjzZVso" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -295,6 +295,7 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased bg-background text-foreground')} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <I18nProvider>
           <SplashScreen />
           <ClientSideInitializer />
           <ChunkErrorListener />
@@ -309,6 +310,7 @@ export default function RootLayout({
               <UpdatePrompt />
               <BranchProvider>
                 <POSProvider>
+                  <LocaleSync />
                   <TauriLayoutWrapper>
                      <DesktopTitleBar />
                      <DesktopLauncher />
@@ -321,6 +323,7 @@ export default function RootLayout({
               </BranchProvider>
             </PWAProvider>
           </FirebaseClientProvider>
+          </I18nProvider>
         </ThemeProvider>
         <Toaster />
         <script

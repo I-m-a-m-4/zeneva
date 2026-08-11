@@ -21,6 +21,29 @@ The short version:
 - The dev guard in `src/components/shared/client-initializer.tsx` unregisters
   stray workers but deliberately spares `firebase-messaging-sw.js` — killing
   that one breaks push notifications in dev.
+- **Zen AI never writes on the server.** A `propose*` tool returns a card; the
+  write happens on the client through `addToQueue` after the owner approves, and
+  `proposal-guard.ts` re-validates it against live data first. `addToQueue` is
+  the only thing that enforces RBAC, injects `activeBranchId`, survives offline
+  and updates the SQLite mirror — a direct `updateDoc` skips all four.
+- The 41 tools live in `src/app/api/chat/tools.ts`, not the route. Two of their
+  query shapes have **no Firestore composite index** (`receipts` by
+  status+date, `auditLogs` by date) and filter in memory on purpose —
+  "fixing" that into a proper query makes the tool throw at call time.
+- **Zen AI never stores prompt text.** The admin board at
+  `/admin-imamshaffy/ai-usage` answers "what are people asking" from an intent
+  label plus a fixed keyword allow-list (`src/lib/ai-analytics.ts`), written
+  per day to `platform_stats/ai_usage_global/daily/{date}`. That is a privacy
+  boundary, not a missing feature — the board is platform-wide, so a raw
+  prompt archive would expose every tenant's customers to the platform owner.
+  The rollup uses **nested maps**, not the dotted field paths used on the
+  business doc in the same batch: `set()` does not parse dots as paths.
+- Chat UI is four components in `src/components/ai-insights/`, plus
+  `proposal-guard.ts`. Adding a tool means a `TOOL_LINES` entry in
+  `zen-status.tsx` too, or the status line renders raw camelCase. `ZenMark`'s
+  paths are copied verbatim from `AppConfig.logoIconUrl`; its gradient ids must
+  stay per-instance, and its sheen is SMIL, so reduced-motion is handled in JS
+  rather than CSS.
 
 ## Android signing — read before touching release builds
 
@@ -57,6 +80,47 @@ That shipped in 3.1.2 across desktop, Android and iOS.
 
 `release.yml` has a *Verify Firebase config is present* step that fails the
 build if any required value is missing. Keep it.
+
+## API routes — check the filename before debugging the client
+
+A route only exists if the file is named exactly `route.ts`. Several were
+renamed to **`route.ts.bak`** during an old static-export experiment and were
+never restored, so `zeneva.space/api/<name>` answers the **HTML 404 page**.
+Client code then calls `response.json()` on `<!DOCTYPE html>` and reports:
+
+```
+SyntaxError: Failed to execute 'json' on 'Response':
+Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+```
+
+That message is about JSON parsing and the fault is a missing file — so when a
+`fetch` to your own API reports a parse error, check for a `.bak` first:
+
+```bash
+find src/app/api -name "route.ts.bak"
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://zeneva.space/api/<name>
+```
+
+Two things that travel with that rename and must not come back:
+
+- **`export const dynamic = 'force-static'`** was injected at the top of these
+  files. It is meaningless on a POST handler. Use `force-dynamic`.
+- A stray **UTF-8 BOM** was written into the middle of some of them by a
+  PowerShell `>` redirect (see the Shell section). `grep -P '\xEF\xBB\xBF'`.
+
+Routes restored so far: `api/chat`, `api/admin/*`, `api/dodo/checkout`,
+`api/webhooks/dodo`. **Still `.bak`, so still 404 in production:** every
+`api/paystack/*` route and `api/webhooks/paystack` (the NGN checkout path),
+plus `api/platform-stats`, `api/download/[platform]`, `api/track`,
+`api/upload` and `api/auth/create-login-token`.
+
+`scripts/prepare-tauri.mjs` deletes `src/app/api` wholesale for native builds,
+so the desktop and mobile shells call the hosted API by absolute URL. A route
+handler therefore needs `OPTIONS` + CORS headers or the native apps cannot
+reach it — a JSON body triggers a preflight.
+
+**Fixing a route only takes effect once zeneva.space is redeployed.** Rebuilding
+the desktop app does not help; it has no API of its own.
 
 ## Announcing an update to store users
 

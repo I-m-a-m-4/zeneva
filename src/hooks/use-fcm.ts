@@ -7,6 +7,7 @@ import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
 import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { updateChannel, isNativeApp } from '@/lib/platform';
 
 export function useFCM() {
     const { user } = usePOS();
@@ -65,12 +66,20 @@ export function useFCM() {
 
                     if (user) {
                         // Save token to Firestore
+                        // `channel` is what makes uninstall reporting possible: when
+                        // this token later comes back "not registered" from FCM, it is
+                        // the only record of which store the install came from.
                         const tokenRef = doc(firestore, `users/${user.uid}/fcmTokens`, token);
                         await setDoc(tokenRef, {
                             token,
                             lastUsed: serverTimestamp(),
-                            device: navigator.userAgent
-                        });
+                            device: navigator.userAgent,
+                            channel: updateChannel(),
+                            isNative: isNativeApp(),
+                            status: 'active',
+                            // Clear any previous uninstall verdict — the token is live again.
+                            uninstalledAt: null,
+                        }, { merge: true });
                         if (showToast) toast({ title: "Notifications Enabled", description: "You will now receive alerts." });
                     }
                 } else {

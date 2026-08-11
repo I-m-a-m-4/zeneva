@@ -25,6 +25,7 @@ import StoreFooter from '@/components/store/footer';
 import { AppConfig } from '@/lib/config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { apiBase } from '@/lib/platform';
 
 const colorPresets = [
     { name: 'Orange (Default)', value: '22 90% 55%' },
@@ -217,7 +218,7 @@ function StorefrontCustomizationPage() {
     React.useEffect(() => {
         const fetchBanks = async () => {
             try {
-                const res = await fetch('https://zeneva.space/api/paystack/banks');
+                const res = await fetch(`${apiBase()}/api/paystack/banks`);
                 if (res.ok) {
                     const data = await res.json();
                     setBanks(data.sort((a: any, b: any) => a.name.localeCompare(b.name)));
@@ -236,7 +237,7 @@ function StorefrontCustomizationPage() {
                 setResolveError('');
                 setBankDetails(prev => ({ ...prev, accountName: '' })); // Clear previous name
                 try {
-                    const res = await fetch('https://zeneva.space/api/paystack/resolve-account', {
+                    const res = await fetch(`${apiBase()}/api/paystack/resolve-account`, {
                         method: 'POST',
                         body: JSON.stringify({ account_number: bankDetails.accountNumber, bank_code: bankDetails.bankCode })
                     });
@@ -341,7 +342,7 @@ function StorefrontCustomizationPage() {
             let subaccountCode = business?.settings?.paystackSubaccount;
 
             if (!subaccountCode) {
-                const subRes = await fetch('https://zeneva.space/api/paystack/create-subaccount', {
+                const subRes = await fetch(`${apiBase()}/api/paystack/create-subaccount`, {
                     method: 'POST',
                     body: JSON.stringify({
                         business_name: business.name,

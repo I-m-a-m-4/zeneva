@@ -26,6 +26,10 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Edit2, Maximize2, Minimize2 } from 'lucide-react';
+import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic';
+import { useI18n } from '@/context/i18n-context';
+import { ToastAction } from '@/components/ui/toast';
+import { idToken } from '@/lib/id-token';
 
 const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: string[] }[] = [
   // --- CATEGORY: OFFLINE & SYNC (5) ---
@@ -335,7 +339,7 @@ const faqItems: { question: string; answer: React.ReactNode; id?: string; tags: 
   {
       question: "Does Zeneva offer a free trial for the Pro features?",
       tags: ["trial", "pricing", "pro", "free"],
-      answer: <p className="text-sm">Every new Zeneva account starts with a **14-day Free Trial** of our 'Pro' features (including Zen AI and Multi-User). After the trial, you can choose to subscribe or continue using our 'Starter' plan for free.</p>
+      answer: <p className="text-sm">We don't run a trial — we do something better. Our **Starter plan is free forever** (up to 50 products), so there's no countdown and nothing gets taken away. When you need more products, more staff accounts or Zen AI, you can upgrade to Pro or Business at any time, and drop back to Starter whenever you like without losing any of your data.</p>
   }
 ];
 
@@ -350,6 +354,7 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
     const [input, setInput] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
     const { toast } = useToast();
+    const { t } = useI18n();
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -361,8 +366,8 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
         setIsLoading(true);
 
         try {
-            const response = await zenevaSupportChat({ query: input });
-            const aiText = response.answer || (response as any).response || "I'm sorry, I couldn't process that request.";
+            const response = await zenevaSupportChat({ query: input }, await idToken());
+            const aiText = response.answer || (response as any).response || t('support.aiFallback');
             const aiMessage: Message = { sender: 'ai', text: aiText };
             setMessages(prev => [...prev, aiMessage]);
 
@@ -386,8 +391,8 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
             console.error("AI chat error:", error);
             toast({
                 variant: 'destructive',
-                title: 'AI Error',
-                description: 'Could not get a response from the AI. Please try again.'
+                title: t('support.aiErrorTitle'),
+                description: t('support.aiErrorDescription')
             });
             setMessages(prev => prev.filter(m => m !== userMessage));
         } finally {
@@ -444,6 +449,7 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
     const [progress, setProgress] = React.useState(0);
     const [audioSrc, setAudioSrc] = React.useState<string>('');
     const audioRef = React.useRef<HTMLAudioElement | null>(null);
+    const { t } = useI18n();
 
     React.useEffect(() => {
         if (voiceUrl) {
@@ -495,7 +501,7 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
                 onClick={togglePlay}
                 className="h-9 w-9 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shadow-md transition-transform hover:scale-105 active:scale-95 shrink-0"
             >
-                {isPlaying ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white ml-0.5" />}
+                {isPlaying ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white ms-0.5" />}
             </button>
             <div className="flex-1 min-w-0 space-y-1">
                 <div 
@@ -516,8 +522,8 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
                     />
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>🎙️ Voice Note</span>
-                    <span>{voiceDuration ? `${voiceDuration}s` : 'Audio'}</span>
+                    <span>🎙️ {t('support.voiceNote')}</span>
+                    <span>{voiceDuration ? `${voiceDuration}s` : t('support.audio')}</span>
                 </div>
             </div>
         </div>
@@ -527,7 +533,8 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
 function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    
+    const { t } = useI18n();
+
     const [thread, setThread] = React.useState<SupportThread | null>(null);
     const [message, setMessage] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(true);
@@ -744,7 +751,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
 
         } catch (err) {
             console.error("Failed to upload/send image:", err);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not send the image.' });
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.imageSendFailed') });
         } finally {
             // Remove optimistic message and free local Object URL memory
             setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
@@ -798,10 +805,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             }, { merge: true });
 
             setMessage('');
-            toast({ variant: 'success', title: 'Message Sent!' });
+            toast({ variant: 'success', title: t('support.messageSent') });
         } catch (error) {
             console.error("Failed to send message:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not send message.' });
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.messageSendFailed') });
         } finally {
             setIsSending(false);
         }
@@ -824,10 +831,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             setEditModalOpen(false);
             setEditMessageId(null);
             setEditMessageText('');
-            toast({ variant: 'success', title: 'Message Updated', description: 'Your message has been updated successfully.' });
+            toast({ variant: 'success', title: t('support.messageUpdated'), description: t('support.messageUpdatedDescription') });
         } catch (e) {
             console.error("Failed to update message:", e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not update message.' });
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.messageUpdateFailed') });
         }
     };
 
@@ -835,26 +842,17 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         if (!thread) return;
         try {
             await deleteDoc(doc(firestore, `supportThreads/${thread.id}/messages`, msgId));
-            toast({ variant: 'success', title: 'Message Deleted', description: 'The message was deleted.' });
+            toast({ variant: 'success', title: t('support.messageDeleted'), description: t('support.messageDeletedDescription') });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not delete message.' });
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.messageDeleteFailed') });
         }
     };
 
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await acquireMicStream();
             audioChunksRef.current = [];
-            let mimeType = 'audio/webm';
-            if (typeof MediaRecorder !== 'undefined') {
-                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    mimeType = 'audio/webm;codecs=opus';
-                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    mimeType = 'audio/mp4';
-                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-                    mimeType = 'audio/ogg;codecs=opus';
-                }
-            }
+            const mimeType = pickAudioMimeType();
             const mediaRecorder = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mediaRecorder;
 
@@ -909,9 +907,9 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             status: 'open'
                         }, { merge: true });
 
-                        toast({ variant: 'success', title: 'Voice Note Sent' });
+                        toast({ variant: 'success', title: t('support.voiceNoteSent') });
                     } catch (e) {
-                        toast({ variant: 'destructive', title: 'Error', description: 'Could not send voice note.' });
+                        toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.voiceNoteSendFailed') });
                     } finally {
                         setIsSending(false);
                     }
@@ -925,8 +923,16 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 setRecordingSeconds(s => s + 1);
             }, 1000);
         } catch (err) {
-            console.error("Microphone access denied:", err);
-            toast({ variant: 'destructive', title: 'Mic Access Denied', description: 'Please enable microphone permission in your browser.' });
+            const failure = describeMicError(err);
+            console.error(`Microphone unavailable (${failure.kind}):`, err);
+            toast({
+                variant: 'destructive',
+                title: t(failure.titleKey),
+                description: t(failure.bodyKey),
+                action: failure.recoverable
+                    ? <ToastAction altText={t('common.tryAgain')} onClick={() => { void startRecording(); }}>{t('common.tryAgain')}</ToastAction>
+                    : undefined,
+            });
         }
     };
 
@@ -972,7 +978,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     <h4 className="text-sm font-bold leading-none text-slate-800 dark:text-white">Bello Imam</h4>
                     <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                         <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                        CEO Direct Line (replies within minutes)
+                        {t('support.ceoStatus')}
                     </p>
                 </div>
             </div>
@@ -985,8 +991,8 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             <AvatarFallback className="bg-primary text-primary-foreground font-bold">CEO</AvatarFallback>
                         </Avatar>
                         <div className="rounded-xl rounded-tl-none p-3 max-w-[80%] bg-white dark:bg-slate-900 shadow-sm border">
-                            <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-100 font-medium">Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally. Let me know what features you want, any issues you're experiencing, or feedback. How can I help your business today?</p>
-                            <p className="text-[9px] text-muted-foreground mt-1">CEO Direct Office</p>
+                            <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-100 font-medium">{t('support.ceoGreeting')}</p>
+                            <p className="text-[9px] text-muted-foreground mt-1">{t('support.ceoOffice')}</p>
                         </div>
                     </div>
 
@@ -1000,12 +1006,12 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                  <div className={cn(
                                      "max-w-[70%] rounded-xl p-2.5 relative shadow-sm transition-all duration-300", 
                                      isUser 
-                                        ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pr-8' 
+                                        ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pe-8' 
                                         : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none'
                                   )}>
                                      {/* Three-dot dropdown menu instead of hover trash */}
                                      {isUser && !msg.isUploading && (
-                                         <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                         <div className="absolute top-1.5 end-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                              <DropdownMenu modal={false}>
                                                  <DropdownMenuTrigger asChild>
                                                      <button className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border hover:bg-slate-200 dark:hover:bg-slate-700">
@@ -1019,11 +1025,11 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                                              setEditMessageText(msg.text || '');
                                                              setEditModalOpen(true);
                                                          }}>
-                                                             <Edit2 className="h-3.5 w-3.5 mr-2" /> Edit
+                                                             <Edit2 className="h-3.5 w-3.5 me-2" /> {t('common.edit')}
                                                          </DropdownMenuItem>
                                                      )}
                                                      <DropdownMenuItem onClick={() => handleDeleteMessage(msg.id)} className="text-red-500 focus:text-red-500">
-                                                         <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                                         <Trash2 className="h-3.5 w-3.5 me-2" /> {t('common.delete')}
                                                      </DropdownMenuItem>
                                                  </DropdownMenuContent>
                                              </DropdownMenu>
@@ -1035,7 +1041,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                               className="mb-2 rounded-lg overflow-hidden border max-w-sm relative group/img cursor-pointer" 
                                               onClick={() => setActiveLightboxUrl(msg.mediaUrl)}
                                           >
-                                              <img src={msg.mediaUrl} alt="Attached File" className="w-full h-auto object-cover max-h-60 group-hover/img:scale-105 transition-transform duration-300" />
+                                              <img src={msg.mediaUrl} alt={t('support.attachedFile')} className="w-full h-auto object-cover max-h-60 group-hover/img:scale-105 transition-transform duration-300" />
                                               {msg.isUploading && (
                                                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
                                                       <div className="h-10 w-10 rounded-full bg-black/45 border border-white/20 flex items-center justify-center animate-spin">
@@ -1046,7 +1052,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                           </div>
                                       )}
                                       {msg.replyTo && (
-                                          <div className="mb-2 p-2 rounded-lg bg-black/5 dark:bg-white/10 border-l-4 border-orange-500 text-xs">
+                                          <div className="mb-2 p-2 rounded-lg bg-black/5 dark:bg-white/10 border-s-4 border-orange-500 text-xs">
                                               <p className="font-semibold text-orange-600 dark:text-orange-400 text-[11px]">{msg.replyTo.senderName}</p>
                                               <p className="text-slate-600 dark:text-slate-300 text-[11px] truncate">{msg.replyTo.text}</p>
                                           </div>
@@ -1061,7 +1067,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                      {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>}
 
                                      <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
-                                         {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 mr-0.5">Edited •</span>}
+                                         {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 me-0.5">{t('support.edited')} •</span>}
                                          <span>{safeFormatTime(msg.createdAt)}</span>
                                          {isUser && (
                                              msg.isUploading || msg.isPending || !msg.createdAt ? (
@@ -1082,7 +1088,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             
             <div className="bg-[#f0f0f0] dark:bg-slate-900 p-3 border-t flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                    <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
+                    <Button type="button" size="icon" variant="ghost" aria-label={t('support.attachFile')} title={t('support.attachFile')} className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
                         <ImageIcon className="h-5 w-5" />
                     </Button>
 
@@ -1090,17 +1096,17 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                         <div className="flex-1 flex items-center justify-between bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border h-10 animate-pulse">
                             <div className="flex items-center gap-2 text-rose-500">
                                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                                <span className="text-xs font-bold font-mono">Recording: {recordingSeconds}s</span>
+                                <span className="text-xs font-bold font-mono">{t('support.recordingSeconds', { count: recordingSeconds })}</span>
                             </div>
                             <div className="flex-1 flex items-center gap-2">
-                                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={cancelRecording}>Cancel</Button>
-                                <Button size="sm" variant="default" className="text-xs h-7 bg-orange-600 text-white" onClick={stopAndSendVoice}>Send</Button>
+                                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={cancelRecording}>{t('common.cancel')}</Button>
+                                <Button size="sm" variant="default" className="text-xs h-7 bg-orange-600 text-white" onClick={stopAndSendVoice}>{t('support.send')}</Button>
                             </div>
                         </div>
                     ) : (
                         <div className="flex-1 flex items-center gap-2">
                             <Textarea 
-                                placeholder={editMessageId ? "Edit your message..." : "Type your message to the CEO..."} 
+                                placeholder={editMessageId ? t('support.editYourMessage') : t('support.typeToCeo')}
                                 value={message} 
                                 onChange={(e) => setMessage(e.target.value)} 
                                 disabled={isSending} 
@@ -1112,14 +1118,14 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                     }
                                 }}
                             />
-                            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={startRecording}>
+                            <Button type="button" size="icon" variant="ghost" aria-label={t('support.recordVoiceNote')} title={t('support.recordVoiceNote')} className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={startRecording}>
                                 <Mic className="h-5 w-5" />
                             </Button>
                         </div>
                     )}
 
                     {!isRecording && (
-                        <Button onClick={handleSendMessage} disabled={!message.trim() || isSending} size="icon" className="h-10 w-10 rounded-lg bg-orange-600 text-white hover:bg-orange-700 flex-shrink-0">
+                        <Button onClick={handleSendMessage} disabled={!message.trim() || isSending} size="icon" aria-label={t('support.send')} className="h-10 w-10 rounded-lg bg-orange-600 text-white hover:bg-orange-700 flex-shrink-0">
                             {isSending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
                         </Button>
                     )}
@@ -1132,7 +1138,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     <div className="w-full max-w-sm bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
                         <div className="flex items-center justify-between border-b pb-2">
                             <div className="flex items-center gap-2 font-bold text-sm text-orange-600">
-                                <Edit2 className="h-4 w-4" /> Edit Message
+                                <Edit2 className="h-4 w-4" /> {t('support.editMessage')}
                             </div>
                             <button 
                                 onClick={() => setEditModalOpen(false)}
@@ -1146,15 +1152,15 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                 value={editMessageText}
                                 onChange={(e) => setEditMessageText(e.target.value)}
                                 className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                                placeholder="Edit your message text..."
+                                placeholder={t('support.editMessagePlaceholder')}
                             />
                         </div>
                         <div className="flex justify-end gap-2 text-xs">
                             <Button variant="ghost" size="sm" className="rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900 h-8" onClick={() => setEditModalOpen(false)}>
-                                Cancel
+                                {t('common.cancel')}
                             </Button>
                             <Button size="sm" className="bg-orange-600 text-white hover:bg-orange-700 rounded-lg h-8 px-3" onClick={handleSaveEditedMessage} disabled={!editMessageText.trim()}>
-                                Save
+                                {t('common.save')}
                             </Button>
                         </div>
                     </div>
@@ -1177,7 +1183,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                         >
                             <X className="h-6 w-6" />
                         </button>
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Preview</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('support.preview')}</span>
                         <div className="w-10"></div> {/* Spacer to center the title */}
                     </div>
 
@@ -1185,7 +1191,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
                         <img 
                             src={previewUrl} 
-                            alt="Preview" 
+                            alt={t('support.preview')}
                             className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-xl border border-slate-200/50 dark:border-white/10" 
                         />
                     </div>
@@ -1197,7 +1203,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                 type="text"
                                 value={caption}
                                 onChange={(e) => setCaption(e.target.value)}
-                                placeholder="Type a message (caption)..."
+                                placeholder={t('support.captionPlaceholder')}
                                 className="w-full bg-slate-100 dark:bg-[#1f2c34] text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 text-sm py-3 px-4 rounded-xl border border-slate-200 dark:border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
@@ -1207,9 +1213,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                 }}
                             />
                         </div>
-                        <Button 
-                            onClick={handleSendPreview} 
-                            size="icon" 
+                        <Button
+                            onClick={handleSendPreview}
+                            size="icon"
+                            aria-label={t('support.send')}
                             className="h-12 w-12 rounded-full bg-orange-600 hover:bg-orange-700 text-white flex-shrink-0 flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
                         >
                             <Send className="h-5 w-5" />
@@ -1224,15 +1231,15 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     onClick={() => setActiveLightboxUrl(null)}
                 >
                     {/* Top action bar */}
-                    <div className="absolute top-4 right-4 flex items-center gap-3 z-10" onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute top-4 end-4 flex items-center gap-3 z-10" onClick={(e) => e.stopPropagation()}>
                         <a 
                             href={activeLightboxUrl} 
                             target="_blank" 
                             rel="noopener noreferrer" 
                             className="text-white hover:text-orange-400 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-xs font-semibold px-4 flex items-center gap-1.5"
-                            title="Open Original Image"
+                            title={t('support.openOriginalImage')}
                         >
-                            Open Original
+                            {t('support.openOriginal')}
                         </a>
                         <button 
                             className="text-white hover:text-rose-400 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
@@ -1246,7 +1253,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     <div className="relative max-w-[95vw] max-h-[92vh] flex items-center justify-center overflow-auto p-2" onClick={(e) => e.stopPropagation()}>
                         <img 
                             src={activeLightboxUrl} 
-                            alt="Expanded View" 
+                            alt={t('support.expandedView')}
                             className="max-h-[90vh] max-w-[95vw] w-auto h-auto object-contain rounded-xl shadow-2xl ring-1 ring-white/10 cursor-zoom-out" 
                             onClick={() => setActiveLightboxUrl(null)}
                         />
@@ -1261,6 +1268,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
 export default function SupportPage() {
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const { t } = useI18n();
 
     const userDocRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [user, firestore]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
@@ -1304,7 +1312,7 @@ export default function SupportPage() {
 
     return (
         <div className="space-y-8 pb-10">
-            <PageTitle title="Help & Support" subtitle="Directly message our leadership or get assistance from Zen AI." />
+            <PageTitle title={t('support.pageTitle')} subtitle={t('support.pageSubtitle')} />
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Side: Direct Line to the CEO */}
@@ -1312,19 +1320,19 @@ export default function SupportPage() {
                     <div className="flex items-center justify-between mb-4 pb-2 border-b">
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Direct Line to CEO</h2>
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('support.directLine')}</h2>
                                 <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
-                                    ⚡ Replies within minutes
+                                    ⚡ {t('support.repliesWithinMinutes')}
                                 </span>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">No tickets, no bots. Message Bello Imam directly for feature requests, feedback, or custom support.</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('support.directLineHint')}</p>
                         </div>
                         <Button 
                             variant="ghost" 
                             size="sm" 
                             className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
                             onClick={() => setIsChatMaximized(!isChatMaximized)}
-                            title={isChatMaximized ? "Shrink Chat" : "Expand Chat"}
+                            title={isChatMaximized ? t('support.shrinkChat') : t('support.expandChat')}
                         >
                             {isChatMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                         </Button>
@@ -1335,7 +1343,7 @@ export default function SupportPage() {
                         ) : userProfile ? (
                             <UserSupportChat userProfile={userProfile} />
                         ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground text-center">Could not load your user profile.</div>
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-center">{t('support.profileLoadFailed')}</div>
                         )}
                     </div>
                 </div>
@@ -1344,7 +1352,7 @@ export default function SupportPage() {
                 {!isChatMaximized && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Resources</h2>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{t('support.quickResources')}</h2>
                         </div>
 
                         {/* Zen AI Card */}
@@ -1353,20 +1361,20 @@ export default function SupportPage() {
                                 <div>
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <Bot className="h-5 w-5 text-primary" />
-                                        Chat with Zen AI
+                                        {t('support.chatWithZen')}
                                     </CardTitle>
-                                    <CardDescription>Instant automatic support for Zeneva features.</CardDescription>
+                                    <CardDescription>{t('support.chatWithZenDescription')}</CardDescription>
                                 </div>
                                 <Dialog>
                                     <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white">
-                                        <DialogTrigger title="Expand AI Strategist">
+                                        <DialogTrigger title={t('support.expandAiStrategist')}>
                                             <Maximize2 className="h-4 w-4 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" />
                                         </DialogTrigger>
                                     </Button>
                                     <DialogContent className="max-w-xl h-[80vh] flex flex-col p-6">
                                         <DialogHeader>
-                                            <DialogTitle>Zen AI Support Assistant</DialogTitle>
-                                            <DialogDescription>Ask me anything about Zeneva operations, sync status, or hardware configurations.</DialogDescription>
+                                            <DialogTitle>{t('support.zenAssistantTitle')}</DialogTitle>
+                                            <DialogDescription>{t('support.zenAssistantDescription')}</DialogDescription>
                                         </DialogHeader>
                                         <div className="flex-1 overflow-hidden mt-4">
                                             <ZenAIChatBot userProfile={userProfile || undefined} />
@@ -1377,12 +1385,12 @@ export default function SupportPage() {
                             <CardContent>
                                 <Dialog>
                                     <Button asChild className="w-full animate-pulse-orange">
-                                        <DialogTrigger>Launch AI Strategist</DialogTrigger>
+                                        <DialogTrigger>{t('support.launchAiStrategist')}</DialogTrigger>
                                     </Button>
                                     <DialogContent className="max-w-xl h-[80vh] flex flex-col p-6">
                                         <DialogHeader>
-                                            <DialogTitle>Zen AI Support Assistant</DialogTitle>
-                                            <DialogDescription>Ask me anything about Zeneva operations, sync status, or hardware configurations.</DialogDescription>
+                                            <DialogTitle>{t('support.zenAssistantTitle')}</DialogTitle>
+                                            <DialogDescription>{t('support.zenAssistantDescription')}</DialogDescription>
                                         </DialogHeader>
                                         <div className="flex-1 overflow-hidden mt-4">
                                             <ZenAIChatBot userProfile={userProfile || undefined} />
@@ -1398,43 +1406,43 @@ export default function SupportPage() {
                                 <div>
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <HelpCircle className="h-5 w-5 text-amber-500" />
-                                        FAQs & Guides
+                                        {t('support.faqsAndGuides')}
                                     </CardTitle>
-                                    <CardDescription>Search offline and inventory setups.</CardDescription>
+                                    <CardDescription>{t('support.faqsDescription')}</CardDescription>
                                 </div>
                                 <Button 
                                     variant="ghost" 
                                     size="sm" 
                                     className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
                                     onClick={() => setIsFaqDialogExpanded(true)}
-                                    title="Expand FAQs"
+                                    title={t('support.expandFaqs')}
                                 >
                                     <Maximize2 className="h-4 w-4 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white" />
                                 </Button>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                  <div className="relative">
-                                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
-                                    <Input 
-                                        className="pl-10 h-9 bg-muted/20 border-none ring-1 ring-border text-xs" 
-                                        placeholder="Search answers..." 
+                                    <SearchIcon className="absolute start-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+                                    <Input
+                                        className="ps-10 h-9 bg-muted/20 border-none ring-1 ring-border text-xs"
+                                        placeholder={t('support.searchAnswers')}
                                         value={faqSearch}
                                         onChange={(e) => setFaqSearch(e.target.value)}
                                     />
                                  </div>
 
-                                 <Accordion type="single" collapsible className="w-full space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                 <Accordion type="single" collapsible className="w-full space-y-2 max-h-[300px] overflow-y-auto pe-1">
                                     {filteredFaqs.length > 0 ? (
                                         filteredFaqs.map((item, index) => (
                                             <AccordionItem key={index} value={`faq-${index}`} className="border rounded-lg px-3 bg-muted/5 border-transparent">
-                                                <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-xs text-left py-2.5">{item.question}</AccordionTrigger>
+                                                <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-xs text-start py-2.5">{item.question}</AccordionTrigger>
                                                 <AccordionContent className="text-xs text-muted-foreground leading-relaxed pb-3">
                                                     {item.answer}
                                                 </AccordionContent>
                                             </AccordionItem>
                                         ))
                                     ) : (
-                                        <div className="text-center py-6 text-xs text-muted-foreground">No matches found.</div>
+                                        <div className="text-center py-6 text-xs text-muted-foreground">{t('support.noMatches')}</div>
                                     )}
                                 </Accordion>
                             </CardContent>
@@ -1448,36 +1456,36 @@ export default function SupportPage() {
                 <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-6 rounded-xl">
                     <DialogHeader className="border-b pb-3">
                         <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                            <HelpCircle className="h-6 w-6 text-amber-500" /> FAQs & Knowledge Base
+                            <HelpCircle className="h-6 w-6 text-amber-500" /> {t('support.knowledgeBase')}
                         </DialogTitle>
                         <DialogDescription className="text-sm">
-                            Search and expand guides to resolve your offline syncing, checkout configurations, and hardware questions.
+                            {t('support.knowledgeBaseDescription')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex-1 flex flex-col min-h-0 gap-4 mt-4">
                          <div className="relative w-full max-w-md">
-                            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
-                            <Input 
-                                className="pl-10 h-10 bg-muted/20 border-none ring-1 ring-border text-sm" 
-                                placeholder="Search all guides..." 
+                            <SearchIcon className="absolute start-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
+                            <Input
+                                className="ps-10 h-10 bg-muted/20 border-none ring-1 ring-border text-sm"
+                                placeholder={t('support.searchAllGuides')}
                                 value={faqSearch}
                                 onChange={(e) => setFaqSearch(e.target.value)}
                             />
                          </div>
 
-                         <ScrollArea className="flex-1 pr-2">
+                         <ScrollArea className="flex-1 pe-2">
                              <Accordion type="single" collapsible className="w-full space-y-3">
                                 {filteredFaqs.length > 0 ? (
                                     filteredFaqs.map((item, index) => (
                                         <AccordionItem key={index} value={`expanded-faq-${index}`} className="border border-slate-200 dark:border-slate-800 rounded-xl px-4 bg-muted/5">
-                                            <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-sm text-left py-4">{item.question}</AccordionTrigger>
+                                            <AccordionTrigger className="hover:no-underline hover:underline font-semibold text-sm text-start py-4">{item.question}</AccordionTrigger>
                                             <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">
                                                 {item.answer}
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))
                                 ) : (
-                                    <div className="text-center py-10 text-muted-foreground">No matching guides found.</div>
+                                    <div className="text-center py-10 text-muted-foreground">{t('support.noMatchingGuides')}</div>
                                 )}
                             </Accordion>
                          </ScrollArea>

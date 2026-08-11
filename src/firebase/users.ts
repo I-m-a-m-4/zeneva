@@ -18,7 +18,6 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { add } from 'date-fns';
 import type { UserProfile, UserRole, BusinessInstance } from '@/types';
 
 
@@ -73,13 +72,14 @@ export const createUserProfileDocument = async (
       businessId = businessDocRef.id;
       userRole = 'admin';
       surveyCompleted = false;
-      const trialEndDate = add(new Date(), { days: 30 });
+      // No trial date. Starter is free forever, so a countdown here would be a
+      // lie — and it used to be read as a lockout deadline. `trialExpiresAt` is
+      // now written only by the billing flow, for real paying customers.
       const newBusiness: Omit<BusinessInstance, 'id'> = {
         name: displayName,
         createdAt: serverTimestamp(),
         ownerId: user.uid,
         plan: 'starter',
-        trialExpiresAt: trialEndDate,
         status: 'active',
         settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
       };
@@ -99,6 +99,13 @@ export const createUserProfileDocument = async (
 
     if (branchId) {
       userProfile.branchId = branchId;
+    }
+    // Recorded so firestore.rules can verify this member was actually invited to
+    // `businessId`, rather than taking the claim on trust. The invitation is
+    // deleted in this same batch, but rules evaluate `get()` against the
+    // pre-batch state, so the document is still there to check against.
+    if (invitationCode) {
+      userProfile.invitationCode = invitationCode;
     }
     batch.set(userDocRef, userProfile);
 

@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '../ui/button';
 import { AppConfig } from '@/lib/config';
+import { useI18n } from '@/context/i18n-context';
+import { LanguageSwitcherCompact } from '@/components/settings/language-switcher';
 
 export default function MarketingHeader() {
   const { user, isUserLoading } = useUser();
@@ -20,6 +22,7 @@ export default function MarketingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { t } = useI18n();
   const [mounted, setMounted] = React.useState(false);
 
 
@@ -35,21 +38,21 @@ export default function MarketingHeader() {
   const handleLogout = () => {
     signOut(getAuth())
       .then(() => {
-        toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+        toast({ title: t('toast.loggedOut'), description: t('toast.loggedOutDescription') });
         router.push('/');
       })
       .catch(() => {
-        toast({ variant: 'destructive', title: 'Logout Failed' });
+        toast({ variant: 'destructive', title: t('toast.logoutFailed') });
       });
   };
 
   const navLinks = [
-    { href: "/#features", label: "Features" },
-    { href: "/download", label: "Download" },
-    { href: "/about/our-mission", label: "Our Mission" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/blog", label: "Blog" },
-    { href: "/contact", label: "Contact" },
+    { href: "/#features", labelKey: "home.navFeatures" },
+    { href: "/download", labelKey: "home.navDownload" },
+    { href: "/about/our-mission", labelKey: "home.navMission" },
+    { href: "/pricing", labelKey: "home.navPricing" },
+    { href: "/blog", labelKey: "home.navBlog" },
+    { href: "/contact", labelKey: "home.navContact" },
   ];
 
   return (
@@ -78,7 +81,7 @@ export default function MarketingHeader() {
                     isActive ? "text-black font-semibold" : "text-slate-700"
                   )}
                 >
-                  {link.label}
+                  {t(link.labelKey)}
                 </a>
               )
             })}
@@ -86,19 +89,21 @@ export default function MarketingHeader() {
 
           {/* Actions & Mobile Toggle */}
           <div className="flex items-center gap-2">
+            {/* Visitors switch language before they ever sign up, so this sits in the public header. */}
+            <LanguageSwitcherCompact className="h-9 w-auto min-w-[6.5rem] justify-between font-normal bg-white hover:bg-slate-50 hover:text-slate-900 border-stone-200 px-2.5 text-sm rounded-md text-slate-900" />
             <div className="hidden sm:flex items-center gap-4">
               {mounted && user ? (
                 <>
-                  <Link href="/sales/pos/select-products" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Dashboard</Link>
+                  <Link href="/sales/pos/select-products" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">{t('nav.dashboard')}</Link>
                   <Button onClick={handleLogout} variant="outline" size="sm">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
+                    <LogOut className="me-2 h-4 w-4" />
+                    {t('common.signOut')}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Link href="/login" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-3 py-2 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>
-                  <Link href="/signup" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">Get Started</Link>
+                  <Link href="/login" className="transition-colors text-sm font-medium bg-[#ffffff] border rounded-md px-3 py-2 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">{t('common.signIn')}</Link>
+                  <Link href="/signup" className="hover:bg-[#0f172a] transition-colors text-sm font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md pt-2.5 pr-5 pb-2.5 pl-5 shadow-sm">{t('common.getStarted')}</Link>
                 </>
               )}
             </div>
@@ -131,23 +136,23 @@ export default function MarketingHeader() {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="w-full text-center py-4 text-lg font-medium text-slate-700 tracking-tight font-dm-sans hover:text-black border-b-2 border-dashed border-slate-200"
               >
-                {link.label}
+                {t(link.labelKey)}
               </a>
             ))}
           </div>
           <div className="mt-8 flex flex-col gap-4">
             {mounted && user ? (
               <>
-                <Link href="/sales/pos/select-products" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">Dashboard</Link>
+                <Link href="/sales/pos/select-products" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">{t('nav.dashboard')}</Link>
                 <Button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} variant="outline" size="lg">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  <LogOut className="me-2 h-4 w-4" />
+                  {t('common.signOut')}
                 </Button>
               </>
             ) : (
               <>
-                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center transition-colors text-base font-medium bg-[#ffffff] border rounded-md py-3 px-5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">Login</Link>
-                <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">Get Started</Link>
+                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center transition-colors text-base font-medium bg-[#ffffff] border rounded-md py-3 px-5 font-dm-sans tracking-tight hover:text-slate-600 text-slate-900 border-stone-200">{t('common.signIn')}</Link>
+                <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center hover:bg-[#0f172a] transition-colors text-base font-medium text-white tracking-tight font-dm-sans bg-[#1e293b] rounded-md py-3 px-5 shadow-sm">{t('common.getStarted')}</Link>
               </>
             )}
           </div>

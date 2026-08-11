@@ -50,6 +50,10 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MarqueeSection } from '@/components/marquee-section';
 import { ThemeProvider } from '@/components/theme-provider';
+// This page exports `metadata`, so it stays a server component. `<T>` is a
+// client leaf that reads the active locale — see src/components/i18n/t.tsx.
+import { T } from '@/components/i18n/t';
+import WhatsappFab from '@/components/home/whatsapp-fab';
 
 // Client Components
 import { HeroInputForm } from '@/components/home/hero-input-form';
@@ -57,54 +61,76 @@ import { DashboardCarousel } from '@/components/home/dashboard-carousel';
 import { ZenAIInsights } from '@/components/home/zen-ai-insights';
 import { PricingPlans } from '@/components/home/pricing-plans';
 
+// `question`/`answer` stay English on purpose: they are what the FAQPage
+// JSON-LD below publishes to crawlers, and the static export is prerendered in
+// English. `qKey`/`aKey` are what the visitor actually reads.
 const faqItems = [
     {
+        qKey: "landing.faq1q",
+        aKey: "landing.faq1a",
         question: "Who is Zeneva built for?",
         answer: "Zeneva is designed for serious retail businesses — mini-marts, pharmacies, boutiques, supermarkets, and online stores managing real inventory, real volume, and real money."
     },
     {
+        qKey: "landing.faq2q",
+        aKey: "landing.faq2a",
         question: "What makes Zeneva different from other inventory tools?",
         answer: "Most tools report the past. Zeneva predicts the future. Zen AI analyzes demand patterns and recommends exact stock decisions to maximize profit."
     },
     {
+        qKey: "landing.faq3q",
+        aKey: "landing.faq3a",
         question: "Does Zeneva work without internet?",
         answer: "Yes. POS works fully offline. All transactions are queued and synced automatically once connectivity returns — no sales are ever lost."
     },
     {
+        qKey: "landing.faq4q",
+        aKey: "landing.faq4a",
         question: "How accurate are Zen AI predictions?",
         answer: "Zen AI improves continuously using your historical sales, time-based demand, and customer behavior. Accuracy increases as your data grows."
     },
     {
+        qKey: "landing.faq5q",
+        aKey: "landing.faq5a",
         question: "Can I manage multiple business locations?",
         answer: "Yes. Zeneva’s Enterprise Plus plan allows you to sync stock levels, track staff movements, and view unified analytics across multiple storefronts or warehouses from one dashboard."
     },
     {
+        qKey: "landing.faq6q",
+        aKey: "landing.faq6a",
         question: "Does Zeneva support international payments?",
         answer: "Yes! Zeneva supports international payments via Paystack. You can accept USD and other global currencies from customers anywhere in the world on our Pro and Enterprise plans."
     },
     {
+        qKey: "landing.faq7q",
+        aKey: "landing.faq7a",
         question: "Can Zeneva replace my existing POS or inventory system?",
         answer: "Yes. Zeneva is a full operating system — POS, inventory, storefront, CRM, and analytics in one unified platform."
     },
     {
+        qKey: "landing.faq8q",
+        aKey: "landing.faq8a",
         question: "Is my data secure?",
         answer: "Yes. All data is encrypted, isolated per business, and protected using enterprise-grade cloud infrastructure."
     },
     {
+        qKey: "landing.faq9q",
+        aKey: "landing.faq9a",
         question: "How long does setup take?",
         answer: "Most businesses are live within hours — products can be imported, staff invited, and selling started the same day."
     }
 ];
 
+// `name` is kept for the image `alt` (SEO); `nameKey`/`descKey` are displayed.
 const businessTypes = [
-    { name: 'Fashion & Clothing', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.', link: '/use-cases' },
-    { name: 'Jewellery Store', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.', link: '/use-cases' },
-    { name: 'Furniture Store', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.', link: '/use-cases' },
-    { name: 'Electronic Shop', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.', link: '/use-cases' },
-    { name: 'Cafe Shop', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.', link: '/use-cases' },
-    { name: 'Book Store', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.', link: '/use-cases' },
-    { name: 'Skin Care', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.', link: '/use-cases' },
-    { name: 'Restaurant', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.', link: '/use-cases' },
+    { name: 'Fashion & Clothing', nameKey: 'landing.biz1t', descKey: 'landing.biz1d', imageId: 'boutique-store', description: 'Manage your unique collection with style and ease.', link: '/use-cases' },
+    { name: 'Jewellery Store', nameKey: 'landing.biz2t', descKey: 'landing.biz2d', imageId: 'jewelry-store', description: 'Track every precious item from display to sale.', link: '/use-cases' },
+    { name: 'Furniture Store', nameKey: 'landing.biz3t', descKey: 'landing.biz3d', imageId: 'furniture-store', description: 'From sofas to side tables, keep your large inventory in order.', link: '/use-cases' },
+    { name: 'Electronic Shop', nameKey: 'landing.biz4t', descKey: 'landing.biz4d', imageId: 'electronics-store', description: 'Handle serial numbers and complex inventory with ease.', link: '/use-cases' },
+    { name: 'Cafe Shop', nameKey: 'landing.biz5t', descKey: 'landing.biz5d', imageId: 'cafe-shop', description: 'Serve up loyalty and track your beans with precision.', link: '/use-cases' },
+    { name: 'Book Store', nameKey: 'landing.biz6t', descKey: 'landing.biz6d', imageId: 'book-store', description: 'Organize your titles, authors, and editions seamlessly.', link: '/use-cases' },
+    { name: 'Skin Care', nameKey: 'landing.biz7t', descKey: 'landing.biz7d', imageId: 'skin-care', description: 'Manage batches, expiry dates, and product variations.', link: '/use-cases' },
+    { name: 'Restaurant', nameKey: 'landing.biz8t', descKey: 'landing.biz8d', imageId: 'restaurant', description: 'Track ingredients, manage menus, and speed up orders.', link: '/use-cases' },
 ];
 
 export default function Home() {
@@ -197,20 +223,20 @@ export default function Home() {
                         <div className="grid lg:grid-cols-2 max-w-7xl mr-auto ml-auto items-center">
 
                             {/* Left Column: Copy & Form */}
-                            <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-left">
-                                <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900">The Operating System For Your Business</p>
+                            <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-start">
+                                <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900"><T k="landing.heroEyebrow" /></p>
                                 <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-4xl md:text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
-                                    Never Lose a Sale.<br />
-                                    Never Waste <span className="text-muted-foreground/80 relative inline-block">Stock.
-                                        <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
+                                    <T k="landing.heroLine1" /><br />
+                                    <T k="landing.heroLine2" /> <span className="text-muted-foreground/80 relative inline-block"><T k="landing.heroLine2Accent" />
+                                        <svg className="absolute w-full h-3 -bottom-1 start-0 text-primary -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.4"></path></svg>
                                     </span>
                                 </h1>
 
                                 <p className="leading-relaxed text-lg tracking-tight font-dm-sans max-w-lg mb-4 text-slate-900 font-medium">
-                                    Zeneva is the operating system for serious retail—combining POS, inventory, storefront, CRM, and AI to predict demand and maximize profit.
+                                    <T k="landing.heroLead" />
                                 </p>
                                 <p className="leading-relaxed text-sm tracking-tight font-dm-sans max-w-lg mb-10 text-slate-600 hidden md:block">
-                                    Built for modern retail. Works offline. Scales online. Powered by Zen AI.
+                                    <T k="landing.heroSub" />
                                 </p>
 
                                 <HeroInputForm />
@@ -291,33 +317,33 @@ export default function Home() {
                     <section className="bg-black">
                         <div className="max-w-7xl mr-auto ml-auto pt-12 pr-6 pb-12 pl-6">
                             <p className="uppercase text-xs font-medium tracking-tight font-dm-sans text-center mb-10 text-stone-300">
-                                Powering various high-growth businesses
+                                <T k="landing.socialTitle" />
                             </p>
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-t border-l border-stone-700">
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-t border-s border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <ShoppingCart className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Online Retailers</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segOnline" /></span>
                                 </div>
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <Shirt className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Fashion Boutiques</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segFashion" /></span>
                                 </div>
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <Coffee className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Coffee Shops</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segCoffee" /></span>
                                 </div>
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <Sparkles className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Skincare Brands</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segSkincare" /></span>
                                 </div>
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <BookOpen className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Book Stores</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segBooks" /></span>
                                 </div>
-                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-r border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
+                                <div className="flex flex-col gap-2 hover:opacity-100 hover:grayscale-0 transition-all cursor-pointer opacity-60 h-28 border-e border-b pt-6 pr-6 pb-6 pl-6 grayscale items-center justify-center border-stone-700">
                                     <Smartphone className="w-8 h-8 text-stone-400" />
-                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center">Electronics Shops</span>
+                                    <span className="tracking-tight font-dm-sans text-sm text-stone-300 text-center"><T k="landing.segElectronics" /></span>
                                 </div>
                             </div>
                         </div>
@@ -328,158 +354,158 @@ export default function Home() {
                         <div className="max-w-7xl mx-auto relative z-10">
                             <div className="text-center max-w-2xl mx-auto mb-16">
                                 <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
-                                    Everything You Need to Grow
+                                    <T k="landing.featuresHeading" />
                                 </h2>
                                 <p className="text-lg text-slate-600 tracking-tight font-dm-sans mb-6">
-                                    Zeneva is an all-in-one platform. From point-of-sale to a public storefront, we provide the tools to run your business efficiently.
+                                    <T k="landing.featuresSub" />
                                 </p>
                                 <Button asChild variant="outline" size="sm">
-                                    <Link href="/use-cases">Explore Use Cases</Link>
+                                    <Link href="/use-cases"><T k="landing.exploreUseCases" /></Link>
                                 </Button>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                                 {[
                                     {
                                         icon: ShoppingCart,
-                                        title: "Blazing-Fast POS",
-                                        description: "A modern Point of Sale system that's intuitive, fast, and works seamlessly even when you're offline.",
+                                        titleKey: "landing.f1t",
+                                        descKey: "landing.f1d",
                                         bgColor: "bg-blue-100",
                                         iconColor: "text-blue-600",
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
                                         icon: Globe,
-                                        title: "E-Commerce Storefront",
-                                        description: "Launch a beautiful, customizable online store in minutes. Your products sync automatically.",
+                                        titleKey: "landing.f2t",
+                                        descKey: "landing.f2d",
                                         bgColor: "bg-green-100",
                                         iconColor: "text-green-600",
                                         hoverBg: "bg-[#FFF1F2]" // Light Pink
                                     },
                                     {
                                         icon: Bot,
-                                        title: "AI-Powered Insights",
-                                        description: "Go beyond simple reports. Zen AI acts as a sentinel for your business, identifying your most valuable products.",
+                                        titleKey: "landing.f3t",
+                                        descKey: "landing.f3d",
                                         bgColor: "bg-purple-100",
                                         iconColor: "text-purple-600",
                                         hoverBg: "bg-[#FAFAF9]" // Light Stone/White
                                     },
                                     {
                                         icon: Users,
-                                        title: "Integrated CRM",
-                                        description: "Build lasting relationships. Every sale is linked to a customer profile to power your loyalty programs.",
+                                        titleKey: "landing.f4t",
+                                        descKey: "landing.f4d",
                                         bgColor: "bg-pink-100",
                                         iconColor: "text-pink-600",
                                         hoverBg: "bg-[#FFFBEB]" // Light Cream/Yellow
                                     },
                                     {
                                         icon: BarChart2,
-                                        title: "Advanced Reporting",
-                                        description: "Deep-dive into your business performance with detailed reports on sales, profit & loss, and top products.",
+                                        titleKey: "landing.f5t",
+                                        descKey: "landing.f5d",
                                         bgColor: "bg-sky-100",
                                         iconColor: "text-sky-600",
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
                                         icon: UserCog,
-                                        title: "User & Role Management",
-                                        description: "Securely manage your team by inviting staff and assigning roles with specific permissions.",
+                                        titleKey: "landing.f6t",
+                                        descKey: "landing.f6d",
                                         bgColor: "bg-yellow-100",
                                         iconColor: "text-yellow-600",
                                         hoverBg: "bg-[#FFF1F2]" // Light Pink
                                     },
                                     {
                                         icon: WifiOff,
-                                        title: "Robust Offline Mode",
-                                        description: "Never miss a sale. The Zeneva POS is built to work perfectly offline, saving all transactions locally.",
+                                        titleKey: "landing.f7t",
+                                        descKey: "landing.f7d",
                                         bgColor: "bg-gray-200",
                                         iconColor: "text-gray-700",
                                         hoverBg: "bg-[#FFFBEB]" // Light Cream/Yellow
                                     },
                                     {
                                         icon: Download,
-                                        title: "Smart Bulk Import",
-                                        description: "Upload and migrate thousands of products in seconds using our smart bulk import tools. Highly utilized by high-volume retailers.",
+                                        titleKey: "landing.f8t",
+                                        descKey: "landing.f8d",
                                         bgColor: "bg-teal-100",
                                         iconColor: "text-teal-600",
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
                                         icon: Clock,
-                                        title: "Backorders & Backdating",
-                                        description: "Effortlessly record sales for items that are out of stock. Backdate missed sales to keep your records perfectly accurate.",
+                                        titleKey: "landing.f9t",
+                                        descKey: "landing.f9d",
                                         bgColor: "bg-rose-100",
                                         iconColor: "text-rose-600",
                                         hoverBg: "bg-[#FFF1F2]" // Light Rose
                                     },
                                     {
                                         icon: InfinityIcon,
-                                        title: "Unlimited Sales Recording",
-                                        description: "Record an infinite amount of sales transactions. The system scales effortlessly with your business volume without slowing down.",
+                                        titleKey: "landing.f10t",
+                                        descKey: "landing.f10d",
                                         bgColor: "bg-cyan-100",
                                         iconColor: "text-cyan-600",
                                         hoverBg: "bg-[#ECFEFF]" // Light Cyan
                                     },
                                     {
                                         icon: FileText,
-                                        title: "Process Invoicing",
-                                        description: "Generate professional invoices instantly for B2B clients or unpaid orders. Track unpaid balances efficiently.",
+                                        titleKey: "landing.f11t",
+                                        descKey: "landing.f11d",
                                         bgColor: "bg-fuchsia-100",
                                         iconColor: "text-fuchsia-600",
                                         hoverBg: "bg-[#FDF4FF]" // Light Fuchsia
                                     },
                                     {
                                         icon: ShieldCheck,
-                                        title: "Security & Audit Log",
-                                        description: "Enhance security with a detailed record of all critical events, complete with automated issue scanning.",
+                                        titleKey: "landing.f12t",
+                                        descKey: "landing.f12d",
                                         bgColor: "bg-red-100",
                                         iconColor: "text-red-600",
                                         hoverBg: "bg-[#FAFAF9]" // Light Stone/White
                                     },
                                     {
                                         icon: Package,
-                                        title: "Inventory Management",
-                                        description: "Effortlessly track stock levels, manage variants, and receive low-stock alerts to ensure you never run out of your best-selling products.",
+                                        titleKey: "landing.f13t",
+                                        descKey: "landing.f13d",
                                         bgColor: "bg-orange-100",
                                         iconColor: "text-orange-600",
                                         hoverBg: "bg-[#FFF7ED]" // Light Orange
                                     },
                                     {
                                         icon: ScanBarcode,
-                                        title: "Barcode Scanning",
-                                        description: "Speed up your checkout process significantly. Zeneva supports all standard barcode scanners for instant product lookup.",
+                                        titleKey: "landing.f14t",
+                                        descKey: "landing.f14d",
                                         bgColor: "bg-indigo-100",
                                         iconColor: "text-indigo-600",
                                         hoverBg: "bg-[#EEF2FF]" // Light Indigo
                                     },
                                     {
                                         icon: Printer,
-                                        title: "Shareable Receipt Links",
-                                        description: "Share live receipt URLs directly with customers via WhatsApp or SMS, alongside thermal printing compatibility.",
+                                        titleKey: "landing.f15t",
+                                        descKey: "landing.f15d",
                                         bgColor: "bg-amber-100",
                                         iconColor: "text-amber-600",
                                         hoverBg: "bg-[#FFFBEB]", // Light Amber
-                                        badge: "Highly Shared"
+                                        badgeKey: "landing.badgeHighlyShared"
                                     }
                                 ].map((feature, index) => (
                                     <div key={index} className="group relative p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden transition-all duration-300 isolate cursor-pointer shadow-sm">
                                         {/* Slide-in Background Animation */}
                                         <div className={`absolute inset-0 w-0 group-hover:w-full transition-all duration-500 ease-out ${feature.hoverBg} -z-10`}></div>
 
-                                        {feature.badge && (
-                                            <span className="absolute top-4 right-10 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/20 z-20">
-                                                {feature.badge}
+                                        {feature.badgeKey && (
+                                            <span className="absolute top-4 end-10 bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/20 z-20">
+                                                <T k={feature.badgeKey} />
                                             </span>
                                         )}
 
                                         <div className={`w-12 h-12 ${feature.bgColor} ${feature.iconColor} rounded-xl flex items-center justify-center mb-6 relative z-10 transition-colors duration-300 group-hover:bg-white/80`}>
                                             <feature.icon width="24" height="24" />
                                         </div>
-                                        <h3 className="text-xl font-semibold text-slate-900 mb-2 relative z-10">{feature.title}</h3>
-                                        <p className="text-slate-600 text-sm leading-relaxed relative z-10 group-hover:text-slate-700 transition-colors">{feature.description}</p>
+                                        <h3 className="text-xl font-semibold text-slate-900 mb-2 relative z-10"><T k={feature.titleKey} /></h3>
+                                        <p className="text-slate-600 text-sm leading-relaxed relative z-10 group-hover:text-slate-700 transition-colors"><T k={feature.descKey} /></p>
 
                                         {/* Always visible corner accents */}
-                                        <div className="absolute top-4 right-4 h-3 w-3 border-t-2 border-r-2 border-slate-300 z-10"></div>
-                                        <div className="absolute bottom-4 left-4 h-3 w-3 border-b-2 border-l-2 border-slate-300 z-10"></div>
+                                        <div className="absolute top-4 end-4 h-3 w-3 border-t-2 border-e-2 border-slate-300 z-10"></div>
+                                        <div className="absolute bottom-4 start-4 h-3 w-3 border-b-2 border-s-2 border-slate-300 z-10"></div>
                                     </div>
                                 ))}
                             </div>
@@ -492,34 +518,34 @@ export default function Home() {
                         <div className="sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
                             <div className="text-center mb-16">
                                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] text-primary ring-1 ring-primary/20 uppercase tracking-tight mb-4 font-semibold">
-                                    <Workflow className="mr-1 h-3 w-3" />
-                                    The Operating System for Profit-Driven Retail
+                                    <Workflow className="me-1 h-3 w-3" />
+                                    <T k="landing.howBadge" />
                                 </span>
                                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-6 font-bricolage">
                                     <Link href="/about/our-mission" className="text-primary transition-colors cursor-pointer">
-                                        Zen AI: The Brain Behind Every Sale
+                                        <T k="landing.howHeading" />
                                     </Link>
                                 </h2>
                                 <p className="text-lg text-slate-600 font-light max-w-3xl mx-auto mb-8">
-                                    Zeneva connects POS, inventory, storefront, CRM, and analytics into one intelligent system — with Zen AI at the center, turning daily operations into profit-maximizing decisions.
+                                    <T k="landing.howBody" />
                                 </p>
 
-                                <div className="bg-white border-2 border-dashed border-slate-200 rounded-lg p-6 md:p-8 max-w-4xl mx-auto text-left relative overflow-hidden shadow-sm">
-                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <div className="bg-white border-2 border-dashed border-slate-200 rounded-lg p-6 md:p-8 max-w-4xl mx-auto text-start relative overflow-hidden shadow-sm">
+                                    <div className="absolute top-0 end-0 p-4 opacity-10">
                                         <BrainCircuit className="w-32 h-32 text-slate-900" />
                                     </div>
                                     <div className="grid md:grid-cols-2 gap-8 relative z-10">
                                         <div>
-                                            <h3 className="text-xl font-semibold mb-8 text-slate-900">What Zen AI actually does:</h3>
+                                            <h3 className="text-xl font-semibold mb-8 text-slate-900"><T k="landing.zenDoesTitle" /></h3>
                                             <ul className="space-y-8">
                                                 <li className="flex items-start gap-4">
                                                     <div className="bg-primary/10 p-2.5 rounded-xl shrink-0 border border-primary/20 shadow-sm">
                                                         <TrendingUp className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-semibold text-slate-900 text-base">Revenue Opportunities</h4>
+                                                        <h4 className="font-semibold text-slate-900 text-base"><T k="landing.zenRevenueTitle" /></h4>
                                                         <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                                                            Predicts what will sell, when, and how much. Identifies best-selling SKUs by time and day.
+                                                            <T k="landing.zenRevenueBody" />
                                                         </p>
                                                     </div>
                                                 </li>
@@ -528,9 +554,9 @@ export default function Home() {
                                                         <Store className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-semibold text-slate-900 text-base">Smart Merchandising</h4>
+                                                        <h4 className="font-semibold text-slate-900 text-base"><T k="landing.zenMerchTitle" /></h4>
                                                         <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                                                            The best merchandiser that would increase impulse buying by showing optimal product placement.
+                                                            <T k="landing.zenMerchBody" />
                                                         </p>
                                                     </div>
                                                 </li>
@@ -539,9 +565,9 @@ export default function Home() {
                                                         <Search className="w-6 h-6 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-semibold text-slate-900 text-base">Market Opportunities</h4>
+                                                        <h4 className="font-semibold text-slate-900 text-base"><T k="landing.zenMarketTitle" /></h4>
                                                         <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                                                            Shows the business owner new untapped market opportunities and flags cash trapped in inventory.
+                                                            <T k="landing.zenMarketBody" />
                                                         </p>
                                                     </div>
                                                 </li>
@@ -559,31 +585,31 @@ export default function Home() {
                                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
                                             <Monitor className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
-                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">POS</span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity"><T k="landing.nodePos" /></span>
                                     </div>
                                     <div className="group relative cursor-pointer">
                                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
                                             <Package className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
-                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Inventory</span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity"><T k="landing.nodeInventory" /></span>
                                     </div>
                                     <div className="group relative cursor-pointer">
                                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
                                             <Globe className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
-                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Storefront</span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity"><T k="landing.nodeStorefront" /></span>
                                     </div>
                                     <div className="group relative cursor-pointer">
                                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
                                             <Users className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
-                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">CRM</span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity"><T k="landing.nodeCrm" /></span>
                                     </div>
                                     <div className="group relative cursor-pointer">
                                         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 border border-neutral-200 shadow-lg group-hover:scale-110 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] transition-all duration-300">
                                             <BarChart2 className="text-neutral-600 group-hover:text-primary transition-colors h-6 w-6" />
                                         </span>
-                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity">Analytics</span>
+                                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-neutral-500 uppercase transition-opacity"><T k="landing.nodeAnalytics" /></span>
                                     </div>
                                 </div>
 
@@ -672,17 +698,17 @@ export default function Home() {
                                 <div className="flex items-center justify-center gap-3 flex-wrap text-sm text-slate-600">
                                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
                                         <BrainCircuit className="h-4 w-4 text-primary" />
-                                        <span className="font-medium text-xs">Smart Forecasting</span>
+                                        <span className="font-medium text-xs"><T k="landing.chipForecasting" /></span>
                                     </div>
                                     <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
                                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
                                         <Bot className="h-4 w-4 text-primary" />
-                                        <span className="font-medium text-xs">Actionable Insights</span>
+                                        <span className="font-medium text-xs"><T k="landing.chipInsights" /></span>
                                     </div>
                                     <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
                                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
                                         <Database className="h-4 w-4 text-primary" />
-                                        <span className="font-medium text-xs">Unified Data</span>
+                                        <span className="font-medium text-xs"><T k="landing.chipUnifiedData" /></span>
                                     </div>
                                 </div>
                             </div>
@@ -693,10 +719,10 @@ export default function Home() {
                         <div className="max-w-7xl mx-auto">
                             <div className="text-center max-w-2xl mx-auto mb-16">
                                 <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
-                                    Perfect for Your Business
+                                    <T k="landing.bizHeading" />
                                 </h2>
                                 <p className="text-lg text-slate-600 tracking-tight font-dm-sans">
-                                    Zeneva adapts to any retail environment. From fashion boutiques to electronics stores, our platform is built to handle your unique inventory needs.
+                                    <T k="landing.bizSub" />
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
@@ -713,9 +739,9 @@ export default function Home() {
                                                 data-ai-hint={image.imageHint}
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-                                            <div className="absolute bottom-0 left-0 p-4 md:p-6 text-white">
-                                                <h3 className="text-2xl font-light tracking-tight font-bricolage">{type.name}</h3>
-                                                <p className="mt-1 text-sm text-white/90">{type.description}</p>
+                                            <div className="absolute bottom-0 start-0 p-4 md:p-6 text-white">
+                                                <h3 className="text-2xl font-light tracking-tight font-bricolage"><T k={type.nameKey} /></h3>
+                                                <p className="mt-1 text-sm text-white/90"><T k={type.descKey} /></p>
                                             </div>
                                         </Link>
                                     )
@@ -729,10 +755,10 @@ export default function Home() {
                         <div className="max-w-6xl mx-auto">
                             <div className="text-center max-w-2xl mx-auto mb-16">
                                 <h2 className="text-4xl font-light text-slate-900 tracking-tight font-bricolage mb-4">
-                                    Choose the Perfect Plan for Your Business
+                                    <T k="landing.pricingHeading" />
                                 </h2>
                                 <p className="text-lg text-slate-600 tracking-tight font-dm-sans">
-                                    Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
+                                    <T k="landing.pricingSub" />
                                 </p>
                             </div>
 
@@ -742,21 +768,21 @@ export default function Home() {
 
                     <section id="faq" className="py-24 px-6 border-t bg-white border-slate-100">
                         <div className="max-w-3xl mr-auto ml-auto">
-                            <h2 className="text-3xl tracking-tight mb-12 text-center font-bricolage font-light text-slate-900">Frequently asked questions</h2>
+                            <h2 className="text-3xl tracking-tight mb-12 text-center font-bricolage font-light text-slate-900"><T k="landing.faqHeading" /></h2>
                             <Accordion type="multiple" className="w-full">
                                 {faqItems.map((item, index) => (
                                     <AccordionItem key={index} value={`item-${index}`}>
-                                        <AccordionTrigger className="text-lg text-left">{item.question}</AccordionTrigger>
+                                        <AccordionTrigger className="text-lg text-start"><T k={item.qKey} /></AccordionTrigger>
                                         <AccordionContent className="text-base text-muted-foreground leading-relaxed">
-                                            {item.answer}
+                                            <T k={item.aKey} />
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}
                             </Accordion>
                             <div className="text-center mt-12">
-                                <p className="mb-4 font-dm-sans tracking-tight text-neutral-600">Still have questions?</p>
+                                <p className="mb-4 font-dm-sans tracking-tight text-neutral-600"><T k="landing.faqStill" /></p>
                                 <Button asChild>
-                                    <a href="#contact">Contact Us</a>
+                                    <a href="#contact"><T k="landing.faqContact" /></a>
                                 </Button>
                             </div>
                         </div>
@@ -770,13 +796,13 @@ export default function Home() {
                             backgroundSize: '32px 32px'
                         }}></div>
 
-                        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10 text-left">
+                        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10 text-start">
                             <div>
                                 <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6 font-bricolage text-slate-900">
-                                    Turn Data Into Profit — <span className="text-primary">Automatically</span>
+                                    <T k="landing.dialHeading" /> <span className="text-primary"><T k="landing.dialHeadingAccent" /></span>
                                 </h2>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                                    Zeneva doesn’t just track activity. It actively pushes your business toward maximum profit by balancing demand, stock levels, and customer behavior in real time.
+                                    <T k="landing.dialBody" />
                                 </p>
 
                                 <div className="space-y-6 mb-10">
@@ -785,8 +811,8 @@ export default function Home() {
                                             <TrendingUp className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-slate-900">Reduce stockouts</h3>
-                                            <p className="text-slate-600">Capture lost demand before it disappears.</p>
+                                            <h3 className="text-lg font-semibold text-slate-900"><T k="landing.dial1t" /></h3>
+                                            <p className="text-slate-600"><T k="landing.dial1d" /></p>
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
@@ -794,8 +820,8 @@ export default function Home() {
                                             <DollarSign className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-slate-900">Reduce overstock</h3>
-                                            <p className="text-slate-600">Free locked capital for growth.</p>
+                                            <h3 className="text-lg font-semibold text-slate-900"><T k="landing.dial2t" /></h3>
+                                            <p className="text-slate-600"><T k="landing.dial2d" /></p>
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
@@ -803,8 +829,8 @@ export default function Home() {
                                             <Box className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-slate-900">Optimize production timing</h3>
-                                            <p className="text-slate-600">Zero waste. Peak freshness.</p>
+                                            <h3 className="text-lg font-semibold text-slate-900"><T k="landing.dial3t" /></h3>
+                                            <p className="text-slate-600"><T k="landing.dial3d" /></p>
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
@@ -812,15 +838,15 @@ export default function Home() {
                                             <Trophy className="w-6 h-6 text-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-slate-900">Identify winning products</h3>
-                                            <p className="text-slate-600">Double down with confidence.</p>
+                                            <h3 className="text-lg font-semibold text-slate-900"><T k="landing.dial4t" /></h3>
+                                            <p className="text-slate-600"><T k="landing.dial4d" /></p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="p-6 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 shadow-sm">
                                     <p className="text-lg font-medium text-slate-900 text-center">
-                                        Every decision moves the profit dial forward.
+                                        <T k="landing.dialFooter" />
                                     </p>
                                 </div>
                             </div>
@@ -838,11 +864,7 @@ export default function Home() {
                         </div>
                     </section>
 
-                    <a href="https://wa.me/2349064233805?text=Hello%2C%20I'm%20interested%20in%20Zeneva.%20I'd%20like%20to%20learn%20more%20about%20how%20it%20can%20help%20my%20business." target="_blank" rel="noopener noreferrer" className="whatsapp-button z-50" aria-label="Contact us on WhatsApp">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-                            <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z" fillRule="evenodd" fill="#ffffff"></path>
-                        </svg>
-                    </a>
+                    <WhatsappFab />
 
                     {/* Global Payments Banner */}
                     <section className="pt-20 pb-0 px-6">
@@ -855,16 +877,16 @@ export default function Home() {
                                 }}></div>
                                 <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
 
-                                <div className="relative z-10 max-w-xl text-left">
+                                <div className="relative z-10 max-w-xl text-start">
                                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 font-bricolage leading-tight">
-                                        Global Access. <br />Seamless <span className="text-primary">USD</span> Subscriptions.
+                                        <T k="landing.globalLine1" /> <br /><T k="landing.globalLine2Prefix" /> <span className="text-primary"><T k="landing.globalLine2Accent" /></span> <T k="landing.globalLine2Suffix" />
                                     </h2>
                                     <p className="text-sm md:text-base text-white/70 mb-8 leading-relaxed max-w-md font-light">
-                                        Zeneva is built for the world. We accept international card payments and USD subscription billing, ensuring you can access our premium retail operating system from anywhere on the planet.
+                                        <T k="landing.globalBody" />
                                     </p>
                                     <Link href="/signup" className="inline-flex items-center gap-2 text-white font-semibold group/link border-b border-transparent hover:border-white transition-all py-1">
-                                        <span className="text-sm">Get Started on Zeneva Today</span>
-                                        <ArrowRight className="w-4 h-4 transition-transform group-hover/link:translate-x-1" />
+                                        <span className="text-sm"><T k="landing.globalCta" /></span>
+                                        <ArrowRight className="w-4 h-4 transition-transform group-hover/link:translate-x-1 rtl:rotate-180" />
                                     </Link>
                                 </div>
 

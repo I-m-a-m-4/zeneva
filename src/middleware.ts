@@ -6,9 +6,20 @@ export function middleware(req: NextRequest) {
     const pathname = url.pathname;
 
     // Handle CORS for all API routes (to support Tauri desktop apps)
+    //
+    // The origin is reflected rather than allow-listed because the native
+    // shells call the hosted API from origins that vary by platform
+    // (tauri://localhost, https://tauri.localhost, capacitor://…).
+    //
+    // `Access-Control-Allow-Credentials` is deliberately NOT set. Every API
+    // route here authenticates from the `Authorization` header, never an
+    // ambient cookie, so credentials are unnecessary — and reflecting an
+    // arbitrary origin *with* credentials would let any site a logged-in user
+    // visits make authenticated cross-origin calls and read the responses.
+    // src/app/api/admin/_guard.ts makes the same choice for the same reason.
     if (pathname.startsWith("/api/")) {
         const origin = req.headers.get("origin") || "*";
-        
+
         // Handle preflight OPTIONS request
         if (req.method === "OPTIONS") {
             return new NextResponse(null, {
@@ -17,7 +28,7 @@ export function middleware(req: NextRequest) {
                     "Access-Control-Allow-Origin": origin,
                     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
                     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
-                    "Access-Control-Allow-Credentials": "true",
+                    "Vary": "Origin",
                 },
             });
         }
@@ -27,7 +38,7 @@ export function middleware(req: NextRequest) {
         res.headers.set("Access-Control-Allow-Origin", origin);
         res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
-        res.headers.set("Access-Control-Allow-Credentials", "true");
+        res.headers.set("Vary", "Origin");
         return res;
     }
 

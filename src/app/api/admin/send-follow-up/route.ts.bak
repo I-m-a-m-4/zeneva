@@ -1,44 +1,42 @@
-export const dynamic = 'force-static'; // [TAURI_INJECTED]
-// [TAURI_HIDDEN] export const dynamic = 'force-static';
-﻿import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/firebase/admin';
+import { NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/server/resend';
+import { requireSuperAdmin, corsHeaders } from '../_guard';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+// NOTE: mirror of route.ts in this directory. See the note in
+// metrics/route.ts.bak — the .bak must never hold the old unauthenticated
+// handler, or a tauri-postbuild rename would restore it over the guarded one.
+
+export const dynamic = 'force-dynamic';
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-export async function POST(req: NextRequest) {
+/**
+ * POST /api/admin/send-follow-up
+ *
+ * Sends one outreach email from the platform's address.
+ *
+ * The authorization here used to be an `if` with an empty body — it verified the
+ * token's signature, computed a condition, and then did nothing with it. Any
+ * signed-in Zeneva user could therefore send arbitrary HTML from `zeneva.space`
+ * to any address. It is now a real super-admin gate.
+ */
+export async function POST(req: Request) {
+  const auth = await requireSuperAdmin(req);
+  if (!auth.ok) return auth.res;
+
   try {
-    // 1. Verify Admin Session
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
-    if (!token) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401, headers: corsHeaders });
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    // You might want to check for a specific admin role or email here
-    if (!decodedToken.email?.includes('admin') && decodedToken.email !== 'imamshaffy@gmail.com') {
-       // Optional: Add stricter admin check
-    }
-
-    // 2. Parse Body
     const body = await req.json();
-    const { to, name, subject, html, businessId, type } = body;
+    const { to, name, subject, html, businessId, type } = body ?? {};
 
     if (!to || !subject || !html) {
-      return NextResponse.json({ message: 'Missing required fields' }, { status: 400, headers: corsHeaders });
+      return NextResponse.json(
+        { message: 'Missing required fields' },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
-    // 3. Send Email via Resend
     const trackId = await sendEmail({
       to,
       name,
@@ -48,19 +46,17 @@ export async function POST(req: NextRequest) {
       type
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      trackId, 
-      message: 'Follow-up email sent successfully.' 
+    return NextResponse.json({
+      success: true,
+      trackId,
+      message: 'Follow-up email sent successfully.'
     }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Send Follow-Up Error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      message: error.message || 'Internal Server Error' 
+    return NextResponse.json({
+      success: false,
+      message: error.message || 'Internal Server Error'
     }, { status: 500, headers: corsHeaders });
   }
 }
-
-

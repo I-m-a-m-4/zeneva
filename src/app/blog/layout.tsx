@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Blog | Retail Insights & Business Growth | Zeneva',
+  title: 'Blog | Retail Insights & Business Growth',
   description: 'Stay updated with the latest retail trends, inventory management tips, and success stories from the Zeneva community. Expert advice for Nigerian businesses.',
   keywords: [
     'retail case studies nigeria',

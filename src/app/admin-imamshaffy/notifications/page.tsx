@@ -59,42 +59,46 @@ const MicrosoftIcon = ({ className }: { className?: string }) => (
 );
 
 
+// Titles here carry no emoji on purpose. These render in the in-app
+// notification centre, in the OS notification tray and in the push payload —
+// a picture character in the title line is what makes a business tool read
+// like a mailing list. The type icon already carries that signal.
 const PREDEFINED_TEMPLATES = [
   {
     id: 'ceo_chat',
-    title: '💬 Chat with the CEO',
-    body: 'Have questions, feedback, or custom feature requests? Tap here to message Bello Imam directly on the CEO Direct Line.',
+    title: 'Message the founder directly',
+    body: 'Questions, feedback, or a feature your shop needs? The CEO Direct Line goes straight to Bello Imam — not a ticket queue.',
     link: '/support',
     iconName: 'MessageSquare',
     badge: 'Onboarding / Day 3'
   },
   {
     id: 'playstore_app',
-    title: 'Take Zeneva on the Go',
-    body: 'Manage sales and inventory directly from your phone! Download Zeneva Mobile on the Google Play Store.',
+    title: 'Zeneva on Android',
+    body: 'Check stock and take sales away from the counter. Available on Google Play.',
     link: 'https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY',
     iconName: 'Smartphone',
     badge: 'Google Play App'
   },
   {
     id: 'msstore_app',
-    title: 'Get Zeneva for Windows',
-    body: 'Enjoy blazing-fast desktop performance & offline receipt printing. Download Zeneva on the Microsoft Store.',
+    title: 'Zeneva on Windows',
+    body: 'Faster receipts and offline printing on the shop PC. Available on the Microsoft Store.',
     link: 'https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare',
     iconName: 'Monitor',
     badge: 'Microsoft Store App'
   },
   {
     id: 'feature_update',
-    title: '🚀 New Platform Upgrade Available',
-    body: "Zeneva has been upgraded with faster offline sync, enhanced sales reports, and instant audio terminal alerts. Tap to explore!",
+    title: 'New platform upgrade available',
+    body: "Zeneva has been upgraded with faster offline sync, enhanced sales reports, and instant audio terminal alerts. Tap to explore.",
     link: '/dashboard',
     iconName: 'Sparkles',
     badge: 'Product Release'
   },
   {
     id: 'terminal_alerts',
-    title: '🔔 Instant Bank Payment Alerts',
+    title: 'Instant bank payment alerts',
     body: 'Never miss a customer bank transfer. Receive instant audio alerts right in your physical store.',
     link: '/terminal-alerts',
     iconName: 'Bell',
@@ -102,7 +106,7 @@ const PREDEFINED_TEMPLATES = [
   },
   {
     id: 'inventory_audit',
-    title: '📦 Low Stock & Inventory Audit',
+    title: 'Low stock and inventory audit',
     body: 'Keep your business healthy. Review your low stock products and reorder points now.',
     link: '/inventory',
     iconName: 'Package',
@@ -187,7 +191,7 @@ export default function AdminNotificationsPage() {
                 <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-lg">
-                            <span className="text-xl">✨</span> Predefined Notification Templates
+                            Predefined Notification Templates
                         </CardTitle>
                         <CardDescription>Click any template below to auto-fill title, message, and target action link.</CardDescription>
                     </CardHeader>
@@ -233,7 +237,7 @@ export default function AdminNotificationsPage() {
                                         <FormField control={form.control} name="title" render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Title</FormLabel>
-                                                <FormControl><Input placeholder="e.g., 💬 Chat with the CEO" {...field} /></FormControl>
+                                                <FormControl><Input placeholder="e.g., Message the founder directly" {...field} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}/>

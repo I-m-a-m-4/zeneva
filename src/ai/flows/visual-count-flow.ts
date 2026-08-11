@@ -2,6 +2,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { requireUser } from '@/actions/admin-guard';
 
 const VisualCountInputSchema = z.object({
     imageBase64: z.string().describe('The base64 encoded image of the products to count.'),
@@ -19,7 +20,18 @@ const VisualCountOutputSchema = z.object({
 export type VisualCountInput = z.infer<typeof VisualCountInputSchema>;
 export type VisualCountOutput = z.infer<typeof VisualCountOutputSchema>;
 
-export async function visualCount(input: VisualCountInput): Promise<VisualCountOutput> {
+/**
+ * A `'use server'` export is a public HTTP endpoint — its action id ships in the
+ * client bundle, so anyone can replay the POST with their own arguments. This
+ * one bills a multimodal Gemini call against the platform's own API key on an
+ * arbitrary caller-supplied image, so it has to prove who is asking first.
+ *
+ * The token is a separate parameter rather than a schema field on purpose:
+ * `VisualCountInputSchema` is fed straight into the prompt, and a credential
+ * has no business being sent to the model.
+ */
+export async function visualCount(input: VisualCountInput, idToken?: string): Promise<VisualCountOutput> {
+    await requireUser(idToken);
     return visualCountFlow(input);
 }
 

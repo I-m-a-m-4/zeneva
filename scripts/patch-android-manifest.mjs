@@ -33,6 +33,18 @@ async function patchManifest() {
     return;
   }
 
+  // This script runs from tauri.conf.json's beforeBuildCommand, which fires for
+  // every target - so a Windows or macOS build reaches here with no Android
+  // project on disk. That is not an error: exit quietly and leave the build
+  // alone. Only a *generated* Android project with an unreachable manifest is
+  // worth failing over, because that is the case where a silent skip would ship
+  // an APK with no RECORD_AUDIO and no permission dialog.
+  const androidRoot = path.join(__dirname, '../src-tauri/gen/android');
+  if (!fs.existsSync(androidRoot)) {
+    console.log('No Android project at src-tauri/gen/android - nothing to patch.');
+    return;
+  }
+
   const searchRoot = path.join(__dirname, '../src-tauri');
   console.log(`Canonical manifest not found. Scanning recursively from: ${searchRoot}`);
 

@@ -19,6 +19,14 @@ const RING_D =
   'M 100 55 A 35 35 0 1 0 100 125 A 35 35 0 1 0 100 55 Z M 100 63 A 27 27 0 1 1 100 117 A 27 27 0 1 1 100 63 Z';
 const CRESCENT_D = 'M 60 127 Q 100 154 140 127 Q 100 142 60 127 Z';
 
+/**
+ * The logo's own viewBox is `0 0 200 200`, but the glyph only occupies
+ * x 60–140, y 55–154 inside it. At avatar size that padding shrinks the mark
+ * to about a third of the space, so crop to a square around the glyph's
+ * centroid (100, 104.5) instead. The paths are untouched.
+ */
+const VIEW_BOX = '42 47 116 116';
+
 let uidCounter = 0;
 
 export function ZenMark({
@@ -42,7 +50,7 @@ export function ZenMark({
 
   return (
     <svg
-      viewBox="0 0 200 200"
+      viewBox={VIEW_BOX}
       className={className}
       role="img"
       aria-label="Zen AI"
@@ -80,8 +88,9 @@ export function ZenMark({
       </defs>
 
       <g className={sweep ? 'zen-mark-pulse' : undefined}>
-        <path d={RING_D} fill={`url(#${orange})`} />
-        <path d={CRESCENT_D} fill={`url(#${orange})`} />
+        {/* stroke matches the logo's own hairline so the mark reads identically */}
+        <path d={RING_D} fill={`url(#${orange})`} stroke="#cc5200" strokeWidth={0.5} />
+        <path d={CRESCENT_D} fill={`url(#${orange})`} stroke="#cc5200" strokeWidth={0.5} />
 
         {sweep && (
           <>

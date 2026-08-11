@@ -69,15 +69,61 @@ export interface UserProfile {
     role: UserRole;
     createdAt?: any;
     surveyCompleted?: boolean;
-    status?: 'active' | 'inactive' | 'deleted';
+    /**
+     * 'suspended' is written by the Cyber Shield hard-kill
+     * (src/components/admin/cyber-shield.tsx) and is filtered on there, so it
+     * belongs in the union even though nothing else sets it — it was missing,
+     * which made every status filter silently miss suspended accounts.
+     */
+    status?: 'active' | 'inactive' | 'suspended' | 'deleted';
+    /** Set alongside status:'suspended' by the hard-kill, for provenance. */
+    suspendedAt?: any;
+    suspendedBy?: string;
     lastSeen?: any;
     permissions?: Record<string, boolean>;
     branchId?: string;
     totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
+    pagesVisited?: number; // cumulative page views (tracked by UserActivityTracker)
+    pageViews?: Record<string, number>; // per-route view counts; keys normalised by routeKey()
+    lastPage?: string; // most recent route this user opened
     appVersion?: string; // Latest app version used by the user
     deviceType?: string; // 'Desktop App' | 'Mobile App' | 'Mobile' | 'Web' - written by UserActivityTracker
     country?: string; // Resolved at sign-in by UserActivityTracker; absent when lookup failed
     ip?: string; // Last known public IP, for the admin login-location column
+    /**
+     * The app language this user actually reads Zeneva in — a LocaleCode ('en',
+     * 'fr', ...), written by UserActivityTracker on the existing heartbeat.
+     * Distinct from the browser language on the session doc: that one is what
+     * the device is set to, this one is what the user chose.
+     */
+    language?: string;
+    /**
+     * The invitation code this account was created from, written once at signup
+     * for invited members only (absent for self-registered owners).
+     *
+     * This is not decorative: firestore.rules needs it. `create` on a user
+     * document has to prove the caller is entitled to the `businessId` they are
+     * claiming, and for an invited member that proof is the invitation itself.
+     * Rules cannot query a collection, so the document id has to be recorded
+     * here for the rule to `get()` it and match email, businessId and role.
+     */
+    invitationCode?: string;
+    /**
+     * Which lifecycle ("drip") notifications this account has already been
+     * sent, as `{ [stageId]: Timestamp }` — see
+     * src/lib/lifecycle-notifications.ts.
+     *
+     * This lives on the user document rather than in localStorage on purpose.
+     * The flag that says "already sent" has to be as durable as the thing it
+     * guards: kept per-browser, a second device, a cleared cache or a
+     * reinstalled desktop app all read it as empty and resent every message,
+     * which is what produced the duplicate storm in the notification centre.
+     *
+     * The timestamps are also what enforces spacing — the scheduler holds back
+     * anything due within LIFECYCLE_MIN_GAP_DAYS of the most recent entry, so a
+     * schedule that has gone stale drips instead of emptying at once.
+     */
+    lifecycleNotifications?: Record<string, any>;
 }
 
 
@@ -280,6 +326,50 @@ export interface ContentPlanner {
     headlines: BlogHeadline[];
 }
 
+/**
+ * Content Strategy AI flow contract.
+ *
+ * These live here rather than in `src/ai/flows/content-strategy-flow.ts` because
+ * `scripts/prepare-tauri.mjs` clears `src/ai` for the static-export build and
+ * replaces that module with a client-safe stub. The admin component still needs
+ * the types to compile, so they cannot live in the file that gets stubbed.
+ * The flow re-exports them, so existing `@/ai/flows/...` type imports keep working.
+ */
+export interface ContentStrategyPlatformStats {
+    totalUsers?: number;
+    totalBusinesses?: number;
+    totalProducts?: number;
+    totalReceipts?: number;
+    platformGmv?: number;
+    averageSalesPerDay?: number;
+    platformAOV?: number;
+    topLocation?: string;
+    topIndustries?: string[];
+}
+
+export interface ContentStrategyInput {
+    theme: string;
+    platform: string;
+    persona: string;
+    seedKnowledge?: string;
+    platformStats?: ContentStrategyPlatformStats;
+}
+
+export interface ContentSectionOutline {
+    heading: string;
+    talkingPoints: string[];
+}
+
+export interface ContentStrategyOutput {
+    title: string;
+    seoKeywords: string[];
+    introduction: string;
+    outline: ContentSectionOutline[];
+    ctaText: string;
+    backlinkOpportunities: string[];
+    marketingPitch: string;
+}
+
 export interface BusinessAnalysisOutput {
     smartStockRecommendations?: SmartStockRecommendation[];
     demandHeatmap?: DemandHeatmap;
@@ -418,6 +508,10 @@ export interface BlogPost {
     authorId: string;
     authorName: string;
     published: boolean;
+    // Optional so a Firestore-authored post can carry the same category the
+    // static posts in blog-data.ts use. blog-post-client renders it and the
+    // listing page groups on it, so omitting it from the type was a lie.
+    category?: string;
     createdAt: any;
     updatedAt: any;
 }

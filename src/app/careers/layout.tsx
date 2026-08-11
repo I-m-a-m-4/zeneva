@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Careers | Join the Zeneva Team | Zeneva',
+  title: 'Careers | Join the Zeneva Team',
   description: 'Explore career opportunities at Zeneva. Join our mission to build the future of borderless retail operating systems and POS technologies.',
   alternates: {
     canonical: '/careers'

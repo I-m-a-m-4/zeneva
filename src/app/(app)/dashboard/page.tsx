@@ -49,6 +49,7 @@ import { safeToDate } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CachedImage } from '@/components/shared/cached-image';
 import { CurrencyAmount } from '@/components/shared/currency-amount';
+import { useI18n } from '@/context/i18n-context';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -90,6 +91,7 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const { toast } = useToast();
+  const { t } = useI18n();
   const dashboardRef = React.useRef<HTMLDivElement>(null);
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
@@ -466,9 +468,9 @@ export default function DashboardPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast({ variant: 'success', title: 'Dashboard Downloaded', description: 'Your dashboard image has been saved.' });
+      toast({ variant: 'success', title: t('dashboard.downloaded'), description: t('dashboard.downloadedDescription') });
     } catch (err) {
-      toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
+      toast({ variant: 'destructive', title: t('dashboard.downloadFailed'), description: t('dashboard.downloadFailedDescription') });
     }
   };
 
@@ -485,11 +487,11 @@ export default function DashboardPage() {
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1 pb-10 sm:pb-1">
-      <PageTitle title="Dashboard" subtitle="Welcome back! Here's your Zeneva business overview.">
+      <PageTitle title={t('dashboard.title')} subtitle={t('dashboard.subtitle')}>
         <div className="no-capture flex flex-wrap items-center justify-start sm:justify-end gap-2">
           <DateRangePicker date={date} onDateChange={setDate} />
           <Button onClick={handleDownloadImage} variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Download
+            <Download className="me-2 h-4 w-4" /> {t('dashboard.download')}
           </Button>
         </div>
       </PageTitle>
@@ -497,76 +499,76 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
         {!isRestricted && (
           <SummaryCard
-            title="Total Revenue"
+            title={t('dashboard.totalRevenue')}
             value={<CurrencyAmount symbol={currencySymbol} amount={totalRevenue || 0} />}
             icon={currencySymbol}
-            description={`${(totalReceipts || 0) + (totalOnlineOrdersCount || 0)} total transactions`}
+            description={t('dashboard.totalTransactions', { count: ((totalReceipts || 0) + (totalOnlineOrdersCount || 0)).toLocaleString() })}
             href="/reports"
           />
         )}
         {!isRestricted && (
           <SummaryCard
-            title="Product Revenue"
+            title={t('dashboard.productRevenue')}
             value={<CurrencyAmount symbol={currencySymbol} amount={productRevenue || 0} />}
             icon={Package}
-            description={`${(productUnitsSold || 0).toLocaleString()} products sold`}
+            description={t('dashboard.productsSold', { count: (productUnitsSold || 0).toLocaleString() })}
             href="/reports"
           />
         )}
         {!isRestricted && (
           <SummaryCard
-            title="Service Revenue"
+            title={t('dashboard.serviceRevenue')}
             value={<CurrencyAmount symbol={currencySymbol} amount={serviceRevenue || 0} />}
             icon={Activity}
-            description={`${(serviceUnitsSold || 0).toLocaleString()} services rendered`}
+            description={t('dashboard.servicesRendered', { count: (serviceUnitsSold || 0).toLocaleString() })}
             href="/reports"
           />
         )}
         <SummaryCard
-          title="Units Sold"
+          title={t('dashboard.unitsSold')}
           value={(totalUnitsSold || 0).toLocaleString()}
           icon={ShoppingBag}
-          description={`${(productUnitsSold || 0).toLocaleString()} products, ${(serviceUnitsSold || 0).toLocaleString()} services`}
+          description={t('dashboard.unitsBreakdown', { products: (productUnitsSold || 0).toLocaleString(), services: (serviceUnitsSold || 0).toLocaleString() })}
           href="/reports"
         />
         <SummaryCard
-          title="New Customers"
+          title={t('dashboard.newCustomers')}
           value={(newCustomersCount || 0).toLocaleString()}
           icon={Users}
-          description="Signed up in this period"
+          description={t('dashboard.signedUpThisPeriod')}
           href="/customers"
         />
         {!isRestricted && (
           <SummaryCard
-            title="POS Sales"
+            title={t('dashboard.posSales')}
             value={<CurrencyAmount symbol={currencySymbol} amount={totalSalesValue || 0} />}
             icon={currencySymbol}
-            description={`${(totalReceipts || 0)} transactions`}
+            description={t('dashboard.transactions', { count: (totalReceipts || 0).toLocaleString() })}
             href="/receipts"
           />
         )}
         {!isRestricted && (
           <SummaryCard
-            title="Online Sales"
+            title={t('dashboard.onlineSales')}
             value={<CurrencyAmount symbol={currencySymbol} amount={totalOnlineSalesValue || 0} />}
             icon={currencySymbol}
-            description={`${(totalOnlineOrdersCount || 0)} online orders`}
+            description={t('dashboard.onlineOrdersCount', { count: (totalOnlineOrdersCount || 0).toLocaleString() })}
             href="/online-orders"
           />
         )}
         <SummaryCard
-          title="Low Stock Alerts"
+          title={t('dashboard.lowStockAlerts')}
           value={(lowStockItems || 0).toLocaleString()}
           icon={AlertCircle}
-          description={(lowStockItems || 0) > 0 ? `${lowStockItems} items needing attention` : "All stock levels healthy"}
+          description={(lowStockItems || 0) > 0 ? t('dashboard.itemsNeedingAttention', { count: (lowStockItems || 0).toLocaleString() }) : t('dashboard.allStockHealthy')}
           href="/inventory"
         />
         {debtItemsCount > 0 && (
           <SummaryCard
-            title="Recorded Debts"
+            title={t('dashboard.recordedDebts')}
             value={totalDebtUnits}
             icon={TrendingDown}
-            description={`${debtItemsCount} products backordered`}
+            description={t('dashboard.productsBackordered', { count: debtItemsCount.toLocaleString() })}
             href="/inventory/debts"
           />
         )}
@@ -586,26 +588,26 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
-              Sales Activity
+              {t('dashboard.salesActivity')}
             </CardTitle>
-            <CardDescription>Overview of your sales pipeline stages for the selected period.</CardDescription>
+            <CardDescription>{t('dashboard.salesActivityDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <PackageCheck className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">{totalReceipts + totalOnlineOrdersCount}</p>
-                <p className="text-xs text-muted-foreground">Completed Sales</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.completedSales')}</p>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <FileDigit className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">To be Invoiced</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.toBeInvoiced')}</p>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50 text-center">
                 <PackageSearch className="h-8 w-8 text-primary mb-2" />
                 <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">To be Delivered</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.toBeDelivered')}</p>
               </div>
             </div>
           </CardContent>
@@ -615,21 +617,21 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Layers className="h-5 w-5 text-primary" />
-                Inventory Summary
+                {t('dashboard.inventorySummary')}
               </CardTitle>
-              <CardDescription>Quick look at your stock status.</CardDescription>
+              <CardDescription>{t('dashboard.inventorySummaryDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Quantity in Hand</p>
+                  <p className="text-sm text-muted-foreground">{t('dashboard.quantityInHand')}</p>
                   <p className="text-2xl font-bold">{(totalStock || 0).toLocaleString()}</p>
                 </div>
                 <Archive className="h-8 w-8 text-primary" />
               </div>
               <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Quantity to be Received</p>
+                  <p className="text-sm text-muted-foreground">{t('dashboard.quantityToBeReceived')}</p>
                   <p className="text-2xl font-bold">0</p>
                 </div>
                 <PackageSearch className="h-8 w-8 text-primary" />
@@ -637,7 +639,7 @@ export default function DashboardPage() {
               <div className="pt-2">
                 <Button variant="outline" size="sm" asChild className="w-full">
                   <Link href="/inventory?sortBy=stock-desc">
-                    View Highest Stock Products <ArrowRight className="ml-2 h-4 w-4" />
+                    {t('dashboard.viewHighestStock')} <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
                   </Link>
                 </Button>
               </div>
@@ -651,10 +653,10 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-primary" />
-              {isLoyaltyEnabled ? "Top Loyalty Customers" : "Top Customers"}
+              {isLoyaltyEnabled ? t('dashboard.topLoyaltyCustomers') : t('dashboard.topCustomers')}
             </CardTitle>
             <CardDescription>
-              {isLoyaltyEnabled ? "Your most loyal customers by points." : "Your top spending customers for the selected period."}
+              {isLoyaltyEnabled ? t('dashboard.topLoyaltyDesc') : t('dashboard.topCustomersDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -672,10 +674,10 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground" title={customer.email}>{customer.email}</p>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-end flex-shrink-0">
                       <p className="text-sm font-semibold text-primary">
-                        {(isLoyaltyEnabled && (customer.loyaltyPoints || 0) > 0) 
-                          ? `${customer.loyaltyPoints} pts` 
+                        {(isLoyaltyEnabled && (customer.loyaltyPoints || 0) > 0)
+                          ? `${customer.loyaltyPoints} ${t('dashboard.points')}`
                           : `${currencySymbol}${(customer as any).spendInRange?.toLocaleString() || 0}`
                         }
                       </p>
@@ -685,11 +687,11 @@ export default function DashboardPage() {
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
-                {isLoyaltyEnabled ? "No customer loyalty data yet." : "No customer sales recorded in this period."}
+                {isLoyaltyEnabled ? t('dashboard.noLoyaltyData') : t('dashboard.noCustomerSales')}
               </p>
             )}
             <Button variant="link" size="sm" asChild className="mt-3 w-full justify-center">
-              <Link href="/customers">View All Customers</Link>
+              <Link href="/customers">{t('dashboard.viewAllCustomers')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -698,9 +700,9 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Top Selling Items
+              {t('dashboard.topSellingItems')}
             </CardTitle>
-            <CardDescription>Your most popular products this period.</CardDescription>
+            <CardDescription>{t('dashboard.topSellingDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {topSellingItems.length > 0 ? (
@@ -717,9 +719,9 @@ export default function DashboardPage() {
                       </Link>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] h-4">
-                          {item.categoryType === 'service' ? 'Service' : 'Product'}
+                          {item.categoryType === 'service' ? t('dashboard.service') : t('dashboard.product')}
                         </Badge>
-                        <span className="text-muted-foreground">{item.quantitySold} sold</span>
+                        <span className="text-muted-foreground">{item.quantitySold} {t('dashboard.sold')}</span>
                       </div>
                     </li>
                   ))}
@@ -727,7 +729,7 @@ export default function DashboardPage() {
                 <div className="pt-4">
                   <Button variant="outline" size="sm" asChild className="w-full">
                     <Link href="/inventory">
-                      View Inventory Details <ArrowRight className="ml-2 h-4 w-4" />
+                      {t('dashboard.viewInventoryDetails')} <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
                     </Link>
                   </Button>
                 </div>
@@ -735,7 +737,7 @@ export default function DashboardPage() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="mx-auto h-12 w-12 opacity-50 mb-3" />
-                <p>Top selling items data will appear here once sales are recorded.</p>
+                <p>{t('dashboard.noTopSelling')}</p>
               </div>
             )}
           </CardContent>
@@ -749,18 +751,18 @@ export default function DashboardPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-primary" />
-                Daily Sales Items Log
+                {t('dashboard.dailySalesLog')}
               </CardTitle>
-              <CardDescription>Recent sales items sold during the selected period.</CardDescription>
+              <CardDescription>{t('dashboard.dailySalesLogDesc')}</CardDescription>
             </div>
-            <Button 
-              size="sm" 
-              asChild 
+            <Button
+              size="sm"
+              asChild
               className="h-9 bg-primary text-white hover:bg-primary/95 hover:scale-[1.03] active:scale-[0.97] shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/40 transition-all duration-300 font-bold px-4 rounded-lg flex items-center gap-2 border border-primary/20"
             >
               <Link href="/reports?tab=daily-sales">
-                <span>View All Daily Sales</span>
-                <ArrowRight className="h-4 w-4" />
+                <span>{t('dashboard.viewAllDailySales')}</span>
+                <ArrowRight className="h-4 w-4 rtl:rotate-180" />
               </Link>
             </Button>
           </CardHeader>
@@ -771,12 +773,12 @@ export default function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12"></TableHead>
-                      <TableHead className="font-semibold text-sm">Item Name</TableHead>
-                      <TableHead className="font-semibold text-sm text-center">Qty</TableHead>
-                      <TableHead className="font-semibold text-sm">Price</TableHead>
-                      <TableHead className="font-semibold text-sm">Total</TableHead>
-                      <TableHead className="font-semibold text-sm">Receipt</TableHead>
-                      <TableHead className="font-semibold text-sm text-right pr-4">Time</TableHead>
+                      <TableHead className="font-semibold text-sm">{t('dashboard.itemName')}</TableHead>
+                      <TableHead className="font-semibold text-sm text-center">{t('dashboard.qty')}</TableHead>
+                      <TableHead className="font-semibold text-sm">{t('common.price')}</TableHead>
+                      <TableHead className="font-semibold text-sm">{t('common.total')}</TableHead>
+                      <TableHead className="font-semibold text-sm">{t('dashboard.receipt')}</TableHead>
+                      <TableHead className="font-semibold text-sm text-end pe-4">{t('dashboard.time')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -833,7 +835,7 @@ export default function DashboardPage() {
                                   ? "text-[9px] h-3.5 bg-blue-500/10 text-blue-600 border-blue-500/20 px-1 font-semibold" 
                                   : "text-[9px] h-3.5 bg-orange-500/10 text-orange-600 border-orange-500/20 px-1 font-semibold"}
                               >
-                                {item.categoryType === 'service' ? 'Service' : 'Product'}
+                                {item.categoryType === 'service' ? t('dashboard.service') : t('dashboard.product')}
                               </Badge>
                             </div>
                           </div>
@@ -855,7 +857,7 @@ export default function DashboardPage() {
                             </span>
                           </Link>
                         </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground py-2.5 pr-4 whitespace-nowrap">
+                        <TableCell className="text-end text-xs text-muted-foreground py-2.5 pe-4 whitespace-nowrap">
                           <div className="flex flex-col items-end">
                             <span className="font-semibold text-foreground">{formatDistanceToNow(item.createdAt, { addSuffix: true })}</span>
                             <span className="text-[10px] text-muted-foreground/85 mt-0.5">{format(item.createdAt, 'PPp')}</span>
@@ -869,7 +871,7 @@ export default function DashboardPage() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <ShoppingCart className="mx-auto h-12 w-12 opacity-50 mb-3" />
-                <p>No sales items recorded in this period.</p>
+                <p>{t('dashboard.noSalesItems')}</p>
               </div>
             )}
           </CardContent>

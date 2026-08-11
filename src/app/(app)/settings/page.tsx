@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Download, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -66,6 +66,8 @@ import { usePOS } from '@/context/pos-context';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeSwitcher } from '@/components/settings/theme-switcher';
+import { LanguageSwitcher } from '@/components/settings/language-switcher';
+import { useI18n } from '@/context/i18n-context';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -162,8 +164,8 @@ function SettingsPageSkeleton() {
     )
 }
 
-import { usePWA } from '@/context/pwa-context';
 import { useFCM } from '@/hooks/use-fcm';
+import { apiBase } from '@/lib/platform';
 
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh, addToQueue, mutateBusiness } = usePOS();
@@ -173,12 +175,12 @@ function SettingsPageContent() {
         currentUserProfile.role === 'owner' ||
         business?.ownerId === currentUserProfile.id
     );
-    const { promptInstall, isInstallable, isAppInstalled } = usePWA();
 
     const { permission, requestPermission, unsubscribe, fcmToken, isLoading: isFcmLoading } = useFCM();
     const firestore = useFirestore();
     const router = useRouter();
     const { toast } = useToast();
+    const { t } = useI18n();
 
     // General state
     const [isSaving, setIsSaving] = React.useState<Record<string, boolean>>({});
@@ -318,14 +320,14 @@ function SettingsPageContent() {
             await updateDoc(sessionRef, { revoked: true });
             toast({
                 variant: 'success',
-                title: 'Access Revoked',
-                description: 'The device has been successfully logged out.'
+                title: t('settings.toastAccessRevoked'),
+                description: t('settings.toastAccessRevokedBody')
             });
         } catch (error) {
             toast({
                 variant: 'destructive',
-                title: 'Revoke Failed',
-                description: 'Could not revoke session access.'
+                title: t('settings.toastRevokeFailed'),
+                description: t('settings.toastRevokeFailedBody')
             });
         } finally {
             setIsRevoking(prev => ({ ...prev, [sessionId]: false }));
@@ -339,14 +341,27 @@ function SettingsPageContent() {
         return <Monitor className="h-4 w-4" />;
     };
 
+    // Returns a stable, language-independent device key. Grouping in
+    // `processedSessions` keys off this, so it must NOT be translated —
+    // `formatUA` renders the label for display instead.
+    const deviceKind = (userAgent: string) => {
+        if (userAgent.includes('Windows')) return 'windows';
+        if (userAgent.includes('Mac OS')) return 'mac';
+        if (userAgent.includes('iPhone')) return 'iphone';
+        if (userAgent.includes('Android')) return 'android';
+        if (userAgent.includes('Linux')) return 'linux';
+        return 'unknown';
+    };
+
     const formatUA = (userAgent: string) => {
-        // Simple UA parser (can be improved)
-        if (userAgent.includes('Windows')) return 'Windows PC';
-        if (userAgent.includes('Mac OS')) return 'MacBook / MacOS';
-        if (userAgent.includes('iPhone')) return 'iPhone';
-        if (userAgent.includes('Android')) return 'Android Device';
-        if (userAgent.includes('Linux')) return 'Linux PC';
-        return 'Unknown Device';
+        switch (deviceKind(userAgent)) {
+            case 'windows': return t('settings.deviceWindows');
+            case 'mac': return t('settings.deviceMac');
+            case 'iphone': return t('settings.deviceIphone');
+            case 'android': return t('settings.deviceAndroid');
+            case 'linux': return t('settings.deviceLinux');
+            default: return t('settings.deviceUnknown');
+        }
     };
 
     React.useEffect(() => {
@@ -392,7 +407,7 @@ function SettingsPageContent() {
 
     const processLogoFile = (file: File) => {
         if (file.size > 2 * 1024 * 1024) { // 2MB
-            toast({ variant: 'destructive', title: 'Image Too Large', description: 'Please select an image smaller than 2MB.' });
+            toast({ variant: 'destructive', title: t('settings.toastImageTooLarge'), description: t('settings.toastImageTooLargeBody') });
             return;
         }
         setLogoFile(file);
@@ -403,13 +418,13 @@ function SettingsPageContent() {
 
     const handleVerifyAccount = async () => {
         if (!paymentBankAccountId || !paymentBankCode) {
-            toast({ variant: 'destructive', title: 'Missing Details', description: 'Please enter an account number and select a bank.' });
+            toast({ variant: 'destructive', title: t('settings.toastMissingDetails'), description: t('settings.toastMissingDetailsBody') });
             return;
         }
         setIsVerifying(true);
         setPaymentAccountName('');
         try {
-            const response = await fetch('https://zeneva.space/api/paystack/resolve-account', {
+            const response = await fetch(`${apiBase()}/api/paystack/resolve-account`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ account_number: paymentBankAccountId, bank_code: paymentBankCode })
@@ -424,12 +439,12 @@ function SettingsPageContent() {
             setPaymentAccountName(result.data.account_name);
             toast({
                 variant: 'success',
-                title: 'Account Verified',
-                description: `Account Name: ${result.data.account_name}`
+                title: t('settings.toastAccountVerified'),
+                description: t('settings.toastAccountVerifiedBody', { name: result.data.account_name })
             });
 
         } catch (error: any) {
-            toast({ variant: "destructive", title: 'Verification Failed', description: error.message });
+            toast({ variant: "destructive", title: t('settings.toastVerificationFailed'), description: error.message });
         } finally {
             setIsVerifying(false);
         }
@@ -437,12 +452,12 @@ function SettingsPageContent() {
 
     const handleActivateTerminal = async () => {
         if (!paymentBankAccountId || !paymentBankCode) {
-            toast({ variant: "destructive", title: "Activation Error", description: "Please verify and save your payout details first." });
+            toast({ variant: "destructive", title: t('settings.toastActivationError'), description: t('settings.toastActivationErrorBody') });
             return;
         }
         const effectivePhone = businessPhone || business?.settings?.phone || '';
         if (!effectivePhone) {
-            toast({ variant: "destructive", title: "Phone Number Required", description: "Please add a business phone number in the Business Profile section above, then save it before activating the terminal." });
+            toast({ variant: "destructive", title: t('settings.toastPhoneRequired'), description: t('settings.toastPhoneRequiredBody') });
             return;
         }
         setIsActivatingTerminal(true);
@@ -487,11 +502,11 @@ function SettingsPageContent() {
 
             toast({
                 variant: 'success',
-                title: 'Zeneva Terminal Activated',
-                description: `Dedicated Virtual Account generated successfully: ${result.bankName} - ${result.accountNumber}`
+                title: t('settings.toastTerminalActivated'),
+                description: t('settings.toastTerminalActivatedBody', { bank: result.bankName, account: result.accountNumber })
             });
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Activation Failed", description: error.message });
+            toast({ variant: "destructive", title: t('settings.toastActivationFailed'), description: error.message });
         } finally {
             setIsActivatingTerminal(false);
         }
@@ -499,7 +514,7 @@ function SettingsPageContent() {
 
     const handleVerifyBvn = async () => {
         if (!bvn || bvn.length !== 11) {
-            toast({ variant: "destructive", title: "Invalid BVN", description: "Please enter a valid 11-digit BVN." });
+            toast({ variant: "destructive", title: t('settings.toastInvalidBvn'), description: t('settings.toastInvalidBvnBody') });
             return;
         }
 
@@ -529,12 +544,12 @@ function SettingsPageContent() {
 
             toast({
                 variant: 'success',
-                title: 'Verification Successful',
-                description: 'Your identity has been verified with Paystack.'
+                title: t('settings.toastVerificationSuccessful'),
+                description: t('settings.toastVerificationSuccessfulBody')
             });
             setBvn('');
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Verification Failed", description: error.message });
+            toast({ variant: "destructive", title: t('settings.toastVerificationFailed'), description: error.message });
         } finally {
             setIsVerifyingBvn(false);
         }
@@ -560,11 +575,11 @@ function SettingsPageContent() {
 
             toast({
                 variant: 'success',
-                title: 'Terminal Deactivated',
-                description: 'Zeneva Terminal has been successfully deactivated.'
+                title: t('settings.toastTerminalDeactivated'),
+                description: t('settings.toastTerminalDeactivatedBody')
             });
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Deactivation Failed", description: error.message });
+            toast({ variant: "destructive", title: t('settings.toastDeactivationFailed'), description: error.message });
         } finally {
             setIsDeactivatingTerminal(false);
         }
@@ -578,25 +593,44 @@ function SettingsPageContent() {
             const update = await check();
             if (update) {
                 toast({
-                    title: "Update Available",
-                    description: `A new version (v${update.version}) is available. It will begin downloading in the background.`,
+                    title: t('settings.toastUpdateAvailable'),
+                    description: t('settings.toastUpdateAvailableBody', { version: update.version }),
                 });
                 // The TauriUpdater component in the root layout will handle the UI for downloading/restarting
             } else {
                 toast({
-                    title: "Up to Date",
-                    description: "You are running the latest version of Zeneva.",
+                    title: t('settings.toastUpToDate'),
+                    description: t('settings.toastUpToDateBody'),
                 });
             }
         } catch (error) {
             console.error('Update check failed:', error);
             toast({
                 variant: 'destructive',
-                title: "Update Check Failed",
-                description: error instanceof Error ? error.message : "The update server is currently unreachable or no metadata file was found. This usually happens if no new version has been published to the update channel yet.",
+                title: t('settings.toastUpdateFailed'),
+                description: error instanceof Error ? error.message : t('settings.toastUpdateFailedBody'),
             });
         } finally {
             setIsCheckingUpdates(false);
+        }
+    };
+
+    /**
+     * `formName` is the internal save-slot id ('operating-hours', 'kyc'…), not
+     * copy. Mapping it to a translated label keeps the queued/saved toast in the
+     * chosen language instead of capitalising the raw id.
+     */
+    const sectionLabel = (formName: string) => {
+        switch (formName) {
+            case 'profile': return t('settings.sectionProfile');
+            case 'loyalty': return t('settings.sectionLoyalty');
+            case 'categories': return t('settings.sectionCategories');
+            case 'financials': return t('settings.sectionFinancials');
+            case 'shipping': return t('settings.sectionShipping');
+            case 'organization': return t('settings.sectionOrganization');
+            case 'operating-hours': return t('settings.sectionOperatingHours');
+            case 'compliance': return t('settings.sectionCompliance');
+            default: return formName.charAt(0).toUpperCase() + formName.slice(1);
         }
     };
 
@@ -657,8 +691,8 @@ function SettingsPageContent() {
 
                 toast({
                     variant: "success",
-                    title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Queued`,
-                    description: `Settings will be synced when online.`
+                    title: t('settings.toastQueued', { section: sectionLabel(formName) }),
+                    description: t('settings.toastQueuedBody')
                 });
 
                 performOptimisticUpdate();
@@ -666,7 +700,7 @@ function SettingsPageContent() {
                 // Web behavior
                 const businessDocRef = doc(firestore, 'businessInstances', business.id);
                 await updateDoc(businessDocRef, finalData);
-                toast({ variant: "success", title: `${formName.charAt(0).toUpperCase() + formName.slice(1)} Settings Saved`, description: `Your settings have been updated.` });
+                toast({ variant: "success", title: t('settings.toastSaved', { section: sectionLabel(formName) }), description: t('settings.toastSavedBody') });
 
                 performOptimisticUpdate();
 
@@ -674,26 +708,59 @@ function SettingsPageContent() {
                 triggerRefresh();
             }
         } catch (error) {
-            toast({ variant: "destructive", title: "Save Failed", description: `Could not save your settings.` });
+            toast({ variant: "destructive", title: t('settings.toastSaveFailed'), description: t('settings.toastSaveFailedBody') });
         } finally {
             setIsSaving(prev => ({ ...prev, [formName]: false }));
         }
     };
 
+    /**
+     * The switcher already shows its own translated confirmation toast, so this
+     * takes the same dual save path as handleSettingsSubmit without the second
+     * generic toast on top of it.
+     */
+    const handleLanguagePersist = React.useCallback((localeCode: string) => {
+        if (!business?.id) return;
+        const finalData = { 'settings.language': localeCode };
+
+        const performOptimisticUpdate = () => {
+            if (!mutateBusiness) return;
+            mutateBusiness((prev: any) => {
+                if (!prev) return null;
+                return { ...prev, settings: { ...prev.settings, language: localeCode } };
+            });
+        };
+
+        try {
+            if (isTauri) {
+                addToQueue({ type: 'update-settings', payload: finalData }, 'Update language setting');
+                performOptimisticUpdate();
+            } else {
+                void updateDoc(doc(firestore, 'businessInstances', business.id), finalData)
+                    .then(performOptimisticUpdate)
+                    .catch(() => {
+                        toast({ variant: 'destructive', title: t('settings.toastSaveFailed'), description: t('settings.toastLanguageFailedBody') });
+                    });
+            }
+        } catch {
+            toast({ variant: 'destructive', title: t('settings.toastSaveFailed'), description: t('settings.toastLanguageFailedBody') });
+        }
+    }, [business?.id, isTauri, mutateBusiness, addToQueue, firestore, toast]);
+
     const handleSendTestNotification = async () => {
         if (!currentUserProfile?.id) return;
         try {
             await addDoc(collection(firestore, `users/${currentUserProfile.id}/notifications`), {
-                title: "Test Notification",
-                body: "This is a test notification from Zeneva Settings. If you see this, notifications are working!",
+                title: t('settings.testNotificationTitle'),
+                body: t('settings.testNotificationBody'),
                 createdAt: serverTimestamp(),
                 read: false,
                 type: 'system'
             });
-            toast({ title: "Test Notification Sent", description: "You should see it in your notification panel shortly." });
+            toast({ title: t('settings.toastTestSent'), description: t('settings.toastTestSentBody') });
         } catch (error) {
             console.error("Error sending test notification:", error);
-            toast({ variant: "destructive", title: "Test Failed", description: "Could not send test notification." });
+            toast({ variant: "destructive", title: t('settings.toastTestFailed'), description: t('settings.toastTestFailedBody') });
         }
     };
 
@@ -705,13 +772,13 @@ function SettingsPageContent() {
 
         if (name && !isNaN(price) && price >= 0) {
             if (type === 'pickup' && !location) {
-                toast({ variant: 'destructive', title: 'Location Required', description: 'Please provide a location for the pickup option.' });
+                toast({ variant: 'destructive', title: t('settings.toastLocationRequired'), description: t('settings.toastLocationRequiredBody') });
                 return;
             }
             setShippingOptions([...shippingOptions, { name, price, type, location: type === 'pickup' ? location : null }]);
             setNewShippingOption({ name: '', price: '', type: 'delivery', location: '' });
         } else {
-            toast({ variant: 'destructive', title: 'Invalid Option', description: 'Please provide a valid name and price.' });
+            toast({ variant: 'destructive', title: t('settings.toastInvalidOption'), description: t('settings.toastInvalidOptionBody') });
         }
     };
 
@@ -735,7 +802,7 @@ function SettingsPageContent() {
         const groups = new Map<string, any>();
 
         sessions.forEach(session => {
-            const deviceType = formatUA(session.userAgent || 'Unknown');
+            const deviceType = deviceKind(session.userAgent || 'Unknown');
             const platform = session.deviceInfo?.platform || 'Unknown OS';
             // Group by device type and platform more aggressively
             const key = `${deviceType}-${platform}`.toLowerCase();
@@ -761,31 +828,31 @@ function SettingsPageContent() {
 
     return (
         <div className="space-y-6">
-            <PageTitle title="Settings" subtitle="Manage your store's core configurations." />
+            <PageTitle title={t('settings.title')} subtitle={t('settings.pageSubtitle')} />
 
             <Tabs defaultValue="general" className="space-y-6">
                 <TabsList className="w-full flex-wrap justify-start h-auto bg-transparent p-0 gap-2 mb-4 border-b pb-4">
-                    <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">General</TabsTrigger>
-                    <TabsTrigger value="storefront" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Storefront</TabsTrigger>
-                    <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Financials & Billing</TabsTrigger>
-                    <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">System & Security</TabsTrigger>
+                    <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabGeneral')}</TabsTrigger>
+                    <TabsTrigger value="storefront" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabStorefront')}</TabsTrigger>
+                    <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabFinancialsBilling')}</TabsTrigger>
+                    <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabSystemSecurity')}</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="general" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Profile</CardTitle>
-                        <CardDescription>Manage your store's fundamental information and branding.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />{t('settings.profileTitle')}</CardTitle>
+                        <CardDescription>{t('settings.profileDescription')}</CardDescription>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className='md:col-span-2 space-y-4'>
-                                <div><Label htmlFor="businessName">Business Name</Label><Input id="businessName" value={businessName} onChange={e => setBusinessName(e.target.value)} /></div>
-                                <div><Label htmlFor="businessAddress">Business Address</Label><Textarea id="businessAddress" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} /></div>
+                                <div><Label htmlFor="businessName">{t('settings.businessName')}</Label><Input id="businessName" value={businessName} onChange={e => setBusinessName(e.target.value)} /></div>
+                                <div><Label htmlFor="businessAddress">{t('settings.businessAddress')}</Label><Textarea id="businessAddress" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} /></div>
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     <div>
-                                        <Label htmlFor="businessPhone">Business Phone</Label>
+                                        <Label htmlFor="businessPhone">{t('settings.businessPhone')}</Label>
                                         <PhoneInput
                                             id="businessPhone"
                                             value={businessPhone}
@@ -793,22 +860,22 @@ function SettingsPageContent() {
                                             className="mt-1"
                                         />
                                     </div>
-                                    <div><Label htmlFor="businessEmail">Business Email</Label><Input id="businessEmail" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)} /></div>
+                                    <div><Label htmlFor="businessEmail">{t('settings.businessEmail')}</Label><Input id="businessEmail" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)} /></div>
                                 </div>
                             </div>
                             <div>
-                                <Label>Business Logo</Label>
+                                <Label>{t('settings.businessLogo')}</Label>
                                 <div
                                     className="mt-1 w-full aspect-square rounded-md border-2 border-dashed flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors"
                                     onClick={() => isTauri && handleNativeLogoUpload()}
                                 >
-                                    {logoPreview ? <Image src={logoPreview} alt="Logo preview" fill className="object-cover" /> : <Upload className="h-8 w-8 text-muted-foreground" />}
+                                    {logoPreview ? <Image src={logoPreview} alt={t('settings.logoPreviewAlt')} fill className="object-cover" /> : <Upload className="h-8 w-8 text-muted-foreground" />}
                                     {!isTauri && (
                                         <Input id="logo-upload" type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" onChange={handleLogoChange} />
                                     )}
                                     {isTauri && (
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                                            <span className="text-white text-xs font-bold">Pick Image</span>
+                                            <span className="text-white text-xs font-bold">{t('settings.pickImage')}</span>
                                         </div>
                                     )}
                                 </div>
@@ -817,7 +884,7 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('profile', { name: businessName, address: businessAddress, "settings.phone": businessPhone, "settings.email": businessEmail })} disabled={isSaving["profile"]}>
-                            {isSaving["profile"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Profile
+                            {isSaving["profile"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveProfile')}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -827,17 +894,17 @@ function SettingsPageContent() {
                 {isOwnerOrAdmin && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Multi-Branch Management</CardTitle>
-                            <CardDescription>Manage multiple store locations, warehouses, and split inventory across locations.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />{t('settings.branchesTitle')}</CardTitle>
+                            <CardDescription>{t('settings.branchesDescription')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-muted/20">
                                 <div className="space-y-1 mb-4 sm:mb-0">
-                                    <h4 className="font-semibold text-sm">Branches & Locations</h4>
-                                    <p className="text-sm text-muted-foreground">Manage your physical stores and track inventory per location.</p>
+                                    <h4 className="font-semibold text-sm">{t('settings.branchesHeading')}</h4>
+                                    <p className="text-sm text-muted-foreground">{t('settings.branchesBody')}</p>
                                 </div>
                                 <Button asChild>
-                                    <Link href="/settings/branches">Manage Branches</Link>
+                                    <Link href="/settings/branches">{t('settings.manageBranches')}</Link>
                                 </Button>
                             </div>
                         </CardContent>
@@ -846,8 +913,8 @@ function SettingsPageContent() {
 
                 <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary fill-primary" />Rate & Review</CardTitle>
-                        <CardDescription>Love using Zeneva? Help us grow by leaving a review on your app store!</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary fill-primary" />{t('settings.reviewTitle')}</CardTitle>
+                        <CardDescription>{t('settings.reviewDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Button 
@@ -877,41 +944,52 @@ function SettingsPageContent() {
                                 }
                             }}
                         >
-                            <Star className="mr-2 h-4 w-4" />
-                            Write a Review
+                            <Star className="me-2 h-4 w-4" />
+                            {t('settings.writeReview')}
                         </Button>
                     </CardContent>
                 </Card>
 
+                <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />{t('settings.appearanceTitle')}</CardTitle>
+                        <CardDescription>{t('settings.appearanceSubtitle')}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <ThemeSwitcher />
+                        <LanguageSwitcher onPersist={handleLanguagePersist} />
+                    </CardContent>
+                </Card>
+
                 </TabsContent>
-                
+
                 <TabsContent value="storefront" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Loyalty Program</CardTitle>
-                        <CardDescription>Reward your returning customers and encourage repeat business.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />{t('settings.loyaltyTitle')}</CardTitle>
+                        <CardDescription>{t('settings.loyaltyDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between rounded-lg border p-4">
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="loyalty-switch" className="text-base">Enable Loyalty Program</Label>
-                                    <p className="text-sm text-muted-foreground">Allow customers to earn points for their purchases.</p>
+                                    <Label htmlFor="loyalty-switch" className="text-base">{t('settings.loyaltyEnable')}</Label>
+                                    <p className="text-sm text-muted-foreground">{t('settings.loyaltyEnableDescription')}</p>
                                 </div>
                                 <Switch id="loyalty-switch" checked={loyaltyEnabled} onCheckedChange={setLoyaltyEnabled} />
                             </div>
                             {loyaltyEnabled && (
                                 <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t">
                                     <div>
-                                        <Label htmlFor="points-per-unit">Points per ₦1</Label>
+                                        <Label htmlFor="points-per-unit">{t('settings.pointsPerUnit')}</Label>
                                         <Input
                                             id="points-per-unit"
                                             type="number"
                                             value={pointsPerUnit}
                                             onChange={e => setPointsPerUnit(e.target.value)}
-                                            placeholder="e.g., 0.1 for 1 point per ₦10"
+                                            placeholder={t('settings.pointsPerUnitPlaceholder')}
                                         />
-                                        <p className="text-xs text-muted-foreground mt-1">For 1 point per ₦100, enter 0.01.</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{t('settings.pointsPerUnitHint')}</p>
                                     </div>
                                 </div>
                             )}
@@ -919,15 +997,15 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('loyalty', { 'settings.loyaltyProgramEnabled': loyaltyEnabled, 'settings.pointsPerUnit': parseFloat(pointsPerUnit) || 0 })} disabled={isSaving["loyalty"]}>
-                            {isSaving["loyalty"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Loyalty Settings
+                            {isSaving["loyalty"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveLoyalty')}
                         </Button>
                     </CardFooter>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Product Categories</CardTitle>
-                        <CardDescription>Manage the categories for your products. This helps in organizing and filtering your inventory.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />{t('settings.categoriesTitle')}</CardTitle>
+                        <CardDescription>{t('settings.categoriesDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -940,14 +1018,14 @@ function SettingsPageContent() {
                                 </div>
                             ))}
                             <div className="flex items-end gap-2 pt-4 border-t">
-                                <div className="flex-1"><Label>New Category</Label><Input placeholder="e.g., Electronics" value={newCategory} onChange={e => setNewCategory(e.target.value)} /></div>
-                                <Button type="button" onClick={handleAddCategory}><Plus className="h-4 w-4 mr-2" />Add Category</Button>
+                                <div className="flex-1"><Label>{t('settings.newCategory')}</Label><Input placeholder={t('settings.newCategoryPlaceholder')} value={newCategory} onChange={e => setNewCategory(e.target.value)} /></div>
+                                <Button type="button" onClick={handleAddCategory}><Plus className="h-4 w-4 me-2" />{t('settings.addCategory')}</Button>
                             </div>
                         </div>
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('categories', { 'settings.productCategories': productCategories })} disabled={isSaving["categories"]}>
-                            {isSaving["categories"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Categories
+                            {isSaving["categories"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveCategories')}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -958,13 +1036,13 @@ function SettingsPageContent() {
                 <TabsContent value="financials" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" />Payment & Financials</CardTitle>
-                        <CardDescription>Manage currency, taxes, and payment details for online and offline sales.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" />{t('settings.financialsTitle')}</CardTitle>
+                        <CardDescription>{t('settings.financialsDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-4">
                             <div className="flex flex-col gap-1.5">
-                                <Label>Currency</Label>
+                                <Label>{t('settings.currency')}</Label>
                                 <Combobox
                                     options={ALL_CURRENCIES.map(curr => ({
                                         value: curr.value,
@@ -972,8 +1050,8 @@ function SettingsPageContent() {
                                     }))}
                                     value={currency}
                                     onChange={(val) => setCurrency(val)}
-                                    placeholder="Select currency"
-                                    searchPlaceholder="Search currency..."
+                                    placeholder={t('settings.selectCurrency')}
+                                    searchPlaceholder={t('settings.searchCurrency')}
                                     renderSelected={(opt) => (
                                         <div className="flex items-center gap-2">
                                             <img 
@@ -998,19 +1076,19 @@ function SettingsPageContent() {
                                 />
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label>Timezone</Label>
+                                <Label>{t('settings.timezone')}</Label>
                                 <Combobox
                                     options={typeof Intl !== 'undefined' && Intl.supportedValuesOf 
                                       ? Intl.supportedValuesOf('timeZone').map(tz => ({ value: tz, label: tz }))
                                       : [{ value: 'Africa/Lagos', label: 'Africa/Lagos' }]}
                                     value={timezone}
                                     onChange={(val) => setTimezone(val)}
-                                    placeholder="Select timezone"
-                                    searchPlaceholder="Search timezone..."
+                                    placeholder={t('settings.selectTimezone')}
+                                    searchPlaceholder={t('settings.searchTimezone')}
                                     triggerClassName="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md"
                                 />
                             </div>
-                            <div><Label>Default Tax Rate (%)</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
+                            <div><Label>{t('settings.defaultTaxRate')}</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
                         </div>
                         {(ipCountry === 'Nigeria' || currency === 'NGN') && (
                             <>
@@ -1019,27 +1097,27 @@ function SettingsPageContent() {
                                     requiredPlan="business"
                                     currentPlan={business?.plan}
                                     hasLifetimeAccess={hasLifetimeAccess}
-                                    featureName="Zeneva Terminal Integration"
-                                    featureDescription="Enable direct Paystack subaccount creation and automated payout routing with the Zeneva Terminal."
+                                    featureName={t('settings.terminalGateName')}
+                                    featureDescription={t('settings.terminalGateDescription')}
                                     variant="rich"
                                 >
                             <div>
-                                <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />Bank Transfer Details</h4>
+                                <h4 className="font-semibold text-lg flex items-center gap-2 mb-2"><Banknote className="h-5 w-5 text-muted-foreground" />{t('settings.bankTransferTitle')}</h4>
                                 <p className="text-sm text-muted-foreground mb-4">
-                                    Provide bank details for "Bank Transfer" payments at checkout.
-                                    {currency === 'NGN' && ' This will also create a Paystack Subaccount for card payments.'}
+                                    {t('settings.bankTransferBody')}
+                                    {currency === 'NGN' && ` ${t('settings.bankTransferSubaccountNote')}`}
                                 </p>
                                 <div className="space-y-4">
                                     <div className={cn("grid gap-4 items-end", currency === 'NGN' ? "grid-cols-1 sm:grid-cols-[2fr_1fr]" : "grid-cols-1")}>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                                             <div>
-                                                <Label>Bank Name</Label>
+                                                <Label>{t('settings.bankName')}</Label>
                                                 {currency === 'NGN' ? (
                                                     <DropdownMenu modal={false}>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                                                <span>{NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || "Select a bank"}</span>
-                                                                <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                                                <span>{NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || t('settings.selectBank')}</span>
+                                                                <ChevronDown className="h-4 w-4 opacity-50 ms-2" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
@@ -1054,50 +1132,50 @@ function SettingsPageContent() {
                                                     <Input 
                                                         value={paymentBankCode} 
                                                         onChange={e => setPaymentBankCode(e.target.value)} 
-                                                        placeholder="Enter Bank Name (e.g. Chase)" 
+                                                        placeholder={t('settings.bankNamePlaceholder')}
                                                     />
                                                 )}
                                             </div>
                                             <div>
-                                                <Label>{currency === 'NGN' ? "Account Number" : "Account Number / IBAN"}</Label>
-                                                <Input 
-                                                    value={paymentBankAccountId} 
-                                                    onChange={e => setPaymentBankAccountId(e.target.value)} 
-                                                    placeholder={currency === 'NGN' ? "10-digit number" : "e.g. US1234567890"} 
+                                                <Label>{currency === 'NGN' ? t('settings.accountNumber') : t('settings.accountNumberIban')}</Label>
+                                                <Input
+                                                    value={paymentBankAccountId}
+                                                    onChange={e => setPaymentBankAccountId(e.target.value)}
+                                                    placeholder={currency === 'NGN' ? t('settings.accountNumberPlaceholder') : t('settings.ibanPlaceholder')}
                                                 />
                                             </div>
                                         </div>
                                         {currency === 'NGN' ? (
                                             <Button type="button" onClick={handleVerifyAccount} disabled={isVerifying} className="w-full">
-                                                {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify Account
+                                                {isVerifying && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.verifyAccount')}
                                             </Button>
                                         ) : (
                                             <div className="w-full">
-                                                <Label>Account Name</Label>
-                                                <Input 
-                                                    value={paymentAccountName} 
-                                                    onChange={e => setPaymentAccountName(e.target.value)} 
-                                                    placeholder="Enter Account Name" 
+                                                <Label>{t('settings.accountName')}</Label>
+                                                <Input
+                                                    value={paymentAccountName}
+                                                    onChange={e => setPaymentAccountName(e.target.value)}
+                                                    placeholder={t('settings.accountNamePlaceholder')}
                                                 />
                                             </div>
                                         )}
                                     </div>
                                     {currency === 'NGN' && paymentAccountName && (
                                         <div>
-                                            <Label>Resolved Account Name</Label>
+                                            <Label>{t('settings.resolvedAccountName')}</Label>
                                             <Input value={paymentAccountName} readOnly className="bg-muted font-bold text-emerald-600" />
                                         </div>
                                     )}
                                     <div>
-                                        <Label htmlFor="paymentInstructions">Payment Instructions / Invoice Notes</Label>
+                                        <Label htmlFor="paymentInstructions">{t('settings.paymentInstructions')}</Label>
                                         <Textarea
                                             id="paymentInstructions"
-                                            placeholder="e.g. Please include your Invoice ID as the payment reference. Thank you!"
+                                            placeholder={t('settings.paymentInstructionsPlaceholder')}
                                             value={paymentInstructions}
                                             onChange={e => setPaymentInstructions(e.target.value)}
                                             className="h-20"
                                         />
-                                        <p className="text-xs text-muted-foreground mt-1">These notes will appear at the bottom of your invoices.</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{t('settings.paymentInstructionsHint')}</p>
                                     </div>
                                     {currency === 'NGN' && ipCountry === 'Nigeria' && (
                                         business?.settings?.terminalAccountNumber ? (
@@ -1105,28 +1183,28 @@ function SettingsPageContent() {
                                                 <div className="flex items-center justify-between">
                                                     <h5 className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
                                                         <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                                                        Active Zeneva Terminal Account
+                                                        {t('settings.terminalActiveTitle')}
                                                     </h5>
-                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">Active (Live)</Badge>
+                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-white text-[10px]">{t('settings.terminalActiveBadge')}</Badge>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">Customers can make transfers to this permanent account to trigger automated POS alerts.</p>
+                                                <p className="text-xs text-muted-foreground">{t('settings.terminalActiveBody')}</p>
                                                 <div className="grid grid-cols-2 gap-4 text-xs pt-2 font-mono border-b border-emerald-100/30 pb-2">
                                                     <div>
-                                                        <span className="text-slate-400 block">Bank Name</span>
+                                                        <span className="text-slate-400 block">{t('settings.bankName')}</span>
                                                         <span className="font-bold text-slate-800">{business.settings.terminalBankName || 'Wema Bank'}</span>
                                                     </div>
                                                     <div>
-                                                        <span className="text-slate-400 block">Account Number</span>
+                                                        <span className="text-slate-400 block">{t('settings.accountNumber')}</span>
                                                         <span className="font-bold text-slate-800">{business.settings.terminalAccountNumber}</span>
                                                     </div>
                                                     <div className="col-span-2">
-                                                        <span className="text-slate-400 block">Account Name</span>
+                                                        <span className="text-slate-400 block">{t('settings.accountName')}</span>
                                                         <span className="font-bold text-slate-800">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
                                                     </div>
                                                 </div>
                                                 <div className="pt-2 flex items-center justify-between border-t border-emerald-100/10">
                                                     <div className="text-[11px] text-emerald-600 leading-relaxed">
-                                                        <strong>✓ Live Mode:</strong> Automated payouts and chimes are active.
+                                                        {t('settings.terminalLiveMode')}
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -1139,10 +1217,10 @@ function SettingsPageContent() {
                                                         {isDeactivatingTerminal ? (
                                                             <>
                                                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                                                Deactivating...
+                                                                {t('settings.terminalDeactivating')}
                                                             </>
                                                         ) : (
-                                                            "Deactivate Terminal"
+                                                            t('settings.terminalDeactivate')
                                                         )}
                                                     </Button>
                                                 </div>
@@ -1153,27 +1231,27 @@ function SettingsPageContent() {
                                                     <div>
                                                         <h5 className="font-semibold text-orange-800 text-sm flex items-center gap-1.5">
                                                             <Banknote className="h-4 w-4 text-orange-600" />
-                                                            Activate Zeneva Terminal
+                                                            {t('settings.terminalActivateTitle')}
                                                         </h5>
                                                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                                            Generate your permanent, static store transfer account with Paystack. This allows your operators to receive instant confirmation alerts without viewing your master account.
+                                                            {t('settings.terminalActivateBody')}
                                                         </p>
                                                     </div>
                                                     {!(businessPhone || business?.settings?.phone) && (
                                                         <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                                                             <span className="text-base mt-0.5">⚠️</span>
                                                             <div className="text-xs leading-relaxed">
-                                                                <strong>Phone number required</strong> — Please scroll up to the <strong>Business Profile</strong> section, add your business phone number (🇳🇬 +234...) and save before activating the terminal.
+                                                                {t('settings.terminalPhoneWarning')}
                                                             </div>
                                                         </div>
                                                     )}
                                                     <div className="flex flex-col gap-2 bg-muted/30 p-3 rounded-lg border border-dashed text-xs text-muted-foreground my-3">
                                                         <div className="flex items-center gap-1.5 font-medium text-foreground">
                                                             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                                                            Transparent Processing Fees
+                                                            {t('settings.feesTitle')}
                                                         </div>
-                                                        <p>Zeneva takes <strong>0% commission</strong> on your payouts.</p>
-                                                        <p>Paystack charges a standard automated processing fee of <strong>1% (capped at ₦300)</strong> per bank transfer.</p>
+                                                        <p>{t('settings.feesZeneva')}</p>
+                                                        <p>{t('settings.feesPaystack')}</p>
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -1184,10 +1262,10 @@ function SettingsPageContent() {
                                                         {isActivatingTerminal ? (
                                                             <>
                                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                                Activating Terminal & Provisioning DVA...
+                                                                {t('settings.terminalActivating')}
                                                             </>
                                                         ) : (
-                                                            "Activate Zeneva Terminal"
+                                                            t('settings.terminalActivateTitle')
                                                         )}
                                                     </Button>
                                                 </div>
@@ -1202,15 +1280,15 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('financials', { "settings.currency": currency, "settings.timezone": timezone, "settings.defaultTaxRate": parseFloat(defaultTaxRate) || 0, "settings.paymentBankCode": paymentBankCode, 'settings.paymentBankName': NIGERIAN_BANKS.find(b => b.value === paymentBankCode)?.label || paymentBankCode || '', "settings.paymentBankAccountId": paymentBankAccountId, "settings.paymentAccountName": paymentAccountName, "settings.paymentInstructions": paymentInstructions })} disabled={isSaving["financials"]}>
-                            {isSaving["financials"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Financials
+                            {isSaving["financials"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveFinancials')}
                         </Button>
                     </CardFooter>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5 text-primary" />Shipping & Delivery</CardTitle>
-                        <CardDescription>Set up the shipping options available for your online store customers.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5 text-primary" />{t('settings.shippingTitle')}</CardTitle>
+                        <CardDescription>{t('settings.shippingDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -1219,7 +1297,7 @@ function SettingsPageContent() {
                                     <div>
                                         <p className="font-medium">{option.name}</p>
                                         <p className="text-sm text-muted-foreground">
-                                            {option.type === 'pickup' ? `Pickup at: ${option.location}` : `Delivery`} - ₦{option.price.toLocaleString()}
+                                            {option.type === 'pickup' ? t('settings.shippingPickupAt', { location: option.location }) : t('settings.shippingDelivery')} - ₦{option.price.toLocaleString()}
                                         </p>
                                     </div>
                                     <Button variant="ghost" size="icon" onClick={() => handleDeleteShippingOption(index)}>
@@ -1228,34 +1306,34 @@ function SettingsPageContent() {
                                 </div>
                             ))}
                             <div className="pt-4 border-t space-y-4">
-                                <Label>Add New Option</Label>
+                                <Label>{t('settings.shippingAddNew')}</Label>
                                 <RadioGroup value={newShippingOption.type} onValueChange={(value: 'delivery' | 'pickup') => setNewShippingOption({ ...newShippingOption, type: value })} className="flex space-x-4">
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="delivery" id="delivery" />
-                                        <Label htmlFor="delivery">Delivery</Label>
+                                        <Label htmlFor="delivery">{t('settings.shippingDelivery')}</Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="pickup" id="pickup" />
-                                        <Label htmlFor="pickup">In-Store Pickup</Label>
+                                        <Label htmlFor="pickup">{t('settings.shippingInStorePickup')}</Label>
                                     </div>
                                 </RadioGroup>
                                 <div className="flex items-end gap-2">
-                                    <div className="flex-1"><Label>Option Name</Label><Input placeholder="e.g., Standard Delivery" value={newShippingOption.name} onChange={e => setNewShippingOption({ ...newShippingOption, name: e.target.value })} /></div>
-                                    <div className="w-32"><Label>Price</Label><Input type="number" placeholder="e.g., 2000" value={newShippingOption.price} onChange={e => setNewShippingOption({ ...newShippingOption, price: e.target.value })} /></div>
+                                    <div className="flex-1"><Label>{t('settings.shippingOptionName')}</Label><Input placeholder={t('settings.shippingOptionNamePlaceholder')} value={newShippingOption.name} onChange={e => setNewShippingOption({ ...newShippingOption, name: e.target.value })} /></div>
+                                    <div className="w-32"><Label>{t('common.price')}</Label><Input type="number" placeholder={t('settings.shippingPricePlaceholder')} value={newShippingOption.price} onChange={e => setNewShippingOption({ ...newShippingOption, price: e.target.value })} /></div>
                                 </div>
                                 {newShippingOption.type === 'pickup' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="pickup-location">Pickup Location</Label>
-                                        <Input id="pickup-location" placeholder="e.g., 123 Main St, Lagos" value={newShippingOption.location} onChange={e => setNewShippingOption({ ...newShippingOption, location: e.target.value })} />
+                                        <Label htmlFor="pickup-location">{t('settings.shippingPickupLocation')}</Label>
+                                        <Input id="pickup-location" placeholder={t('settings.shippingPickupLocationPlaceholder')} value={newShippingOption.location} onChange={e => setNewShippingOption({ ...newShippingOption, location: e.target.value })} />
                                     </div>
                                 )}
-                                <Button type="button" onClick={handleAddShippingOption} className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Add Option</Button>
+                                <Button type="button" onClick={handleAddShippingOption} className="w-full sm:w-auto"><Plus className="h-4 w-4 me-2" />{t('settings.shippingAddOption')}</Button>
                             </div>
                         </div>
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('shipping', { 'settings.publicStore.shippingOptions': shippingOptions })} disabled={isSaving["shipping"]}>
-                            {isSaving["shipping"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Shipping Options
+                            {isSaving["shipping"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveShipping')}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -1265,18 +1343,18 @@ function SettingsPageContent() {
                 <TabsContent value="system" className="space-y-6 mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />Organization</CardTitle>
-                        <CardDescription>Manage your business's industry, location, and financial year settings.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary" />{t('settings.organizationTitle')}</CardTitle>
+                        <CardDescription>{t('settings.organizationDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <Label>Industry</Label>
+                                <Label>{t('settings.industry')}</Label>
                                 <DropdownMenu modal={false}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                            <span>{industry || "Select an industry"}</span>
-                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                            <span>{industry || t('settings.selectIndustry')}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ms-2" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
@@ -1289,12 +1367,12 @@ function SettingsPageContent() {
                                 </DropdownMenu>
                             </div>
                             <div>
-                                <Label>Country</Label>
+                                <Label>{t('settings.country')}</Label>
                                 <DropdownMenu modal={false}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                            <span>{country || "Select country"}</span>
-                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                            <span>{country || t('settings.selectCountry')}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ms-2" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
@@ -1306,14 +1384,14 @@ function SettingsPageContent() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
-                            <div><Label>State/Province</Label><Input value={state} onChange={e => setState(e.target.value)} /></div>
+                            <div><Label>{t('settings.stateProvince')}</Label><Input value={state} onChange={e => setState(e.target.value)} /></div>
                             <div>
-                                <Label>Fiscal Year Start</Label>
+                                <Label>{t('settings.fiscalYearStart')}</Label>
                                 <DropdownMenu modal={false}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" className="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md">
-                                            <span>{fiscalYearStart || "Select month"}</span>
-                                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                                            <span>{fiscalYearStart || t('settings.selectMonth')}</span>
+                                            <ChevronDown className="h-4 w-4 opacity-50 ms-2" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto bg-popover text-popover-foreground shadow-md rounded-md border p-1 z-50">
@@ -1329,26 +1407,26 @@ function SettingsPageContent() {
                     </CardContent>
                     <CardFooter>
                         <Button type="button" onClick={() => handleSettingsSubmit('organization', { 'settings.industry': industry, 'settings.state': state, 'settings.country': country, 'settings.fiscalYearStart': fiscalYearStart })} disabled={isSaving["organization"]}>
-                            {isSaving["organization"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Organization
+                            {isSaving["organization"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveOrganization')}
                         </Button>
                     </CardFooter>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Notifications</CardTitle>
-                        <CardDescription>Manage your push notification preferences.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />{t('settings.notificationsTitle')}</CardTitle>
+                        <CardDescription>{t('settings.notificationsDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="text-base">Push Notifications</Label>
+                                <Label className="text-base">{t('settings.pushNotifications')}</Label>
                                 <p className="text-sm text-muted-foreground">
                                     {permission === 'granted'
-                                        ? "You are receiving notifications. (Test in background)"
+                                        ? t('settings.pushGranted')
                                         : permission === 'denied'
-                                            ? "Notifications are blocked. Please enable them in your browser settings."
-                                            : "Enable push notifications to stay updated on orders and stock."}
+                                            ? t('settings.pushDenied')
+                                            : t('settings.pushDefault')}
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1358,7 +1436,7 @@ function SettingsPageContent() {
                                         variant="outline"
                                         size="sm"
                                     >
-                                        Send Test
+                                        {t('settings.sendTest')}
                                     </Button>
                                 )}
                                 <Button
@@ -1367,8 +1445,8 @@ function SettingsPageContent() {
                                     variant={fcmToken ? "destructive" : "default"}
                                     size="sm"
                                 >
-                                    {isFcmLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    {fcmToken ? "Disable" : "Enable"}
+                                    {isFcmLoading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+                                    {fcmToken ? t('settings.disable') : t('settings.enable')}
                                 </Button>
                             </div>
                         </div>
@@ -1376,14 +1454,14 @@ function SettingsPageContent() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Security & Devices</CardTitle>
-                        <CardDescription>Manage your active login sessions and registered devices.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />{t('settings.securityTitle')}</CardTitle>
+                        <CardDescription>{t('settings.securityDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-4">
                             {processedSessions.length === 0 ? (
                                 <div className="text-center py-6 text-muted-foreground">
-                                    No active sessions found.
+                                    {t('settings.noSessions')}
                                 </div>
                             ) : (
                                 <>
@@ -1409,13 +1487,13 @@ function SettingsPageContent() {
                                                         <div className="space-y-1">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="font-medium">{formatUA(session.userAgent || 'Unknown')}</span>
-                                                                {isCurrent && <Badge variant="default" className="text-[10px] h-4 px-1">This Device</Badge>}
-                                                                {session.revoked && <Badge variant="destructive" className="text-[10px] h-4 px-1">Revoked</Badge>}
+                                                                {isCurrent && <Badge variant="default" className="text-[10px] h-4 px-1">{t('settings.thisDevice')}</Badge>}
+                                                                {session.revoked && <Badge variant="destructive" className="text-[10px] h-4 px-1">{t('settings.revoked')}</Badge>}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center sm:gap-2">
-                                                                <span>{session.deviceInfo?.platform || 'Unknown OS'}</span>
+                                                                <span>{session.deviceInfo?.platform || t('settings.unknownOs')}</span>
                                                                 <span className="hidden sm:inline opacity-30">•</span>
-                                                                <span>Last active: {session.lastSeen instanceof Timestamp ? formatDistanceToNow(session.lastSeen.toDate(), { addSuffix: true }) : 'Just now'}</span>
+                                                                <span>{t('settings.lastActive', { when: session.lastSeen instanceof Timestamp ? formatDistanceToNow(session.lastSeen.toDate(), { addSuffix: true }) : t('settings.justNow') })}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1442,9 +1520,9 @@ function SettingsPageContent() {
                                             onClick={() => setShowAllSessions(!showAllSessions)}
                                         >
                                             {showAllSessions ? (
-                                                <>Show Less</>
+                                                <>{t('settings.showLess')}</>
                                             ) : (
-                                                <>Show More ({processedSessions.length - 3} more)</>
+                                                <>{t('settings.showMore', { n: processedSessions.length - 3 })}</>
                                             )}
                                         </Button>
                                     )}
@@ -1456,14 +1534,14 @@ function SettingsPageContent() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />Operating Hours</CardTitle>
-                        <CardDescription>Set your business opening and closing hours to track or prevent sales outside these times.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />{t('settings.hoursTitle')}</CardTitle>
+                        <CardDescription>{t('settings.hoursDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                                <Label className="text-base text-stone-900">Enable Working Hours Tracking</Label>
-                                <p className="text-sm text-muted-foreground">Monitor or restrict sales recorded outside of business hours.</p>
+                                <Label className="text-base text-stone-900">{t('settings.hoursEnable')}</Label>
+                                <p className="text-sm text-muted-foreground">{t('settings.hoursEnableDescription')}</p>
                             </div>
                             <Switch checked={operatingHoursEnabled} onCheckedChange={setOperatingHoursEnabled} />
                         </div>
@@ -1472,7 +1550,7 @@ function SettingsPageContent() {
                             <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <Label htmlFor="openTime">Opening Time</Label>
+                                        <Label htmlFor="openTime">{t('settings.openingTime')}</Label>
                                         <Input
                                             id="openTime"
                                             type="time"
@@ -1481,7 +1559,7 @@ function SettingsPageContent() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="closeTime">Closing Time</Label>
+                                        <Label htmlFor="closeTime">{t('settings.closingTime')}</Label>
                                         <Input
                                             id="closeTime"
                                             type="time"
@@ -1492,10 +1570,10 @@ function SettingsPageContent() {
                                 </div>
 
                                 <div className="flex items-center justify-between rounded-lg border p-4 bg-orange-50/50 border-orange-100">
-                                    <div className="space-y-0.5 pr-8">
-                                        <Label className="text-base text-orange-900">Enforce Strict Hours</Label>
+                                    <div className="space-y-0.5 pe-8">
+                                        <Label className="text-base text-orange-900">{t('settings.hoursStrict')}</Label>
                                         <p className="text-sm text-orange-700/70">
-                                            If enabled, operators will be blocked from completing sales outside these hours. Otherwise, sales will just be flagged in the logs.
+                                            {t('settings.hoursStrictDescription')}
                                         </p>
                                     </div>
                                     <Switch checked={preventSalesOutsideHours} onCheckedChange={setPreventSalesOutsideHours} />
@@ -1516,15 +1594,15 @@ function SettingsPageContent() {
                             })}
                             disabled={isSaving["operating-hours"]}
                         >
-                            {isSaving["operating-hours"] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Working Hours
+                            {isSaving["operating-hours"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveHours')}
                         </Button>
                     </CardFooter>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Compliance & KYC</CardTitle>
-                        <CardDescription>Verify your identity with Paystack to lift processing limits and scale your business.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />{t('settings.kycTitle')}</CardTitle>
+                        <CardDescription>{t('settings.kycDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -1533,24 +1611,24 @@ function SettingsPageContent() {
                                     <ShieldCheck className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-sm">Status: {business?.settings?.kycStatus === 'verified' ? 'Verified' : 'Unverified (Starter limits apply)'}</p>
+                                    <p className="font-medium text-sm">{business?.settings?.kycStatus === 'verified' ? t('settings.kycStatusVerified') : t('settings.kycStatusUnverified')}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {business?.settings?.kycStatus === 'verified' 
-                                            ? 'Your business has been verified. You can process unlimited volumes.' 
-                                            : 'Verify your BVN to lift the ₦3 million cumulative payout limit.'}
+                                        {business?.settings?.kycStatus === 'verified'
+                                            ? t('settings.kycVerifiedBody')
+                                            : t('settings.kycUnverifiedBody')}
                                     </p>
                                 </div>
                             </div>
 
                             {business?.settings?.kycStatus !== 'verified' && (
                                 <div className="space-y-2 pt-2">
-                                    <Label htmlFor="bvn">Bank Verification Number (BVN)</Label>
+                                    <Label htmlFor="bvn">{t('settings.bvnLabel')}</Label>
                                     <div className="flex gap-2">
                                         <Input 
                                             id="bvn" 
                                             type="text" 
                                             maxLength={11}
-                                            placeholder="Enter your 11-digit BVN" 
+                                            placeholder={t('settings.bvnPlaceholder')}
                                             value={bvn}
                                             onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
                                         />
@@ -1559,12 +1637,12 @@ function SettingsPageContent() {
                                             onClick={handleVerifyBvn}
                                             disabled={isVerifyingBvn || bvn.length !== 11}
                                         >
-                                            {isVerifyingBvn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                            Verify BVN
+                                            {isVerifyingBvn ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                                            {t('settings.verifyBvn')}
                                         </Button>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Your BVN is securely submitted directly to Paystack and is not permanently stored by Zeneva.
+                                        {t('settings.bvnHint')}
                                     </p>
                                 </div>
                             )}
@@ -1572,36 +1650,21 @@ function SettingsPageContent() {
                     </CardContent>
                 </Card>
 
-                {isInstallable && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5 text-primary" />App Installation</CardTitle>
-                            <CardDescription>Install Zeneva on this device for a native experience.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Button variant="default" className="w-full" onClick={promptInstall}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Install App
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
-
                 {isNative && (
                     <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Monitor className="h-5 w-5 text-primary" />
-                                Software Updates
+                                {t('settings.updatesTitle')}
                             </CardTitle>
                             <CardDescription>
-                                Check for the latest features and security updates for the Zeneva desktop app.
+                                {t('settings.updatesDescription')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center justify-between p-4 rounded-lg border bg-background">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium">Current Version</p>
+                                    <p className="text-sm font-medium">{t('settings.currentVersion')}</p>
                                     <p className="text-2xl font-bold text-primary">v{currentVersion}</p>
                                 </div>
                                 <Button
@@ -1611,34 +1674,22 @@ function SettingsPageContent() {
                                     className="border-primary text-primary hover:bg-primary hover:text-white"
                                 >
                                     {isCheckingUpdates ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2 className="me-2 h-4 w-4 animate-spin" />
                                     ) : (
-                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        <RefreshCw className="me-2 h-4 w-4" />
                                     )}
-                                    Check for Updates
+                                    {t('settings.checkUpdates')}
                                 </Button>
                             </div>
                         </CardContent>
                         <CardFooter>
                             <p className="text-xs text-muted-foreground italic">
-                                Note: Zeneva normally checks for updates automatically every hour.
+                                {t('settings.updatesNote')}
                             </p>
                         </CardFooter>
                     </Card>
                 )}
 
-                {/* Appearance - Placed at the very bottom as requested */}
-                <div className="pt-6 mt-6 border-t border-border/10">
-                    <Card className="border-border/15 dark:border-border/25 shadow-none hover:shadow-sm transition-shadow">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance & Theme</CardTitle>
-                            <CardDescription>Customize the visual interface of Zeneva.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <ThemeSwitcher />
-                        </CardContent>
-                    </Card>
-                </div>
                 </TabsContent>
             </Tabs>
         </div>

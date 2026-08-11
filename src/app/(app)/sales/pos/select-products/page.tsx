@@ -22,6 +22,7 @@ import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
 import { QrCode } from "lucide-react";
 import { ImageDialog } from "@/components/shared/image-dialog";
 import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
+import { useI18n } from "@/context/i18n-context";
 
 
 function ProductCardSkeleton() {
@@ -48,6 +49,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     addToCart: any,
     onPreview: (src: string, alt: string) => void
 }) => {
+    const { t } = useI18n();
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
             <CardContent 
@@ -73,16 +75,16 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                 <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground flex items-center gap-1.5 flex-wrap">
                     {product.name}
                     {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? (
-                        <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">Service</Badge>
+                        <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">{t('pos.serviceBadge')}</Badge>
                     ) : (
-                        (product.stock || 0) <= 0 && <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/10 text-red-500 border-red-500/20">Out of Stock</Badge>
+                        (product.stock || 0) <= 0 && <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/10 text-red-500 border-red-500/20">{t('pos.outOfStock')}</Badge>
                     )}
                 </CardTitle>
             </CardHeader>
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">
                     <span className="text-lg font-bold text-foreground dark:text-white">{currencySymbol}{product.price.toLocaleString()}</span>
-                    {product.baseUnit && <span className="text-[10px] text-muted-foreground">per {product.baseUnit}</span>}
+                    {product.baseUnit && <span className="text-[10px] text-muted-foreground">{t('pos.perUnit', { unit: product.baseUnit })}</span>}
                 </div>
 
                 {product.uomConversions && product.uomConversions.length > 0 ? (
@@ -93,7 +95,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Select Unit</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('pos.selectUnit')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuRadioGroup onValueChange={(unit) => {
                                 if (unit === 'base') {
@@ -105,10 +107,10 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                                     }
                                 }
                             }}>
-                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || 'Piece'} ({currencySymbol}{product.price.toLocaleString()})</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || t('pos.piece')} ({currencySymbol}{product.price.toLocaleString()})</DropdownMenuRadioItem>
                                 {product.uomConversions.map((uom) => (
                                     <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
-                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || 'pcs'}) - {currencySymbol}{(uom.price || product.price).toLocaleString()}
+                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || t('pos.pcs')}) - {currencySymbol}{(uom.price || product.price).toLocaleString()}
                                     </DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>
@@ -139,6 +141,7 @@ const CartContents = () => {
         resumeHeldSale,
         deleteHeldSale
     } = usePOS();
+    const { t } = useI18n();
 
     // Suppress SSR/client hydration mismatch: cart is read from localStorage which
     // doesn't exist on the server. Render a neutral placeholder until mounted.
@@ -158,7 +161,7 @@ const CartContents = () => {
             {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                     <ShoppingCart className="h-12 w-12" />
-                    <p className="mt-4">Your cart is empty.</p>
+                    <p className="mt-4">{t('pos.cartEmpty')}</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -171,7 +174,7 @@ const CartContents = () => {
                                 className="h-8 gap-1.5 px-2 text-xs font-medium border-dashed"
                             >
                                 <Archive className="h-3.5 w-3.5" />
-                                Hold
+                                {t('pos.hold')}
                             </Button>
                         </div>
                         <Button
@@ -181,17 +184,17 @@ const CartContents = () => {
                             className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1.5 px-2 text-xs font-medium"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
-                            Clear Cart
+                            {t('pos.clearCart')}
                         </Button>
                     </div>
                     {cart.map(item => {
                         const cartItemId = item.unit ? `${item.product.id}-${item.unit}` : item.product.id;
                         return (
                             <div key={cartItemId} className="flex justify-between items-center">
-                                <div className="flex-1 mr-4">
+                                <div className="flex-1 me-4">
                                     <p className="font-medium text-sm line-clamp-1">
                                         {item.product.name}
-                                        {item.unit && <Badge variant="secondary" className="ml-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
+                                        {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
                                     </p>
                                     <p className="text-xs text-muted-foreground">{currencySymbol}{(item.product.price * item.quantity).toLocaleString()}</p>
                                 </div>
@@ -212,7 +215,7 @@ const CartContents = () => {
                     })}
                     <Separator />
                     <div className="flex justify-between font-semibold">
-                        <span>Subtotal</span>
+                        <span>{t('common.subtotal')}</span>
                         <span>{currencySymbol}{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
@@ -236,6 +239,7 @@ export default function SelectProductsPage() {
         findProductBySku,
         fetchMoreProducts,
         isSyncing,
+        isFullSyncingProducts,
         heldSales,
         resumeHeldSale,
         deleteHeldSale,
@@ -243,6 +247,7 @@ export default function SelectProductsPage() {
     } = usePOS();
     const router = useRouter();
     const { toast } = useToast();
+    const { t } = useI18n();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
@@ -259,7 +264,14 @@ export default function SelectProductsPage() {
     const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
     const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    const isLoading = isNative ? (isPosLoading && (!products || products.length === 0)) : isPosLoading;
+    // On native, one cached product is enough to render — the rest streams in.
+    // On web there is no cache on a first login, and `isPosLoading` goes false
+    // as soon as the listener attaches, which is before any document arrives.
+    // Without the sync guard the grid falls straight through to "No products
+    // found" while the catalogue is still downloading.
+    const isLoading = isNative
+        ? (isPosLoading && (!products || products.length === 0))
+        : (isPosLoading || (isFullSyncingProducts && (!products || products.length === 0)));
 
     const performManualSearch = () => {
         if (!searchTerm.trim()) return;
@@ -273,7 +285,7 @@ export default function SelectProductsPage() {
             addToCart(exactMatch);
             setSearchTerm('');
             toast({
-                title: "Added to Cart",
+                title: t('pos.addedToCart'),
                 description: exactMatch.name
             });
         }
@@ -317,15 +329,15 @@ export default function SelectProductsPage() {
         if (product) {
             addToCart(product);
             toast({
-                title: "Product Added",
-                description: `${product.name} has been added to the cart.`,
+                title: t('pos.productAdded'),
+                description: t('pos.productAddedDescription', { name: product.name }),
             });
             setIsScannerOpen(false);
         } else {
             toast({
                 variant: "destructive",
-                title: "Product Not Found",
-                description: `No product found with SKU: ${sku}`,
+                title: t('pos.productNotFound'),
+                description: t('pos.productNotFoundDescription', { sku }),
             });
         }
     };
@@ -342,10 +354,10 @@ export default function SelectProductsPage() {
                 <div className="flex flex-col mb-4 gap-2 sticky top-0 bg-background py-2 z-10 border-b">
                     <div className="flex items-center gap-2">
                         <div className="relative flex-1 group">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                             <Input
-                                placeholder="Search name or SKU..."
-                                className="pl-8 ring-offset-background focus-visible:ring-primary h-11"
+                                placeholder={t('pos.searchNameOrSku')}
+                                className="ps-8 ring-offset-background focus-visible:ring-primary h-11"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => {
@@ -361,7 +373,7 @@ export default function SelectProductsPage() {
                             size="icon"
                             className="h-11 w-11 shrink-0 border shadow-sm hover:shadow-md transition-all active:scale-95"
                             onClick={performManualSearch}
-                            aria-label="Search"
+                            aria-label={t('common.search')}
                         >
                             <Search className="h-4 w-4" />
                         </Button>
@@ -370,6 +382,7 @@ export default function SelectProductsPage() {
                             size="icon"
                             className="h-11 w-11 md:hidden shrink-0 border-primary/20 text-primary hover:bg-primary/5"
                             onClick={() => setIsScannerOpen(true)}
+                            aria-label={t('pos.scanBarcode')}
                         >
                             <QrCode className="h-6 w-6" />
                         </Button>
@@ -377,15 +390,15 @@ export default function SelectProductsPage() {
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-11 gap-1.5 min-w-[44px]">
                                     <ListFilter className="h-4 w-4" />
-                                    <span className="sr-only sm:not-sr-only">Filter</span>
-                                    {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ml-1">1</Badge>}
+                                    <span className="sr-only sm:not-sr-only">{t('inventory.filter')}</span>
+                                    {categoryFilter !== 'all' && <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ms-1">1</Badge>}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t('pos.filterByCategory')}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuRadioGroup value={categoryFilter} onValueChange={setCategoryFilter}>
-                                    <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="all">{t('inventory.allCategories')}</DropdownMenuRadioItem>
                                     {business?.settings?.productCategories?.map(cat => (
                                         <DropdownMenuRadioItem key={cat} value={cat}>{cat}</DropdownMenuRadioItem>
                                     ))}
@@ -396,30 +409,35 @@ export default function SelectProductsPage() {
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" className="w-[150px] h-11 hidden lg:flex justify-between font-normal bg-background">
                                     <span className="flex items-center">
-                                        <Columns className="h-4 w-4 mr-2" />
-                                        {columnClass === 'lg:grid-cols-3' ? '3 Columns' : columnClass === 'lg:grid-cols-4' ? '4 Columns' : '5 Columns'}
+                                        <Columns className="h-4 w-4 me-2" />
+                                        {columnClass === 'lg:grid-cols-3' ? t('pos.columnsCount', { n: 3 }) : columnClass === 'lg:grid-cols-4' ? t('pos.columnsCount', { n: 4 }) : t('pos.columnsCount', { n: 5 })}
                                     </span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-[150px]">
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-3')}>3 Columns</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-4')}>4 Columns</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-5')}>5 Columns</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-3')}>{t('pos.columnsCount', { n: 3 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-4')}>{t('pos.columnsCount', { n: 4 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-5')}>{t('pos.columnsCount', { n: 5 })}</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                     {isSyncing && (
-                        <div className="flex items-center gap-2 ml-1">
+                        <div className="flex items-center gap-2 ms-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest leading-none">Global Catalog Syncing...</span>
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest leading-none">{t('pos.globalCatalogSyncing')}</span>
                         </div>
                     )}
                 </div>
                 <div className="pb-24 md:pb-0">
                     {isLoading || products === null ? (
-                        <div className="flex flex-col items-center justify-center p-12 min-h-[300px] text-center">
-                            <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
-                            <p className="text-muted-foreground animate-pulse">Filtering products...</p>
+                        // Skeleton tiles rather than a spinner: on a first login the
+                        // catalogue streams in from Firestore, and an empty grid used
+                        // to read as "you have no products". Tiles in the grid's own
+                        // shape say "these are loading" without claiming a count.
+                        <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <ProductCardSkeleton key={i} />
+                            ))}
                         </div>
                     ) : (
                         <>
@@ -441,18 +459,18 @@ export default function SelectProductsPage() {
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg min-h-[400px]">
                                     <Package className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
-                                    <h3 className="text-xl font-semibold">No products found</h3>
+                                    <h3 className="text-xl font-semibold">{t('pos.noProductsFound')}</h3>
                                     <p className="text-muted-foreground mt-2 mb-6 max-w-[250px] mx-auto">
-                                        {searchTerm ? `We couldn't find matches for "${searchTerm}" in your synchronized catalog.` : "This category is currently empty."}
+                                        {searchTerm ? t('pos.noProductsSearchHint', { term: searchTerm }) : t('pos.categoryEmpty')}
                                     </p>
                                     {searchTerm ? (
                                         <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); }}>
-                                            Clear Search
+                                            {t('pos.clearSearch')}
                                         </Button>
                                     ) : (
                                         <Button size="sm" asChild>
                                             <Link href="/inventory/add">
-                                                <PlusCircle className="h-4 w-4 mr-2" /> Add Product
+                                                <PlusCircle className="h-4 w-4 me-2" /> {t('inventory.addProduct')}
                                             </Link>
                                         </Button>
                                     )}
@@ -472,18 +490,18 @@ export default function SelectProductsPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <ShoppingCart className="h-5 w-5" />
-                            <span>Cart</span>
+                            <span>{t('pos.cart')}</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <ScrollArea className="h-96 pr-3">
+                        <ScrollArea className="h-96 pe-3">
                             <CartContents />
                         </ScrollArea>
                     </CardContent>
                     <CardFooter>
                         <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
-                            {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Next: Customer
+                            {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                            {t('pos.nextCustomer')}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -493,27 +511,27 @@ export default function SelectProductsPage() {
             <div className="md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
-                        <Button variant="default" className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+6px)] left-4 right-4 z-20 h-16 shadow-lg rounded-xl text-lg">
+                        <Button variant="default" className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+6px)] start-4 end-4 z-20 h-16 shadow-lg rounded-xl text-lg">
                             <div className="flex justify-between items-center w-full">
                                 <div className="flex items-center gap-2">
                                     <ChevronsUp className="h-5 w-5" />
-                                    <span>View Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})</span>
+                                    <span>{t('pos.viewCart', { n: cart.reduce((acc, item) => acc + item.quantity, 0) })}</span>
                                 </div>
                                 <span>{currencySymbol}{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="bottom" className="h-[75%] flex flex-col">
-                        <SheetHeader className="p-4 border-b text-left">
-                            <SheetTitle>Your Cart</SheetTitle>
+                        <SheetHeader className="p-4 border-b text-start">
+                            <SheetTitle>{t('pos.yourCart')}</SheetTitle>
                         </SheetHeader>
                         <ScrollArea className="flex-1 p-4">
                             <CartContents />
                         </ScrollArea>
                         <SheetFooter className="p-4 border-t bg-background">
                             <Button className="w-full" size="lg" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
-                                {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Next: Customer
+                                {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                                {t('pos.nextCustomer')}
                             </Button>
                         </SheetFooter>
                     </SheetContent>

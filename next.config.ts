@@ -27,6 +27,38 @@ const nextConfig: NextConfig = {
         destination: '/use-cases',
         permanent: true,
       },
+      // --- Blog consolidation (see the note at the bottom of blog-data.ts) ---
+      // These URLs are indexed, so they must 301 rather than 404. Removing the
+      // 301 later re-creates the soft-404s the cleanup was meant to clear.
+      //
+      // 128 templated industry x location doorway pages. Two slug shapes cover
+      // all of them; the regex is anchored to the template prefix so a future
+      // post that merely starts with "how-to-" is not swallowed.
+      {
+        source: '/blog/:slug(best-pos-system-for-[a-z0-9-]+-in-[a-z0-9-]+)',
+        destination: '/use-cases',
+        permanent: true,
+      },
+      {
+        source: '/blog/:slug(how-to-manage-[a-z0-9-]+-inventory-in-[a-z0-9-]+)',
+        destination: '/use-cases',
+        permanent: true,
+      },
+      // Seven contentless "best/affordable inventory software" stubs, all
+      // chasing the same query as the one surviving long-form comparison.
+      ...[
+        '10-best-free-inventory-management-apps-small-business-2025',
+        '5-best-inventory-systems-with-online-store-integration-2025',
+        'best-real-time-inventory-management-software-retail',
+        'affordable-inventory-software-small-business-nigeria',
+        'best-sales-point-system-ecommerce-integration',
+        'best-affordable-pos-systems-nigeria',
+        'best-inventory-management-software-nigeria',
+      ].map((slug) => ({
+        source: `/blog/${slug}`,
+        destination: '/blog/best-free-affordable-inventory-management-software-2025',
+        permanent: true,
+      })),
     ];
   },
   experimental: {

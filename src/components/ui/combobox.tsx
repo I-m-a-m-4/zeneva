@@ -29,6 +29,9 @@ type ComboboxProps = {
   searchPlaceholder?: string
   emptyPlaceholder?: string
   triggerClassName?: string
+  /** Overrides the default "match the trigger width" sizing of the popover. */
+  contentClassName?: string
+  itemClassName?: string
   disabled?: boolean
   avoidCollisions?: boolean
   sideOffset?: number
@@ -45,6 +48,8 @@ export function Combobox({
   searchPlaceholder = "Search...",
   emptyPlaceholder = "No results found.",
   triggerClassName,
+  contentClassName,
+  itemClassName,
   disabled = false,
   avoidCollisions = true,
   sideOffset = 4,
@@ -76,8 +81,14 @@ export function Combobox({
         align="start"
         avoidCollisions={avoidCollisions}
         sideOffset={sideOffset}
-        className="w-full p-0"
-        style={{ width: "var(--radix-popover-trigger-width)" }}
+        className={cn("p-0", contentClassName ?? "w-full")}
+        // An inline width always beats a class, so callers that pass their own
+        // sizing get a floor instead — the panel can grow past a narrow trigger.
+        style={
+          contentClassName
+            ? { minWidth: "var(--radix-popover-trigger-width)" }
+            : { width: "var(--radix-popover-trigger-width)" }
+        }
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
@@ -92,7 +103,7 @@ export function Combobox({
                     onChange(option.value === value ? "" : option.value)
                     setOpen(false)
                   }}
-                  className="cursor-pointer"
+                  className={cn("cursor-pointer", itemClassName)}
                 >
                   <Check
                     className={cn(

@@ -1,14 +1,28 @@
-
 'use client';
 
+/**
+ * Platform user directory.
+ *
+ * Despite living beside the tenant staff screens, this page has always listed
+ * *every* user on Zeneva — its users query is unscoped and the page is gated to
+ * the platform owner. It is now built for that job: search, segment filters and
+ * a row-click through to the per-user detail page.
+ *
+ * Read cost: two collection reads for the whole page (`users` +
+ * `businessInstances`), joined in memory. Everything deeper is deferred to the
+ * detail page, so browsing the directory costs the same whether the platform has
+ * ten users or ten thousand.
+ */
+
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -16,11 +30,34 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, ArrowUpDown, Clock, Calendar } from "lucide-react";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  PlusCircle,
+  User,
+  MoreHorizontal,
+  AlertCircle,
+  Trash2,
+  Mail,
+  UserCheck,
+  UserX,
+  Search,
+  Download,
+  ChevronRight,
+  Laptop,
+  Smartphone,
+  Globe,
+} from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, query, where, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, query, where, deleteDoc, runTransaction } from 'firebase/firestore';
 import type { UserProfile, Invitation, BusinessInstance } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +66,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import AddUserDialog from '@/components/users/add-user-dialog';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AppConfig } from '@/lib/config';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -47,8 +83,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { downloadCsv } from '@/lib/csv';
+import { UserPresence, formatDuration, toDate } from '@/components/admin/user-detail/user-primitives';
+import {
+  businessIndex,
+  planOf,
+  segmentOf,
+  segmentCounts,
+  SEGMENT_LABELS,
+  SEGMENT_BADGE_CLASS,
+  type UserSegment,
+} from '@/components/admin/user-detail/user-segments';
 
-// Hook to get current user's profile, including businessId and role
 function useCurrentUserProfile() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -61,75 +107,104 @@ function useCurrentUserProfile() {
   return { profile: userProfile, isLoading };
 }
 
+const DeviceIcon = ({ device }: { device?: string }) => {
+  if (!device) return <span className="text-muted-foreground">—</span>;
+  const Icon = device.includes('Desktop') ? Laptop : device.includes('Mobile') ? Smartphone : Globe;
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+      <span className="text-xs">{device}</span>
+    </span>
+  );
+};
+
+const StatTile = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => (
+  <Card className="p-3">
+    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <p className="mt-1 text-2xl font-bold leading-none">{value}</p>
+    {hint && <p className="mt-1 truncate text-[10px] text-muted-foreground">{hint}</p>}
+  </Card>
+);
+
+// Kept in one place so the skeleton and the loaded table cannot drift apart —
+// they had, which is what made the loading state's columns misalign.
+const COLUMNS = [
+  { key: 'user', label: 'User', className: 'min-w-[200px]' },
+  { key: 'business', label: 'Business', className: 'hidden md:table-cell min-w-[160px]' },
+  { key: 'role', label: 'Role', className: 'min-w-[100px]' },
+  { key: 'plan', label: 'Plan', className: 'hidden lg:table-cell min-w-[90px]' },
+  { key: 'usage', label: 'Usage', className: 'hidden xl:table-cell min-w-[90px]' },
+  { key: 'seen', label: 'Last active', className: 'hidden sm:table-cell min-w-[140px]' },
+  { key: 'segment', label: 'Segment', className: 'hidden lg:table-cell min-w-[100px]' },
+  { key: 'status', label: 'Status', className: 'min-w-[90px]' },
+  { key: 'device', label: 'Device', className: 'hidden xl:table-cell min-w-[130px]' },
+  { key: 'version', label: 'Version', className: 'hidden xl:table-cell min-w-[110px]' },
+  { key: 'actions', label: '', className: 'w-[80px] text-right' },
+];
+
+function UserTableHeader() {
+  return (
+    <TableHeader>
+      <TableRow>
+        {COLUMNS.map(c => (
+          <TableHead key={c.key} className={c.className}>
+            {c.label || <span className="sr-only">Actions</span>}
+          </TableHead>
+        ))}
+      </TableRow>
+    </TableHeader>
+  );
+}
+
 function UserRowSkeleton() {
   return (
     <TableRow>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="space-y-2 w-full">
-            <Skeleton className="h-5 w-1/2" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="hidden sm:table-cell">
-        <Skeleton className="h-5 w-full" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-6 w-24" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-6 w-24" />
-      </TableCell>
-      <TableCell className="text-right">
-        <Skeleton className="h-8 w-8 ml-auto" />
-      </TableCell>
+      {COLUMNS.map(c => (
+        <TableCell key={c.key} className={c.className}>
+          <Skeleton className="h-5 w-full" />
+        </TableCell>
+      ))}
     </TableRow>
-  )
+  );
 }
 
 export default function UsersPage() {
   const { profile: currentUser, isLoading: isProfileLoading } = useCurrentUserProfile();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
+
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
   const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
-  const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile, action: 'activate' | 'deactivate' } | null>(null);
-  const [sortBy, setSortBy] = React.useState<'active' | 'joined' | 'name'>('active');
+  const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile; action: 'activate' | 'deactivate' } | null>(null);
 
-  const businessDocRef = useMemoFirebase(() => {
-    if (!currentUser?.businessId || !firestore) return null;
-    return doc(firestore, 'businessInstances', currentUser.businessId);
-  }, [currentUser?.businessId, firestore]);
-  const { data: businessInstance, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessDocRef);
+  const [search, setSearch] = React.useState('');
+  const [roleFilter, setRoleFilter] = React.useState('all');
+  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [planFilter, setPlanFilter] = React.useState('all');
+  const [segmentFilter, setSegmentFilter] = React.useState('all');
+  const [sortBy, setSortBy] = React.useState<'active' | 'joined' | 'name' | 'usage'>('active');
 
-  const canManageUsers = currentUser?.role === 'imamshaffy' || 
-                         currentUser?.id === 'jzQgCHzaObeUbeYklTLtQQh03G53' || 
+  // UI gate only; src/actions/admin-guard.ts is the real one, and firestore.rules
+  // is what actually stops a non-owner reading this collection.
+  const canManageUsers = currentUser?.id === 'jzQgCHzaObeUbeYklTLtQQh03G53' ||
                          currentUser?.email === 'belloimam431@gmail.com';
 
   const usersQuery = useMemoFirebase(() => {
     if (!firestore || !canManageUsers) return null;
-    return query(collection(firestore, "users"));
+    return query(collection(firestore, 'users'));
   }, [canManageUsers, firestore]);
+  // `useCollection` is a live onSnapshot listener, so status writes below reflect
+  // themselves — there is no refetch to call.
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
-  const sortedUsers = React.useMemo(() => {
-    if (!users) return [];
-    return [...users].sort((a, b) => {
-      if (sortBy === 'active') {
-        const dateA = a.lastSeen ? a.lastSeen.toDate() : new Date(0);
-        const dateB = b.lastSeen ? b.lastSeen.toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      } else if (sortBy === 'joined') {
-        const dateA = a.createdAt ? a.createdAt.toDate() : new Date(0);
-        const dateB = b.createdAt ? b.createdAt.toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      } else {
-        return a.name.localeCompare(b.name);
-      }
-    });
-  }, [users, sortBy]);
+  // One read for every business, joined in memory below. A per-user lookup would
+  // be one read per row, which is exactly what this page must not do.
+  const businessesQuery = useMemoFirebase(() => {
+    if (!firestore || !canManageUsers) return null;
+    return query(collection(firestore, 'businessInstances'));
+  }, [canManageUsers, firestore]);
+  const { data: businesses, isLoading: areBusinessesLoading } = useCollection<BusinessInstance>(businessesQuery);
 
   const invitationsQuery = useMemoFirebase(() => {
     if (!currentUser?.businessId || !firestore) return null;
@@ -137,7 +212,65 @@ export default function UsersPage() {
   }, [currentUser?.businessId, firestore]);
   const { data: invitations, isLoading: areInvitationsLoading } = useCollection<Invitation>(invitationsQuery);
 
-  const isLoading = isProfileLoading || areUsersLoading || areInvitationsLoading || isBusinessLoading;
+  const isLoading = isProfileLoading || areUsersLoading || areBusinessesLoading || areInvitationsLoading;
+
+  const bizIndex = React.useMemo(() => businessIndex(businesses), [businesses]);
+
+  const summary = React.useMemo(() => {
+    const all = users ?? [];
+    const counts = segmentCounts(all);
+    const outdated = all.filter(u => u.appVersion && u.appVersion !== AppConfig.version).length;
+    const blocked = all.filter(u => u.status === 'inactive' || u.status === 'suspended').length;
+    return { total: all.length, counts, outdated, blocked };
+  }, [users]);
+
+  const visibleUsers = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    const filtered = (users ?? []).filter(u => {
+      if (roleFilter !== 'all' && (u.role || 'vendor_operator') !== roleFilter) return false;
+      if (statusFilter !== 'all' && (u.status || 'active') !== statusFilter) return false;
+      if (planFilter !== 'all' && planOf(u, bizIndex).toLowerCase() !== planFilter) return false;
+      if (segmentFilter !== 'all' && segmentOf(u) !== segmentFilter) return false;
+
+      if (!term) return true;
+      const business = u.businessId ? bizIndex.get(u.businessId) : undefined;
+      return (
+        (u.name || '').toLowerCase().includes(term) ||
+        (u.email || '').toLowerCase().includes(term) ||
+        (u.phone || '').toLowerCase().includes(term) ||
+        (business?.name || '').toLowerCase().includes(term)
+      );
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'usage') return (b.totalUsageSeconds ?? 0) - (a.totalUsageSeconds ?? 0);
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+      const key = sortBy === 'joined' ? 'createdAt' : 'lastSeen';
+      return (toDate((b as any)[key])?.getTime() ?? 0) - (toDate((a as any)[key])?.getTime() ?? 0);
+    });
+  }, [users, bizIndex, search, roleFilter, statusFilter, planFilter, segmentFilter, sortBy]);
+
+  const handleExport = () => {
+    const rows = [
+      ['Name', 'Email', 'Phone', 'Business', 'Role', 'Plan', 'Status', 'Segment',
+       'Total usage (s)', 'Page views', 'Last seen', 'Joined', 'Device', 'Country', 'Language', 'App version', 'User ID'],
+      ...visibleUsers.map(u => {
+        const business = u.businessId ? bizIndex.get(u.businessId) : undefined;
+        const seen = toDate(u.lastSeen);
+        const joined = toDate(u.createdAt);
+        return [
+          u.name, u.email, u.phone, business?.name, u.role, planOf(u, bizIndex),
+          u.status || 'active', SEGMENT_LABELS[segmentOf(u)],
+          u.totalUsageSeconds ?? 0, u.pagesVisited ?? 0,
+          seen ? seen.toISOString() : '', joined ? joined.toISOString() : '',
+          u.deviceType, u.country, u.language, u.appVersion, u.id,
+        ];
+      }),
+    ];
+    downloadCsv(`zeneva-users-${format(new Date(), 'yyyy-MM-dd')}.csv`, rows);
+    toast({ title: 'Export started', description: `${visibleUsers.length} users written to CSV.` });
+  };
 
   const handleRevokeInvitation = async () => {
     if (!invitationToRevoke || !firestore) return;
@@ -160,9 +293,7 @@ export default function UsersPage() {
     try {
       await runTransaction(firestore, async (transaction) => {
         const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User does not exist.");
-        }
+        if (!userDoc.exists()) throw new Error('User does not exist.');
         transaction.update(userRef, { status: newStatus });
       });
       toast({ title: `User ${userToUpdate.action}d`, description: `${userToUpdate.user.name}'s account has been ${userToUpdate.action}d.`, variant: 'success' });
@@ -171,52 +302,38 @@ export default function UsersPage() {
     } finally {
       setUserToUpdate(null);
     }
-  }
+  };
+
+  const openUser = (id: string) => router.push(`/admin-imamshaffy/users/detail?id=${encodeURIComponent(id)}`);
 
   return (
     <>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="w-full md:col-span-2">
+      <div className="grid gap-6">
+        <Card className="w-full">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <CardTitle>User & Staff Management</CardTitle>
+                <CardTitle>Platform Users</CardTitle>
                 <CardDescription>
-                  Invite and manage roles for your business.
+                  Every account on Zeneva. Select a user to see their full history.
                 </CardDescription>
               </div>
-              <Button size="lg" className="h-9 gap-1" disabled={!canManageUsers} onClick={() => setIsAddUserDialogOpen(true)}>
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Invite User
-                </span>
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 gap-1 ml-2">
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only">Sort: {sortBy === 'active' ? 'Last Active' : sortBy === 'joined' ? 'Date Joined' : 'Name'}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Sort Users By</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setSortBy('active')}>
-                    <Clock className="mr-2 h-4 w-4" /> Last Active
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy('joined')}>
-                    <Calendar className="mr-2 h-4 w-4" /> Date Joined
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSortBy('name')}>
-                    <User className="mr-2 h-4 w-4" /> Name
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={handleExport} disabled={!visibleUsers.length}>
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden whitespace-nowrap sm:inline">Export CSV</span>
+                </Button>
+                <Button size="sm" className="h-9 gap-1" disabled={!canManageUsers} onClick={() => setIsAddUserDialogOpen(true)}>
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="whitespace-nowrap">Invite User</span>
+                </Button>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
+
+          <CardContent className="space-y-4">
             {!canManageUsers && (
-              <Alert variant="destructive" className="mb-6">
+              <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Permission Denied</AlertTitle>
                 <AlertDescription>
@@ -224,143 +341,288 @@ export default function UsersPage() {
                 </AlertDescription>
               </Alert>
             )}
+
+            {canManageUsers && (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  <StatTile label="Total users" value={summary.total.toLocaleString()} />
+                  <StatTile label="Power users" value={summary.counts.power} hint="Active 7d, 5h+ total" />
+                  <StatTile label="Active" value={summary.counts.active} hint="Seen in last 7 days" />
+                  <StatTile label="At risk" value={summary.counts.at_risk} hint="Quiet 8–30 days" />
+                  <StatTile label="Dormant" value={summary.counts.dormant} hint="Quiet 30+ days" />
+                  <StatTile label="Blocked" value={summary.blocked} hint="Inactive or suspended" />
+                </div>
+
+                {/* One filter row, scoping the table and the export below it. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[200px] flex-1">
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                    <Input
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search name, email, phone or business…"
+                      className="h-9 pl-8 text-sm"
+                      aria-label="Search users"
+                    />
+                  </div>
+                  <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+                    <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Segment" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All segments</SelectItem>
+                      {(Object.keys(SEGMENT_LABELS) as UserSegment[]).map(s => (
+                        <SelectItem key={s} value={s}>{SEGMENT_LABELS[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="h-9 w-[120px] text-xs"><SelectValue placeholder="Role" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="vendor_operator">Operator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-9 w-[120px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      {/* Written by the Cyber Shield hard-kill. */}
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="deleted">Deleted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={planFilter} onValueChange={setPlanFilter}>
+                    <SelectTrigger className="h-9 w-[120px] text-xs"><SelectValue placeholder="Plan" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All plans</SelectItem>
+                      <SelectItem value="starter">Starter</SelectItem>
+                      <SelectItem value="pro">Pro</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="lifetime">Lifetime</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                    <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Last active</SelectItem>
+                      <SelectItem value="joined">Date joined</SelectItem>
+                      <SelectItem value="usage">Most usage</SelectItem>
+                      <SelectItem value="name">Name A–Z</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Showing {visibleUsers.length.toLocaleString()} of {summary.total.toLocaleString()} users
+                  {summary.outdated > 0 && ` · ${summary.outdated} on an outdated app version`}
+                </p>
+              </>
+            )}
+
             {isLoading ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead className="hidden sm:table-cell">Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Last Active</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>App Version</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <UserRowSkeleton />
-                  <UserRowSkeleton />
-                </TableBody>
-              </Table>
-            ) : users && users.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead className="hidden sm:table-cell">Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Last Active</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>App Version</TableHead>
-                    <TableHead><span className='sr-only'>Actions</span></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="font-medium">{user.name}</div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={(user.role || 'operator') === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                          {(user.role || 'operator').replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {user.lastSeen ? formatDistanceToNow(user.lastSeen.toDate(), { addSuffix: true }) : 'Never'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
-                          {user.status || 'active'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.appVersion ? (
-                          <Badge variant={user.appVersion === AppConfig.version ? 'default' : 'destructive'} className="font-mono text-[10px]">
-                            v{user.appVersion} {user.appVersion !== AppConfig.version && '(Outdated)'}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs italic">Unknown</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              aria-haspopup="true"
-                              size="icon"
-                              variant="ghost"
-                              disabled={!canManageUsers || currentUser.id === user.id}
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <UserTableHeader />
+                  <TableBody>
+                    <UserRowSkeleton />
+                    <UserRowSkeleton />
+                    <UserRowSkeleton />
+                  </TableBody>
+                </Table>
+              </div>
+            ) : visibleUsers.length > 0 ? (
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <UserTableHeader />
+                  <TableBody>
+                    {visibleUsers.map((user) => {
+                      const business = user.businessId ? bizIndex.get(user.businessId) : undefined;
+                      const segment = segmentOf(user);
+                      const outdated = !!user.appVersion && user.appVersion !== AppConfig.version;
+                      return (
+                        <TableRow
+                          key={user.id}
+                          className="cursor-pointer"
+                          onClick={() => openUser(user.id)}
+                          tabIndex={0}
+                          role="link"
+                          aria-label={`Open ${user.name}'s profile`}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUser(user.id); }
+                          }}
+                        >
+                          <TableCell>
+                            <div className="font-medium">{user.name}</div>
+                            <div className="break-all text-xs text-muted-foreground">{user.email}</div>
+                            {/* Columns that drop out by breakpoint are restated
+                                here so nothing is lost on a narrow screen. */}
+                            <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
+                              {business?.name || 'No business'}
+                              <span className="sm:hidden">
+                                {' · '}
+                                {toDate(user.lastSeen)
+                                  ? formatDistanceToNow(toDate(user.lastSeen)!, { addSuffix: true })
+                                  : 'Never'}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">—</span>}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={(user.role || 'vendor_operator') === 'admin' ? 'default' : 'secondary'} className="whitespace-nowrap capitalize">
+                              {(user.role || 'operator').replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <span className="text-xs capitalize">{planOf(user, bizIndex)}</span>
+                          </TableCell>
+                          <TableCell className="hidden whitespace-nowrap text-xs tabular-nums xl:table-cell">
+                            {formatDuration(user.totalUsageSeconds ?? 0)}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <UserPresence lastSeen={user.lastSeen} />
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <Badge variant="outline" className={`whitespace-nowrap text-[10px] ${SEGMENT_BADGE_CLASS[segment]}`}>
+                              {SEGMENT_LABELS[segment]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={user.status === 'inactive' || user.status === 'suspended' ? 'destructive' : 'outline'}
+                              className="capitalize"
                             >
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            {user.status === 'inactive' ? (
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'activate' }); }}>
-                                <UserCheck className="mr-2 h-4 w-4" /> Activate User
-                              </DropdownMenuItem>
+                              {user.status || 'active'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell">
+                            <DeviceIcon device={user.deviceType} />
+                            {user.country && <div className="text-[10px] text-muted-foreground">{user.country}</div>}
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell">
+                            {user.appVersion ? (
+                              <Badge variant={outdated ? 'destructive' : 'default'} className="whitespace-nowrap font-mono text-[10px]">
+                                v{user.appVersion}
+                              </Badge>
                             ) : (
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
-                                <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                              </DropdownMenuItem>
+                              <span className="text-xs italic text-muted-foreground">Unknown</span>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-0.5">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    aria-haspopup="true"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    disabled={!canManageUsers || currentUser?.id === user.id}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Actions for {user.name}</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem className="cursor-pointer" onSelect={() => openUser(user.id)}>
+                                    <User className="mr-2 h-4 w-4" /> View full profile
+                                  </DropdownMenuItem>
+                                  {user.status === 'inactive' || user.status === 'suspended' ? (
+                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'activate' }); }}>
+                                      <UserCheck className="mr-2 h-4 w-4" /> Activate user
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setUserToUpdate({ user, action: 'deactivate' }); }}>
+                                      <UserX className="mr-2 h-4 w-4" /> Deactivate user
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
+              <div className="flex h-full flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center">
                 <User className="h-12 w-12 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mt-4">No Staff Found</h3>
-                <p className="text-muted-foreground mt-2 mb-4">Invite your first team member to get started.</p>
+                <h3 className="mt-4 text-xl font-semibold">
+                  {summary.total > 0 ? 'No users match these filters' : 'No users found'}
+                </h3>
+                <p className="mb-4 mt-2 text-muted-foreground">
+                  {summary.total > 0
+                    ? 'Try clearing the search or widening a filter.'
+                    : 'Invite your first team member to get started.'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {canManageUsers && (
-          <Card className="md:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle>Pending Invitations</CardTitle>
-              <CardDescription>These users have been invited but have not yet signed up.</CardDescription>
+              <CardDescription>
+                Invited to your own business and not yet signed up. This card is scoped to your
+                business, not the whole platform.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {areInvitationsLoading ? (
                 <div className="p-4 text-center text-muted-foreground">Loading invitations...</div>
               ) : invitations && invitations.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Invited</TableHead>
-                      <TableHead><span className="sr-only">Actions</span></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invitations.map(invitation => (
-                      <TableRow key={invitation.id}>
-                        <TableCell className="font-medium">{invitation.email}</TableCell>
-                        <TableCell><Badge variant="outline" className="capitalize">{invitation.role.replace('_', ' ')}</Badge></TableCell>
-                        <TableCell className="text-muted-foreground">{invitation.createdAt ? formatDistanceToNow(invitation.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                <div className="w-full overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[200px]">Email</TableHead>
+                        <TableHead className="min-w-[110px]">Role</TableHead>
+                        <TableHead className="hidden min-w-[130px] sm:table-cell">Invited</TableHead>
+                        <TableHead className="w-[60px] text-right"><span className="sr-only">Actions</span></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {invitations.map(invitation => (
+                        <TableRow key={invitation.id}>
+                          <TableCell className="break-all font-medium">
+                            {invitation.email}
+                            <div className="text-xs font-normal text-muted-foreground sm:hidden">
+                              {toDate(invitation.createdAt)
+                                ? formatDistanceToNow(toDate(invitation.createdAt)!, { addSuffix: true })
+                                : 'Just now'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="whitespace-nowrap capitalize">{invitation.role.replace('_', ' ')}</Badge>
+                          </TableCell>
+                          <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
+                            {toDate(invitation.createdAt)
+                              ? formatDistanceToNow(toDate(invitation.createdAt)!, { addSuffix: true })
+                              : 'Just now'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="destructive" size="sm" onClick={() => setInvitationToRevoke(invitation)}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Revoke invitation for {invitation.email}</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
-                <div className="text-center text-muted-foreground p-8">
+                <div className="p-8 text-center text-muted-foreground">
                   <Mail className="mx-auto h-12 w-12 opacity-50" />
                   <p className="mt-4">No pending invitations.</p>
                 </div>
@@ -375,8 +637,13 @@ export default function UsersPage() {
           isOpen={isAddUserDialogOpen}
           onOpenChange={setIsAddUserDialogOpen}
           businessId={currentUser.businessId}
-          businessName={businessInstance?.name || ''}
+          businessName={bizIndex.get(currentUser.businessId)?.name || ''}
           inviterName={currentUser.name}
+          // `users` is the platform-wide collection, so count this business's own
+          // members rather than every user on Zeneva — otherwise the plan seat
+          // limit trips for everyone.
+          currentUserCount={(users || []).filter(u => u.businessId === currentUser.businessId).length}
+          pendingInvitationCount={invitations?.length || 0}
         />
       )}
 
@@ -384,7 +651,9 @@ export default function UsersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>This will revoke the invitation for <strong>{invitationToRevoke?.email}</strong>. They will not be able to join your business unless you invite them again.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This will revoke the invitation for <strong>{invitationToRevoke?.email}</strong>. They will not be able to join your business unless you invite them again.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

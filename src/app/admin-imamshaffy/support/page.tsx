@@ -17,6 +17,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ToastAction } from '@/components/ui/toast';
+import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic';
+import { useI18n } from '@/context/i18n-context';
 import { Bot } from 'lucide-react';
 
 interface AISupportLog {
@@ -147,6 +150,7 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
 function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: UserProfile }) {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { t } = useI18n();
     const [reply, setReply] = React.useState('');
     const [isSending, setIsSending] = React.useState(false);
     
@@ -317,18 +321,9 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
 
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await acquireMicStream();
             audioChunksRef.current = [];
-            let mimeType = 'audio/webm';
-            if (typeof MediaRecorder !== 'undefined') {
-                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    mimeType = 'audio/webm;codecs=opus';
-                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    mimeType = 'audio/mp4';
-                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-                    mimeType = 'audio/ogg;codecs=opus';
-                }
-            }
+            const mimeType = pickAudioMimeType();
             const mediaRecorder = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mediaRecorder;
 
@@ -380,8 +375,16 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                 setRecordingSeconds(s => s + 1);
             }, 1000);
         } catch (err) {
-            console.error("Microphone access denied:", err);
-            toast({ variant: 'destructive', title: 'Mic Access Denied', description: 'Please enable microphone permission in your browser.' });
+            const failure = describeMicError(err);
+            console.error(`Microphone unavailable (${failure.kind}):`, err);
+            toast({
+                variant: 'destructive',
+                title: t(failure.titleKey),
+                description: t(failure.bodyKey),
+                action: failure.recoverable
+                    ? <ToastAction altText={t('common.tryAgain')} onClick={() => { void startRecording(); }}>{t('common.tryAgain')}</ToastAction>
+                    : undefined,
+            });
         }
     };
 

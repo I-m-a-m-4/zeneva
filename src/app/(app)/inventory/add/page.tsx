@@ -45,6 +45,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
+import { effectivePlan, productLimit } from '@/lib/plan';
 import { logAuditEvent } from '@/lib/audit';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -80,11 +81,6 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-const PRODUCT_LIMITS = {
-  starter: 500,
-  pro: 1500,
-  business: Infinity,
-};
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -286,8 +282,8 @@ export default function AddProductPage() {
       return;
     }
 
-    const currentPlan = business.plan || 'starter';
-    const limit = PRODUCT_LIMITS[currentPlan as keyof typeof PRODUCT_LIMITS] || 500;
+    const currentPlan = effectivePlan(business);
+    const limit = productLimit(business);
 
     if (limit !== Infinity && products.length >= limit) {
       toast({

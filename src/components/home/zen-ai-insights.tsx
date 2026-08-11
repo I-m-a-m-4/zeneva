@@ -3,24 +3,28 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Sparkles } from 'lucide-react';
+import { useI18n } from '@/context/i18n-context';
 
+// Keys, not copy — the rotation indices are locale-independent, so the arrays
+// can stay at module scope and only the lookup happens at render.
 const foodInsights = [
-    "This snack sells most on Wednesdays between 4–7 PM. Prepare 28 units. Producing more wastes cash.",
-    "Fresh bread moves fast on rainy mornings. Bake 15 extra loaves to meet demand.",
-    "Milk expires in 2 days. Mark down by 20% now to clear stock before loss.",
-    "Lunch rush incoming. Pre-pack 50 sandwiches to reduce wait times.",
-    "Vegetable waste is up 10%. Reduce order quantity for next shipment."
+    'landing.zenFood1',
+    'landing.zenFood2',
+    'landing.zenFood3',
+    'landing.zenFood4',
+    'landing.zenFood5',
 ];
 
 const fashionInsights = [
-    "Blue denim sales spike 40% on pay-day weekends. Stock 15 extra units to capture demand.",
-    "Summer dresses are trending. Move to front window display to increase foot traffic.",
-    "Red sneakers are low in stock. Reorder now to avoid missing weekend sales.",
-    "Customer X buys formal wear every 3 months. Send personalized offer now.",
-    "Winter coats are moving slow. Bundle with scarves to clear inventory."
+    'landing.zenFashion1',
+    'landing.zenFashion2',
+    'landing.zenFashion3',
+    'landing.zenFashion4',
+    'landing.zenFashion5',
 ];
 
 export function ZenAIInsights() {
+    const { t } = useI18n();
     const containerRef = useRef<HTMLDivElement>(null);
     const [hasTriggered, setHasTriggered] = useState(false);
     const [foodIndex, setFoodIndex] = useState(0);
@@ -93,12 +97,12 @@ export function ZenAIInsights() {
                     className="relative group cursor-pointer transform hover:scale-[1.02] transition-transform duration-300"
                 >
                     {/* Icon - Outside Clipping */}
-                    <div className="absolute -top-3 -left-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
+                    <div className="absolute -top-3 -start-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
                         <Bot className="w-4 h-4 text-emerald-600" />
                     </div>
 
                     {/* Clipped Card Container */}
-                    <div className={`relative rounded-2xl rounded-tl-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFoodPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
+                    <div className={`relative rounded-2xl rounded-ss-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFoodPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
                         {/* Spinning Beam Background */}
                         <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_280deg,#10b981_360deg)] animate-[spin_8s_linear_infinite] opacity-0 blur-md transition-opacity duration-300 ${isFoodPulsing ? 'opacity-100' : ''}`}></div>
 
@@ -106,10 +110,10 @@ export function ZenAIInsights() {
                         <div className="relative bg-white p-5 h-full rounded-[inherit]">
                             <div className="flex items-center gap-2 mb-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Food & Perishables</span>
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">{t('landing.zenFoodLabel')}</span>
                             </div>
                             <p className="text-slate-700 text-sm leading-relaxed font-medium min-h-[60px] flex items-center transition-opacity duration-300">
-                                “{foodInsights[foodIndex]}”
+                                “{t(foodInsights[foodIndex])}”
                             </p>
                         </div>
                     </div>
@@ -118,22 +122,22 @@ export function ZenAIInsights() {
                 {/* Bubble 2 */}
                 <div
                     onClick={handleFashionClick}
-                    className="relative group cursor-pointer transform hover:scale-[1.02] transition-transform duration-300 ml-6"
+                    className="relative group cursor-pointer transform hover:scale-[1.02] transition-transform duration-300 ms-6"
                 >
-                    <div className="absolute -top-3 -right-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
+                    <div className="absolute -top-3 -end-3 bg-white border border-slate-100 p-1.5 rounded-full shadow-sm z-20">
                         <Bot className="w-4 h-4 text-blue-600" />
                     </div>
 
-                    <div className={`relative rounded-2xl rounded-tr-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFashionPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
+                    <div className={`relative rounded-2xl rounded-se-sm overflow-hidden bg-white shadow-xl transition-all duration-300 ${isFashionPulsing ? 'p-[2px]' : 'border border-slate-100'}`}>
                         <div className={`absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_280deg,#3b82f6_360deg)] animate-[spin_8s_linear_infinite] opacity-0 blur-md transition-opacity duration-300 ${isFashionPulsing ? 'opacity-100' : ''}`}></div>
 
                         <div className="relative bg-white p-5 h-full rounded-[inherit]">
                             <div className="flex items-center gap-2 mb-2">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">Fashion & Retail</span>
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">{t('landing.zenFashionLabel')}</span>
                             </div>
                             <p className="text-slate-700 text-sm leading-relaxed font-medium min-h-[60px] flex items-center transition-opacity duration-300">
-                                “{fashionInsights[fashionIndex]}”
+                                “{t(fashionInsights[fashionIndex])}”
                             </p>
                         </div>
                     </div>

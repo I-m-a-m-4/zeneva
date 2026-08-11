@@ -13,6 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, Globe, X, CheckCircle2, Trash2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Markdown } from '@/components/ai-insights/markdown';
+import { openExternal } from '@/lib/platform';
+import { collapseDuplicateNotifications } from '@/lib/lifecycle-notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -45,13 +48,19 @@ export default function NotificationsPage() {
       const dateB = safeToDate(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
-    return combined;
+    // Accounts that ran the old localStorage-guarded schedule have repeats of
+    // the same announcement sitting in Firestore. Fold them to the newest copy
+    // rather than deleting anyone's data. Operational alerts pass through.
+    return collapseDuplicateNotifications(combined as any[]);
   }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
-  const unreadCount = React.useMemo(() => {
-    if (!userNotifications) return 0;
-    return userNotifications.filter(n => !n.read).length;
-  }, [userNotifications]);
+  // Counted off the collapsed list so the badge matches what is actually on
+  // screen. "Mark all read" and "Clear All" still act on every raw document,
+  // including the folded-away duplicates.
+  const unreadCount = React.useMemo(
+    () => allNotifications.filter((n: any) => !n.isGlobal && !n.read).length,
+    [allNotifications]
+  );
 
   const handleMarkAsRead = React.useCallback(async () => {
     if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
@@ -122,8 +131,13 @@ export default function NotificationsPage() {
 
     const targetLink = getNotificationLink(notif);
 
-    if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
-      window.open(targetLink, '_blank');
+    // Store links and other external URLs go through openExternal: window.open
+    // is a no-op inside the Tauri webview, so on desktop and Android the
+    // "download us on the Microsoft Store" notification did nothing at all.
+    // openExternal hands off to the OS and prefers the ms-windows-store deep
+    // link so the Store app opens rather than a browser tab.
+    if (/^https?:\/\//i.test(targetLink)) {
+      await openExternal(targetLink);
     } else {
       router.push(targetLink);
     }
@@ -213,9 +227,9 @@ export default function NotificationsPage() {
                       </span>
                     </div>
                     
-                    <p className="text-sm text-muted-foreground leading-relaxed break-words pr-8">
-                      {notif.body}
-                    </p>
+                    <Markdown className="text-sm text-muted-foreground leading-relaxed break-words pr-8">
+                      {notif.body || ''}
+                    </Markdown>
                     
                     <div className="pt-2 flex items-center gap-3">
                       <Badge variant="secondary" className={cn(

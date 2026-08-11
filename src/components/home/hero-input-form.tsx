@@ -1,23 +1,39 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/context/i18n-context';
 
 export function HeroInputForm() {
+    const { t, locale } = useI18n();
     const [email, setEmail] = useState('');
     const [placeholder, setPlaceholder] = useState('');
     const [phraseIndex, setPhraseIndex] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
     const [charIndex, setCharIndex] = useState(0);
 
-    const phrases = ["Enter your work email", "Start your free trial", "Unlock Zen AI insights", "Join 30+ smart retailers"];
+    const phrases = useMemo(() => [
+        t('landing.heroEmailPlaceholder'),
+        t('landing.heroPhrase2'),
+        t('landing.heroPhrase3'),
+        t('landing.heroPhrase4'),
+    ], [t]);
+
+    // Restart the typewriter cleanly when the language changes, otherwise
+    // charIndex can point past the end of the new (shorter) phrase.
+    useEffect(() => {
+        setPhraseIndex(0);
+        setCharIndex(0);
+        setIsDeleting(false);
+        setPlaceholder('');
+    }, [locale]);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
-            const currentPhrase = phrases[phraseIndex];
-            
+            const currentPhrase = phrases[phraseIndex] ?? '';
+
             if (!isDeleting && charIndex < currentPhrase.length) {
                 setPlaceholder(currentPhrase.substring(0, charIndex + 1));
                 setCharIndex(prev => prev + 1);
@@ -34,16 +50,16 @@ export function HeroInputForm() {
         }, isDeleting ? 40 : 80);
 
         return () => clearTimeout(timeout);
-    }, [charIndex, isDeleting, phraseIndex]);
+    }, [charIndex, isDeleting, phraseIndex, phrases]);
 
     return (
         <div className="flex flex-row w-full gap-2 items-stretch max-w-md mx-auto lg:mx-0">
             <Input
                 type="email"
-                placeholder={placeholder || "Enter your work email"}
+                placeholder={placeholder || t('landing.heroEmailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                aria-label="Work email address"
+                aria-label={t('landing.heroEmailAria')}
                 className="
                     !h-auto
                     !min-h-[4rem]
@@ -73,7 +89,7 @@ export function HeroInputForm() {
                     <div className="codepen-button rounded-md h-full">
                         <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'} className="h-full block">
                             <span className="flex items-center justify-center w-full text-center bg-[#1e293b] text-white hover:bg-[#0f172a] transition-colors text-sm font-semibold tracking-wide font-dm-sans rounded-md py-2 px-5 shadow-sm whitespace-nowrap h-full min-h-[4rem] leading-tight">
-                                Get Started
+                                {t('landing.heroGetStarted')}
                             </span>
                         </Link>
                     </div>

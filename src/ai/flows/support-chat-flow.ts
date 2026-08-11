@@ -10,6 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { requireUser } from '@/actions/admin-guard';
 import {z} from 'genkit';
 
 const ZenevaSupportChatInputSchema = z.object({
@@ -22,7 +23,11 @@ const ZenevaSupportChatOutputSchema = z.object({
 });
 export type ZenevaSupportChatOutput = z.infer<typeof ZenevaSupportChatOutputSchema>;
 
-export async function zenevaSupportChat(input: ZenevaSupportChatInput): Promise<ZenevaSupportChatOutput> {
+// Server Action = public endpoint. Verify the caller before spending an LLM
+// call on the platform's API key. Token stays out of the input schema so it is
+// never forwarded to the model.
+export async function zenevaSupportChat(input: ZenevaSupportChatInput, idToken?: string): Promise<ZenevaSupportChatOutput> {
+  await requireUser(idToken);
   return supportChatFlow(input);
 }
 

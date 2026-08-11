@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Business Grants Directory | Equity-Free Funding | Zeneva',
+  title: 'Business Grants Directory | Equity-Free Funding',
   description: 'Explore verified, equity-free business grants and funding opportunities tailored for Nigerian retail entrepreneurs, pharmacies, supermarkets, and MSMEs.',
   alternates: {
     canonical: '/grants'

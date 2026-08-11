@@ -100,7 +100,7 @@ export default function DownloadPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
-  const phrases = ["Enter your work email", "Start your free trial", "Unlock Zen AI insights", "Join 30+ smart retailers"];
+  const phrases = ["Enter your work email", "Start free, stay free", "Unlock Zen AI insights", "Join 30+ smart retailers"];
 
   useEffect(() => {
     setMounted(true);
@@ -163,7 +163,12 @@ export default function DownloadPage() {
     document.getElementById('downloads')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  if (!mounted) return null;
+  // No `if (!mounted) return null` here. It used to gate the whole page, so the
+  // server sent an empty body and /download — a sitemap priority 0.9 route —
+  // had no crawlable content, no h1 and no store links in the HTML. Nothing in
+  // the JSX below reads client-only state, so the gate was protecting nothing.
+  // If you add something that touches `window` during render, guard that one
+  // subtree instead of returning null for the entire page.
 
   return (
     <ThemeProvider forcedTheme="light">
@@ -755,7 +760,7 @@ export default function DownloadPage() {
                         Download Zeneva Today
                     </h2>
                     <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto mb-16 leading-relaxed">
-                        Available on the Microsoft Store for Windows desktops and Google Play Store for Android devices. Start your free trial instantly — no credit card required.
+                        Available on the Microsoft Store for Windows desktops and Google Play Store for Android devices. Start free instantly — no trial, no credit card required.
                     </p>
 
                     {/* Store Badges */}

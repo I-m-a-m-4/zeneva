@@ -14,11 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Banknote, CreditCard, Landmark, Loader2, FileText } from "lucide-react";
 import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/context/i18n-context';
 
 export default function PaymentPage() {
     const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, currencySymbol, autoPrint, setAutoPrint } = usePOS();
     const business = useBusiness();
     const router = useRouter();
+    const { t } = useI18n();
     const [isNavigating, setIsNavigating] = React.useState(false);
 
     const handleNext = () => {
@@ -40,8 +42,8 @@ export default function PaymentPage() {
             <div className="md:col-span-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Payment Method</CardTitle>
-                        <CardDescription>Select how the customer will pay.</CardDescription>
+                        <CardTitle>{t('pos.paymentMethod')}</CardTitle>
+                        <CardDescription>{t('pos.paymentMethodDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -49,41 +51,41 @@ export default function PaymentPage() {
                                 <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Cash' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
                                     <RadioGroupItem value="Cash" id="cash" className="sr-only" />
                                     <Banknote className="h-8 w-8 mb-2" />
-                                    <span className="font-semibold text-sm">Cash</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">Direct Cash Payment</span>
+                                    <span className="font-semibold text-sm">{t('pos.cash')}</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{t('pos.cashDescription')}</span>
                                 </Card>
                             </Label>
                             <Label htmlFor="card" className="cursor-pointer">
                                 <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Card' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
                                     <RadioGroupItem value="Card" id="card" className="sr-only" />
                                     <CreditCard className="h-8 w-8 mb-2" />
-                                    <span className="font-semibold text-sm">Card</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">POS Card Payment</span>
+                                    <span className="font-semibold text-sm">{t('pos.card')}</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{t('pos.cardDescription')}</span>
                                 </Card>
                             </Label>
                             <Label htmlFor="bank" className="cursor-pointer">
                                 <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Bank Transfer' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
                                     <RadioGroupItem value="Bank Transfer" id="bank" className="sr-only" />
                                     <Landmark className="h-8 w-8 mb-2" />
-                                    <span className="font-semibold text-sm">Bank Transfer</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">Direct Bank Deposit</span>
+                                    <span className="font-semibold text-sm">{t('pos.bankTransfer')}</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{t('pos.bankTransferDescription')}</span>
                                 </Card>
                             </Label>
                             <Label htmlFor="invoice" className="cursor-pointer">
                                 <Card className={`flex flex-col items-center justify-center p-6 ${paymentMethod === 'Invoice' ? 'border-primary ring-1 ring-primary' : ''} hover:border-primary hover:bg-muted transition-colors h-full`}>
                                     <RadioGroupItem value="Invoice" id="invoice" className="sr-only" />
                                     <FileText className="h-8 w-8 mb-2" />
-                                    <span className="font-semibold text-sm">Invoice</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">Pay Later / Credit</span>
+                                    <span className="font-semibold text-sm">{t('pos.invoice')}</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{t('pos.invoiceDescription')}</span>
                                 </Card>
                             </Label>
                         </RadioGroup>
                         {paymentMethod === 'Invoice' && (
                             <Alert className="mt-4 bg-blue-50 border-blue-200">
                                 <FileText className="h-4 w-4 text-blue-600" />
-                                <AlertTitle className="text-blue-800">Issue Professional Invoice</AlertTitle>
+                                <AlertTitle className="text-blue-800">{t('pos.invoiceAlertTitle')}</AlertTitle>
                                 <AlertDescription className="text-blue-700">
-                                    This will record the sale and deduct stock, but mark the payment as <strong>Unpaid</strong>. You can track this in the Invoices section.
+                                    {t('pos.invoiceAlertBody')}
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -91,23 +93,23 @@ export default function PaymentPage() {
                             <Alert className="mt-4 border-emerald-500/20 bg-emerald-500/5">
                                 <Landmark className="h-4 w-4 text-emerald-600" />
                                 <AlertTitle className="text-emerald-800 flex items-center gap-1.5 font-bold">
-                                    Zeneva Terminal Account (Automated Confirmation)
-                                    <Badge className="bg-emerald-500 text-white text-[9px] border-none font-semibold">Active</Badge>
+                                    {t('pos.terminalAccountTitle')}
+                                    <Badge className="bg-emerald-500 text-white text-[9px] border-none font-semibold">{t('pos.statusActive')}</Badge>
                                 </AlertTitle>
                                 <AlertDescription className="text-emerald-700 mt-2 space-y-1">
                                     {business?.settings?.terminalAccountNumber ? (
                                         <>
-                                            Instruct customer to transfer to this static store account:<br />
-                                            <strong>Bank:</strong> {business?.settings?.terminalBankName || 'Wema Bank'}<br />
-                                            <strong>Account:</strong> {business?.settings?.terminalAccountNumber}<br />
-                                            <strong>Account Name:</strong> {business?.settings?.terminalAccountName || `Zeneva - ${business.name}`}
-                                            <p className="text-[10px] text-emerald-600 mt-2">✓ The terminal will chime and verify the payment instantly upon transfer.</p>
+                                            {t('pos.transferInstruction')}<br />
+                                            <strong>{t('pos.bankLabel')}</strong> {business?.settings?.terminalBankName || 'Wema Bank'}<br />
+                                            <strong>{t('pos.accountLabel')}</strong> {business?.settings?.terminalAccountNumber}<br />
+                                            <strong>{t('pos.accountNameLabel')}</strong> {business?.settings?.terminalAccountName || `Zeneva - ${business.name}`}
+                                            <p className="text-[10px] text-emerald-600 mt-2">{t('pos.terminalChime')}</p>
                                         </>
                                     ) : (
                                         <>
-                                            <strong>Bank:</strong> {business?.settings?.paymentBankName || 'Not configured'}<br />
-                                            <strong>Account:</strong> {business?.settings?.paymentBankAccountId || 'Not configured'}<br />
-                                            <p className="text-[10px] text-amber-600 mt-2">⚠ Zeneva Terminal not provisioned. Manual payment confirmation required.</p>
+                                            <strong>{t('pos.bankLabel')}</strong> {business?.settings?.paymentBankName || t('pos.notConfigured')}<br />
+                                            <strong>{t('pos.accountLabel')}</strong> {business?.settings?.paymentBankAccountId || t('pos.notConfigured')}<br />
+                                            <p className="text-[10px] text-amber-600 mt-2">{t('pos.terminalNotProvisioned')}</p>
                                         </>
                                     )}
                                 </AlertDescription>
@@ -117,16 +119,16 @@ export default function PaymentPage() {
                 </Card>
                 <Card className="mt-8">
                     <CardHeader>
-                        <CardTitle>Discount & Tax</CardTitle>
-                        <CardDescription>Apply discounts or adjust tax rates for this sale.</CardDescription>
+                        <CardTitle>{t('pos.discountAndTax')}</CardTitle>
+                        <CardDescription>{t('pos.discountAndTaxDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="discount">Discount ({currencySymbol})</Label>
+                            <Label htmlFor="discount">{t('pos.discountLabel', { symbol: currencySymbol })}</Label>
                             <Input id="discount" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="tax">Tax Rate (%)</Label>
+                            <Label htmlFor="tax">{t('pos.taxRateLabel')}</Label>
                             <Input id="tax" type="number" value={taxRate} onChange={e => setTax(Number(e.target.value))} />
                         </div>
                     </CardContent>
@@ -135,31 +137,31 @@ export default function PaymentPage() {
             <div>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Order Summary</CardTitle>
+                        <CardTitle>{t('pos.orderSummary')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subtotal</span>
+                            <span className="text-muted-foreground">{t('common.subtotal')}</span>
                             <span>{currencySymbol}{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Tax</span>
+                            <span className="text-muted-foreground">{t('common.tax')}</span>
                             <span>{currencySymbol}{tax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Discount</span>
+                            <span className="text-muted-foreground">{t('common.discount')}</span>
                             <span className="text-destructive">-{currencySymbol}{discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-bold text-lg">
-                            <span>Total</span>
+                            <span>{t('common.total')}</span>
                             <span>{currencySymbol}{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
                         <Separator />
                         <div className="flex items-center justify-between py-2">
                             <Label htmlFor="auto-print" className="cursor-pointer font-medium text-sm">
-                                Print Receipt
+                                {t('pos.printReceipt')}
                             </Label>
                             <input
                                 type="checkbox"
@@ -172,11 +174,11 @@ export default function PaymentPage() {
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
                         <Button className="w-full h-12 text-lg" onClick={handleNext} disabled={isNavigating}>
-                            {isNavigating && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                            {autoPrint ? 'Finalize & Print' : 'Review & Complete'}
+                            {isNavigating && <Loader2 className="me-2 h-5 w-5 animate-spin" />}
+                            {autoPrint ? t('pos.finalizeAndPrint') : t('pos.reviewAndComplete')}
                         </Button>
                         <Button className="w-full" variant="outline" asChild>
-                            <Link href="/sales/pos/customer">Back</Link>
+                            <Link href="/sales/pos/customer">{t('common.back')}</Link>
                         </Button>
                     </CardFooter>
                 </Card>

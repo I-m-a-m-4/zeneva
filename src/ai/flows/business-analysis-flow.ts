@@ -8,6 +8,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { requireUser } from '@/actions/admin-guard';
 import {
   BusinessAnalysisInputSchema,
   BusinessAnalysisOutputSchema,
@@ -15,9 +16,13 @@ import {
   type BusinessAnalysisOutput,
 } from './business-analysis-types';
 
+// Server Action = public endpoint. Guard sits outside the try/catch so an auth
+// failure is not reported to the caller as a transient AI error.
 export async function businessAnalysis(
-  input: BusinessAnalysisInput
+  input: BusinessAnalysisInput,
+  idToken?: string
 ): Promise<BusinessAnalysisOutput> {
+  await requireUser(idToken);
   try {
     console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
     const result = await businessAnalysisFlow(input);

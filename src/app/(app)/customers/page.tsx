@@ -33,6 +33,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
+import { useFirestore } from '@/firebase';
+import { doc, writeBatch } from 'firebase/firestore';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -71,11 +74,11 @@ function CustomerRowSkeleton() {
       <TableCell className="hidden md:table-cell">
         <Skeleton className="h-5 w-full" />
       </TableCell>
-      <TableCell className="text-right">
-        <Skeleton className="h-5 w-1/2 ml-auto" />
+      <TableCell className="text-end">
+        <Skeleton className="h-5 w-1/2 ms-auto" />
       </TableCell>
-      <TableCell className="text-right">
-        <Skeleton className="h-8 w-8 ml-auto rounded-md" />
+      <TableCell className="text-end">
+        <Skeleton className="h-8 w-8 ms-auto rounded-md" />
       </TableCell>
     </TableRow>
   )
@@ -106,6 +109,8 @@ export default function CustomersPage() {
   } = usePOS();
   const { toast } = useToast();
   const router = useRouter();
+  const { t } = useI18n();
+  const firestore = useFirestore();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -245,7 +250,7 @@ export default function CustomersPage() {
 
   const handleBulkDelete = async () => {
     if (!firestore || selectedCustomerIds.length === 0 || !business || !currentUser) {
-      toast({ title: 'Error', description: 'Could not perform deletion. Session data missing.', variant: 'destructive' });
+      toast({ title: t('toast.error'), description: t('customers.deleteFailedSession'), variant: 'destructive' });
       return;
     }
 
@@ -270,11 +275,15 @@ export default function CustomersPage() {
       await batch.commit();
       await Promise.all(auditPromises);
 
-      toast({ variant: 'success', title: 'Customers Deleted', description: `${selectedCustomerIds.length} customers have been removed.` });
+      toast({
+        variant: 'success',
+        title: t('customers.deletedTitle'),
+        description: t('customers.deletedDescription', { count: selectedCustomerIds.length }),
+      });
       setSelectedCustomerIds([]);
       triggerRefresh();
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete customers.' });
+      toast({ variant: 'destructive', title: t('toast.error'), description: t('customers.deleteFailed') });
     }
     setIsDeleteDialogOpen(false);
   };
@@ -288,20 +297,20 @@ export default function CustomersPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Customers
+                {t('customers.title')}
                 {isFullSyncingCustomers && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
               </CardTitle>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
                 <div className="relative w-full max-w-sm group">
-                  <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                  <User className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
-                    placeholder="Search name, email, or code..."
-                    className="pl-8 pr-8 ring-offset-background focus-visible:ring-primary"
+                    placeholder={t('customers.searchNameEmailCode')}
+                    className="ps-8 pe-8 ring-offset-background focus-visible:ring-primary"
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                   />
                   {isSearching && (
-                    <div className="absolute right-2.5 top-2.5">
+                    <div className="absolute end-2.5 top-2.5">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     </div>
                   )}
@@ -310,16 +319,22 @@ export default function CustomersPage() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="w-[180px] justify-between font-normal bg-background">
                       <span>
-                        {sortBy === 'spent' ? 'Biggest Spender' : sortBy === 'loyalty' ? 'Top Loyalty' : sortBy === 'name' ? 'Name' : 'Most Recent'}
+                        {sortBy === 'spent'
+                          ? t('customers.sortBiggestSpender')
+                          : sortBy === 'loyalty'
+                            ? t('customers.sortTopLoyalty')
+                            : sortBy === 'name'
+                              ? t('customers.sortName')
+                              : t('customers.sortMostRecent')}
                       </span>
-                      <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                      <ChevronDown className="h-4 w-4 opacity-50 ms-2" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-[180px]">
-                    <DropdownMenuItem onClick={() => setSortBy('spent')}>Biggest Spender</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy('loyalty')}>Top Loyalty</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy('name')}>Name</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy('recent')}>Most Recent</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('spent')}>{t('customers.sortBiggestSpender')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('loyalty')}>{t('customers.sortTopLoyalty')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('name')}>{t('customers.sortName')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('recent')}>{t('customers.sortMostRecent')}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -331,7 +346,7 @@ export default function CustomersPage() {
                   <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
                     <Trash2 className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                      Delete ({visibleSelectedCount})
+                      {t('customers.deleteSelected', { count: visibleSelectedCount })}
                     </span>
                   </Button>
                 );
@@ -340,13 +355,13 @@ export default function CustomersPage() {
               <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Import
+                  {t('common.import')}
                 </span>
               </Button>
               <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Add Customer
+                  {t('customers.addCustomer')}
                 </span>
               </Button>
             </div>
@@ -358,13 +373,13 @@ export default function CustomersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12"><Checkbox disabled /></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Code</TableHead>
-                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
-                  <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
-                  <TableHead className="text-right">Total Spent</TableHead>
-                  <TableHead className="text-right text-destructive">Debt</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('customers.codeCol')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('common.phone')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('customers.loyaltyPoints')}</TableHead>
+                  <TableHead className="text-end">{t('customers.totalSpent')}</TableHead>
+                  <TableHead className="text-end text-destructive">{t('customers.debtCol')}</TableHead>
+                  <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -378,13 +393,13 @@ export default function CustomersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12"><Checkbox disabled /></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Code</TableHead>
-                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
-                  <TableHead className="hidden md:table-cell">Loyalty Points</TableHead>
-                  <TableHead className="text-right">Total Spent</TableHead>
-                  <TableHead className="text-right text-destructive">Debt</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('customers.codeCol')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('common.phone')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('customers.loyaltyPoints')}</TableHead>
+                  <TableHead className="text-end">{t('customers.totalSpent')}</TableHead>
+                  <TableHead className="text-end text-destructive">{t('customers.debtCol')}</TableHead>
+                  <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -403,18 +418,18 @@ export default function CustomersPage() {
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Code</TableHead>
-                  <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('customers.codeCol')}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{t('common.phone')}</TableHead>
                   <TableHead className="hidden md:table-cell">
                     <div className="flex items-center gap-1.5">
                       <Award className="h-4 w-4" />
-                      Loyalty Points
+                      {t('customers.loyaltyPoints')}
                     </div>
                   </TableHead>
-                  <TableHead className="text-right">Total Spent</TableHead>
-                  <TableHead className="text-right text-destructive">Debt</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  <TableHead className="text-end">{t('customers.totalSpent')}</TableHead>
+                  <TableHead className="text-end text-destructive">{t('customers.debtCol')}</TableHead>
+                  <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -447,15 +462,15 @@ export default function CustomersPage() {
                       <TableCell className="hidden sm:table-cell">
                         {customer.code ? (
                           <span className="font-mono text-xs font-bold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{customer.code}</span>
-                        ) : 'N/A'}
+                        ) : t('customers.notAvailable')}
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell">{customer.phone || 'N/A'}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{customer.phone || t('customers.notAvailable')}</TableCell>
                       <TableCell className="hidden md:table-cell">{customer.loyaltyPoints || 0}</TableCell>
-                      <TableCell className="text-right">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right text-destructive font-bold">
+                      <TableCell className="text-end">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-end text-destructive font-bold">
                         {debt > 0 ? `${currencySymbol}${debt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                       </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>
                             <Pencil className="h-4 w-4" />
@@ -473,15 +488,15 @@ export default function CustomersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-12 border-2 border-dashed rounded-lg">
               <User className="h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mt-4">No Customers Found</h3>
+              <h3 className="text-xl font-semibold mt-4">{t('customers.noneFound')}</h3>
               <p className="text-muted-foreground mt-2 mb-4">
-                {searchTerm ? 'Try a different search term.' : 'Get started by adding your first customer.'}
+                {searchTerm ? t('customers.noneFoundSearch') : t('customers.noneFoundHint')}
               </p>
               {!searchTerm && (
                 <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Add Customer
+                    {t('customers.addCustomer')}
                   </span>
                 </Button>
               )}
@@ -492,12 +507,11 @@ export default function CustomersPage() {
           <CardFooter className="flex flex-col border-t py-4 gap-4">
             <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground">{filtered.length}</span>
-                <span>{filtered.length === 1 ? 'Customer' : 'Customers'} matched</span>
+                <span>{t('customers.matched', { count: filtered.length })}</span>
               </div>
               {searchTerm && (
                 <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setSearchTerm('')}>
-                  Clear filters
+                  {t('customers.clearFilters')}
                 </Button>
               )}
             </div>
@@ -507,7 +521,7 @@ export default function CustomersPage() {
               <div className="flex flex-col items-center justify-center pt-4 border-t w-full space-y-2">
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  Syncing full catalog in background...
+                  {t('customers.syncingCatalog')}
                 </div>
               </div>
             )}
@@ -518,14 +532,14 @@ export default function CustomersPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('customers.deleteConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {selectedCustomerIds.length} customer(s). This action cannot be undone.
+              {t('customers.deleteConfirmBody', { count: selectedCustomerIds.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

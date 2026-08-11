@@ -25,6 +25,7 @@ import { visualCount, VisualCountOutput } from '@/ai/flows/visual-count-flow';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { idToken } from '@/lib/id-token';
 
 interface VisualCountDialogProps {
     onAddItems: (items: { name: string; quantity: number }[]) => Promise<void>;
@@ -73,7 +74,7 @@ export default function VisualCountDialog({ onAddItems }: VisualCountDialogProps
             // Let's strip the prefix just to be safe for the server action input schema.
             const base64Data = base64Image.split(',')[1];
 
-            const result = await visualCount({ imageBase64: base64Data });
+            const result = await visualCount({ imageBase64: base64Data }, await idToken());
 
             if (result && result.items) {
                 setFoundItems(result.items.map(item => ({ name: item.name, quantity: item.count })));

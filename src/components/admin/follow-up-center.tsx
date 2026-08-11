@@ -23,6 +23,49 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { getAuth } from 'firebase/auth';
+import { safeToDate, cn } from '@/lib/utils';
+import { apiBase } from '@/lib/platform';
+import {
+  SEGMENT_META,
+  segmentCounts,
+  type OutreachSegment,
+  type ScoredBusiness,
+} from '@/lib/outreach-scoring';
+
+/** Badge colours per segment tone. Keyed off SEGMENT_META so the two cannot drift. */
+const TONE_CLASSES: Record<'danger' | 'warn' | 'info' | 'good', string> = {
+  danger: 'bg-destructive/10 text-destructive border-destructive/20',
+  warn: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  info: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+  good: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+};
+
+/**
+ * Escape a string for literal use inside a RegExp.
+ *
+ * Business names are user-supplied, so interpolating one straight into `new RegExp`
+ * throws on anything containing regex metacharacters — "C++ Store" and "Foo (Ltd)"
+ * both blow up mid-send.
+ */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The email body is HTML, and the name we splice into it comes from the `users`
+ * collection — a field any self-registered account sets for itself. Unescaped,
+ * a name like `<img src=x onerror=...>` is emailed as live markup and stored in
+ * `follow_up_logs`, where the audit dialog renders it back on the admin origin.
+ * Escape at the source so the stored record is clean too, not just the preview.
+ */
+function escapeHtml(value: string): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 interface FollowUpLog {
   id: string;
@@ -40,6 +83,11 @@ interface FollowUpLog {
 
 interface FollowUpCenterProps {
   atRiskBusinesses: any[];
+  /**
+   * Every non-deleted business, ranked by outreach value. Optional so the tab
+   * still renders if a caller has not been updated to pass it.
+   */
+  scoredLeads?: ScoredBusiness[];
   users: any[];
   conversionRate?: number;
   churnRiskCount?: number;
@@ -50,9 +98,10 @@ interface FollowUpCenterProps {
   onMount?: () => void;
 }
 
-export default function FollowUpCenter({ 
-    atRiskBusinesses, 
-    users, 
+export default function FollowUpCenter({
+    atRiskBusinesses,
+    scoredLeads = [],
+    users,
     conversionRate = 0, 
     churnRiskCount = 0,
     cachedLogs = [],
@@ -66,20 +115,92 @@ export default function FollowUpCenter({
   const [isLoading, setIsLoading] = React.useState(false);
   const [filterStatus, setFilterStatus] = React.useState<'all' | 'opened' | 'sent' | 'failed' | 'newly_opened'>('all');
   const [searchQuery, setSearchQuery] = React.useState('');
-  
-  // Sync with parent cache
-  React.useEffect(() => {
-    if (cachedLogs.length > 0) {
-      setLogs(cachedLogs);
-      setSentCount(cachedSentCount);
-    }
-  }, [cachedLogs, cachedSentCount]);
+  /** null = "everything worth acting on" rather than a specific segment. */
+  const [segmentFilter, setSegmentFilter] = React.useState<OutreachSegment | null>(null);
+  /** Separate from `searchQuery`, which filters the sent-log table below. */
+  const [leadSearch, setLeadSearch] = React.useState('');
 
+  const counts = React.useMemo(() => segmentCounts(scoredLeads), [scoredLeads]);
+
+  /**
+   * The queue itself.
+   *
+   * Default view hides `healthy_paid` and `active_free`: they are the two
+   * segments whose correct action is "leave them alone", and including them
+   * buried the handful of accounts that actually need an email. They stay
+   * reachable by picking the segment explicitly.
+   */
+  const queue = React.useMemo(() => {
+    const base = segmentFilter
+      ? scoredLeads.filter(lead => lead.segment === segmentFilter)
+      : scoredLeads.filter(
+          lead => lead.segment !== 'healthy_paid' && lead.segment !== 'active_free',
+        );
+
+    const needle = leadSearch.trim().toLowerCase();
+    if (!needle) return base;
+    return base.filter(lead =>
+      lead.businessName.toLowerCase().includes(needle)
+      || (lead.email || '').toLowerCase().includes(needle)
+      || (lead.contactName || '').toLowerCase().includes(needle),
+    );
+  }, [scoredLeads, segmentFilter, leadSearch]);
+  
+  // Sync with parent cache.
+  //
+  // This deliberately mirrors an empty parent list too. Guarding on
+  // `cachedLogs.length > 0` meant a parent refresh that legitimately returned
+  // nothing left the previous campaign's rows on screen for ever.
+  const isParentControlled = typeof onRefresh === 'function';
   React.useEffect(() => {
-    if (onMount && cachedLogs.length === 0) {
-      onMount();
+    if (!isParentControlled) return;
+    setLogs(cachedLogs);
+    setSentCount(cachedSentCount);
+  }, [cachedLogs, cachedSentCount, isParentControlled]);
+
+  // Ask the parent for data once on mount. Reads a ref rather than
+  // `cachedLogs.length` so the empty-deps array is not a stale closure.
+  const hasRequestedMount = React.useRef(false);
+  React.useEffect(() => {
+    if (hasRequestedMount.current) return;
+    hasRequestedMount.current = true;
+    if (onMount && cachedLogs.length === 0) onMount();
+  }, [onMount, cachedLogs.length]);
+
+  /**
+   * Owner lookup, indexed once per users change.
+   *
+   * The previous `users.find(u => u.businessId === bus.id)` returned whichever user
+   * happened to sit first in the array — often a cashier rather than the account
+   * owner, so retention mail addressed the wrong person. Prefer the admin, then the
+   * most recently seen account.
+   */
+  const ownersByBusiness = React.useMemo(() => {
+    const byBusiness = new Map<string, any>();
+    for (const user of users || []) {
+      if (!user?.businessId) continue;
+      const current = byBusiness.get(user.businessId);
+      if (!current) {
+        byBusiness.set(user.businessId, user);
+        continue;
+      }
+      const currentIsAdmin = current.role === 'admin';
+      const candidateIsAdmin = user.role === 'admin';
+      if (candidateIsAdmin && !currentIsAdmin) {
+        byBusiness.set(user.businessId, user);
+      } else if (candidateIsAdmin === currentIsAdmin) {
+        const currentSeen = safeToDate(current.lastSeen)?.getTime() ?? -Infinity;
+        const candidateSeen = safeToDate(user.lastSeen)?.getTime() ?? -Infinity;
+        if (candidateSeen > currentSeen) byBusiness.set(user.businessId, user);
+      }
     }
-  }, []);
+    return byBusiness;
+  }, [users]);
+
+  const ownerFor = React.useCallback(
+    (businessId: string) => ownersByBusiness.get(businessId) || null,
+    [ownersByBusiness]
+  );
 
   const campaignStats = React.useMemo(() => {
     const validLogs = logs.filter(l => l.status !== 'failed');
@@ -128,12 +249,17 @@ export default function FollowUpCenter({
 
     // 4. Outreach Coverage of At-Risk Businesses
     const atRiskEmails = new Set(atRiskBusinesses.map(bus => {
-      const owner = users.find(u => u.businessId === bus.id);
+      const owner = ownerFor(bus.id);
       return owner?.email;
     }).filter(Boolean));
 
-    const emailedAtRisk = logs.filter(l => atRiskEmails.has(l.sentTo)).length;
-    const coverage = atRiskEmails.size > 0 ? (emailedAtRisk / atRiskEmails.size) * 100 : 0;
+    // Count DISTINCT businesses reached, not log rows. Counting rows against a
+    // distinct-email denominator pushed coverage past 100% as soon as anyone was
+    // emailed twice.
+    const contactedAtRisk = new Set(
+      logs.map(l => l.sentTo).filter(email => atRiskEmails.has(email))
+    );
+    const coverage = atRiskEmails.size > 0 ? (contactedAtRisk.size / atRiskEmails.size) * 100 : 0;
 
     return {
       openRate,
@@ -142,9 +268,11 @@ export default function FollowUpCenter({
       bestRate,
       coverage
     };
-  }, [logs, atRiskBusinesses, users]);
+  }, [logs, atRiskBusinesses, ownerFor]);
 
   const [isSending, setIsSending] = React.useState(false);
+  const [bulkProgress, setBulkProgress] = React.useState<{ done: number; total: number } | null>(null);
+  const abortBulkRef = React.useRef(false);
   const { toast } = useToast();
   const [selectedRecipient, setSelectedRecipient] = React.useState<any>(null);
   const [subject, setSubject] = React.useState('Getting the most out of Zeneva');
@@ -194,19 +322,31 @@ export default function FollowUpCenter({
       const token = await auth.currentUser?.getIdToken();
 
       if (selectedRecipient.isBulk) {
-        const targets = selectedRecipient.recipients;
+        const targets = selectedRecipient.recipients as any[];
         let successCount = 0;
         let failCount = 0;
 
+        // Sequential on purpose — this is transactional email to real customers, and
+        // firing N requests at once risks tripping provider rate limits. What was
+        // missing is feedback and a way out: a 200-recipient run previously froze the
+        // dialog with no progress and no cancel.
+        abortBulkRef.current = false;
+        setBulkProgress({ done: 0, total: targets.length });
+
         for (const target of targets) {
+          if (abortBulkRef.current) break;
           try {
             let customizedBody = emailBody;
-            if (emailBody.includes(selectedRecipient.name)) {
-              customizedBody = emailBody.replace(new RegExp(selectedRecipient.name, 'g'), target.name);
+            const safeTargetName = escapeHtml(target.name);
+            if (selectedRecipient.name && emailBody.includes(selectedRecipient.name)) {
+              customizedBody = emailBody.replace(
+                new RegExp(escapeRegExp(selectedRecipient.name), 'g'),
+                () => safeTargetName
+              );
             } else {
-              customizedBody = emailBody.replace(/Hi\s+[^,]+/i, `Hi ${target.name}`);
+              customizedBody = emailBody.replace(/Hi\s+[^,]+/i, () => `Hi ${safeTargetName}`);
             }
-            const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
+            const response = await fetch(`${apiBase()}/api/admin/send-follow-up`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -230,17 +370,21 @@ export default function FollowUpCenter({
           } catch (e) {
             failCount++;
           }
+          setBulkProgress(prev => ({ done: prev.done + 1, total: prev.total }));
         }
-        
-        toast({ 
-          variant: failCount === 0 ? 'success' : 'destructive', 
-          title: 'Bulk Email Complete', 
-          description: `Dispatched to ${successCount} recipients. Failed: ${failCount}.` 
+
+        const stopped = abortBulkRef.current;
+        setBulkProgress(null);
+        toast({
+          variant: failCount === 0 && !stopped ? 'success' : 'destructive',
+          title: stopped ? 'Bulk Email Stopped' : 'Bulk Email Complete',
+          description: `Dispatched to ${successCount} recipients. Failed: ${failCount}.`
+            + (stopped ? ` ${targets.length - successCount - failCount} not attempted.` : ''),
         });
         setIsModalOpen(false);
-        fetchLogs();
+        await fetchLogs();
       } else {
-        const response = await fetch('https://zeneva.space/api/admin/send-follow-up', {
+        const response = await fetch(`${apiBase()}/api/admin/send-follow-up`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -261,7 +405,7 @@ export default function FollowUpCenter({
         if (result.success) {
           toast({ variant: 'success', title: 'Success', description: 'Follow-up email dispatched.' });
           setIsModalOpen(false);
-          fetchLogs();
+          await fetchLogs();
         } else {
           throw new Error(result.message);
         }
@@ -270,6 +414,9 @@ export default function FollowUpCenter({
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
       setIsSending(false);
+      // Clear here too: an exception mid-run would otherwise strand the progress bar.
+      setBulkProgress(null);
+      abortBulkRef.current = false;
     }
   };
 
@@ -299,7 +446,10 @@ export default function FollowUpCenter({
   const applyTemplate = (template: any) => {
     if (!selectedRecipient) return;
     setSubject(template.subject);
-    setEmailBody(template.body(selectedRecipient.name));
+    // Templates build raw HTML around the recipient's name, and that name comes
+    // from a self-registered `users` document. Escaping here covers both send
+    // paths, since the single-recipient branch posts `emailBody` verbatim.
+    setEmailBody(template.body(escapeHtml(selectedRecipient.name || '')));
   };
 
   return (
@@ -395,6 +545,129 @@ export default function FollowUpCenter({
         </Card>
       </div>
 
+      {/* Priority outreach queue — ranked by src/lib/outreach-scoring.ts */}
+      {scoredLeads.length > 0 && (
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Priority Outreach Queue
+                </CardTitle>
+                <CardDescription>
+                  Every account ranked by what it is worth reaching out to right now.
+                </CardDescription>
+              </div>
+              <Input
+                placeholder="Search name or email..."
+                value={leadSearch}
+                onChange={(e) => setLeadSearch(e.target.value)}
+                className="h-9 w-full sm:max-w-[240px]"
+              />
+            </div>
+
+            {/* Segment rail. Counts come from the engine, so they always sum to the full book. */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSegmentFilter(null)}
+                className={cn(
+                  'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+                  segmentFilter === null
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground hover:bg-muted',
+                )}
+              >
+                Needs action
+              </button>
+              {(Object.keys(SEGMENT_META) as OutreachSegment[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSegmentFilter(key)}
+                  title={SEGMENT_META[key].blurb}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+                    segmentFilter === key
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : cn(TONE_CLASSES[SEGMENT_META[key].tone], 'hover:opacity-80'),
+                  )}
+                >
+                  {SEGMENT_META[key].label} ({counts[key]})
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[420px] pr-3">
+              <div className="space-y-2">
+                {queue.length === 0 && (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Nothing in this segment.
+                  </p>
+                )}
+                {queue.map((lead) => (
+                  <div
+                    key={lead.businessId}
+                    className="flex flex-col gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-semibold">{lead.businessName}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn('text-[10px]', TONE_CLASSES[SEGMENT_META[lead.segment].tone])}
+                        >
+                          {SEGMENT_META[lead.segment].label}
+                        </Badge>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          score {lead.score}
+                        </span>
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {lead.contactName || 'Unknown contact'}
+                        {lead.email ? ` • ${lead.email}` : ' • no email on file'}
+                      </div>
+                      {lead.reasons.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {lead.reasons.map((reason) => (
+                            <span
+                              key={reason}
+                              className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                            >
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!lead.contactable}
+                      title={lead.contactable ? undefined : 'No email address on this account'}
+                      className="h-8 shrink-0 text-xs"
+                      onClick={() => {
+                        setSelectedRecipient({
+                          id: lead.businessId,
+                          name: lead.contactName || lead.businessName,
+                          email: lead.email,
+                          businessId: lead.businessId,
+                        });
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <Mail className="mr-2 h-3 w-3" /> Reach out
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Col: At Risk Businesses */}
         <Card className="lg:col-span-1">
@@ -413,7 +686,7 @@ export default function FollowUpCenter({
                 className="text-[10px] font-bold h-8 border-destructive/20 text-destructive hover:bg-destructive/10 shrink-0"
                 onClick={() => {
                   const allRecipients = atRiskBusinesses
-                    .map(bus => users.find(u => u.businessId === bus.id))
+                    .map(bus => ownerFor(bus.id))
                     .filter(u => !!u);
                   
                   setSelectedRecipient({
@@ -433,7 +706,7 @@ export default function FollowUpCenter({
             <ScrollArea className="h-[400px]">
               <div className="space-y-3">
                 {atRiskBusinesses.map((bus) => {
-                  const owner = users.find(u => u.businessId === bus.id);
+                  const owner = ownerFor(bus.id);
                   if (!owner) return null;
                   return (
                     <div key={bus.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -729,12 +1002,36 @@ export default function FollowUpCenter({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSendEmail} disabled={isSending} className="bg-orange-600 hover:bg-orange-700 text-white">
-              {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Dispatch Strike
-            </Button>
+          <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {bulkProgress ? (
+              <div className="flex w-full items-center gap-3">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-orange-600 transition-all duration-300"
+                    style={{ width: `${bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {bulkProgress.done}/{bulkProgress.total}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => { abortBulkRef.current = true; }}
+                >
+                  Stop
+                </Button>
+              </div>
+            ) : (
+              <div className="flex w-full justify-end gap-2">
+                <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSending}>Cancel</Button>
+                <Button onClick={handleSendEmail} disabled={isSending} className="bg-orange-600 hover:bg-orange-700 text-white">
+                  {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  Dispatch Strike
+                </Button>
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -753,7 +1050,23 @@ export default function FollowUpCenter({
           
           <div className="flex-1 overflow-y-auto border rounded-md p-4 bg-white mt-4">
              {viewLog?.html ? (
-               <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: viewLog.html }} />
+               /*
+                * Rendered in a fully-sandboxed iframe rather than via
+                * dangerouslySetInnerHTML. Logs written before the escaping fix
+                * above still hold raw recipient names, and this dialog runs on
+                * the super-admin origin — the one session firestore.rules grants
+                * platform-wide read/write. `sandbox=""` applies every
+                * restriction, so no script, form or navigation in the stored
+                * body can execute. An iframe also previews the email closer to
+                * how the recipient sees it, styles included.
+                */
+               <iframe
+                 sandbox=""
+                 referrerPolicy="no-referrer"
+                 srcDoc={viewLog.html}
+                 title="Email body preview"
+                 className="w-full h-[60vh] border-0 bg-white"
+               />
              ) : (
                <div className="text-center py-10 text-muted-foreground italic">
                  Email body not stored in this log.

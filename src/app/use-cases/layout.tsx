@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Industry Use Cases | Solutions for Retail & Wholesale | Zeneva',
+  title: 'Industry Use Cases | Solutions for Retail & Wholesale',
   description: 'Discover how Zeneva transforms businesses across Supermarkets, Pharmacies, Boutiques, and more with intelligent inventory and POS solutions.',
   alternates: {
     canonical: '/use-cases'

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBranch } from '@/context/branch-context';
 import { usePOS } from '@/context/pos-context';
+import { hasBusinessFeatures } from '@/lib/plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,7 +103,7 @@ export default function BranchesSettingsPage() {
     };
   };
 
-  const isBusinessPlan = business?.plan === 'business' || business?.accessLevel === 'lifetime';
+  const isBusinessPlan = hasBusinessFeatures(business);
 
   const displayedBranches = branches;
   const displayedActiveBranchId = activeBranchId;

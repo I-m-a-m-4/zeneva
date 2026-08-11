@@ -17,9 +17,20 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import useDodoPayments from '@/hooks/use-dodopayments';
 import { track } from '@vercel/analytics';
+import { AI_DAILY_LIMITS, effectivePlan, isPaidPlan, isPaidPlanExpired } from '@/lib/plan';
+import { apiBase } from '@/lib/platform';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
+/**
+ * What each paid plan advertises here must match the marketing pages
+ * (`src/components/home/pricing-plans.tsx` and `src/app/pricing/pricing-content.tsx`).
+ * A shop reads the homepage before it reaches this screen, so a feature listed
+ * there and missing here reads as a downgrade at the moment of payment.
+ *
+ * Zen AI allowances are pulled from `AI_DAILY_LIMITS` rather than typed out, so
+ * changing a limit in one place cannot leave this list quietly overselling.
+ */
 const plans = [
     {
         name: 'Pro',
@@ -27,10 +38,15 @@ const plans = [
         priceUSD: 10,
         features: [
             'Up to 1,500 products & 5 staff accounts',
-            'Advanced Point of Sale (POS)',
-            'Customizable Public Storefront',
+            'Advanced Point of Sale (POS) with barcode scanning',
+            'Invoicing & Debt Management',
+            `Zen AI — ${AI_DAILY_LIMITS.pro} messages/day`,
+            'Smart Bulk Inventory Import',
+            'Shareable Receipt Links (WhatsApp/SMS)',
+            'Backorders & Backdating',
             'Advanced Reports & Analytics',
             'AI Product Data Troubleshooter',
+            'Granular Staff Permissions (RBAC)',
             'Secure Audit Log',
         ],
         planId: 'pro',
@@ -42,6 +58,9 @@ const plans = [
         features: [
             'Everything in Pro',
             'Unlimited products & staff accounts',
+            'Multi-Branch Management',
+            'Integrated Zeneva Terminal (Anti-Theft)',
+            `Zen AI — ${AI_DAILY_LIMITS.business} messages/day`,
             'AI Business Performance Dashboard',
             'Advanced Customer Intelligence (CRM+)',
             'Inventory Velocity Reports (ABC Analysis)',
@@ -93,66 +112,27 @@ const PaystackSubscriptionButton = ({
         }
 
         try {
-            // Step 1: Verify payment on our backend
+            // Verification, pricing and the Firestore write all happen on the
+            // server now. The client cannot be trusted with any of them: it used
+            // to check the amount against a price it had itself chosen, then
+            // write `plan` directly — both bypassable from a modded build.
+            // `firestore.rules` now rejects client writes to entitlement fields.
             toast({ title: "Processing...", description: "Verifying your payment securely." });
-            const verifyResponse = await fetch('https://zeneva.space/api/paystack/verify-transaction', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference: transaction.reference }),
-            });
 
-            const verifyResult = await verifyResponse.json();
+            const { activateSubscription } = await import('@/actions/subscription');
+            const { idToken } = await import('@/lib/id-token');
 
-            if (!verifyResponse.ok || verifyResult.status !== 'success') {
-                throw new Error(verifyResult.message || 'Payment verification failed. Please contact support.');
-            }
-
-            // Step 2: Double-check amount and currency on the backend response
-            if (verifyResult.data.amount !== Math.round(finalAmount * 100)) {
-                throw new Error(`Paid amount does not match plan price. Please contact support.`);
-            }
-
-            if (verifyResult.data.currency !== currency) {
-                throw new Error(`Transaction currency mismatch. Expected ${currency}, got ${verifyResult.data.currency}.`);
-            }
-
-            // Step 3: Payment is fully verified. Update Firestore.
-            const batch = writeBatch(firestore);
-            
-            // If renewing, add time to the existing expiry. Otherwise, start from now.
-            const currentExpiry = safeToDate(businessInstance.trialExpiresAt);
-            const startDate = currentExpiry > new Date() ? currentExpiry : new Date();
-            const newExpiryDate = add(startDate, { months: cycle.months });
-            
-            const businessDocRef = doc(firestore, 'businessInstances', businessInstance.id);
-            batch.update(businessDocRef, {
-                plan: plan.planId,
-                trialExpiresAt: newExpiryDate,
-                accessLevel: null, // Remove lifetime access if they subscribe
-            });
-
-            const purchasesRef = collection(firestore, 'purchases');
-            const purchaseDocRef = doc(purchasesRef); // Auto-generate ID
-            batch.set(purchaseDocRef, {
-                userId: userProfile.id,
-                businessId: businessInstance.id,
-                plan: plan.name,
-                amount: finalAmount,
-                currency: currency,
-                timestamp: serverTimestamp(),
+            const result = await activateSubscription({
+                idToken: await idToken(),
                 reference: transaction.reference,
+                planId: plan.planId,
+                cycleId: cycle.id,
+                currency,
             });
 
-            const historyRef = collection(firestore, 'businessInstances', businessInstance.id, 'subscription_history');
-            const historyDocRef = doc(historyRef); // Auto-generate ID
-            batch.set(historyDocRef, {
-                action: `Subscribed to ${plan.name} Plan for ${cycle.label}`,
-                amount: finalAmount,
-                currency: currency,
-                timestamp: serverTimestamp(),
-            });
-
-            await batch.commit();
+            if (!result.ok) {
+                throw new Error(result.error);
+            }
 
             try {
                 track('billing_checkout_success', {
@@ -350,7 +330,7 @@ const DodoSubscriptionButton = ({
         }
 
         try {
-            const response = await fetch('https://zeneva.space/api/dodo/checkout', {
+            const response = await fetch(`${apiBase()}/api/dodo/checkout`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -361,10 +341,35 @@ const DodoSubscriptionButton = ({
                 }),
             });
 
-            const data = await response.json();
+            /*
+             * Read the body as text and parse it ourselves.
+             *
+             * `response.json()` on a non-JSON body throws
+             * "Unexpected token '<'", which is what the owner saw for the whole
+             * time this endpoint was answering the HTML 404 page — a message
+             * about JSON parsing for what was really a missing route. Any
+             * infrastructure failure (404, 502, a proxy error page) is HTML,
+             * so the status is the useful thing to report, not the parse error.
+             */
+            const raw = await response.text();
+            let data: any = null;
+            try {
+                data = raw ? JSON.parse(raw) : null;
+            } catch {
+                console.error('Dodo checkout returned non-JSON:', response.status, raw.slice(0, 500));
+                throw new Error(
+                    response.status === 404
+                        ? 'The payment service is unavailable (404). Please contact support.'
+                        : `The payment service returned an unexpected response (HTTP ${response.status}).`,
+                );
+            }
 
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to initialize checkout');
+                throw new Error(data?.error || `Failed to initialize checkout (HTTP ${response.status})`);
+            }
+
+            if (!data?.checkout_url) {
+                throw new Error('No checkout link was returned. Please try again.');
             }
 
             initializeCheckout(data.checkout_url);
@@ -455,18 +460,23 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                     <div className="flex justify-between py-2 border-b">
                         <span className="text-sm font-medium">Current Plan</span>
                         <Badge variant="secondary" className="capitalize font-semibold">
-                            {businessInstance.plan || 'Free / Trial'}
+                            {effectivePlan(businessInstance) === 'starter' ? 'Starter (Free)' : effectivePlan(businessInstance)}
                         </Badge>
                     </div>
                     <div className="flex justify-between py-2 border-b">
                         <span className="text-sm font-medium">Status</span>
                         <span className="text-sm text-muted-foreground font-medium">
-                            {safeToDate(businessInstance.trialExpiresAt) > new Date() ? 'Active' : 'Expired'}
+                            {isPaidPlanExpired(businessInstance) ? 'Ended — now on Starter' : 'Active'}
                         </span>
                     </div>
-                    {businessInstance.trialExpiresAt && (
+                    {/* Only a purchased plan has a date worth showing. The free plan
+                        never expires, and older free accounts still carry a leftover
+                        trial date that would read as a deadline if we printed it. */}
+                    {isPaidPlan(businessInstance) && businessInstance.trialExpiresAt && (
                         <div className="flex justify-between py-2">
-                            <span className="text-sm font-medium">Expires On</span>
+                            <span className="text-sm font-medium">
+                                {isPaidPlanExpired(businessInstance) ? 'Ended On' : 'Renews On'}
+                            </span>
                             <span className="text-sm text-muted-foreground font-medium">
                                 {format(safeToDate(businessInstance.trialExpiresAt), 'PPP')}
                             </span>

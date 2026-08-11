@@ -118,8 +118,14 @@ const fallbackOpportunities = [
 ];
 
 export default function GrantsPage() {
-  const [grants, setGrants] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Seeded with the static fallback rather than [] so the listings are in the
+  // server HTML. Starting empty behind a spinner meant a crawler saw ~230 words
+  // of page chrome and no grant content at all, and a visitor saw a spinner for
+  // a list that was already in the bundle. The Firestore fetch below still runs
+  // and takes priority; it just merges into real content instead of replacing a
+  // blank.
+  const [grants, setGrants] = useState<any[]>(fallbackOpportunities);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedGrant, setSelectedGrant] = useState<any | null>(null);
   const firestore = useFirestore();
 
@@ -127,7 +133,7 @@ export default function GrantsPage() {
     const fetchGrants = async () => {
       try {
         const querySnapshot = await getDocs(query(collection(firestore, 'grants'), orderBy('createdAt', 'desc')));
-        const fetchedGrants = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetchedGrants = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
         
         // Merge fallback with Firestore (Firestore takes priority, avoid duplicate urls)
         const combined = [...fetchedGrants];

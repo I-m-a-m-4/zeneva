@@ -32,6 +32,16 @@
     --chart-4: 35 90% 60%;
     --chart-5: 10 85% 50%;
 
+    /* Categorical series slots for analytics charts. Validated for colour-vision
+       deficiency and contrast against the card surface in this mode; capped at
+       three hues on purpose — a fourth stops being separable. Keep the pairs. */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+    --viz-neutral: #898781;
+    --viz-grid: #e1e0d9;
+    --viz-axis: #c3c2b7;
+
     --sidebar-background: 40 33% 98%;
     --sidebar-foreground: 224 71% 10%;
     --sidebar-border: 214.3 31.8% 91.4%;
@@ -78,6 +88,14 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Same three hues, re-stepped for the dark card surface — not an auto-flip. */
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-neutral: #898781;
+    --viz-grid: #2c2c2a;
+    --viz-axis: #383835;
   }
 }
 

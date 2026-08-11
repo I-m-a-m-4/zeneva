@@ -41,6 +41,22 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { safeToDate, cn } from '@/lib/utils';
 
+/**
+ * The AI summary is generated from customer records, and a customer name is a
+ * field any staff-role user can write. Rendering it raw let markup in a name
+ * reach the owner's session, so escape everything first and only then reinstate
+ * the one bit of formatting the summary actually uses (`**bold**`).
+ */
+function renderBoldSafe(summary: string | undefined | null): string {
+    return String(summary ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+}
+
 export default function CustomerDetailPage() {
     return (
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>
@@ -566,7 +582,7 @@ function CustomerDetailContent() {
                         <div className="space-y-6">
                             <div>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> Business Summary</h3>
-                                <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: (insights.summary || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></div>
+                                <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: renderBoldSafe(insights.summary) }}></div>
                             </div>
                             <Separator />
                             <div>

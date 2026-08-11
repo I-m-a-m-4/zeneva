@@ -98,6 +98,62 @@ function periodRange(period: string): { start: Date; end: Date; label: string } 
  * ("cetaphil" → "Cetaphil Moisturizing Cream 250g") which is all the
  * disambiguation picker needs.
  */
+/**
+ * Least-squares fit over an evenly-spaced series.
+ *
+ * Deliberately plain: a straight line through daily takings is honest about
+ * being a run-rate, where a fancier model would imply a precision this data
+ * does not have. `r2` is reported so callers can label their own confidence
+ * rather than presenting every projection as equally sound.
+ */
+function linearFit(values: number[]): { slope: number; intercept: number; r2: number } {
+  const n = values.length;
+  if (n < 2) return { slope: 0, intercept: values[0] ?? 0, r2: 0 };
+  const meanX = (n - 1) / 2;
+  const meanY = values.reduce((s, v) => s + v, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - meanX) * (values[i] - meanY);
+    den += (i - meanX) ** 2;
+  }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = meanY - slope * meanX;
+
+  let ssRes = 0;
+  let ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    ssRes += (values[i] - (intercept + slope * i)) ** 2;
+    ssTot += (values[i] - meanY) ** 2;
+  }
+  // A flat series has no variance to explain; calling that a perfect fit would
+  // be misleading, so report no confidence instead of dividing by zero.
+  const r2 = ssTot === 0 ? 0 : Math.max(0, 1 - ssRes / ssTot);
+  return { slope, intercept, r2 };
+}
+
+/**
+ * How far a projection can be trusted. Past a few months a POS history is a
+ * run-rate and nothing more, so the label has to say so — the model quotes
+ * this rather than inventing its own hedge.
+ */
+function horizonConfidence(days: number, r2: number, daysWithSales: number): { level: string; caveat: string } {
+  if (days <= 30 && r2 >= 0.5 && daysWithSales >= 14) {
+    return { level: 'reasonable', caveat: 'Short-horizon projection from a clear trend. Still an estimate, not a promise.' };
+  }
+  if (days <= 90) {
+    return { level: 'rough', caveat: 'A quarter out is a rough run-rate. It assumes trading conditions hold.' };
+  }
+  if (days <= 365) {
+    return { level: 'speculative', caveat: 'A year out from till data is speculative. It ignores seasonality, price changes, competition and anything you plan to do differently.' };
+  }
+  return {
+    level: 'illustrative only',
+    caveat:
+      'Beyond a year this is arithmetic, not a forecast — it just repeats your current run-rate. Real multi-year outcomes depend on decisions and conditions no sales history can see. Treat it as a "if nothing at all changes" figure.',
+  };
+}
+
 function similarity(query: string, target: string): number {
   const q = query.trim().toLowerCase();
   const t = (target ?? '').trim().toLowerCase();
@@ -145,6 +201,187 @@ function slimProduct(p: any) {
 type Ctx = { db: Firestore; businessId: string; currency: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Every route `linkToPage` may point at, kept in sync with the actual
+ * `src/app/(app)/**\/page.tsx` tree by hand. Missing a real page here is what
+ * turned "open bulk import" into two identical red error cards instead of one
+ * useful link — keep this list honest when a route is added or removed.
+ *
+ * `/onboarding` is the one real page deliberately left out: it is the pre-setup
+ * flow, not somewhere to send an owner who is already trading.
+ */
+const APP_ROUTES = new Set([
+  '/dashboard', '/reports', '/inventory', '/inventory/add', '/inventory/debts',
+  '/inventory/details', '/inventory/troubleshoot', '/customers', '/customers/details',
+  '/receipts', '/invoices', '/audit-log', '/settings', '/settings/branches',
+  '/users', '/online-orders', '/product-items', '/achievements', '/billing',
+  '/notifications', '/terminal-alerts', '/support', '/storefront',
+  '/sales/pos/select-products', '/sales/pos/customer', '/sales/pos/payment', '/sales/pos/review',
+  '/ai-insights', '/ai-insights/use-cases',
+]);
+
+/** One-line context shown under the link card, keyed by the same paths. */
+const ROUTE_HINTS: Record<string, string> = {
+  '/inventory': 'Bulk import, add products, adjust stock — the Import button is at the top of this page.',
+  '/inventory/add': 'Add one product with full detail.',
+  '/inventory/debts': 'Unpaid supplier balances.',
+  '/inventory/troubleshoot': 'Data health checks for inventory records.',
+  '/reports': 'Sales, inventory and customer reports.',
+  '/receipts': 'Every past sale.',
+  '/invoices': 'Outstanding and paid invoices.',
+  '/customers': 'Customer directory and loyalty.',
+  '/settings/branches': 'Manage branches and locations.',
+  '/audit-log': 'Every change made to your data, by whom and when.',
+  '/sales/pos/select-products': 'Start a new sale.',
+};
+
+/**
+ * Walkthroughs for things the app does through a dialog or a multi-step page,
+ * where there is no single route to link to. Written from the actual UI — the
+ * CSV header list below is `HEADER_MAPPINGS` in
+ * `src/components/inventory/import-dialog.tsx`, so update both together.
+ *
+ * The model picks a topic; it never writes the steps itself. An invented
+ * walkthrough for a screen that does not look like that is worse than no
+ * answer, because the owner goes looking for a button that isn't there.
+ */
+const WORKFLOWS: Record<string, { title: string; intro: string; steps: string[]; href?: string; hrefLabel?: string; tips?: string[] }> = {
+  bulkImport: {
+    title: 'Bulk import products from a spreadsheet',
+    intro: 'Import lives on the Inventory page as a dialog, not a page of its own.',
+    steps: [
+      'Open Inventory and tap the Import button at the top of the page.',
+      'Save your spreadsheet as CSV — up to 10MB. Excel files must be exported to CSV first.',
+      'Make sure it has at least a Name column and a Price column. Without both, the import is refused.',
+      'Upload the file. Every row is previewed with what was matched before anything is saved.',
+      'Check the preview, then confirm to import.',
+    ],
+    tips: [
+      'Column names are matched loosely, so a WooCommerce or Shopify export usually works as-is: Regular Price, Qty, Image Src and Product Name are all understood.',
+      'Optional columns worth including: SKU, Category, Cost Price, Stock, Description and Image URL. Cost Price is what makes margin reporting work later.',
+      'Products already in your inventory are matched rather than duplicated.',
+    ],
+    href: '/inventory',
+    hrefLabel: 'Open Inventory',
+  },
+  recordSale: {
+    title: 'Record a sale on the POS',
+    intro: 'Four steps, and you can leave at any point without losing the basket.',
+    steps: [
+      'Open the POS and pick your products — scan a barcode or search by name.',
+      'Attach a customer, or continue as a walk-in.',
+      'Take payment: cash, transfer, card, or split across several methods.',
+      'Review and confirm. Stock comes down and the receipt is issued at that point, not before.',
+    ],
+    tips: [
+      'A sale can be held and resumed later if a customer steps away.',
+      'Selling offline is fine — it queues and syncs when you reconnect.',
+    ],
+    href: '/sales/pos/select-products',
+    hrefLabel: 'Start a sale',
+  },
+  addProduct: {
+    title: 'Add a single product',
+    intro: 'For one item at a time. Use bulk import for a whole catalogue.',
+    steps: [
+      'Open Inventory and tap Add Product.',
+      'Fill in the name and selling price — everything else is optional.',
+      'Set the cost price if you know it, so margin and profit figures work.',
+      'Set a low stock threshold so you get warned before you run out.',
+      'Save.',
+    ],
+    href: '/inventory/add',
+    hrefLabel: 'Add a product',
+  },
+  lowStockThreshold: {
+    title: 'Set up low stock warnings',
+    intro: 'Each product carries its own threshold, so fast movers can warn earlier.',
+    steps: [
+      'Open Inventory and pick the product.',
+      'Set its low stock threshold to the count where you want to be warned.',
+      'Save. It appears in low-stock alerts as soon as it drops to that number.',
+    ],
+    tips: ['Ask me "what should I restock?" and I can suggest thresholds from how fast each item actually sells.'],
+    href: '/inventory',
+    hrefLabel: 'Open Inventory',
+  },
+  addBranch: {
+    title: 'Add a branch',
+    intro: 'Each branch keeps its own stock counts and its own sales figures.',
+    steps: [
+      'Open Settings, then Branches.',
+      'Add the branch with its name and location.',
+      'Assign staff to it from the Users page.',
+      'Switch branches from the selector in the header.',
+    ],
+    href: '/settings/branches',
+    hrefLabel: 'Manage branches',
+  },
+  refund: {
+    title: 'Refund or return a sale',
+    intro: 'Refunds start from the original receipt, so stock goes back correctly.',
+    steps: [
+      'Open Receipts and find the sale.',
+      'Open it and choose the refund or return option.',
+      'Pick which items are coming back and how much is being refunded.',
+      'Confirm. Stock is returned and the refund is written to the audit log.',
+    ],
+    href: '/receipts',
+    hrefLabel: 'Open Receipts',
+  },
+  addStaff: {
+    title: 'Add a staff member',
+    intro: 'Staff get their own login, and their role decides what they can reach.',
+    steps: [
+      'Open the Users page and invite the staff member.',
+      'Choose their role — this controls what they can see and change.',
+      'Assign them to a branch if you run more than one.',
+      'They set their own password on first sign-in.',
+    ],
+    tips: ['Every action a staff member takes is recorded in the audit log against their name.'],
+    href: '/users',
+    hrefLabel: 'Open Users',
+  },
+  invoice: {
+    title: 'Send an invoice',
+    intro: 'For customers paying later rather than at the counter.',
+    steps: [
+      'Open Invoices and create a new one.',
+      'Pick the customer and add the items.',
+      'Set the due date.',
+      'Save and send it. It shows as outstanding until you mark it paid.',
+    ],
+    tips: ['Ask me "who owes me money?" for everything outstanding, oldest first.'],
+    href: '/invoices',
+    hrefLabel: 'Open Invoices',
+  },
+  stocktake: {
+    title: 'Do a stock count',
+    intro: 'Bringing the system in line with what is physically on the shelf.',
+    steps: [
+      'Count what you actually have, category by category.',
+      'Ask me for the current count of anything as you go.',
+      'Where they differ, tell me the real number and I will draw up an adjustment for you to approve.',
+      'Approving it corrects the count and records why in the audit log.',
+    ],
+    tips: ['I never change stock myself — you approve every adjustment, and it is re-checked against live data at that moment.'],
+    href: '/inventory',
+    hrefLabel: 'Open Inventory',
+  },
+  loyalty: {
+    title: 'Run customer loyalty',
+    intro: 'Points accrue on sales and can be redeemed against future ones.',
+    steps: [
+      'Turn loyalty on in Settings and set what a point is worth.',
+      'Attach a customer to sales at the POS so their points accrue.',
+      'Points build automatically as they spend.',
+      'Redeem them at payment time on a later sale.',
+    ],
+    href: '/customers',
+    hrefLabel: 'Open Customers',
+  },
+};
+
 export function createZenTools({ db, businessId, currency }: Ctx) {
   // Per-request caches. A single turn can call six tools that all need the
   // same receipts; without this that is six identical Firestore reads.
@@ -276,9 +513,27 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           if (scored.length === 0) {
             return { type: 'PRODUCT_PICKER', query: name, resolved: false, candidates: [], note: `No product resembling "${name}" exists in this inventory.` };
           }
-          // One clear winner: exact-ish, and comfortably ahead of runner-up.
           const [best, next] = scored;
-          if (best.score >= 0.95 && (!next || best.score - next.score > 0.2)) {
+
+          /*
+           * An exact name match is an answer, not a candidate. This used to be
+           * folded into the gap rule below, which made the picker inescapable:
+           * `similarity` scores an exact hit 1.0 and a prefix-sharing sibling
+           * 0.8 (0.5 + 0.3 for the shared word), so "Semoliva" against
+           * "Semoliva"/"Semo" left a gap of exactly 0.2 — and the rule demanded
+           * strictly more than 0.2. Every tap on the picker re-sent the name and
+           * drew the same picker again, forever.
+           *
+           * Only shortcut when one product owns the name. Two items genuinely
+           * called the same thing still have to be disambiguated by the user.
+           */
+          const exact = scored.filter((x) => x.score === 1);
+          if (exact.length === 1) {
+            return { type: 'PRODUCT_LIST', title: `Matched "${name}"`, resolved: true, totalMatches: 1, shown: 1, currency, products: [slimProduct(exact[0].product)] };
+          }
+
+          // Otherwise: near-certain, and clearly ahead of the runner-up.
+          if (best.score >= 0.95 && (!next || best.score - next.score >= 0.2)) {
             return { type: 'PRODUCT_LIST', title: `Matched "${name}"`, resolved: true, totalMatches: 1, shown: 1, currency, products: [slimProduct(best.product)] };
           }
           return {
@@ -307,10 +562,13 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           const perDay = sold30 / 30;
           const stock = data.stock ?? 0;
           return {
-            type: 'PRODUCT_LIST',
+            // PRODUCT_DETAIL renders one product large, with its photo — the
+            // grid tile is right for scanning a list and too small when the
+            // owner asked about this one item.
+            type: 'PRODUCT_DETAIL',
             title: data.name,
-            totalMatches: 1, shown: 1, currency,
-            products: [slimProduct(data)],
+            currency,
+            product: slimProduct(data),
             velocity: {
               unitsSoldLast30Days: sold30,
               unitsPerDay: round2(perDay),
@@ -319,6 +577,63 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             },
           };
         } catch (e: any) { return fail('Failed to load product', e); }
+      },
+    }),
+
+    showProductImage: tool({
+      description:
+        "Show a product's photo, by name. Use this when the user asks to see, view or look at a product, or asks what it looks like. Returns the picture at full size with its price and stock. If the name is ambiguous this returns a picker instead — do not guess.",
+      inputSchema: z.object({
+        name: z.string().describe('The product name the user typed, verbatim.'),
+      }),
+      execute: async ({ name }) => {
+        try {
+          const products = await allProducts();
+          const scored = products
+            .map((p) => ({ product: p, score: similarity(name, p.name) }))
+            .filter((x) => x.score > 0.3)
+            .sort((a, b) => b.score - a.score);
+
+          if (scored.length === 0) {
+            return { error: `No product resembling "${name}" exists in this inventory.` };
+          }
+
+          // Same confidence rule as findSimilarProducts: one clear winner or
+          // hand it back to the user. Showing the wrong bottle is worse than
+          // asking, and the picker is one tap.
+          const [best, next] = scored;
+          const confident = best.score >= 0.95 && (!next || best.score - next.score > 0.2);
+          if (!confident) {
+            return {
+              type: 'PRODUCT_PICKER',
+              query: name,
+              resolved: false,
+              currency,
+              note: 'Ask the user which one they meant before showing a photo.',
+              candidates: scored.slice(0, 5).map((x) => ({ ...slimProduct(x.product), confidence: round2(x.score) })),
+            };
+          }
+
+          const data = best.product;
+          const sold30 = (await unitsSold(30)).get(data.id) ?? 0;
+          const perDay = sold30 / 30;
+          return {
+            type: 'PRODUCT_DETAIL',
+            title: data.name,
+            currency,
+            product: slimProduct(data),
+            // Tell the model rather than the user — the card already says
+            // "No photo on this product", so a prose repeat is noise. This
+            // exists so the model can offer to add one.
+            hasImage: Boolean(data.imageUrl),
+            velocity: {
+              unitsSoldLast30Days: sold30,
+              unitsPerDay: round2(perDay),
+              daysOfCover: perDay > 0 ? Math.floor((data.stock ?? 0) / perDay) : null,
+              margin: data.costPrice ? round2(((data.price - data.costPrice) / data.price) * 100) : null,
+            },
+          };
+        } catch (e: any) { return fail('Failed to load product image', e); }
       },
     }),
 
@@ -443,18 +758,25 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             byCat.set(key, row);
           }
           const total = [...byCat.values()].reduce((s, r) => s + r.value, 0);
+          const catRows = [...byCat.entries()]
+            .sort((a, b) => b[1].value - a[1].value)
+            .map(([name, r]) => ({
+              label: name,
+              SKUs: r.skus, Units: r.units,
+              value: round2(r.value),
+              Share: total > 0 ? `${round2((r.value / total) * 100)}%` : '0%',
+            }));
           return {
-            type: 'TABLE',
-            title: 'Inventory by category',
+            type: 'CHART', chartKind: 'pie',
+            title: 'Inventory value by category',
+            xKey: 'label',
+            series: [{ key: 'value', label: 'Retail value', format: 'currency' }],
+            highlights: [
+              { label: 'Total value', value: round2(total), format: 'currency' },
+              { label: 'Categories', value: catRows.length, format: 'number' },
+            ],
             currency,
-            columns: ['Category', 'SKUs', 'Units', 'Retail value', 'Share'],
-            rows: [...byCat.entries()]
-              .sort((a, b) => b[1].value - a[1].value)
-              .map(([name, r]) => ({
-                Category: name, SKUs: r.skus, Units: r.units,
-                'Retail value': round2(r.value),
-                Share: total > 0 ? `${round2((r.value / total) * 100)}%` : '0%',
-              })),
+            rows: catRows,
           };
         } catch (e: any) { return fail('Failed to break down categories', e); }
       },
@@ -553,7 +875,10 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             columns: ['Product', 'Cost', 'Price', 'Margin', 'Profit/unit'],
             rows: rows.slice(0, limit ?? 15).map((r) => ({
               Product: r.name, Cost: r.cost, Price: r.price,
-              Margin: `${r.marginPct}%`, 'Profit/unit': r.profitPerUnit,
+              // A number, not `${n}%` — the table adds the sign for percent
+              // columns, and only a real number gets the negative-value
+              // highlight that makes a below-cost item visible at a glance.
+              Margin: r.marginPct, 'Profit/unit': r.profitPerUnit,
             })),
           };
         } catch (e: any) { return fail('Failed to analyse margins', e); }
@@ -631,6 +956,170 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       },
     }),
 
+    /**
+     * The owner's daily close-out. Draws the whole day as a report card, then
+     * suggests where the numbers live in the app. The model should call this in
+     * addition to (not instead of) getSalesMetrics when the user says "today".
+     */
+    getDailyReport: tool({
+      description:
+        "A day's trading drawn as a report card — takings, transactions, method split, top items, debt owed. Use when the user asks 'how did we do today', 'daily report', or 'end of day'.",
+      inputSchema: z.object({
+        date: z.string().optional().describe('YYYY-MM-DD. Defaults to today.'),
+      }),
+      execute: async ({ date }) => {
+        try {
+          const day = date || new Date().toISOString().slice(0, 10);
+          const start = new Date(`${day}T00:00:00`);
+          const end = new Date(start.getTime() + DAY_MS);
+          const receipts = (await receiptsSince(90)).filter((r) => {
+            const t = toMillis(r.createdAt);
+            return t >= start.getTime() && t < end.getTime();
+          });
+
+          const revenue = round2(receipts.reduce((s, r) => s + (r.total ?? 0), 0));
+          const profit = round2(receipts.reduce((s, r) => s + (r.profit ?? 0), 0));
+          const transactions = receipts.length;
+          const units = receipts.reduce(
+            (s, r) => s + (r.items ?? []).reduce((a: number, i: any) => a + (i.quantity ?? 0), 0), 0,
+          );
+          const byMethod: Record<string, number> = {};
+          const byProduct = new Map<string, { name: string; units: number; revenue: number }>();
+          for (const r of receipts) {
+            const m = r.paymentMethod ?? 'Unknown';
+            byMethod[m] = round2((byMethod[m] ?? 0) + (r.total ?? 0));
+            for (const item of r.items ?? []) {
+              if (!item?.productId) continue;
+              const row = byProduct.get(item.productId) ?? { name: item.name ?? 'Unknown', units: 0, revenue: 0 };
+              row.units += item.quantity ?? 0;
+              row.revenue = round2(row.revenue + ((item.price ?? 0) * (item.quantity ?? 0)));
+              byProduct.set(item.productId, row);
+            }
+          }
+          const topItems = [...byProduct.values()].sort((a, b) => b.units - a.units).slice(0, 3);
+          const debt = round2(receipts.filter((r) => r.status === 'unpaid' || r.status === 'pending').reduce((s, r) => s + (r.total ?? 0), 0));
+
+          const methodRows = Object.entries(byMethod)
+            .sort((a, b) => b[1] - a[1])
+            .map(([method, amount]) => ({
+              Method: method,
+              'Taken': amount,
+              Share: revenue > 0 ? `${round2((amount / revenue) * 100)}%` : '0%',
+            }));
+
+          return {
+            type: 'CHART', chartKind: 'bar',
+            title: `Daily report — ${day}`,
+            subtitle: `${transactions} transaction${transactions === 1 ? '' : 's'}, ${units} units`,
+            xKey: 'Method',
+            series: [{ key: 'Taken', label: 'Taken', format: 'currency', color: '#ea580c' }],
+            highlights: [
+              { label: 'Takings', value: revenue, format: 'currency' },
+              { label: 'Profit', value: profit, format: 'currency' },
+              { label: 'Transactions', value: transactions, format: 'number' },
+              { label: 'Debt owed', value: debt, format: 'currency' },
+            ],
+            note: topItems.length
+              ? `Top sellers: ${topItems.map((t) => `${t.name} (${t.units})`).join(', ')}.`
+              : undefined,
+            currency,
+            rows: methodRows,
+            // The model narrates the report; the card shows the split.
+            links: [
+              { label: 'Full sales report', href: '/reports', kind: 'page' },
+              { label: 'Today in the ledger', href: '/receipts', kind: 'page' },
+            ],
+          };
+        } catch (e: any) { return fail('Failed to build daily report', e); }
+      },
+    }),
+
+    /**
+     * Deep-link the owner into the app instead of narrating a page that exists.
+     * The model should offer this after an answer ("open Inventory", "show me
+     * the reports page").
+     */
+    explainHowTo: tool({
+      description:
+        "Step-by-step walkthrough for a task in the app. Use whenever the user asks how to DO something — 'how do I bulk import', 'teach me to record a sale', 'how do refunds work', 'how do I add staff'. Returns a numbered card with a link to the right page. Always prefer this over describing steps yourself.",
+      inputSchema: z.object({
+        topic: z
+          .enum([
+            'bulkImport', 'recordSale', 'addProduct', 'lowStockThreshold', 'addBranch',
+            'refund', 'addStaff', 'invoice', 'stocktake', 'loyalty',
+          ])
+          .describe('Which walkthrough to show.'),
+      }),
+      execute: async ({ topic }) => {
+        const w = WORKFLOWS[topic];
+        if (!w) {
+          return { error: `I don't have a walkthrough for "${topic}" yet.` };
+        }
+        return {
+          type: 'WALKTHROUGH',
+          title: w.title,
+          intro: w.intro,
+          steps: w.steps,
+          tips: w.tips ?? [],
+          href: w.href ?? null,
+          hrefLabel: w.hrefLabel ?? 'Open',
+        };
+      },
+    }),
+
+    linkToPage: tool({
+      description:
+        "Offer a tap-through link to a page in the Zeneva app. Use when the user asks to open, go to, or see a page — e.g. 'open inventory', 'show me the reports', 'take me to the POS'. Returns a LINK card. Covers sub-pages too: adding a product, branches, debts, the POS steps.",
+      inputSchema: z.object({
+        href: z.string().describe('Absolute app path, starting with a forward slash.'),
+        label: z.string().describe('What the link says, e.g. "Open Inventory".'),
+        detail: z.string().optional().describe('One short line on what is on that page.'),
+      }),
+      execute: async ({ href, label, detail }) => {
+        // Only ever link inside the app — never to external sites.
+        if (typeof href !== 'string' || !href.startsWith('/') || href.startsWith('//')) {
+          return { error: 'Links must point inside the app.' };
+        }
+
+        // Strip query/hash before matching so `/inventory?x=1` still resolves.
+        const path = href.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+
+        if (!APP_ROUTES.has(path)) {
+          /*
+           * A near-miss is the common case: the model reaches for a page that
+           * sounds right but does not exist (`/inventory/import` — bulk import
+           * is a dialog on the Inventory page, not a route). Returning an error
+           * painted a red card in the chat and taught the user nothing, so walk
+           * up the path to the nearest real ancestor and link that instead.
+           */
+          const segments = path.split('/').filter(Boolean);
+          for (let i = segments.length - 1; i > 0; i--) {
+            const parent = '/' + segments.slice(0, i).join('/');
+            if (APP_ROUTES.has(parent)) {
+              return {
+                type: 'LINK',
+                href: parent,
+                label: label ?? `Open ${parent.slice(1)}`,
+                detail: detail ?? ROUTE_HINTS[parent],
+                redirectedFrom: path,
+                note: `${path} isn't a page of its own — this is where it lives.`,
+              };
+            }
+          }
+          return {
+            error: `There's no ${path} page. Try Inventory, Reports, Receipts, Customers, Invoices, Dashboard, POS, Settings or Users.`,
+          };
+        }
+
+        return {
+          type: 'LINK',
+          label: label ?? 'Open',
+          detail: detail ?? ROUTE_HINTS[path],
+          href: path,
+        };
+      },
+    }),
+
     getSalesTrend: tool({
       description: 'Day-by-day revenue and transaction counts over a period. Use to describe trends and spot spikes or dips.',
       inputSchema: z.object({ days: z.number().min(2).max(90).default(14) }),
@@ -647,16 +1136,30 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             const b = buckets.get(key);
             if (b) { b.revenue = round2(b.revenue + (r.total ?? 0)); b.transactions++; }
           }
-          const series = [...buckets.entries()].map(([date, v]) => ({ date, ...v }));
+          const series = [...buckets.entries()].map(([date, v]) => ({
+            date,
+            // Short axis label — the ISO date is too wide for the chat column.
+            label: `${date.slice(8, 10)}/${date.slice(5, 7)}`,
+            ...v,
+          }));
           const revenues = series.map((s) => s.revenue);
           const best = series[revenues.indexOf(Math.max(...revenues))];
+          const total = round2(revenues.reduce((s, v) => s + v, 0));
           return {
-            type: 'TABLE',
+            type: 'CHART', chartKind: 'line',
             title: `Daily sales — last ${days} days`,
+            xKey: 'label',
+            series: [{ key: 'revenue', label: 'Revenue', format: 'currency', color: '#ea580c' }],
+            highlights: [
+              { label: 'Total', value: total, format: 'currency' },
+              { label: 'Daily average', value: round2(total / days), format: 'currency' },
+              { label: 'Best day', value: best?.revenue ?? 0, format: 'currency' },
+              { label: 'Transactions', value: series.reduce((s, v) => s + v.transactions, 0), format: 'number' },
+            ],
+            note: best ? `Best day was ${best.date}.` : undefined,
             currency,
             bestDay: best ? { date: best.date, revenue: best.revenue } : null,
-            total: round2(revenues.reduce((s, v) => s + v, 0)),
-            columns: ['date', 'revenue', 'transactions'],
+            total,
             rows: series,
           };
         } catch (e: any) { return fail('Failed to build sales trend', e); }
@@ -768,6 +1271,25 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       execute: async ({ days }) => {
         try {
           const receipts = (await receiptsSince(days)).filter(isPaid);
+
+          /*
+           * With no paid receipts every bucket is zero, and `reduce` below seeds
+           * at index 0 and never finds anything greater — so the tool used to
+           * report "busiest day is Sunday, peak hour 00:00" with total
+           * confidence on an empty book. A staffing decision made on that is
+           * actively harmful, so say plainly that there is nothing to read.
+           */
+          if (receipts.length === 0) {
+            return {
+              type: 'METRICS',
+              title: `Trading patterns — last ${days} days`,
+              insufficientData: true,
+              caveat: `No paid sales in the last ${days} days, so there is no trading pattern to read yet.`,
+              currency,
+              tiles: [],
+            };
+          }
+
           const hours = Array.from({ length: 24 }, () => ({ revenue: 0, transactions: 0 }));
           const dow = Array.from({ length: 7 }, () => ({ revenue: 0, transactions: 0 }));
           for (const r of receipts) {
@@ -781,13 +1303,21 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           const busiestHour = hours.reduce((best, h, i) => (h.revenue > hours[best].revenue ? i : best), 0);
           const busiestDay = dow.reduce((best, d, i) => (d.revenue > dow[best].revenue ? i : best), 0);
           return {
-            type: 'TABLE',
+            type: 'CHART', chartKind: 'bar',
             title: `Trading patterns — last ${days} days`,
+            subtitle: 'Revenue by day of week',
+            xKey: 'Day',
+            series: [{ key: 'Revenue', label: 'Revenue', format: 'currency', color: '#ea580c' }],
+            highlights: [
+              { label: 'Busiest day', value: dow[busiestDay].revenue, format: 'currency' },
+              { label: 'Transactions', value: dow.reduce((s, d) => s + d.transactions, 0), format: 'number' },
+            ],
+            note: `Busiest day is ${names[busiestDay]}; peak hour is ${String(busiestHour).padStart(2, '0')}:00.`,
             currency,
             busiestHour: `${String(busiestHour).padStart(2, '0')}:00`,
             busiestDay: names[busiestDay],
-            columns: ['Day', 'Revenue', 'Transactions'],
-            rows: dow.map((d, i) => ({ Day: names[i], Revenue: d.revenue, Transactions: d.transactions })),
+            // Short labels on the axis, full names kept for the model's prose.
+            rows: dow.map((d, i) => ({ Day: names[i].slice(0, 3), fullDay: names[i], Revenue: d.revenue, Transactions: d.transactions })),
             hourly: hours.map((h, i) => ({ hour: `${String(i).padStart(2, '0')}:00`, ...h })).filter((h) => h.transactions > 0),
           };
         } catch (e: any) { return fail('Failed to compute peak hours', e); }
@@ -880,7 +1410,14 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               .limit(3).get();
             results.push(...byEmail.docs.map(map));
           }
-          return { count: results.length, customers: results, currency };
+          return {
+            type: 'CUSTOMER_LIST',
+            title: results.length === 1 ? 'Customer' : `Customers matching "${searchTerm}"`,
+            emptyText: `No customer matching "${searchTerm}".`,
+            count: results.length,
+            customers: results,
+            currency,
+          };
         } catch (e: any) { return fail('Failed to query customers', e); }
       },
     }),
@@ -895,13 +1432,22 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             .orderBy('totalSpent', 'desc')
             .limit(limit ?? 10).get();
           return {
-            type: 'TABLE',
+            type: 'CUSTOMER_LIST',
             title: 'Top customers',
+            emptyText: 'No customers on record yet.',
             currency,
-            columns: ['#', 'Customer', 'Total spent', 'Loyalty points'],
-            rows: snap.docs.map((d, i) => {
+            customers: snap.docs.map((d, i) => {
               const c = d.data();
-              return { '#': i + 1, Customer: c.name, 'Total spent': round2(c.totalSpent ?? 0), 'Loyalty points': c.loyaltyPoints ?? 0 };
+              return {
+                id: d.id,
+                rank: i + 1,
+                name: c.name,
+                email: c.email ?? null,
+                phone: c.phone ?? null,
+                totalSpent: round2(c.totalSpent ?? 0),
+                loyaltyPoints: c.loyaltyPoints ?? 0,
+                lastPurchaseDate: c.lastPurchaseDate ? new Date(toMillis(c.lastPurchaseDate)).toISOString() : null,
+              };
             }),
           };
         } catch (e: any) { return fail('Failed to load top customers', e); }
@@ -954,17 +1500,24 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             .filter((c) => (c.totalSpent ?? 0) > 0 && c.lastPurchaseDate && toMillis(c.lastPurchaseDate) < cutoff)
             .sort((a, b) => (b.totalSpent ?? 0) - (a.totalSpent ?? 0));
           return {
-            type: 'TABLE',
+            type: 'CUSTOMER_LIST',
             title: `No purchase in ${inactiveDays}+ days`,
+            emptyText: `Nobody has been quiet for ${inactiveDays}+ days — every paying customer has been back recently.`,
             currency,
             atRiskCount: rows.length,
+            totalMatches: rows.length,
+            // Formatted by the card, not here — a string built server-side
+            // would miss the business's currency symbol.
             revenueAtRisk: round2(rows.reduce((s, c) => s + (c.totalSpent ?? 0), 0)),
-            columns: ['Customer', 'Last purchase', 'Days ago', 'Lifetime spend'],
-            rows: rows.slice(0, limit ?? 15).map((c) => ({
-              Customer: c.name,
-              'Last purchase': new Date(toMillis(c.lastPurchaseDate)).toISOString().slice(0, 10),
-              'Days ago': Math.floor((Date.now() - toMillis(c.lastPurchaseDate)) / DAY_MS),
-              'Lifetime spend': round2(c.totalSpent ?? 0),
+            customers: rows.slice(0, limit ?? 15).map((c) => ({
+              id: c.id,
+              name: c.name,
+              email: c.email ?? null,
+              phone: c.phone ?? null,
+              totalSpent: round2(c.totalSpent ?? 0),
+              loyaltyPoints: c.loyaltyPoints ?? 0,
+              lastPurchaseDate: new Date(toMillis(c.lastPurchaseDate)).toISOString(),
+              daysAgo: Math.floor((Date.now() - toMillis(c.lastPurchaseDate)) / DAY_MS),
             })),
           };
         } catch (e: any) { return fail('Failed to find at-risk customers', e); }
@@ -1225,6 +1778,326 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
         change: p.newThreshold - p.currentThreshold, reason: p.reason,
         status: 'PENDING_APPROVAL', currency,
       }),
+    }),
+
+    /**
+     * Propose recording a sale.
+     *
+     * Only call this once the owner has actually confirmed *every* line — the
+     * system prompt requires asking for product, quantity and payment method
+     * before this tool runs. It is the one proposal that moves money, so it is
+     * the strictest.
+     *
+     * Every line is re-resolved against Firestore here: the model supplies only
+     * `productId` and `quantity`, and prices, names and stock come from the
+     * product documents. That means the card the owner reads shows the real
+     * total even if the model miscalculated, and it lets the tool refuse an
+     * oversell before a card is ever drawn. The client re-checks all of this in
+     * `proposal-guard.ts` against its own live snapshot, because stock can move
+     * between this call and the owner tapping Approve.
+     */
+    proposeSale: tool({
+      description:
+        'Propose recording a sale, producing an approval card. Does NOT write to the database. ' +
+        'Only call after the owner has confirmed the exact products, quantities and payment method. ' +
+        'Never guess a quantity or a payment method — ask first.',
+      inputSchema: z.object({
+        items: z.array(z.object({
+          productId: z.string().describe('Exact product id from a lookup tool, never a guess.'),
+          quantity: z.number().int().min(1),
+        })).min(1).max(50),
+        paymentMethod: z.enum(['Cash', 'Card', 'Bank Transfer', 'Invoice']),
+        customerId: z.string().optional().describe('Only if the owner named a customer.'),
+        discount: z.number().min(0).optional().describe('Absolute amount off, not a percentage.'),
+        confirmedByOwner: z.boolean().describe('True only if the owner explicitly confirmed these exact lines.'),
+      }),
+      execute: async (p) => {
+        try {
+          if (!p.confirmedByOwner) {
+            return { error: 'Ask the owner to confirm the products, quantities and payment method first.' };
+          }
+
+          const catalogue = await allProducts();
+          const lines: any[] = [];
+          const wanted = new Map<string, number>();
+          let subtotal = 0;
+
+          for (const line of p.items) {
+            const product = catalogue.find((x) => x.id === line.productId);
+            if (!product) {
+              return { error: `No product with id "${line.productId}". Look it up again before proposing the sale.` };
+            }
+            const price = Number(product.price) || 0;
+            if (price <= 0) {
+              return { error: `${product.name} has no price set, so it cannot be sold. Set a price first.` };
+            }
+
+            // Same product listed twice — total the ask before comparing stock.
+            const running = (wanted.get(product.id) ?? 0) + line.quantity;
+            wanted.set(product.id, running);
+
+            const isService = product.categoryType === 'service' || product.type === 'service';
+            const onHand = Number(product.stock) || 0;
+            if (!isService && running > onHand) {
+              return {
+                error: `Not enough stock for ${product.name}: ${onHand} on hand but ${running} requested. ` +
+                  'Tell the owner and ask whether to reduce the quantity or record a delivery first.',
+              };
+            }
+
+            subtotal += price * line.quantity;
+            lines.push({
+              productId: product.id,
+              name: product.name,
+              quantity: line.quantity,
+              price,
+              lineTotal: round2(price * line.quantity),
+              stockAfter: isService ? null : onHand - running,
+            });
+          }
+
+          const discount = p.discount && p.discount > 0 ? p.discount : 0;
+          if (discount > subtotal) {
+            return { error: `The discount (${discount}) is more than the subtotal (${round2(subtotal)}).` };
+          }
+
+          let customerName: string | null = null;
+          if (p.customerId) {
+            const snap = await db.collection('customers').doc(p.customerId).get();
+            if (!snap.exists) return { error: 'That customer id does not exist. Look the customer up again.' };
+            // The Admin SDK bypasses firestore.rules, so the tenant check has to
+            // happen here. Same wording as the not-found case on purpose: a
+            // different message would confirm the id exists in another tenant.
+            if ((snap.data() as any)?.businessId !== businessId) {
+              return { error: 'That customer id does not exist. Look the customer up again.' };
+            }
+            customerName = (snap.data() as any)?.name ?? null;
+          }
+
+          // Tax is recomputed on the client from business settings; shown here
+          // so the approval card can state the figure the owner will commit to.
+          const settingsSnap = await db.collection('businessInstances').doc(businessId).get();
+          const taxRate = Number((settingsSnap.data() as any)?.settings?.defaultTaxRate) || 0;
+          const tax = round2((subtotal * taxRate) / 100);
+          const total = round2(subtotal + tax - discount);
+
+          return {
+            type: 'PROPOSAL', action: 'RECORD_SALE',
+            proposalId: `prop_sale_${lines.map((l) => `${l.productId}x${l.quantity}`).join('_')}_${total}`,
+            items: lines,
+            paymentMethod: p.paymentMethod,
+            customerId: p.customerId ?? null, customerName,
+            subtotal: round2(subtotal), tax, taxRate, discount, total,
+            reason: `${lines.length} line${lines.length === 1 ? '' : 's'}, paid by ${p.paymentMethod}`,
+            status: 'PENDING_APPROVAL', currency,
+          };
+        } catch (e: any) { return fail('Failed to build the sale', e); }
+      },
+    }),
+
+    forecastRevenue: tool({
+      description:
+        'Project revenue forward from the actual sales trend. Use this for ANY forward-looking money question — "what will I make next month", "how much in a year", "where are we heading". It fits a line to real daily takings and reports its own confidence, refusing to extrapolate when the history is too thin. Never answer a projection question from memory; call this.',
+      inputSchema: z.object({
+        aheadDays: z.number().min(7).max(3650).default(30).describe('How far ahead to project, in days.'),
+        basedOnDays: z.number().min(14).max(365).default(90).describe('How much history to fit the trend to.'),
+      }),
+      execute: async ({ aheadDays, basedOnDays }) => {
+        try {
+          const receipts = (await receiptsSince(basedOnDays)).filter(isPaid);
+
+          const buckets = new Map<string, number>();
+          for (let i = basedOnDays - 1; i >= 0; i--) {
+            buckets.set(new Date(Date.now() - i * DAY_MS).toISOString().slice(0, 10), 0);
+          }
+          for (const r of receipts) {
+            const key = new Date(toMillis(r.createdAt)).toISOString().slice(0, 10);
+            if (buckets.has(key)) buckets.set(key, round2((buckets.get(key) ?? 0) + (r.total ?? 0)));
+          }
+
+          const daily = [...buckets.values()];
+          const daysWithSales = daily.filter((v) => v > 0).length;
+          const observed = round2(daily.reduce((s, v) => s + v, 0));
+
+          /*
+           * The honest refusal. A handful of sales cannot support a projection,
+           * and the failure mode is not a vague answer — it is a confident
+           * multi-year figure built from one transaction, which an owner could
+           * actually plan against. Hand back the facts and say why instead.
+           */
+          if (daysWithSales < 7) {
+            return {
+              type: 'METRICS',
+              title: 'Not enough trading history to project',
+              insufficientData: true,
+              currency,
+              tiles: [
+                { label: `Revenue, last ${basedOnDays}d`, value: observed, format: 'currency' },
+                { label: 'Days with a sale', value: daysWithSales, format: 'number' },
+              ],
+              caveat: `A projection needs at least 7 days that actually had sales; this book has ${daysWithSales}. Record more trading and ask again — a forecast from this little data would be a guess dressed up as a number.`,
+            };
+          }
+
+          const { slope, intercept, r2 } = linearFit(daily);
+          const n = daily.length;
+
+          // Sum the fitted line across the future window, floored at zero: a
+          // declining trend eventually predicts negative takings, which is not
+          // a thing that happens in a shop.
+          let projected = 0;
+          for (let i = n; i < n + aheadDays; i++) projected += Math.max(0, intercept + slope * i);
+          projected = round2(projected);
+
+          const runRate = round2((observed / n) * aheadDays);
+          const { level, caveat } = horizonConfidence(aheadDays, r2, daysWithSales);
+          const direction = slope > 0.01 ? 'growing' : slope < -0.01 ? 'declining' : 'flat';
+
+          const months = aheadDays / 30.44;
+          const horizonLabel =
+            aheadDays >= 365 ? `${round2(aheadDays / 365)} year${aheadDays >= 730 ? 's' : ''}`
+            : months >= 1.5 ? `${Math.round(months)} months`
+            : `${aheadDays} days`;
+
+          return {
+            type: 'METRICS',
+            title: `Projection — next ${horizonLabel}`,
+            currency,
+            confidence: level,
+            trend: direction,
+            r2: round2(r2),
+            projected,
+            runRate,
+            tiles: [
+              { label: `Trend projection`, value: projected, format: 'currency', hint: `Fitted to ${n} days of takings` },
+              { label: 'Flat run-rate', value: runRate, format: 'currency', hint: 'If today\'s average simply continued' },
+              { label: `Actual, last ${basedOnDays}d`, value: observed, format: 'currency' },
+              { label: 'Daily average', value: round2(observed / n), format: 'currency' },
+              { label: 'Trend', value: direction, format: 'text' },
+              { label: 'Fit quality', value: `${Math.round(r2 * 100)}%`, format: 'text', hint: 'How well a straight line explains the history' },
+            ],
+            flags: [`Confidence: ${level}.`],
+            caveat,
+          };
+        } catch (e: any) { return fail('Failed to build the projection', e); }
+      },
+    }),
+
+    getGrowthRate: tool({
+      description:
+        'Growth rate between two consecutive equal periods, with the annualised equivalent. Use for "are we growing", "how fast", "what rate are we growing at".',
+      inputSchema: z.object({ periodDays: z.number().min(7).max(180).default(30).describe('Length of each half being compared.') }),
+      execute: async ({ periodDays }) => {
+        try {
+          const rows = (await receiptsSince(periodDays * 2)).filter(isPaid);
+          const cutoff = Date.now() - periodDays * DAY_MS;
+          let recent = 0;
+          let prior = 0;
+          for (const r of rows) {
+            const t = toMillis(r.createdAt);
+            if (t >= cutoff) recent = round2(recent + (r.total ?? 0));
+            else prior = round2(prior + (r.total ?? 0));
+          }
+
+          if (prior === 0) {
+            return {
+              type: 'METRICS',
+              title: `Growth — last ${periodDays} days`,
+              insufficientData: true,
+              currency,
+              tiles: [{ label: 'Recent period', value: recent, format: 'currency' }],
+              caveat: `Nothing was sold in the previous ${periodDays}-day period, so there is no baseline to measure growth against.`,
+            };
+          }
+
+          const change = round2(((recent - prior) / prior) * 100);
+          // Compounding a single period's change over a year overstates it wildly
+          // when the period is short, so cap what gets presented as annualised.
+          const periodsPerYear = 365 / periodDays;
+          const annualised = periodsPerYear <= 12 ? round2((Math.pow(recent / prior, periodsPerYear) - 1) * 100) : null;
+
+          return {
+            type: 'METRICS',
+            title: `Growth — last ${periodDays} days vs previous ${periodDays}`,
+            currency,
+            growthPercent: change,
+            tiles: [
+              { label: 'Change', value: change, format: 'percent' },
+              { label: `Last ${periodDays}d`, value: recent, format: 'currency' },
+              { label: `Previous ${periodDays}d`, value: prior, format: 'currency' },
+              ...(annualised !== null ? [{ label: 'Annualised', value: annualised, format: 'percent', hint: 'If this rate repeated all year' }] : []),
+            ],
+            caveat: annualised === null
+              ? 'Too short a period to annualise meaningfully.'
+              : 'Annualised figures compound one period\'s change across a year — treat as indicative.',
+          };
+        } catch (e: any) { return fail('Failed to compute growth rate', e); }
+      },
+    }),
+
+    forecastStockout: tool({
+      description:
+        'When each product will run out, based on its recent sales velocity, and the date to reorder by. Use for "what will run out", "what should I reorder first", "how long will stock last".',
+      inputSchema: z.object({
+        basedOnDays: z.number().min(7).max(180).default(30).describe('History window used to measure velocity.'),
+        withinDays: z.number().min(1).max(365).default(30).describe('Only report items running out within this many days.'),
+        limit: z.number().min(1).max(50).default(15),
+      }),
+      execute: async ({ basedOnDays, withinDays, limit }) => {
+        try {
+          const [products, receipts] = await Promise.all([allProducts(), receiptsSince(basedOnDays)]);
+          const paid = receipts.filter(isPaid);
+
+          const sold = new Map<string, number>();
+          for (const r of paid) {
+            for (const it of (r.items ?? [])) {
+              const id = it.productId ?? it.id;
+              if (id) sold.set(id, (sold.get(id) ?? 0) + (it.quantity ?? 0));
+            }
+          }
+
+          const rows = products
+            .map((p) => {
+              const units = sold.get(p.id) ?? 0;
+              const perDay = units / basedOnDays;
+              const stock = p.stock ?? 0;
+              // No movement means no forecastable stockout — an untouched item
+              // is a dead-stock question, not a reorder one.
+              const daysLeft = perDay > 0 ? Math.floor(stock / perDay) : null;
+              return { id: p.id, name: p.name ?? 'Unnamed', sku: p.sku ?? null, stock, unitsSold: units, perDay: round2(perDay), daysLeft };
+            })
+            .filter((r) => r.daysLeft !== null && r.daysLeft <= withinDays)
+            .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
+            .slice(0, limit);
+
+          if (rows.length === 0) {
+            return {
+              type: 'METRICS',
+              title: `Stockout forecast — next ${withinDays} days`,
+              currency,
+              tiles: [{ label: 'Items at risk', value: 0, format: 'number' }],
+              caveat: `Nothing with recent movement is projected to run out within ${withinDays} days. Items with no sales in the last ${basedOnDays} days are excluded — they have no velocity to project.`,
+            };
+          }
+
+          return {
+            type: 'TABLE',
+            title: `Projected to run out within ${withinDays} days`,
+            currency,
+            // `columns` are display labels used directly as row keys by
+            // DataTable — not {key,label} objects.
+            columns: ['Product', 'In stock', 'Sold/day', 'Days left'],
+            rows: rows.map((r) => ({
+              Product: r.name,
+              'In stock': r.stock,
+              'Sold/day': r.perDay,
+              'Days left': r.daysLeft,
+            })),
+            atRisk: rows.length,
+            note: `Based on ${basedOnDays} days of velocity. Soonest first.`,
+          };
+        } catch (e: any) { return fail('Failed to forecast stockouts', e); }
+      },
     }),
   };
 }

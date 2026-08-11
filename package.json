@@ -3,6 +3,7 @@
   "version": "3.1.7",
   "private": true,
   "scripts": {
+    "predev": "node scripts/clean-sw.mjs",
     "dev": "next dev --turbopack -p 9007",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
@@ -13,7 +14,9 @@
     "postinstall": "patch-package",
     "tauri": "tauri",
     "version-up": "node scripts/update-version.js",
-    "announce-release": "node scripts/announce-release.mjs"
+    "announce-release": "node scripts/announce-release.mjs",
+    "record": "node scripts/record/record.mjs",
+    "record:audio": "node scripts/record/add-audio.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.36",

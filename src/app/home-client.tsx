@@ -212,7 +212,7 @@ export default function Home() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [charIndex, setCharIndex] = useState(0);
 
-    const phrases = ["Enter your work email", "Start your free trial", "Unlock Zen AI insights", "Join 30+ smart retailers"];
+    const phrases = ["Enter your work email", "Start free, stay free", "Unlock Zen AI insights", "Join 30+ smart retailers"];
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -1077,7 +1077,7 @@ export default function Home() {
                                     Choose the Perfect Plan for Your Business
                                 </h2>
                                 <p className="text-lg text-slate-500 tracking-tight font-dm-sans">
-                                    Start for free, and scale as you grow. All plans come with a 30-day free trial of our premium features. No credit card required.
+                                    Start free and stay free for as long as you like — no trial, no countdown, no credit card. Upgrade the day your shop outgrows it.
                                 </p>
                             </div>
 
@@ -1109,7 +1109,7 @@ export default function Home() {
                                         <span className="text-4xl font-bold tracking-tight">Free</span>
                                     </div>
                                     <ul className="mt-6 space-y-4 text-sm">
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 500 products</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 50 products</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 1 Staff Account</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Standard POS (Unlimited Sales)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Basic Analytics</li>
@@ -1142,16 +1142,19 @@ export default function Home() {
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Up to 1,500 products</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 5 Staff Accounts</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Customizable E-Commerce Storefront</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced POS with barcode scanning</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 100 messages/day</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Smart Bulk Inventory Import</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Shareable Receipt Links (WhatsApp/SMS)</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Reports & Analytics</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Product Troubleshooter</li>
                                         <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> Granular Staff Permissions (RBAC)</li>
                                     </ul>
                                     <div className="mt-auto pt-6">
                                         <Button asChild size="lg" className="w-full">
-                                            <Link href="/signup">Start Your Pro Trial</Link>
+                                            <Link href="/signup">Upgrade to Pro</Link>
                                         </Button>
                                     </div>
                                 </div>
@@ -1174,13 +1177,17 @@ export default function Home() {
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 500 messages/day</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Granular Role-Based Access Control</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence (CRM+)</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Inventory Velocity Reports (ABC Analysis)</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Automated Email Receipts</li>
+                                        <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> Multi-Branch Management</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Priority Phone & Email Support</li>
                                     </ul>
                                     <div className="mt-auto pt-6">
                                         <Button asChild size="lg" className="w-full">
-                                            <Link href="/signup">Start Your Business Trial</Link>
+                                            <Link href="/signup">Upgrade to Business</Link>
                                         </Button>
                                     </div>
                                 </div>

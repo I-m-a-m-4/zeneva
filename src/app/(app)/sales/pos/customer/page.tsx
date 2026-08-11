@@ -23,12 +23,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
+import { useI18n } from '@/context/i18n-context';
 
 
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: (customer: Customer) => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { triggerRefresh, customers, addToQueue } = usePOS();
+    const { t } = useI18n();
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [phone, setPhone] = React.useState('');
@@ -39,14 +41,14 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) {
-            toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
+            toast({ title: t('pos.missingFields'), description: t('pos.customerNameRequired'), variant: 'destructive' });
             return;
         }
 
         if (email) {
             const emailExists = customers?.some(c => c.email.toLowerCase() === email.toLowerCase());
             if (emailExists) {
-                toast({ title: 'Customer Exists', description: 'A customer with this email already exists.', variant: 'destructive' });
+                toast({ title: t('pos.customerExists'), description: t('pos.customerExistsDescription'), variant: 'destructive' });
                 return;
             }
         }
@@ -54,7 +56,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
         if (phone) {
             const phoneExists = customers?.some(c => c.phone === phone);
             if (phoneExists) {
-                toast({ title: 'Duplicate Phone Number', description: 'A customer with this phone number already exists.', variant: 'destructive' });
+                toast({ title: t('pos.duplicatePhone'), description: t('pos.duplicatePhoneDescription'), variant: 'destructive' });
                 return;
             }
         }
@@ -62,7 +64,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
         if (code) {
             const codeExists = customers?.some(c => c.code?.toLowerCase() === code.toLowerCase());
             if (codeExists) {
-                toast({ title: 'Duplicate Code', description: 'A customer with this unique code already exists.', variant: 'destructive' });
+                toast({ title: t('pos.duplicateCode'), description: t('pos.duplicateCodeDescription'), variant: 'destructive' });
                 return;
             }
         }
@@ -92,14 +94,14 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
             addToQueue({
                 type: 'add-customer',
                 payload: newCustomerData,
-            }, `Adding customer: ${name}`);
+            }, t('pos.queueAddingCustomer', { name }));
 
-            toast({ title: 'Customer Saved', description: `${name} has been added to the system.`, variant: 'success' });
+            toast({ title: t('pos.customerSaved'), description: t('pos.customerSavedDescription', { name }), variant: 'success' });
             triggerRefresh();
             onCustomerAdded(newCustomerData as Customer);
 
         } catch (error) {
-            toast({ title: 'Error', description: 'Could not add customer.', variant: 'destructive' });
+            toast({ title: t('errors.genericTitle'), description: t('pos.addCustomerFailed'), variant: 'destructive' });
             isSavingRef.current = false;
             setIsSaving(false);
         }
@@ -109,26 +111,26 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
         <form onSubmit={handleSave}>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="name" className="text-right">Name</label>
+                    <label htmlFor="name" className="text-end">{t('common.name')}</label>
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="email" className="text-right">Email <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
+                    <label htmlFor="email" className="text-end">{t('common.email')} <span className="text-[10px] text-muted-foreground">({t('common.optional')})</span></label>
                     <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="phone" className="text-right">Phone <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
+                    <label htmlFor="phone" className="text-end">{t('common.phone')} <span className="text-[10px] text-muted-foreground">({t('common.optional')})</span></label>
                     <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor="code" className="text-right">Unique Code <span className="text-[10px] text-muted-foreground">(Optional)</span></label>
-                    <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. VIP-001" className="col-span-3" />
+                    <label htmlFor="code" className="text-end">{t('pos.uniqueCode')} <span className="text-[10px] text-muted-foreground">({t('common.optional')})</span></label>
+                    <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('pos.uniqueCodePlaceholder')} className="col-span-3" />
                 </div>
             </div>
             <DialogFooter>
                 <Button type="submit" disabled={isSaving}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Customer
+                    {isSaving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                    {t('pos.saveCustomer')}
                 </Button>
             </DialogFooter>
         </form>
@@ -138,6 +140,7 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 export default function CustomerPage() {
     const { selectedCustomer, selectCustomer, customers, isLoading: isPosLoading, currentUserProfile: currentUser, searchCustomers } = usePOS();
     const router = useRouter();
+    const { t } = useI18n();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
     const [isSearching, setIsSearching] = React.useState(false);
@@ -211,14 +214,14 @@ export default function CustomerPage() {
             <div className="md:col-span-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Select a Customer</CardTitle>
-                        <CardDescription>Search for an existing customer or add a new one.</CardDescription>
+                        <CardTitle>{t('pos.selectACustomer')}</CardTitle>
+                        <CardDescription>{t('pos.selectCustomerDescription')}</CardDescription>
                         <div className="flex items-center gap-4 pt-4">
                             <div className="relative w-full">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search by name, email, or unique code..."
-                                    className="pl-8"
+                                    placeholder={t('pos.searchByNameEmailCode')}
+                                    className="ps-8"
                                     value={searchTerm}
                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                                 />
@@ -226,14 +229,14 @@ export default function CustomerPage() {
                             <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
                                 <DialogTrigger asChild>
                                     <Button variant="outline">
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Add New
+                                        <PlusCircle className="me-2 h-4 w-4" /> {t('pos.addNew')}
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[500px]">
                                     <DialogHeader>
-                                        <DialogTitle>Add New Customer</DialogTitle>
+                                        <DialogTitle>{t('pos.addNewCustomer')}</DialogTitle>
                                         <DialogDescription>
-                                            Enter the details for the new customer.
+                                            {t('pos.addNewCustomerDescription')}
                                         </DialogDescription>
                                     </DialogHeader>
                                     {currentUser?.businessId && (
@@ -259,7 +262,7 @@ export default function CustomerPage() {
                             </div>
                         ) : filteredCustomers && filteredCustomers.length > 0 ? (
                             filteredCustomers.map(customer => (
-                                <button key={customer.id} onClick={() => selectCustomer(customer)} className="w-full text-left">
+                                <button key={customer.id} onClick={() => selectCustomer(customer)} className="w-full text-start">
                                     <Card className={selectedCustomer?.id === customer.id ? "border-primary" : ""}>
                                         <CardContent className="p-3 flex items-center justify-between">
                                             <div>
@@ -275,7 +278,7 @@ export default function CustomerPage() {
                                 </button>
                             ))
                         ) : (
-                            <p className="text-muted-foreground text-center pt-8">{searchTerm ? "No customers found." : "No customers added yet."}</p>
+                            <p className="text-muted-foreground text-center pt-8">{searchTerm ? t('pos.noCustomersFound') : t('pos.noCustomersAdded')}</p>
                         )}
                     </CardContent>
                 </Card>
@@ -283,7 +286,7 @@ export default function CustomerPage() {
             <div>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Selected Customer</CardTitle>
+                        <CardTitle>{t('pos.selectedCustomer')}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-center">
                         {selectedCustomer ? (
@@ -291,23 +294,23 @@ export default function CustomerPage() {
                                 <User className="mx-auto h-12 w-12 text-muted-foreground" />
                                 <p className="font-semibold mt-2">{selectedCustomer.name}</p>
                                 <p className="text-sm text-muted-foreground">{selectedCustomer.email}</p>
-                                <Button variant="link" onClick={() => selectCustomer(null)}>Clear selection</Button>
+                                <Button variant="link" onClick={() => selectCustomer(null)}>{t('pos.clearSelection')}</Button>
                             </div>
                         ) : (
                             <div className="py-8">
                                 <User className="mx-auto h-12 w-12 text-muted-foreground" />
-                                <p className="text-muted-foreground mt-2">No customer selected.</p>
-                                <p className="text-xs text-muted-foreground">This is optional.</p>
+                                <p className="text-muted-foreground mt-2">{t('pos.noCustomerSelected')}</p>
+                                <p className="text-xs text-muted-foreground">{t('pos.customerIsOptional')}</p>
                             </div>
                         )}
                     </CardContent>
                     <CardFooter className="flex gap-2">
                         <Button className="w-full" variant="outline" asChild>
-                            <Link href="/sales/pos/select-products">Back</Link>
+                            <Link href="/sales/pos/select-products">{t('common.back')}</Link>
                         </Button>
                         <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
-                            {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Next: Payment
+                            {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                            {t('pos.nextPayment')}
                         </Button>
                     </CardFooter>
                 </Card>

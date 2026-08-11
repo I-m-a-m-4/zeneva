@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Our Mission | Empowering Retailers Worldwide | Zeneva',
+  title: 'Our Mission | Empowering Retailers Worldwide',
   description: 'Learn why we built Zeneva. Our mission is to provide retailers with the intelligence they need to thrive, minimize waste, and maximize profit with cutting-edge technology.',
   alternates: {
     canonical: '/about/our-mission'

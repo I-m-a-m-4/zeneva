@@ -7,11 +7,13 @@ import React, { useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { sendContactFormEmail } from '@/lib/email';
 import { AppConfig } from "@/lib/config";
+import { useI18n } from '@/context/i18n-context';
 
 export default function MarketingFooter() {
   const form = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
   const [isSending, setIsSending] = useState(false);
+  const { t } = useI18n();
 
   const microsoftStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
   const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
@@ -24,10 +26,10 @@ export default function MarketingFooter() {
 
     sendContactFormEmail(form.current)
       .then((result) => {
-        toast({ variant: 'success', title: 'Message Sent!', description: 'We will get back to you shortly.' });
+        toast({ variant: 'success', title: t('footer.sentTitle'), description: t('footer.sentBody') });
         form.current?.reset();
       }, (error) => {
-        toast({ variant: 'destructive', title: 'Send Failed', description: error.message || 'Could not send message. Please try again later.' });
+        toast({ variant: 'destructive', title: t('footer.sendFailedTitle'), description: error.message || t('footer.sendFailedBody') });
       })
       .finally(() => {
         setIsSending(false);
@@ -50,29 +52,28 @@ export default function MarketingFooter() {
               <div className="flex cursor-pointer mb-8 gap-x-2 gap-y-2 items-center">
                 <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
               </div>
-              <p className="max-w-3xl text-white/70">Ready to take control of your inventory? Tell us a bit about
-                your business and we’ll get back within one business day.</p>
+              <p className="max-w-3xl text-white/70">{t('footer.lead')}</p>
 
               <div className="sm:p-6 md:p-8 border rounded-md mt-6 pt-5 pr-5 pb-5 pl-5 bg-white/5 border-white/10" id="contact-form-section">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="space-y-4">
                     <div className="inline-flex gap-2 text-xs ring-1 rounded-full pt-1 pr-2.5 pb-1 pl-2.5 gap-x-2 gap-y-2 items-center text-emerald-300 bg-emerald-400/10 ring-emerald-300/20">
                       <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-emerald-400"></span>
-                      Built for Growth
+                      {t('footer.badgeGrowth')}
                     </div>
-                    <h4 className="font-semibold tracking-tight text-white">Zeneva is the operating system for modern commerce.</h4>
+                    <h4 className="font-semibold tracking-tight text-white">{t('footer.osHeading')}</h4>
                     <ul className="space-y-2 text-sm text-neutral-300">
                       <li className="flex items-start gap-2">
                         <Check className="w-4 h-4 mt-0.5 text-emerald-400" />
-                        <span>Real-time inventory sync across all your sales channels.</span>
+                        <span>{t('footer.bullet1')}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Check className="w-4 h-4 mt-0.5 text-emerald-400" />
-                        <span>A blazing-fast Point of Sale that works online and offline.</span>
+                        <span>{t('footer.bullet2')}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Check className="w-4 h-4 mt-0.5 text-emerald-400" />
-                        <span>AI-powered insights to reduce waste and boost profits.</span>
+                        <span>{t('footer.bullet3')}</span>
                       </li>
                     </ul>
                     <div className="flex items-center gap-3 pt-2 text-sm">
@@ -87,40 +88,40 @@ export default function MarketingFooter() {
 
                   <form ref={form} onSubmit={sendEmail} className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 gap-x-4 gap-y-4" id="contact-form">
                     <div className="sm:col-span-1">
-                      <label htmlFor="name" className="block text-xs font-medium mb-1 text-white/80">Your name</label>
-                      <input id="name" name="from_name" type="text" required placeholder="Jane Doe" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
+                      <label htmlFor="name" className="block text-xs font-medium mb-1 text-white/80">{t('footer.formName')}</label>
+                      <input id="name" name="from_name" type="text" required placeholder={t('footer.formNamePlaceholder')} className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
                     </div>
                     <div className="sm:col-span-1">
-                      <label htmlFor="email" className="block text-xs font-medium mb-1 text-white/80">Email</label>
-                      <input name="from_email" type="email" required placeholder="jane@company.com" className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="email" />
+                      <label htmlFor="email" className="block text-xs font-medium mb-1 text-white/80">{t('footer.formEmail')}</label>
+                      <input name="from_email" type="email" required placeholder={t('footer.formEmailPlaceholder')} className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="email" />
                     </div>
                     <div className="sm:col-span-1">
-                      <label htmlFor="company" className="block text-xs font-medium mb-1 text-white/80">Company</label>
-                      <input id="company" name="company" type="text" placeholder="Acme Inc." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
+                      <label htmlFor="company" className="block text-xs font-medium mb-1 text-white/80">{t('footer.formCompany')}</label>
+                      <input id="company" name="company" type="text" placeholder={t('footer.formCompanyPlaceholder')} className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" />
                     </div>
                     <div className="sm:col-span-1">
-                      <label htmlFor="project-type" className="block text-xs font-medium mb-1 text-white/80">Primary Goal</label>
+                      <label htmlFor="project-type" className="block text-xs font-medium mb-1 text-white/80">{t('footer.formGoal')}</label>
                       <select id="project-type" name="project_type" className="appearance-none outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10">
-                        <option className="bg-neutral-900" value="inventory">Inventory Management</option>
-                        <option className="bg-neutral-900" value="pos">Point of Sale</option>
-                        <option className="bg-neutral-900" value="analytics">Sales Analytics</option>
-                        <option className="bg-neutral-900" value="full-suite">Full Suite</option>
+                        <option className="bg-neutral-900" value="inventory">{t('footer.goalInventory')}</option>
+                        <option className="bg-neutral-900" value="pos">{t('footer.goalPos')}</option>
+                        <option className="bg-neutral-900" value="analytics">{t('footer.goalAnalytics')}</option>
+                        <option className="bg-neutral-900" value="full-suite">{t('footer.goalFullSuite')}</option>
                       </select>
                     </div>
                     <div className="sm:col-span-2">
-                      <label htmlFor="message" className="block text-xs font-medium mb-1 text-white/80">How can we help?</label>
-                      <textarea name="message" rows={4} placeholder="A few sentences about your business goals and current challenges." className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="message"></textarea>
+                      <label htmlFor="message" className="block text-xs font-medium mb-1 text-white/80">{t('footer.formMessage')}</label>
+                      <textarea name="message" rows={4} placeholder={t('footer.formMessagePlaceholder')} className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-sm w-full border rounded pt-2.5 pr-3 pb-2.5 pl-3 text-white bg-white/10 border-white/10" id="message"></textarea>
                     </div>
                     <div className="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="flex gap-2 text-xs items-center text-white/70">
                         <input id="nda" name="nda_request" type="checkbox" className="h-4 w-4 rounded focus:ring-primary/60 bg-white/10 border-white/20 text-primary" />
-                        <label htmlFor="nda">Please send an NDA</label>
+                        <label htmlFor="nda">{t('footer.formNda')}</label>
                       </div>
                       <div className="flex items-center gap-2">
                         <button type="submit" disabled={isSending} className="inline-flex transition text-sm font-medium ring-1 rounded pt-2.5 pr-4 pb-2.5 pl-4 shadow gap-x-2 gap-y-2 items-center hover:bg-amber-300 text-neutral-900 bg-stone-50 disabled:opacity-50">
-                          {isSending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                          <Send className="w-4 h-4" />
-                          {isSending ? 'Sending...' : 'Send request'}
+                          {isSending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+                          <Send className="w-4 h-4 rtl:-scale-x-100" />
+                          {isSending ? t('footer.formSending') : t('footer.formSend')}
                         </button>
                       </div>
                     </div>
@@ -133,14 +134,14 @@ export default function MarketingFooter() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 pt-12">
             <div className="flex flex-col justify-between h-full">
               <div>
-                <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Features</h4>
+                <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">{t('footer.colFeatures')}</h4>
                 <ul className="mt-3 space-y-2 text-sm">
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Inventory</a></li>
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Point of Sale</a></li>
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">AI Insights</a></li>
-                  <li><Link href="/terminal" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Zeneva Terminal</Link></li>
-                  <li><Link href="/use-cases" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Use Cases</Link></li>
-                  <li><Link href="/pricing" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Pricing</Link></li>
+                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkInventory')}</a></li>
+                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPos')}</a></li>
+                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkAiInsights')}</a></li>
+                  <li><Link href="/terminal" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkTerminal')}</Link></li>
+                  <li><Link href="/use-cases" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkUseCases')}</Link></li>
+                  <li><Link href="/pricing" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPricing')}</Link></li>
                 </ul>
               </div>
               <div className="mt-6">
@@ -165,11 +166,11 @@ export default function MarketingFooter() {
             </div>
             <div className="flex flex-col justify-between h-full">
               <div>
-                <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Resources</h4>
+                <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">{t('footer.colResources')}</h4>
                 <ul className="mt-3 space-y-2 text-sm">
-                  <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">Blog</Link></li>
-                  <li><a href="#faq" className="transition text-neutral-300 hover:text-white">FAQ</a></li>
-                  <li><Link href="/help-center" className="transition text-neutral-300 hover:text-white">Help Center</Link></li>
+                  <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">{t('footer.linkBlog')}</Link></li>
+                  <li><a href="#faq" className="transition text-neutral-300 hover:text-white">{t('footer.linkFaq')}</a></li>
+                  <li><Link href="/help-center" className="transition text-neutral-300 hover:text-white">{t('footer.linkHelpCenter')}</Link></li>
                 </ul>
               </div>
               <div className="mt-6">
@@ -189,33 +190,33 @@ export default function MarketingFooter() {
               </div>
             </div>
             <div className="">
-              <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">Company</h4>
+              <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">{t('footer.colCompany')}</h4>
               <ul className="mt-3 space-y-2 text-sm">
-                <li><Link href="/about/our-mission" className="transition text-neutral-300 hover:text-white">Our Mission</Link></li>
-                <li><Link href="/careers" className="transition text-neutral-300 hover:text-white">Careers</Link></li>
-                <li><Link href="/grants" className="transition text-neutral-300 hover:text-white">Business Grants</Link></li>
-                <li><Link href="/contact" className="transition text-neutral-300 hover:text-white">Contact</Link></li>
-                <li><Link href="/legal/privacy-policy" className="transition text-neutral-300 hover:text-white">Privacy Policy</Link></li>
-                <li><Link href="/legal/terms-of-service" className="transition text-neutral-300 hover:text-white">Terms of Service</Link></li>
+                <li><Link href="/about/our-mission" className="transition text-neutral-300 hover:text-white">{t('footer.linkMission')}</Link></li>
+                <li><Link href="/careers" className="transition text-neutral-300 hover:text-white">{t('footer.linkCareers')}</Link></li>
+                <li><Link href="/grants" className="transition text-neutral-300 hover:text-white">{t('footer.linkGrants')}</Link></li>
+                <li><Link href="/contact" className="transition text-neutral-300 hover:text-white">{t('footer.linkContact')}</Link></li>
+                <li><Link href="/legal/privacy-policy" className="transition text-neutral-300 hover:text-white">{t('footer.linkPrivacyPolicy')}</Link></li>
+                <li><Link href="/legal/terms-of-service" className="transition text-neutral-300 hover:text-white">{t('footer.linkTerms')}</Link></li>
               </ul>
             </div>
             <div className="">
-              <h4 className="uppercase text-xs tracking-[0.2em] text-white/80">Stay in touch</h4>
+              <h4 className="uppercase text-xs tracking-[0.2em] text-white/80">{t('footer.colStayInTouch')}</h4>
               <form id="subscribe" className="mt-3 flex items-center gap-2">
                 <div className="relative flex-1">
-                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40" />
-                  <input 
-                    type="email" 
-                    name="subscribeEmail" 
+                  <Mail className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40" />
+                  <input
+                    type="email"
+                    name="subscribeEmail"
                     id="subscribeEmail"
-                    aria-label="Email address for subscription"
-                    required 
-                    placeholder="you@example.com" 
-                    className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-xs w-full border rounded pt-2.5 pr-3 pb-2.5 pl-9 text-white bg-white/10 border-white/10" 
+                    aria-label={t('footer.subscribeAria')}
+                    required
+                    placeholder={t('footer.subscribePlaceholder')}
+                    className="placeholder-white/40 outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition text-xs w-full border rounded pt-2.5 pe-3 pb-2.5 ps-9 text-white bg-white/10 border-white/10"
                   />
                 </div>
                 <button type="submit" className="inline-flex gap-2 transition text-xs font-medium ring-1 rounded pt-2.5 pr-3.5 pb-2.5 pl-3.5 gap-x-2 gap-y-2 items-center hover:bg-amber-300 hover:ring-amber-200 text-neutral-900 bg-white ring-white/80">
-                  Join
+                  {t('footer.subscribeJoin')}
                 </button>
               </form>
               <div className="mt-4 flex items-center gap-3">
@@ -252,7 +253,7 @@ export default function MarketingFooter() {
                     }, 800);
                   }}
                 >
-                  <span>★ Write a Microsoft Store Review</span>
+                  <span>{t('footer.reviewMsStore')}</span>
                 </a>
               </div>
 
@@ -260,7 +261,7 @@ export default function MarketingFooter() {
           </div>
 
           <div className="mt-8 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-white/10">
-            <p className="text-sm text-white/60">© 2026 ZENEVATECH SOLUTIONS (BN: 9673520). All rights reserved.</p>
+            <p className="text-sm text-white/60">{t('footer.rights')}</p>
 
             {/* SEO-Optimized CAC Trust Badge */}
             <div 
@@ -286,9 +287,9 @@ export default function MarketingFooter() {
             </div>
 
             <div className="flex items-center gap-4 text-sm text-white/60">
-              <Link href="/legal/privacy-policy" className="transition hover:text-white">Privacy</Link>
+              <Link href="/legal/privacy-policy" className="transition hover:text-white">{t('footer.privacyShort')}</Link>
               <span className="hidden sm:block text-white/20">•</span>
-              <Link href="/legal/terms-of-service" className="transition hover:text-white">Terms</Link>
+              <Link href="/legal/terms-of-service" className="transition hover:text-white">{t('footer.termsShort')}</Link>
               <span className="hidden sm:block text-white/20">•</span>
               <BackToTopButton />
             </div>

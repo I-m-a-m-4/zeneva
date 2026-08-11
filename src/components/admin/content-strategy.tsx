@@ -10,8 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { generateContentPlan, type ContentStrategyOutput } from '@/ai/flows/content-strategy-flow';
+import { generateContentPlan } from '@/ai/flows/content-strategy-flow';
+import type { ContentStrategyOutput } from '@/types';
 import { Newspaper, Loader2, Sparkles, Send, Copy, ArrowRight, Share2, Bot, Bookmark, BookOpen, AlertCircle } from 'lucide-react';
+import { idToken } from '@/lib/id-token';
 
 interface ContentStrategyCenterProps {
   platformStats?: {
@@ -70,7 +72,7 @@ export default function ContentStrategyCenter({ platformStats }: ContentStrategy
         persona,
         seedKnowledge,
         platformStats
-      });
+      }, await idToken());
       setResult(plan);
       toast({
         variant: 'success',

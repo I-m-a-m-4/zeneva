@@ -1,0 +1,596 @@
+/**
+ * Screen capture: CDP screencast frames -> one MJPEG file -> ffmpeg -> MP4/WebM.
+ *
+ * Why not `MediaRecorder` inside the page (what the canvas studio used)? Because
+ * Chromium cannot mux H.264 into MP4 from `MediaRecorder`, so that path can only
+ * ever produce WebM. `Page.startScreencast` hands us raw frames instead, and
+ * ffmpeg — already on this machine — encodes a real H.264 MP4 that drops into
+ * Premiere, CapCut, a store listing or a tweet without a conversion step.
+ *
+ * ## Why this file writes one big file instead of a JPEG per frame
+ *
+ * It used to write `f000123.jpg` per frame and hand ffmpeg a concat list with a
+ * per-frame duration. That produced 7.5 captured frames a second against a
+ * requested 30 — every real frame held for four output frames, which is exactly
+ * what a stutter is. The cause was measured, not guessed:
+ *
+ *   screencast with the write removed .... 51.2 fps desktop, 40.1 fps mobile
+ *   screencast with writeFileSync ........ 12.7 fps, and the write alone 73ms
+ *   writeFileSync, one file each ......... 28.1 ms/frame
+ *   writeSync to one already-open fd ..... 0.1 ms/frame
+ *
+ * 28ms is not throughput — a 32KB write is nothing. It is the cost of *creating*
+ * a file on this machine: NTFS metadata plus Defender scanning each new `.jpg`
+ * as it lands. Chrome was never the ceiling; the recorder was stalling its own
+ * event loop, and Chrome will not send frame N+1 until frame N is acknowledged.
+ *
+ * So frames are appended to a single descriptor that is opened once. Concatenated
+ * JPEGs are a valid MJPEG stream, which `-f mjpeg -framerate N` reads back as a
+ * constant-rate video — and that removes the irregular-spacing problem at the
+ * source rather than papering over it at encode time.
+ *
+ * ## Two clocks became one
+ *
+ * The old design had a hazard worth naming, because it is gone now and should
+ * not come back: frame durations were clamped and pause-collapsed at encode
+ * time, so `videoTimeFor()` had to replay the identical transform or every click
+ * sound landed on the wrong frame. Here the emitter runs at a fixed rate, so
+ * video time is just `frameIndex / fps`. There is one clock and nothing to keep
+ * in agreement.
+ */
+
+import { spawn } from 'node:child_process';
+import {
+  mkdirSync, openSync, writeSync, closeSync, fsyncSync,
+  rmSync, existsSync, statSync,
+} from 'node:fs';
+import { writeFile, rename } from 'node:fs/promises';
+import path from 'node:path';
+import { phoneFrame } from './phone.mjs';
+
+export function hasFfmpeg() {
+  const probe = spawn(process.platform === 'win32' ? 'where' : 'which', ['ffmpeg']);
+  return new Promise((resolve) => {
+    probe.on('error', () => resolve(false));
+    probe.on('exit', (code) => resolve(code === 0));
+  });
+}
+
+/**
+ * How long the emitter will keep repeating a frame that Chrome has stopped
+ * refreshing, before it stops emitting entirely.
+ *
+ * Chrome only paints when something changes, so "no new frame" means either the
+ * page is genuinely still (a caption holding, a card on screen) or the renderer
+ * is stuck behind something slow. From out here those look identical, so this is
+ * a compromise rather than a detection: hold long enough that no authored beat
+ * is ever truncated — cards run to ~4.5s and captions to ~5s — and short enough
+ * that a pathological network stall does not put thirty seconds of frozen
+ * spinner in the middle of an ad. While the timeline is stopped, wall time keeps
+ * running and video time does not, which is the intended trade.
+ */
+const MAX_HOLD = 6.0;
+
+/**
+ * Ceiling on how many frames one tick may emit to catch up after the event loop
+ * was blocked.
+ *
+ * The sampler is a timer, and a timer that fires late owes frames. Emitting them
+ * keeps video time equal to wall time, which is what keeps the click sounds on
+ * the clicks. This caps the debt at the same duration as MAX_HOLD so a single
+ * pathological stall cannot dump a thousand duplicate frames into the file.
+ */
+const MAX_CATCHUP = Math.ceil(MAX_HOLD * 60);
+
+/**
+ * Build an ffmpeg expression for a value that holds, then eases to a new value,
+ * then holds again — the shape of a camera move.
+ *
+ * `marks` are `{ at, dur, val }` on the *video* timeline, sorted. Each segment
+ * eases from the previous value over `dur` and then holds, which the `clip` on
+ * the progress term does for free: past `at + dur` it pins at 1 and the segment
+ * evaluates to `val` until the next mark takes over. Built back to front because
+ * the nesting runs that way — the last segment is the innermost else.
+ *
+ * easeOutCubic, `1-(1-u)^3`: fast off the mark and settling gently, which is how
+ * a camera move reads as deliberate rather than mechanical.
+ */
+function moveExpr(T, marks, initial) {
+  if (!marks.length) return String(initial);
+  const seg = (m) => {
+    const u = `clip((${T}-${m.at.toFixed(4)})/${Math.max(0.05, m.dur).toFixed(4)},0,1)`;
+    if (Math.abs(m.val - m.prev) < 1e-6) return m.val.toFixed(5);
+    return `(${m.prev.toFixed(5)}+${(m.val - m.prev).toFixed(5)}*(1-pow(1-${u},3)))`;
+  };
+  let expr = seg(marks[marks.length - 1]);
+  for (let i = marks.length - 2; i >= 0; i--) {
+    expr = `if(lt(${T},${marks[i + 1].at.toFixed(4)}),${seg(marks[i])},${expr})`;
+  }
+  return `if(lt(${T},${marks[0].at.toFixed(4)}),${initial},${expr})`;
+}
+
+export function run(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d.toString(); });
+    p.on('error', reject);
+    p.on('exit', (code) => {
+      if (code === 0) resolve(err);
+      else reject(new Error(`${cmd} exited ${code}\n${err.split('\n').slice(-14).join('\n')}`));
+    });
+  });
+}
+
+export class Recorder {
+  /** @param {import('./cdp.mjs').Cdp} cdp */
+  constructor(cdp, { dir, fps = 30, quality = 92, maxWidth, maxHeight, preview = null }) {
+    this.cdp = cdp;
+    this.dir = dir;
+    this.fps = fps;
+    this.quality = quality;
+    this.maxWidth = maxWidth;
+    this.maxHeight = maxHeight;
+    this.off = null;
+    this.dropped = 0;
+
+    /** The MJPEG stream every emitted frame is appended to, and its descriptor. */
+    this.file = path.join(dir, 'frames.mjpg');
+    this.fd = null;
+
+    /**
+     * The newest JPEG Chrome has sent, and when it landed (epoch seconds).
+     *
+     * The screencast handler does nothing but keep this current. Anything slower
+     * than that in the handler throttles the capture, because Chrome waits for
+     * the ack before painting the next frame — see the header.
+     */
+    this.latest = null;
+    this.latestAt = 0;
+
+    /** Frames Chrome delivered, vs frames written. They are not the same number. */
+    this.painted = 0;
+    this.emitted = 0;
+    this.duplicated = 0;
+    this.stalledTicks = 0;
+
+    /**
+     * Wall-clock instant (epoch seconds) each emitted frame was written at.
+     *
+     * Frame `i` occupies video time `[i/fps, (i+1)/fps)`, so this array is the
+     * whole of the wall-clock -> video-time mapping that `videoTimeFor` needs.
+     * At 30fps a two-minute take is 3600 numbers; keeping them is cheaper than
+     * any scheme that reconstructs them.
+     */
+    this.marks = [];
+    this.timer = null;
+    this.stopped = false;
+
+    /**
+     * Where to mirror the newest frame so the studio can show a live view, or
+     * null for none. Written at a throttled rate rather than per frame — the
+     * preview only has to look live, and at 30fps a second JPEG write per frame
+     * competes with the capture it is supposed to be showing.
+     */
+    this.preview = preview;
+    this.previewEveryMs = 200;
+    this.lastPreview = 0;
+    this.previewBusy = false;
+
+    /**
+     * Wall-clock spans the operator paused for, as [start, end] epoch seconds.
+     *
+     * A pause is not a stall: nothing about the app is slow, the human just
+     * stopped to look. Nothing is emitted while paused, so the span costs zero
+     * video time and a five-minute inspection does not become five minutes of
+     * frozen picture. Kept for the run log.
+     */
+    this.pauses = [];
+    this.pausedAt = null;
+  }
+
+  /** Hold the capture. Frames keep arriving; they are just not written. */
+  pause() {
+    if (this.pausedAt !== null) return false;
+    this.pausedAt = Date.now() / 1000;
+    return true;
+  }
+
+  resume() {
+    if (this.pausedAt === null) return false;
+    this.pauses.push([this.pausedAt, Date.now() / 1000]);
+    this.pausedAt = null;
+    return true;
+  }
+
+  get paused() {
+    return this.pausedAt !== null;
+  }
+
+  async start() {
+    mkdirSync(this.dir, { recursive: true });
+    this.fd = openSync(this.file, 'w');
+    this.off = this.cdp.on('Page.screencastFrame', (p) => this.#onFrame(p));
+    await this.cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: this.quality,
+      maxWidth: this.maxWidth,
+      maxHeight: this.maxHeight,
+      everyNthFrame: 1,
+    });
+    this.t0 = Date.now() / 1000;
+    this.#sample();
+  }
+
+  #onFrame(params) {
+    // Ack first and unconditionally: Chrome will not paint the next frame until
+    // this one is acknowledged, so anything queued ahead of the ack becomes the
+    // capture rate. That is not hypothetical — the JPEG write used to sit here,
+    // and it cost two thirds of the frames.
+    this.cdp.send('Page.screencastFrameAck', { sessionId: params.sessionId }).catch(() => {
+      this.dropped++;
+    });
+    let buf;
+    try {
+      buf = Buffer.from(params.data, 'base64');
+    } catch {
+      this.dropped++;
+      return;
+    }
+    this.latest = buf;
+    this.latestAt = Date.now() / 1000;
+    this.painted++;
+
+    // The live view keeps updating while paused — the whole point of pausing is
+    // to look at the page, so a frozen preview would defeat it.
+    this.#writePreview(buf);
+  }
+
+  /**
+   * Emit exactly `fps` frames a second, whatever Chrome happens to be doing.
+   *
+   * Sampling on our own clock rather than on Chrome's paints is what makes the
+   * output constant-rate by construction. A page that paints at 50fps gets
+   * evenly decimated; one that paints at 12 gets each frame repeated, which is
+   * what a screen recorder is supposed to do and reads as smooth. The old code
+   * instead wrote one video frame per paint and asked ffmpeg to resample
+   * afterwards, so an uneven capture stayed uneven.
+   *
+   * The timer is self-correcting: `next` advances by exactly one period every
+   * tick regardless of when the callback actually ran, so drift cannot
+   * accumulate over a two-minute take.
+   */
+  #sample() {
+    const period = 1000 / this.fps;
+    let next = performance.now() + period;
+
+    const tick = () => {
+      if (this.stopped) return;
+
+      // A late tick owes frames. Emitting them keeps video time equal to wall
+      // time, which is the whole reason the sound effects land where they
+      // should; skipping them would silently fast-forward past whatever blocked
+      // the loop.
+      const behind = Math.floor((performance.now() - next) / period);
+      const owed = 1 + Math.max(0, Math.min(behind, MAX_CATCHUP));
+      this.#emit(owed);
+
+      next += owed * period;
+      const delay = next - performance.now();
+      this.timer = setTimeout(tick, Math.max(0, delay));
+    };
+
+    this.timer = setTimeout(tick, period);
+  }
+
+  /** One sampler tick: append the newest frame `count` times, or nothing. */
+  #emit(count) {
+    if (this.pausedAt !== null || this.fd === null || !this.latest) return;
+
+    // Nothing has painted for a long time: either the page is a still image or
+    // the renderer is wedged, and from here those are the same thing. Stop the
+    // timeline rather than pile up frozen frames — see MAX_HOLD.
+    if (Date.now() / 1000 - this.latestAt > MAX_HOLD) {
+      this.stalledTicks++;
+      return;
+    }
+    this.#append(this.latest, count, Date.now() / 1000);
+  }
+
+  /** The only writer. Appends `buf` `count` times and marks each frame at `now`. */
+  #append(buf, count, now) {
+    if (this.fd === null) return;
+    for (let i = 0; i < count; i++) {
+      try {
+        // writeSync is not obliged to take the whole buffer in one call.
+        let off = 0;
+        while (off < buf.length) off += writeSync(this.fd, buf, off, buf.length - off);
+        this.marks.push(now);
+        this.emitted++;
+      } catch {
+        this.dropped++;
+        return;
+      }
+    }
+    if (count > 1) this.duplicated += count - 1;
+  }
+
+  /**
+   * Mirror the newest frame for the studio's live view.
+   *
+   * Written to a temp name and renamed, because rename is atomic on both
+   * platforms while a plain write is not: the studio polls this file on its own
+   * schedule and would otherwise eventually read a half-written JPEG and render a
+   * torn or blank frame.
+   *
+   * Asynchronous, and skipped entirely while a previous one is still in flight.
+   * The preview creates two files every time it runs, and file creation is the
+   * expensive operation on this machine — doing it synchronously here would
+   * reintroduce the stall this file exists to remove, at 10 writes a second.
+   */
+  #writePreview(buf) {
+    if (!this.preview || this.previewBusy) return;
+    const now = Date.now();
+    if (now - this.lastPreview < this.previewEveryMs) return;
+    this.lastPreview = now;
+    this.previewBusy = true;
+    const tmp = `${this.preview}.tmp`;
+    writeFile(tmp, buf)
+      .then(() => rename(tmp, this.preview))
+      .catch(() => { /* preview is cosmetic — never let it break a take */ })
+      .finally(() => { this.previewBusy = false; });
+  }
+
+  async stop({ tailHoldMs = 700 } = {}) {
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    try {
+      await this.cdp.send('Page.stopScreencast');
+    } catch { /* page may already be closing */ }
+    if (this.off) this.off();
+    this.off = null;
+    this.tStop = Date.now() / 1000;
+
+    if (this.fd !== null) {
+      // Hold the closing frame for a beat. Cutting to black on the same frame
+      // the last animation lands on reads as a dropped connection, not an
+      // ending. Appended directly rather than through #emit, which would refuse
+      // on the staleness check — a page that has finished animating is exactly
+      // the case here.
+      const hold = Math.round((tailHoldMs / 1000) * this.fps);
+      if (hold > 0 && this.latest) this.#append(this.latest, hold, Date.now() / 1000);
+      // Flush before ffmpeg opens it: 250MB of MJPEG can otherwise still be
+      // sitting in the page cache when the encoder starts reading.
+      try { fsyncSync(this.fd); } catch { /* best effort */ }
+      try { closeSync(this.fd); } catch { /* best effort */ }
+      this.fd = null;
+    }
+    return {
+      count: this.emitted,
+      painted: this.painted,
+      duplicated: this.duplicated,
+      dropped: this.dropped,
+    };
+  }
+
+  /** Wall-clock seconds the capture was open for. */
+  get seconds() {
+    if (!this.t0) return 0;
+    return (this.tStop ?? Date.now() / 1000) - this.t0;
+  }
+
+  /** Frames a second Chrome actually delivered — for the run log, not for timing. */
+  get paintedFps() {
+    const s = this.seconds;
+    return s > 0 ? this.painted / s : 0;
+  }
+
+  /**
+   * Map a wall-clock instant (epoch seconds, as `Date.now()/1000` gives) onto the
+   * encoded video's own timeline.
+   *
+   * Frame `i` is written at `marks[i]` and occupies video time `i/fps`, so this is
+   * a binary search over `marks` — which is sorted, being append-only in time.
+   * The two clocks are nearly the same now that emission is constant-rate; they
+   * still diverge across a pause and across a stall, which is exactly what makes
+   * this function necessary rather than decorative. Sound effects are placed with
+   * it so a click tick stays on the frame where the button actually depresses.
+   */
+  videoTimeFor(wallSeconds) {
+    const m = this.marks;
+    if (!m.length) return 0;
+    if (wallSeconds <= m[0]) return 0;
+    if (wallSeconds >= m[m.length - 1]) return (m.length - 1) / this.fps;
+
+    let lo = 0;
+    let hi = m.length - 1;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (m[mid] <= wallSeconds) lo = mid;
+      else hi = mid;
+    }
+    // Interpolate across the gap so several ticks between two emitted frames do
+    // not all collapse onto the same instant.
+    const span = m[hi] - m[lo];
+    const frac = span > 0 ? (wallSeconds - m[lo]) / span : 0;
+    return (lo + frac) / this.fps;
+  }
+
+  /** Length of the encoded video in its own timeline. One clock, one division. */
+  get videoSeconds() {
+    return this.emitted / this.fps;
+  }
+
+  /**
+   * @param {string} outPath  final .mp4 (or .webm) path
+   * @param {{ crf?:number, preset?:string,
+   *           zooms?:Array<{at:number,dur:number,to:number,px:number,py:number}>,
+   *           phone?:{ theme:string, aspect:number, dir:string }|null }} opts
+   */
+  async encode(outPath, opts = {}) {
+    if (this.emitted < 2) {
+      throw new Error(`only ${this.emitted} frame(s) captured — nothing to encode`);
+    }
+    const { crf = 18, preset = 'veryfast', phone = null, zooms = [] } = opts;
+
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    const webm = outPath.endsWith('.webm');
+    /*
+     * `veryfast` rather than `slow`, by default.
+     *
+     * At crf 18 on screen content the two are visually indistinguishable — flat
+     * UI panels and text are cheap to encode, the motion is a cursor and some
+     * scrolling — while `slow` costs several times the wall clock on a
+     * two-minute take. The operator is waiting for this, so the time is worth
+     * more than the last few percent of bitrate efficiency.
+     */
+    const codec = webm
+      ? ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf + 12), '-row-mt', '1',
+         '-deadline', 'realtime', '-cpu-used', '4']
+      : ['-c:v', 'libx264', '-preset', preset, '-crf', String(crf),
+         '-profile:v', 'high', '-movflags', '+faststart'];
+
+    /*
+     * Mobile takes are composited into a phone chassis here rather than drawn
+     * inside the page.
+     *
+     * A border painted in the page sits *over* the app, so every screen loses its
+     * outer ten pixels behind a bezel — and a frame drawn inside a full-bleed
+     * rectangle reads as a vignette, not a device. Containing the screen means
+     * shrinking the footage, which cannot happen in the page at all. Doing it in
+     * one ffmpeg graph also means the app renders exactly as it always did:
+     * nothing about the frame is on the page's code path.
+     */
+    const frame = phone ? phoneFrame({
+      outW: this.maxWidth, outH: this.maxHeight,
+      // The *capture's* aspect, not the output's. These are not the same number
+      // once the phone viewport stops being 9:16 — the output stays 1080x1920
+      // because that is what Reels and Shorts want, while the screen inside the
+      // chassis takes the shape of the phone being simulated. Passing the output
+      // aspect here would letterbox a tall phone into a square-ish screen.
+      aspect: phone.aspect,
+      theme: phone.theme, dir: phone.dir,
+    }) : null;
+
+    /*
+     * One sequential file at a constant rate, so there is no concat list, no
+     * per-frame duration and no `fps=` resample filter. The stream *is* the
+     * timeline. This is also the reason the encode got faster: ffmpeg reads
+     * forward through one 250MB file instead of opening several thousand.
+     */
+    const input = ['-f', 'mjpeg', '-framerate', String(this.fps), '-i', this.file];
+
+    /*
+     * The camera move.
+     *
+     * `zoompan` rather than `crop`, because a crop's output size is fixed at
+     * filter-configuration time — it can pan, but it cannot zoom. zoompan
+     * re-samples to a constant `s` every frame, which is exactly a camera.
+     *
+     * Two things it is easy to get wrong here. Its time constant is `on/fps` and
+     * not `t` — there is no `t` in this filter, and referring to one fails at
+     * configuration with "Undefined constant". And its default `fps` is 25, so
+     * leaving it off silently resamples a 30fps take to 25 and undoes the
+     * constant-rate capture this file exists for.
+     *
+     * x/y place the *crop centre* on the anchor rather than treating the anchor
+     * as a corner, clamped so the window can never leave the frame — which is
+     * what lets a flow punch in on a button near the edge of the screen without
+     * having to know how close to the edge is too close.
+     */
+    const T = `(on/${this.fps})`;
+    const zoomTo = frame ? { w: frame.screen.w, h: frame.screen.h } : { w: this.maxWidth, h: this.maxHeight };
+    const camera = zooms.length
+      ? `zoompan=z='${moveExpr(T, zooms.map((z) => ({ at: z.at, dur: z.dur, val: z.to, prev: z.from })), 1)}'`
+        + `:x='clip((${moveExpr(T, zooms.map((z) => ({ at: z.at, dur: z.dur, val: z.px, prev: z.fromPx })), 0.5)})*iw-(iw/zoom)/2,0,iw-iw/zoom)'`
+        + `:y='clip((${moveExpr(T, zooms.map((z) => ({ at: z.at, dur: z.dur, val: z.py, prev: z.fromPy })), 0.5)})*ih-(ih/zoom)/2,0,ih-ih/zoom)'`
+        + `:d=1:fps=${this.fps}:s=${zoomTo.w}x${zoomTo.h}`
+      : null;
+
+    /*
+     * Force the declared output size instead of accepting whatever the capture
+     * came out as.
+     *
+     * A 1600x900 viewport at dpr 1.2 ought to be exactly 1920x1080, but Chrome
+     * rounds the surface and delivered 1078 — and the old `trunc(ih/2)*2` guard
+     * only rounded that further down, so takes shipped at 1920x1078. Two rows
+     * short of 1080p is the kind of thing a store listing rejects. Scaling to
+     * *cover* and cropping loses a pixel or two off an edge, which is invisible,
+     * where padding would add visible black bars and a plain scale would stretch.
+     */
+    const fitTo = (w, h) => `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`;
+
+    // The camera already outputs at exactly the size the next stage wants, so it
+    // replaces the fit rather than stacking with it.
+    const screen = camera || fitTo(zoomTo.w, zoomTo.h);
+
+    const filter = frame
+      // Three steps, and the order is the whole trick. Scale the footage into the
+      // cut-out; `pad` it onto a full-size canvas at the cut-out's offset — which
+      // is what keeps the output at `maxWidth`x`maxHeight`, since `overlay` clips
+      // to its *base* and a base the size of the screen would silently crop the
+      // chassis off; then lay the chassis over the top, where its transparent
+      // screen shows the footage through and its rounded corners give the app's
+      // square frame rounded corners.
+      //
+      // The camera move belongs on the screen content, before the chassis goes
+      // on. Zooming the composite would zoom the phone, which is a different and
+      // much worse idea.
+      ? `[0:v]${screen},`
+        + `pad=${this.maxWidth}:${this.maxHeight}:${frame.screen.x}:${frame.screen.y}:black[scr];`
+        + `[scr][1:v]overlay=0:0:shortest=1[v]`
+      : `[0:v]${screen}[v]`;
+
+    await run('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      ...input,
+      // The chassis is one still image, looped for the length of the footage.
+      ...(frame ? ['-loop', '1', '-i', frame.file] : []),
+      '-filter_complex', filter,
+      '-map', '[v]',
+      '-fps_mode', 'cfr',
+      ...codec,
+      '-pix_fmt', 'yuv420p',
+      outPath,
+    ]);
+
+    return {
+      path: outPath,
+      bytes: existsSync(outPath) ? statSync(outPath).size : 0,
+    };
+  }
+
+  cleanup() {
+    try { rmSync(this.dir, { recursive: true, force: true, maxRetries: 3 }); } catch { /* best effort */ }
+  }
+}
+
+/** Duration / frame count / size, straight from the encoded file. */
+export async function probe(file) {
+  const out = await new Promise((resolve, reject) => {
+    const p = spawn('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-count_frames',
+      '-show_entries', 'stream=nb_read_frames,avg_frame_rate,width,height:format=duration,size',
+      '-of', 'json', file,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let buf = '';
+    let err = '';
+    p.stdout.on('data', (d) => { buf += d; });
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('error', reject);
+    p.on('exit', (c) => (c === 0 ? resolve(buf) : reject(new Error(err || `ffprobe exited ${c}`))));
+  });
+  const j = JSON.parse(out);
+  const s = j.streams?.[0] ?? {};
+  return {
+    width: s.width,
+    height: s.height,
+    frames: Number(s.nb_read_frames ?? 0),
+    fps: s.avg_frame_rate,
+    seconds: Number(j.format?.duration ?? 0),
+    bytes: Number(j.format?.size ?? 0),
+  };
+}

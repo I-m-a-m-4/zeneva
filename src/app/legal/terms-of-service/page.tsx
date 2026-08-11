@@ -174,7 +174,7 @@ export default function TermsOfServicePage() {
                 The Service is offered under various subscription plans.
               </p>
               <ul>
-                <li><strong>Free Trial:</strong> New businesses are eligible for a 30-day free trial. At the end of the trial period, you must subscribe to a paid plan to continue using features beyond the 'Starter' tier.</li>
+                <li><strong>Free Starter Plan:</strong> The 'Starter' tier is free of charge and does not expire. No trial period applies and no payment details are required to use it. If a paid subscription ('Pro' or 'Business') is not renewed, the business instance reverts to the free 'Starter' tier — access to your existing data, including products, sales history and receipts, is retained, and only paid-tier features become unavailable until the subscription is renewed.</li>
                 <li><strong>Billing:</strong> Fees for paid plans are billed on a subscription basis (e.g., monthly, annually). You will be billed in advance on a recurring, periodic basis.</li>
                 <li><strong>Payment:</strong> We use a third-party payment processor (Paystack) to handle payments. By subscribing, you agree to their terms and conditions.</li>
                 <li><strong>Cancellation:</strong> You may cancel your subscription at any time through your account's billing page. The cancellation will take effect at the end of the current billing cycle.</li>

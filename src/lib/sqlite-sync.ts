@@ -72,6 +72,26 @@ export async function getOfflineDb() {
           timestamp INTEGER,
           status TEXT DEFAULT 'pending'
         );
+
+        CREATE TABLE IF NOT EXISTS profiles (
+          id TEXT PRIMARY KEY,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          business_id TEXT,
+          data TEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
       `);
       
       db = loadedDb;
@@ -84,6 +104,49 @@ export async function getOfflineDb() {
   })();
 
   return initPromise;
+}
+
+/**
+ * Upserts many rows in as few round-trips as possible.
+ *
+ * This plugin build exposes no `batch` command - only `execute` - so a
+ * row-at-a-time loop costs one IPC hop per row, which is thousands of hops for
+ * a real catalog and leaves partial data behind if it is interrupted. One
+ * multi-row INSERT per chunk is a single hop and a single atomic statement.
+ *
+ * Chunks are sized to stay under SQLite's 999 bound-variable ceiling; exceeding
+ * it fails the whole statement with "too many SQL variables".
+ */
+const MAX_BIND_VARIABLES = 900;
+
+async function upsertRows(
+  db: Database,
+  table: string,
+  columns: string[],
+  rows: any[][]
+) {
+  if (rows.length === 0) return;
+
+  const rowsPerChunk = Math.max(1, Math.floor(MAX_BIND_VARIABLES / columns.length));
+  const columnList = columns.join(', ');
+
+  for (let offset = 0; offset < rows.length; offset += rowsPerChunk) {
+    const chunk = rows.slice(offset, offset + rowsPerChunk);
+    const placeholders: string[] = [];
+    const binds: any[] = [];
+
+    chunk.forEach((row, rowIndex) => {
+      const base = rowIndex * columns.length;
+      placeholders.push(`(${columns.map((_, i) => `$${base + i + 1}`).join(', ')})`);
+      binds.push(...row);
+    });
+
+    // updated_at is omitted so its DEFAULT CURRENT_TIMESTAMP applies per row.
+    await db.execute(
+      `INSERT OR REPLACE INTO ${table} (${columnList}) VALUES ${placeholders.join(', ')}`,
+      binds
+    );
+  }
 }
 
 export async function syncBusinessToOffline(business: any) {
@@ -103,17 +166,14 @@ export async function syncBusinessToOffline(business: any) {
 export async function syncProductsToOffline(businessId: string, products: any[]) {
   const db = await getOfflineDb();
   if (!db || products.length === 0) return;
-  
-  for (const product of products) {
-    if (!product || !product.id) continue;
-    try {
-      await db.execute(
-        'INSERT OR REPLACE INTO products (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
-        [product.id, businessId, JSON.stringify(product)]
-      );
-    } catch (err) {
-      console.error(`SQLite Sync Error (Product ${product.id}):`, err);
-    }
+
+  try {
+    const rows = products
+      .filter(p => p?.id)
+      .map(p => [p.id, businessId, JSON.stringify(p)]);
+    await upsertRows(db, 'products', ['id', 'business_id', 'data'], rows);
+  } catch (err) {
+    console.error('SQLite Sync Error (Products):', err);
   }
 }
 
@@ -241,6 +301,96 @@ export async function getCachedBusiness(businessId: string) {
   }
 }
 
+/**
+ * The signed-in user's profile, keyed by uid.
+ *
+ * This is the row that makes the whole offline cache reachable: every getter
+ * here is keyed by businessId, and offline that value can only come from the
+ * cached profile. It used to live in localStorage alone, where a large catalog's
+ * blobs would exhaust the quota and silently drop it - leaving a full SQLite
+ * database that nothing could address.
+ */
+export async function syncProfileToOffline(profile: any) {
+  const db = await getOfflineDb();
+  if (!db || !profile?.id) return;
+
+  try {
+    await db.execute(
+      'INSERT OR REPLACE INTO profiles (id, data, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+      [profile.id, JSON.stringify(profile)]
+    );
+  } catch (err) {
+    console.error('SQLite Sync Error (Profile):', err);
+  }
+}
+
+export async function getCachedProfile(userId: string) {
+  const db = await getOfflineDb();
+  if (!db || !userId) return null;
+
+  try {
+    const result: any[] = await db.select('SELECT data FROM profiles WHERE id = $1', [userId]);
+    return result.length > 0 ? JSON.parse(result[0].data) : null;
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Profile):', err);
+    return null;
+  }
+}
+
+export async function syncUsersToOffline(businessId: string, users: any[]) {
+  const db = await getOfflineDb();
+  if (!db || users.length === 0) return;
+
+  try {
+    const rows = users
+      .filter(u => u?.id)
+      .map(u => [u.id, businessId, JSON.stringify(u)]);
+    await upsertRows(db, 'users', ['id', 'business_id', 'data'], rows);
+  } catch (err) {
+    console.error('SQLite Sync Error (Users):', err);
+  }
+}
+
+export async function getCachedUsers(businessId: string) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+
+  try {
+    const result: any[] = await db.select('SELECT data FROM users WHERE business_id = $1', [businessId]);
+    return result.map(r => JSON.parse(r.data));
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Users):', err);
+    return [];
+  }
+}
+
+export async function syncAuditLogsToOffline(businessId: string, logs: any[]) {
+  const db = await getOfflineDb();
+  if (!db || logs.length === 0) return;
+
+  try {
+    const rows = logs
+      .filter(l => l?.id)
+      .map(l => [l.id, businessId, JSON.stringify(l)]);
+    await upsertRows(db, 'audit_logs', ['id', 'business_id', 'data'], rows);
+  } catch (err) {
+    console.error('SQLite Sync Error (Audit Logs):', err);
+  }
+}
+
+export async function getCachedAuditLogs(businessId: string) {
+  const db = await getOfflineDb();
+  if (!db) return [];
+
+  try {
+    const result: any[] = await db.select('SELECT data FROM audit_logs WHERE business_id = $1', [businessId]);
+    return result.map(r => JSON.parse(r.data));
+  } catch (err) {
+    console.error('SQLite Retrieval Error (Audit Logs):', err);
+    return [];
+  }
+}
+
 export async function syncStatsToOffline(businessId: string, stats: any) {
   const db = await getOfflineDb();
   if (!db || !businessId) return;
@@ -272,16 +422,13 @@ export async function syncCustomersToOffline(businessId: string, customers: any[
   const db = await getOfflineDb();
   if (!db || customers.length === 0) return;
   
-  for (const customer of customers) {
-    if (!customer || !customer.id) continue;
-    try {
-      await db.execute(
-        'INSERT OR REPLACE INTO customers (id, business_id, data, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
-        [customer.id, businessId, JSON.stringify(customer)]
-      );
-    } catch (err) {
-      console.error(`SQLite Sync Error (Customer ${customer.id}):`, err);
-    }
+  try {
+    const rows = customers
+      .filter(c => c?.id)
+      .map(c => [c.id, businessId, JSON.stringify(c)]);
+    await upsertRows(db, 'customers', ['id', 'business_id', 'data'], rows);
+  } catch (err) {
+    console.error('SQLite Sync Error (Customers):', err);
   }
 }
 
@@ -315,17 +462,13 @@ export async function syncReceiptsToOffline(businessId: string, receipts: any[])
   const db = await getOfflineDb();
   if (!db || receipts.length === 0) return;
 
-  for (const receipt of receipts) {
-    if (!receipt || !receipt.id) continue;
-    try {
-      const createdAt = receiptCreatedAtSeconds(receipt);
-      await db.execute(
-        'INSERT OR REPLACE INTO receipts (id, business_id, data, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
-        [receipt.id, businessId, JSON.stringify(receipt), createdAt]
-      );
-    } catch (err) {
-      console.error(`SQLite Sync Error (Receipt ${receipt.id}):`, err);
-    }
+  try {
+    const rows = receipts
+      .filter(r => r?.id)
+      .map(r => [r.id, businessId, JSON.stringify(r), receiptCreatedAtSeconds(r)]);
+    await upsertRows(db, 'receipts', ['id', 'business_id', 'data', 'created_at'], rows);
+  } catch (err) {
+    console.error('SQLite Sync Error (Receipts):', err);
   }
 }
 
@@ -474,6 +617,9 @@ export async function clearAllTables() {
     await db.execute('DELETE FROM business');
     await db.execute('DELETE FROM sync_metadata');
     await db.execute('DELETE FROM stats');
+    await db.execute('DELETE FROM profiles');
+    await db.execute('DELETE FROM users');
+    await db.execute('DELETE FROM audit_logs');
     console.log("SQLite: All tables cleared.");
   } catch (err) {
     console.error('SQLite Clear Error:', err);

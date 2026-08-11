@@ -13,6 +13,28 @@ export function isNativeApp(): boolean {
   return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 }
 
+/**
+ * Origin to prefix an `/api/...` fetch with.
+ *
+ * Native builds are a static export with no local server, so a relative fetch
+ * resolves against `tauri://localhost` and 404s — they must call the hosted
+ * deployment by absolute URL. The web app must NOT: hardcoding
+ * `https://zeneva.space` there sends every local `npm run dev` request to
+ * production, so a route you just added locally still 404s and a checkout you
+ * are trying to test bills against the live site. Same-origin on web is what
+ * makes local testing possible at all.
+ *
+ * The `|| 'https://zeneva.space'` fallback matters because `.env` is gitignored:
+ * if `NEXT_PUBLIC_BASE_URL` is missing from the workflow-level `env:` block it
+ * inlines as `undefined` in the nested Tauri rebuild (see CLAUDE.md) and every
+ * call would hit `undefined/api/...`.
+ */
+export function apiBase(): string {
+  if (!isNativeApp()) return '';
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space';
+  return base.replace(/\/+$/, '');
+}
+
 /** Running inside the Android or iOS build specifically - not desktop, not web. */
 export function isMobileApp(): boolean {
   if (!isNativeApp()) return false;
@@ -90,6 +112,54 @@ export function openStore(channel: UpdateChannel = updateChannel()): void {
   }
   const url = storeUrl(channel);
   if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/** Deep link that opens the Play Store app directly rather than the browser. */
+const PLAY_STORE_PROTOCOL = 'market://details?id=com.zeneva.app';
+
+/**
+ * The native-app deep link for one of our store listings, or null for any other
+ * URL. Matching on the https listing means callers only have to carry one URL.
+ */
+function storeProtocol(url: string): string | null {
+  if (/apps\.microsoft\.com/i.test(url)) return MS_STORE_PROTOCOL;
+  if (/play\.google\.com/i.test(url)) return PLAY_STORE_PROTOCOL;
+  return null;
+}
+
+/**
+ * Opens a URL outside the app.
+ *
+ * `window.open` is a no-op in the Tauri webview, so anything that has to leave
+ * the app — a store listing, a help article — goes through the shell plugin
+ * when we are running natively. Store URLs try their deep link first so the
+ * Store/Play app opens instead of a browser tab; `shell:default` only scopes
+ * http(s), so the non-http attempt rejects harmlessly and we fall back to the
+ * web listing rather than navigating the shell somewhere it cannot return from.
+ */
+export async function openExternal(url: string): Promise<void> {
+  if (!url) return;
+
+  if (isNativeApp()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const deepLink = storeProtocol(url);
+      if (deepLink) {
+        try {
+          await invoke('plugin:shell|open', { path: deepLink });
+          return;
+        } catch {
+          // scope rejects non-http schemes - use the web listing below
+        }
+      }
+      await invoke('plugin:shell|open', { path: url });
+      return;
+    } catch {
+      // plugin unavailable - let the webview try
+    }
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 /**

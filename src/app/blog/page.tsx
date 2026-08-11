@@ -109,11 +109,20 @@ export default function BlogLandingPage() {
     const seenSlugs = new Set(combined.map(p => p.slug).filter(Boolean));
     const seenIds = new Set(combined.map(p => p.id).filter(Boolean));
 
+    // Also dedupe on the title. Slug and id only catch the same post published
+    // twice through the same path; the seed scripts have produced Firestore
+    // copies of authored posts under a different slug, which slipped past both
+    // sets and rendered the same headline twice in the listing.
+    const normalizeTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const seenTitles = new Set(combined.map(p => normalizeTitle(p.title || '')).filter(Boolean));
+
     staticAsBlogPosts.forEach(staticPost => {
-      if (!seenSlugs.has(staticPost.slug) && !seenIds.has(staticPost.id)) {
+      const titleKey = normalizeTitle(staticPost.title);
+      if (!seenSlugs.has(staticPost.slug) && !seenIds.has(staticPost.id) && !seenTitles.has(titleKey)) {
         combined.push(staticPost);
         seenSlugs.add(staticPost.slug);
         seenIds.add(staticPost.id);
+        seenTitles.add(titleKey);
       }
     });
 

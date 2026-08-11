@@ -8,6 +8,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { requireUser } from '@/actions/admin-guard';
 import { 
     CustomerInsightsInputSchema, 
     CustomerInsightsOutputSchema, 
@@ -16,7 +17,11 @@ import {
 } from './customer-insights-types';
 
 
-export async function getCustomerInsights(input: CustomerInsightsInput): Promise<CustomerInsightsOutput> {
+// Server Action = public endpoint. Verify the caller before spending an LLM
+// call on the platform's API key. Token stays out of the input schema so it is
+// never forwarded to the model.
+export async function getCustomerInsights(input: CustomerInsightsInput, idToken?: string): Promise<CustomerInsightsOutput> {
+  await requireUser(idToken);
   return customerInsightsFlow(input);
 }
 
