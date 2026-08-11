@@ -6,8 +6,8 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNowStrict } from 'date-fns';
-import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock } from 'lucide-react';
+import { format, formatDistanceToNowStrict, isToday, isYesterday } from 'date-fns';
+import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock, ArrowLeft, Megaphone } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,36 @@ function getCleanAudioSource(voiceUrl: string): string {
         }
     }
     return voiceUrl;
+}
+
+/**
+ * Two-letter avatar label. The inbox reads as a list of people, not of subject
+ * lines, so every row and thread header leads with an initials bubble.
+ */
+function initialsOf(name?: string | null): string {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Right-hand timestamp in the conversation list, on WhatsApp's rule: clock time
+ * for today, "Yesterday", then the date. `formatDistanceToNowStrict` renders
+ * "2 hours" there, which is both wider and less useful than "2:35 PM" — and
+ * width is the whole problem on a phone.
+ */
+function conversationTime(value: any): string {
+    if (!value) return '';
+    try {
+        const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        if (isToday(date)) return format(date, 'h:mm a');
+        if (isYesterday(date)) return 'Yesterday';
+        return format(date, 'dd/MM/yy');
+    } catch {
+        return '';
+    }
 }
 
 function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceDuration?: number }) {
@@ -147,7 +177,15 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
     );
 }
 
-function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: UserProfile }) {
+/**
+ * A single conversation, WhatsApp-style.
+ *
+ * `onBack` is what makes the mobile layout work: below `md` the inbox shows one
+ * pane at a time, so entering a thread replaces the list and the only way out is
+ * this button. On desktop the list stays visible beside the thread, so the
+ * button is hidden there rather than made conditional on the prop.
+ */
+function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, adminUser: UserProfile, onBack?: () => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { t } = useI18n();
@@ -419,7 +457,9 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#efeae2] dark:bg-slate-950 border rounded-xl overflow-hidden shadow-lg">
+        // `relative` scopes the edit panel below, which is `absolute inset-0`:
+        // without a positioned ancestor it escaped the pane entirely.
+        <div className="relative flex flex-col h-full bg-[#efeae2] dark:bg-slate-950 border rounded-xl overflow-hidden shadow-lg">
             {/* Hidden inputs for real file uploads */}
             <input 
                 type="file" 
@@ -429,32 +469,46 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                 className="hidden" 
             />
 
-            {/* Header info */}
-            <div className="p-4 bg-white dark:bg-slate-900 border-b flex justify-between items-center z-10 shadow-sm">
-                <div>
-                    <h3 className="font-bold text-base text-slate-800 dark:text-white flex items-center gap-2">
-                        {thread.subject}
+            {/* Thread header. Every text node here is width-capped: `userEmail`
+                printed raw was pushing the header past the screen edge on a
+                phone, which is what dragged the whole pane sideways. */}
+            <div className="p-2.5 md:p-4 bg-white dark:bg-slate-900 border-b flex items-center gap-2 md:gap-3 z-10 shadow-sm">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onBack}
+                    className="h-9 w-9 shrink-0 -ml-1 md:hidden"
+                    aria-label="Back to conversations"
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500/10 text-xs font-bold uppercase text-orange-600 dark:text-orange-400">
+                    {initialsOf(thread.userName)}
+                </span>
+                <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-bold text-sm md:text-base text-slate-800 dark:text-white">
+                        {thread.userName || 'Unknown user'}
                     </h3>
-                    <p className="text-xs text-muted-foreground">{thread.userName} • {thread.userEmail}</p>
+                    <p className="truncate text-[11px] md:text-xs text-muted-foreground">
+                        {thread.subject}{thread.userEmail ? ` • ${thread.userEmail}` : ''}
+                    </p>
                 </div>
-                <div className="flex items-center gap-3">
-                     <Select value={thread.status} onValueChange={(value: 'open' | 'closed') => {
-                         const threadRef = doc(firestore, 'supportThreads', thread.id);
-                         updateDoc(threadRef, { status: value });
-                     }}>
-                        <SelectTrigger className="w-[110px] h-9 text-xs bg-muted/50 border-none">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="open">Open</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                <Select value={thread.status} onValueChange={(value: 'open' | 'closed') => {
+                    const threadRef = doc(firestore, 'supportThreads', thread.id);
+                    updateDoc(threadRef, { status: value });
+                }}>
+                    <SelectTrigger className="w-[84px] md:w-[110px] h-8 md:h-9 shrink-0 text-xs bg-muted/50 border-none">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="open">Open</SelectItem>
+                        <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
             {/* Message viewport */}
-            <ScrollArea className="flex-1 p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat bg-[size:360px]" ref={scrollAreaRef}>
+            <ScrollArea className="flex-1 p-3 md:p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat bg-[size:360px]" ref={scrollAreaRef}>
                 <div className="space-y-3">
                     {isLoading ? (
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mt-10" />
@@ -463,14 +517,18 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                         return (
                             <div key={msg.id} className={cn('flex items-end gap-1 group', isAdmin ? 'justify-end' : 'justify-start')}>
                                  <div className={cn(
-                                     "max-w-[70%] rounded-xl p-2.5 relative shadow-sm transition-all duration-300", 
-                                     isAdmin 
-                                        ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pr-8' 
+                                     // Wider share of a phone than of a desktop pane: at 70% of a
+                                     // 330px viewport a two-word message wraps for no reason.
+                                     "max-w-[85%] md:max-w-[70%] rounded-xl p-2.5 relative shadow-sm transition-all duration-300",
+                                     isAdmin
+                                        ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pr-8'
                                         : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none'
                                  )}>
-                                    {/* Dropdown menu for Edit/Delete instead of absolute trash button */}
+                                    {/* Dropdown menu for Edit/Delete instead of absolute trash button.
+                                        Always visible on touch: hover never fires there, so a
+                                        hover-only trigger made edit and delete unreachable on a phone. */}
                                     {isAdmin && (
-                                         <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                         <div className="absolute top-1.5 right-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20">
                                              <DropdownMenu modal={false}>
                                                  <DropdownMenuTrigger asChild>
                                                      <button className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border hover:bg-slate-200 dark:hover:bg-slate-700">
@@ -519,7 +577,7 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                                         </div>
                                     )}
 
-                                    {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>}
+                                    {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>}
 
                                     {/* Status tick and timestamp */}
                                     <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
@@ -537,7 +595,7 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
             </ScrollArea>
 
             {/* Input action toolbar */}
-            <div className="bg-[#f0f0f0] dark:bg-slate-900 p-3 border-t flex flex-col gap-2">
+            <div className="bg-[#f0f0f0] dark:bg-slate-900 p-2 md:p-3 border-t flex flex-col gap-2">
                 {/* Image attachment preview zone */}
                 {attachedImage && (
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-lg border max-w-xs animate-fade-in relative">
@@ -552,34 +610,37 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                     </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 md:gap-2">
                     {/* File Attachment Button */}
-                    <Button type="button" size="icon" variant="ghost" disabled={isUploadingImage} className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
+                    <Button type="button" size="icon" variant="ghost" disabled={isUploadingImage} className="h-10 w-10 shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
                         {isUploadingImage ? <Loader2 className="h-5 w-5 animate-spin text-slate-400"/> : <Paperclip className="h-5 w-5" />}
                     </Button>
-                    <Button type="button" size="icon" variant="ghost" disabled={isUploadingImage} className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
+                    {/* Opens the same picker as the paperclip. Kept for desktop, where
+                        there is room for it; on a phone a second identical button
+                        costs 40px of the ~300px the composer actually has. */}
+                    <Button type="button" size="icon" variant="ghost" disabled={isUploadingImage} className="hidden md:inline-flex h-10 w-10 shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => fileInputRef.current?.click()}>
                         <ImageIcon className="h-5 w-5" />
                     </Button>
 
                     {isRecording ? (
-                        <div className="flex-1 flex items-center justify-between bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border h-10 animate-pulse">
-                            <div className="flex items-center gap-2 text-rose-500">
-                                <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                                <span className="text-xs font-bold font-mono">Recording: {recordingSeconds}s</span>
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-1 bg-white dark:bg-slate-800 px-2 md:px-3 py-2 rounded-lg border h-10 animate-pulse">
+                            <div className="flex min-w-0 items-center gap-1.5 text-rose-500">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-rose-500 animate-ping"></span>
+                                <span className="truncate text-[10px] md:text-xs font-bold font-mono">{recordingSeconds}s</span>
                             </div>
-                            <div className="flex-1 flex items-center gap-2">
-                                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={cancelRecording}>Cancel</Button>
-                                <Button size="sm" variant="default" className="text-xs h-7 bg-orange-600 text-white" onClick={stopAndSendVoice}>Send</Button>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px] md:text-xs text-muted-foreground" onClick={cancelRecording}>Cancel</Button>
+                                <Button size="sm" variant="default" className="h-7 px-2.5 text-[10px] md:text-xs bg-orange-600 text-white" onClick={stopAndSendVoice}>Send</Button>
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex items-center gap-2">
-                            <Textarea 
-                                placeholder={editMessageId ? "Edit your reply..." : "Type your reply..."} 
-                                value={reply} 
-                                onChange={(e) => setReply(e.target.value)} 
-                                disabled={isSending} 
-                                className="flex-1 min-h-[40px] h-[40px] max-h-[80px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-none rounded-lg text-sm"
+                        <div className="flex-1 min-w-0 flex items-center gap-1 md:gap-2">
+                            <Textarea
+                                placeholder={editMessageId ? "Edit your reply..." : "Type your reply..."}
+                                value={reply}
+                                onChange={(e) => setReply(e.target.value)}
+                                disabled={isSending}
+                                className="flex-1 min-w-0 min-h-[40px] h-[40px] max-h-[80px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-none rounded-lg text-sm"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
@@ -588,7 +649,7 @@ function ChatDetail({ thread, adminUser }: { thread: SupportThread, adminUser: U
                                 }}
                             />
                             {/* Voice recording activator */}
-                            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={startRecording}>
+                            <Button type="button" size="icon" variant="ghost" className="h-10 w-10 shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 hover:text-slate-900 dark:hover:text-slate-100" onClick={startRecording}>
                                 <Mic className="h-5 w-5" />
                             </Button>
                         </div>
@@ -682,6 +743,13 @@ export default function AdminSupportPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [selectedThread, setSelectedThread] = React.useState<SupportThread | null>(null);
+    /**
+     * Controlled purely so the mobile layout can tell which pane is on screen.
+     * `selectedThread` outlives a tab switch, so hiding the page chrome on
+     * "a thread is open" alone would strand someone on the AI Logs tab with no
+     * way back to the tab strip.
+     */
+    const [activeTab, setActiveTab] = React.useState('inbox');
 
     // This is a simplified user object for the admin.
     const adminUser = { id: 'admin', name: 'Zeneva Support', email: 'support@zeneva.com' } as UserProfile;
@@ -722,86 +790,155 @@ export default function AdminSupportPage() {
         return threads.filter(t => !t.isReadByAdmin).length;
     }, [threads]);
 
+    /**
+     * True when the phone is showing a conversation rather than the list.
+     *
+     * Below `md` the inbox is one pane at a time — the old two-column grid
+     * collapsed to a single column, which stacked the chat *underneath* the
+     * whole thread list and meant scrolling past every ticket to reach the
+     * reply box. Entering a thread now replaces the list, WhatsApp-style, and
+     * the page title and tab strip step out of the way so the conversation gets
+     * the full height.
+     */
+    const inThreadOnMobile =
+        (activeTab === 'inbox' && !!selectedThread) ||
+        (activeTab === 'ai-logs' && !!selectedAiLog);
+
     return (
-        <div className="h-[calc(100vh_-_10rem)] flex flex-col">
-            <h1 className="text-2xl font-bold mb-4">Support Center</h1>
-            <Tabs defaultValue="inbox" className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between mb-4">
-                    <TabsList className="mb-0">
-                        <TabsTrigger value="inbox" className="flex gap-2 items-center">
-                            <MessageSquare className="h-4 w-4" /> 
-                            Human Inbox
+        // 11rem on a phone rather than 10: the admin shell spends 56px on its
+        // header and 96px on the bottom-nav reserve, so 10rem overflowed and let
+        // the page itself scroll under a chat that is supposed to be fixed.
+        <div className="h-[calc(100vh_-_11rem)] md:h-[calc(100vh_-_10rem)] flex flex-col">
+            <h1 className={cn("text-xl md:text-2xl font-bold mb-3 md:mb-4", inThreadOnMobile && "hidden md:block")}>
+                Support Center
+            </h1>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+                <div className={cn(
+                    "flex items-center justify-between gap-2 mb-3 md:mb-4",
+                    inThreadOnMobile && "hidden md:flex",
+                )}>
+                    <TabsList className="mb-0 h-9 md:h-10">
+                        <TabsTrigger value="inbox" className="flex gap-1.5 md:gap-2 items-center text-xs md:text-sm">
+                            <MessageSquare className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">Human Inbox</span>
+                            <span className="sm:hidden">Inbox</span>
                             {unreadCount > 0 && (
-                                <Badge variant="destructive" className="ml-2 px-1.5 py-0.5 text-[10px] h-5 min-w-5 flex items-center justify-center rounded-full animate-pulse">
+                                <Badge variant="destructive" className="ml-0.5 md:ml-2 px-1.5 py-0.5 text-[10px] h-5 min-w-5 flex items-center justify-center rounded-full animate-pulse">
                                     {unreadCount}
                                 </Badge>
                             )}
                         </TabsTrigger>
-                        <TabsTrigger value="ai-logs" className="flex gap-2"><Bot className="h-4 w-4" /> AI Chat Logs</TabsTrigger>
+                        <TabsTrigger value="ai-logs" className="flex gap-1.5 md:gap-2 items-center text-xs md:text-sm">
+                            <Bot className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">AI Chat Logs</span>
+                            <span className="sm:hidden">AI Logs</span>
+                        </TabsTrigger>
                     </TabsList>
 
-                    <Button 
+                    {/* Label collapses to the icon on a phone — the full sentence
+                        was wider than the tab strip it sits beside. */}
+                    <Button
                         onClick={handleBroadcastInvite}
-                        className="bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs h-9 flex items-center gap-1.5"
+                        className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs h-9 flex items-center gap-1.5 px-2.5 md:px-4"
                     >
-                        📢 Broadcast CEO Invite
+                        <Megaphone className="h-4 w-4 shrink-0" />
+                        <span className="hidden md:inline">Broadcast CEO Invite</span>
+                        <span className="md:hidden">CEO</span>
                     </Button>
                 </div>
-                
+
                 <TabsContent value="inbox" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-                    <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        <div className="col-span-1 h-full flex flex-col">
+                    <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-0 md:gap-6">
+                        {/* Conversation list. Hidden on a phone while a thread is
+                            open; always present from md up, where the list beside
+                            the thread is the desktop-WhatsApp layout. */}
+                        <div className={cn(
+                            "col-span-1 h-full min-h-0 flex-col",
+                            selectedThread ? 'hidden md:flex' : 'flex',
+                        )}>
                             <ScrollArea className="flex-1 border rounded-lg bg-card">
-                    {isLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
-                    {threads && threads.length > 0 ? (
-                        threads.map(thread => (
-                            <button
-                                key={thread.id}
-                                onClick={() => setSelectedThread(thread)}
-                                className={cn(
-                                    "w-full text-left p-3 border-b last:border-b-0 hover:bg-muted",
-                                    selectedThread?.id === thread.id && 'bg-muted'
+                                {isLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
+                                {threads && threads.length > 0 ? (
+                                    threads.map(thread => {
+                                        const unread = !thread.isReadByAdmin;
+                                        const when = conversationTime(thread.lastMessageAt) || 'now';
+                                        return (
+                                            <button
+                                                key={thread.id}
+                                                onClick={() => setSelectedThread(thread)}
+                                                className={cn(
+                                                    "flex w-full items-start gap-3 px-3 py-2.5 text-left border-b last:border-b-0 transition-colors hover:bg-muted",
+                                                    selectedThread?.id === thread.id && 'bg-muted',
+                                                )}
+                                            >
+                                                <span className={cn(
+                                                    "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase",
+                                                    unread ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                                                )}>
+                                                    {initialsOf(thread.userName)}
+                                                </span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="flex items-baseline justify-between gap-2">
+                                                        <span className={cn("min-w-0 truncate text-sm", unread ? 'font-bold text-primary' : 'font-semibold')}>
+                                                            {thread.userName || 'Unknown user'}
+                                                        </span>
+                                                        <span className={cn("shrink-0 text-[10px]", unread ? 'font-semibold text-primary' : 'text-muted-foreground')}>
+                                                            {when}
+                                                        </span>
+                                                    </span>
+                                                    <span className="mt-0.5 flex items-center gap-1.5">
+                                                        <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? 'text-foreground' : 'text-muted-foreground')}>
+                                                            {thread.lastMessageSnippet || thread.subject}
+                                                        </span>
+                                                        {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                                                    </span>
+                                                    <span className="mt-1 flex items-center gap-1.5">
+                                                        <Badge
+                                                            variant={thread.status === 'open' ? 'default' : 'secondary'}
+                                                            className="h-4 shrink-0 px-1.5 text-[9px] uppercase shadow-none"
+                                                        >
+                                                            {thread.status}
+                                                        </Badge>
+                                                        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+                                                            {thread.subject}
+                                                        </span>
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        );
+                                    })
+                                ) : (
+                                    !isLoading && <div className="p-4 text-center text-muted-foreground">No support tickets found.</div>
                                 )}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <div className='flex-1 min-w-0'>
-                                        <p className={cn("font-semibold truncate", !thread.isReadByAdmin && 'text-primary')}>{thread.subject}</p>
-                                        <p className="text-sm text-muted-foreground truncate">{thread.userName}</p>
-                                    </div>
-                                    {!thread.isReadByAdmin && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 ml-2 flex-shrink-0"></div>}
+                            </ScrollArea>
+                        </div>
+                        <div className={cn(
+                            "h-full min-h-0 md:col-span-2 lg:col-span-3",
+                            selectedThread ? 'block' : 'hidden md:block',
+                        )}>
+                            {selectedThread ? (
+                                <ChatDetail
+                                    key={selectedThread.id}
+                                    thread={selectedThread}
+                                    adminUser={adminUser}
+                                    onBack={() => setSelectedThread(null)}
+                                />
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center bg-card border rounded-lg text-muted-foreground">
+                                    <MessageSquare className="h-16 w-16 opacity-50"/>
+                                    <p className="mt-4 text-lg font-medium">Select a conversation to view</p>
                                 </div>
-                                 <p className="text-xs text-muted-foreground mt-1 truncate">{thread.lastMessageSnippet}</p>
-                                <div className="flex justify-between items-center mt-2">
-                                     <Badge variant={thread.status === 'open' ? 'default' : 'secondary'}>{thread.status}</Badge>
-                                     <p className="text-xs text-muted-foreground">
-                                         {thread.lastMessageAt && typeof thread.lastMessageAt.toDate === 'function' 
-                                             ? formatDistanceToNowStrict(thread.lastMessageAt.toDate(), {addSuffix: true}) 
-                                             : 'Just now'}
-                                     </p>
-                                </div>
-                            </button>
-                        ))
-                    ) : (
-                        !isLoading && <div className="p-4 text-center text-muted-foreground">No support tickets found.</div>
-                    )}
-                </ScrollArea>
-            </div>
-            <div className="h-full md:col-span-2 lg:col-span-3">
-                {selectedThread ? (
-                    <ChatDetail thread={selectedThread} adminUser={adminUser} />
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center bg-card border rounded-lg text-muted-foreground">
-                        <MessageSquare className="h-16 w-16 opacity-50"/>
-                        <p className="mt-4 text-lg font-medium">Select a conversation to view</p>
-                    </div>
                             )}
                         </div>
                     </div>
                 </TabsContent>
 
                 <TabsContent value="ai-logs" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-                     <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        <div className="col-span-1 h-full flex flex-col">
+                     <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-0 md:gap-6">
+                        <div className={cn(
+                            "col-span-1 h-full min-h-0 flex-col",
+                            selectedAiLog ? 'hidden md:flex' : 'flex',
+                        )}>
                             <ScrollArea className="flex-1 border rounded-lg bg-card">
                                 {isAiLogsLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
                                 {aiLogs && aiLogs.length > 0 ? (
@@ -815,11 +952,11 @@ export default function AdminSupportPage() {
                                             )}
                                         >
                                             <p className="font-semibold text-sm truncate">{log.query}</p>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <p className="text-xs text-muted-foreground truncate max-w-[120px]">{log.userName}</p>
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    {log.createdAt && typeof log.createdAt.toDate === 'function' 
-                                                        ? formatDistanceToNowStrict(log.createdAt.toDate(), {addSuffix: true}) 
+                                            <div className="flex justify-between items-center gap-2 mt-1">
+                                                <p className="min-w-0 flex-1 text-xs text-muted-foreground truncate">{log.userName}</p>
+                                                <p className="shrink-0 text-[10px] text-muted-foreground">
+                                                    {log.createdAt && typeof log.createdAt.toDate === 'function'
+                                                        ? formatDistanceToNowStrict(log.createdAt.toDate(), {addSuffix: true})
                                                         : ''}
                                                 </p>
                                             </div>
@@ -830,27 +967,41 @@ export default function AdminSupportPage() {
                                 )}
                             </ScrollArea>
                         </div>
-                        <div className="h-full md:col-span-2 lg:col-span-3">
+                        <div className={cn(
+                            "h-full min-h-0 md:col-span-2 lg:col-span-3",
+                            selectedAiLog ? 'block' : 'hidden md:block',
+                        )}>
                             {selectedAiLog ? (
                                 <div className="h-full bg-card border rounded-lg flex flex-col">
-                                    <div className="p-4 border-b">
-                                        <h3 className="font-semibold text-lg">AI Interaction Details</h3>
-                                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                                            <p><strong>User:</strong> {selectedAiLog.userName} ({selectedAiLog.userEmail || 'No email'})</p>
-                                            <p><strong>Business ID:</strong> {selectedAiLog.businessId}</p>
+                                    <div className="flex items-start gap-2 p-3 md:p-4 border-b">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setSelectedAiLog(null)}
+                                            className="h-9 w-9 shrink-0 -ml-1 md:hidden"
+                                            aria-label="Back to AI logs"
+                                        >
+                                            <ArrowLeft className="h-5 w-5" />
+                                        </Button>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="font-semibold text-base md:text-lg">AI Interaction Details</h3>
+                                            <div className="mt-1 space-y-0.5 text-xs md:text-sm text-muted-foreground">
+                                                <p className="break-words"><strong>User:</strong> {selectedAiLog.userName} ({selectedAiLog.userEmail || 'No email'})</p>
+                                                <p className="break-all"><strong>Business ID:</strong> {selectedAiLog.businessId}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                    <ScrollArea className="flex-1 p-6">
+                                    <ScrollArea className="flex-1 p-3 md:p-6">
                                         <div className="space-y-6">
                                             <div className="flex flex-col gap-2">
                                                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">User Query</span>
-                                                <div className="bg-primary/10 text-primary p-4 rounded-xl rounded-tl-sm w-fit max-w-[80%] whitespace-pre-wrap">
+                                                <div className="bg-primary/10 text-primary p-3 md:p-4 rounded-xl rounded-tl-sm w-fit max-w-[90%] md:max-w-[80%] whitespace-pre-wrap break-words text-sm">
                                                     {selectedAiLog.query}
                                                 </div>
                                             </div>
                                             <div className="flex flex-col gap-2 items-end">
                                                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Zen AI Response</span>
-                                                <div className="bg-muted p-4 rounded-xl rounded-tr-sm w-fit max-w-[80%] whitespace-pre-wrap text-sm">
+                                                <div className="bg-muted p-3 md:p-4 rounded-xl rounded-tr-sm w-fit max-w-[90%] md:max-w-[80%] whitespace-pre-wrap break-words text-sm">
                                                     {selectedAiLog.response}
                                                 </div>
                                             </div>

@@ -1,6 +1,26 @@
 import { adminMessaging, adminFirestore } from '@/firebase/admin';
+import {
+    createPushCampaign,
+    dedupeTargets,
+    finalizePushCampaign,
+    pushStatsDay,
+    rollUpPushStats,
+    type PushSource,
+    type PushTarget,
+} from './push-log';
 
-export async function sendNotificationToUser(userId: string, payload: { title: string; body: string; url?: string }) {
+/**
+ * Push to one user's devices.
+ *
+ * Every send is recorded as a `push_campaigns` doc with a per-recipient row, so
+ * the admin board can report volume and opens — see `push-log.ts`. The campaign id
+ * rides along in `data.campaignId`, which is what lets the service worker attribute
+ * a click back to this notification.
+ */
+export async function sendNotificationToUser(
+    userId: string,
+    payload: { title: string; body: string; url?: string; source?: PushSource; sentBy?: string | null; audienceLabel?: string | null },
+) {
     try {
         // 1. Get user's FCM tokens
         const tokensSnapshot = await adminFirestore
@@ -17,14 +37,29 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
         // use-fcm.ts writes the token as both the doc id and a `token` field, so fall
         // back to the id — a missing field would otherwise put `undefined` in the array
         // and make the send throw.
-        const tokens = tokensSnapshot.docs
-            .map(doc => doc.data().token || doc.id)
-            .filter(Boolean) as string[];
+        const targets = dedupeTargets(
+            tokensSnapshot.docs.map((doc: any) => ({ token: doc.data().token || doc.id, userId })),
+        );
 
-        if (tokens.length === 0) {
+        if (targets.length === 0) {
             console.log(`No usable FCM tokens for user ${userId}`);
             return;
         }
+
+        const tokens = targets.map((t) => t.token);
+        const url = payload.url || '/';
+
+        // Minted before the send: the id has to be inside the payload for a click to
+        // be attributable, so a failure here costs tracking, not delivery.
+        const campaignId = await createPushCampaign({
+            title: payload.title,
+            body: payload.body,
+            link: url,
+            source: payload.source || 'system',
+            audience: 'user',
+            audienceLabel: payload.audienceLabel ?? userId,
+            sentBy: payload.sentBy ?? null,
+        });
 
         // 2. Send multicast message
         const message = {
@@ -35,8 +70,12 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
                 // icon: '/zeneva.png', // Note: icon is often ignored by FCM on iOS/Android unless handled in SW
             },
             data: {
-                url: payload.url || '/',
+                url,
                 icon: '/zeneva.png', // Send in data for SW to use
+                // Read by the `notificationclick` handler in
+                // public/firebase-messaging-sw.js. Must be a string — FCM rejects a
+                // data payload with a non-string value.
+                campaignId: campaignId || '',
             },
             tokens: tokens,
         };
@@ -46,7 +85,7 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
         // 3. Cleanup invalid tokens
         if (response.failureCount > 0) {
             const failedTokens: string[] = [];
-            response.responses.forEach((resp, idx) => {
+            response.responses.forEach((resp: any, idx: number) => {
                 if (!resp.success) {
                     failedTokens.push(tokens[idx]);
                 }
@@ -55,8 +94,117 @@ export async function sendNotificationToUser(userId: string, payload: { title: s
             // Optional: Delete from Firestore
         }
 
+        await finalizePushCampaign(campaignId, targets, response.responses.map((r: any) => r.success));
+        await rollUpPushStats(pushStatsDay(), {
+            devices: targets.length,
+            success: response.successCount,
+            failure: response.failureCount,
+            recipients: 1,
+        });
+
         return response;
     } catch (error) {
         console.error('Error sending notification:', error);
     }
+}
+
+/**
+ * Push to every registered device on the platform, recording who it reached.
+ *
+ * Split out of the `broadcastNotification` server action so the alert form can
+ * reuse the exact same send-and-record path instead of growing a second, subtly
+ * different copy of it. Callers are responsible for authorising the request —
+ * this reads `collectionGroup('fcmTokens')` across every tenant.
+ */
+export async function broadcastToAllDevices(payload: {
+    title: string;
+    body: string;
+    url?: string;
+    source?: PushSource;
+    sentBy?: string | null;
+    sentByEmail?: string | null;
+}): Promise<{ deviceCount: number; successCount: number; failureCount: number; recipientCount: number; campaignId: string | null }> {
+    if (!adminFirestore || !adminMessaging) {
+        throw new Error('Firebase Admin Services are not initialized on the server.');
+    }
+
+    const url = payload.url || '/';
+
+    // Tokens live at `users/{uid}/fcmTokens/{token}`, so the owning uid is the
+    // grandparent of each doc. The old code deduped tokens through a `Set` and
+    // discarded that, which is why a send could not name its recipients.
+    const tokensSnapshot = await adminFirestore.collectionGroup('fcmTokens').get();
+    const targets = dedupeTargets(
+        tokensSnapshot.docs.map((doc: any) => ({
+            token: doc.data().token || doc.id,
+            userId: doc.ref.parent.parent?.id || '',
+        })),
+    );
+
+    if (targets.length === 0) {
+        return { deviceCount: 0, successCount: 0, failureCount: 0, recipientCount: 0, campaignId: null };
+    }
+
+    const campaignId = await createPushCampaign({
+        title: payload.title,
+        body: payload.body,
+        link: url,
+        source: payload.source || 'broadcast',
+        audience: 'all',
+        audienceLabel: 'All registered devices',
+        sentBy: payload.sentBy ?? null,
+        sentByEmail: payload.sentByEmail ?? null,
+    });
+
+    // Firebase multicast limit is 500 tokens per request.
+    const chunks: PushTarget[][] = [];
+    for (let i = 0; i < targets.length; i += 500) {
+        chunks.push(targets.slice(i, i + 500));
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+    // Flat, in target order, so index i here is target i — that alignment is what
+    // `finalizePushCampaign` uses to attribute a device result to a person.
+    const results: boolean[] = [];
+
+    for (const chunk of chunks) {
+        const message = {
+            notification: {
+                title: payload.title,
+                body: payload.body,
+                imageUrl: 'https://zeneva.space/zeneva.png',
+            },
+            data: {
+                url,
+                icon: '/zeneva.png',
+                campaignId: campaignId || '',
+            },
+            tokens: chunk.map((t) => t.token),
+        };
+
+        try {
+            const response = await adminMessaging.sendEachForMulticast(message);
+            successCount += response.successCount;
+            failureCount += response.failureCount;
+            response.responses.forEach((r: any) => results.push(r.success));
+        } catch (error) {
+            // One rejected chunk must not lose the other 500 devices' results.
+            console.error('[broadcast] Chunk send failed:', error);
+            failureCount += chunk.length;
+            chunk.forEach(() => results.push(false));
+        }
+    }
+
+    await finalizePushCampaign(campaignId, targets, results);
+
+    const recipientCount = new Set(targets.map((t) => t.userId)).size;
+    await rollUpPushStats(pushStatsDay(), {
+        devices: targets.length,
+        success: successCount,
+        failure: failureCount,
+        recipients: recipientCount,
+    });
+
+    return { deviceCount: targets.length, successCount, failureCount, recipientCount, campaignId };
 }

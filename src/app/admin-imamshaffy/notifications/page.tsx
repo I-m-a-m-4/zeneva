@@ -12,14 +12,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Send, Trash2 } from 'lucide-react';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { BarChart3, Loader2, Send, Smartphone, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/ui/combobox';
 import { format } from 'date-fns';
 import type { AdminNotification } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { updateDoc } from 'firebase/firestore';
+import { PushAnalytics } from '@/components/admin/push-analytics';
+import { pushAlertToPhones } from '@/actions/notifications';
+import { idToken } from '@/lib/id-token';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +41,15 @@ const notificationSchema = z.object({
   body: z.string().min(5, "Message body is too short."),
   link: z.string().optional(),
   targetEmail: z.string().email("Invalid email format").or(z.literal("")).optional(),
+  /**
+   * Opt-in, and off by default on purpose.
+   *
+   * This form only ever wrote an in-app `notifications` document, so an alert
+   * marked "sent" reached the bell icon and never anyone's phone. Adding the push
+   * unconditionally would have silently turned every existing draft-and-send habit
+   * into a platform-wide phone buzz, so it is a switch the sender has to reach for.
+   */
+  pushToPhones: z.boolean().optional(),
 });
 
 type NotificationFormValues = z.infer<typeof notificationSchema>;
@@ -58,6 +72,26 @@ const MicrosoftIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+
+/**
+ * Where a notification sends people, short enough to sit on a phone.
+ *
+ * The store links are ~90 characters of tracking query string. Printed raw they
+ * pushed the template cards and the history table wider than the screen, which
+ * is the overflow that made this page unusable on a phone. The host answers
+ * "where does this go" on its own; for an in-app route the path already is the
+ * short form.
+ */
+function destinationLabel(link?: string | null): string {
+  const raw = (link || '').trim();
+  if (!raw) return '/support';
+  if (!/^https?:\/\//i.test(raw)) return raw;
+  try {
+    return new URL(raw).hostname.replace(/^www\./, '');
+  } catch {
+    return raw;
+  }
+}
 
 // Titles here carry no emoji on purpose. These render in the in-app
 // notification centre, in the OS notification tray and in the push payload —
@@ -123,7 +157,7 @@ export default function AdminNotificationsPage() {
 
     const form = useForm<NotificationFormValues>({
         resolver: zodResolver(notificationSchema),
-        defaultValues: { title: "", body: "", link: "/support", targetEmail: "" },
+        defaultValues: { title: "", body: "", link: "/support", targetEmail: "", pushToPhones: false },
     });
 
     const notificationsQuery = useMemoFirebase(
@@ -146,15 +180,48 @@ export default function AdminNotificationsPage() {
         }
         setIsSaving(true);
         try {
+            // `pushToPhones` is a delivery option, not a property of the alert —
+            // spreading it into the doc would put a stray field on every record.
+            const { pushToPhones, ...notification } = values;
+
             await addDoc(collection(firestore, 'notifications'), {
-                ...values,
+                ...notification,
                 targetEmail: values.targetEmail || null,
                 sentBy: user.uid,
                 createdAt: serverTimestamp(),
                 deleted: false,
+                /** Recorded so the history row can say whether phones were reached. */
+                pushedToPhones: !!pushToPhones,
             });
-            toast({ variant: 'success', title: 'Notification Sent', description: values.targetEmail ? `Notification targeted to ${values.targetEmail}` : 'Your notification has been sent to all users.' });
-            form.reset({ title: "", body: "", link: "/support", targetEmail: "" });
+
+            const audience = values.targetEmail ? `Notification targeted to ${values.targetEmail}` : 'Your notification has been sent to all users.';
+
+            if (!pushToPhones) {
+                toast({ variant: 'success', title: 'Notification Sent', description: audience });
+            } else {
+                // The in-app document is already saved at this point. A failed push
+                // therefore has to be reported as a partial success, not as a failure —
+                // telling the owner "send failed" would invite a duplicate alert.
+                const result = await pushAlertToPhones({
+                    title: values.title,
+                    body: values.body,
+                    link: values.link || '/notifications',
+                    targetEmail: values.targetEmail || null,
+                    idToken: await idToken(),
+                });
+
+                if (result.success) {
+                    toast({ variant: 'success', title: 'Notification sent and pushed', description: result.message || audience });
+                } else {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Saved, but the phone push failed',
+                        description: `${result.error} The in-app alert was still delivered.`,
+                    });
+                }
+            }
+
+            form.reset({ title: "", body: "", link: "/support", targetEmail: "", pushToPhones: false });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Send Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
@@ -186,32 +253,48 @@ export default function AdminNotificationsPage() {
 
     return (
         <>
+            {/* Two tabs rather than one long scroll: the compose form and the
+                delivery report are separate jobs, and stacking a five-KPI board
+                under the templates grid would push the send button off a phone. */}
+            <Tabs defaultValue="send" className="space-y-4">
+                <TabsList className="h-9 md:h-10">
+                    <TabsTrigger value="send" className="flex items-center gap-1.5 text-xs md:text-sm">
+                        <Send className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Compose &amp; send</span>
+                        <span className="sm:hidden">Send</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="analytics" className="flex items-center gap-1.5 text-xs md:text-sm">
+                        <BarChart3 className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Push analytics</span>
+                        <span className="sm:hidden">Analytics</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="send" className="mt-0">
             <div className="space-y-6">
                 {/* Predefined Templates Section */}
                 <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            Predefined Notification Templates
-                        </CardTitle>
-                        <CardDescription>Click any template below to auto-fill title, message, and target action link.</CardDescription>
+                        <CardTitle className="text-base sm:text-lg">Templates</CardTitle>
+                        <CardDescription>Tap one to fill the form below.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             {PREDEFINED_TEMPLATES.map((tpl) => (
-                                <div 
-                                    key={tpl.id} 
+                                <div
+                                    key={tpl.id}
                                     className="p-4 rounded-xl border bg-card hover:bg-muted/40 transition-all cursor-pointer flex flex-col justify-between space-y-3 shadow-sm hover:shadow-md hover:border-primary/40 group"
                                     onClick={() => handleApplyTemplate(tpl)}
                                 >
                                     <div>
                                         <div className="flex items-center justify-between gap-2 mb-2">
-                                            <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{tpl.badge}</span>
-                                            <span className="text-xs text-muted-foreground font-mono">{tpl.link}</span>
+                                            <span className="min-w-0 truncate text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{tpl.badge}</span>
+                                            <span className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground font-mono">{destinationLabel(tpl.link)}</span>
                                         </div>
                                         <h4 className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
                                             {tpl.id === 'playstore_app' && <PlayStoreIcon className="w-4 h-4 shrink-0" />}
                                             {tpl.id === 'msstore_app' && <MicrosoftIcon className="w-4 h-4 shrink-0" />}
-                                            {tpl.title}
+                                            <span className="min-w-0 break-words">{tpl.title}</span>
                                         </h4>
                                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{tpl.body}</p>
                                     </div>
@@ -228,7 +311,7 @@ export default function AdminNotificationsPage() {
                     <div className="space-y-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Send Notification</CardTitle>
+                                <CardTitle className="text-base sm:text-lg">Send Notification</CardTitle>
                                 <CardDescription>Send a platform-wide notification or direct it to a specific user.</CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -250,22 +333,53 @@ export default function AdminNotificationsPage() {
                                         )}/>
                                         <FormField control={form.control} name="link" render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Target Link (Redirect on Click)</FormLabel>
+                                                <FormLabel>Target link</FormLabel>
                                                 <FormControl><Input placeholder="e.g., /support or /terminal-alerts" {...field} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}/>
                                         <FormField control={form.control} name="targetEmail" render={({ field }) => (
                                             <FormItem className="flex flex-col">
-                                                <FormLabel>Target Email (Optional)</FormLabel>
-                                                <Combobox 
-                                                    options={userOptions} 
-                                                    value={field.value || ""} 
-                                                    onChange={field.onChange} 
-                                                    placeholder="Select a user (leave blank for all)" 
+                                                <FormLabel>Target user (optional)</FormLabel>
+                                                {/* The trigger is a `whitespace-nowrap` button, so a
+                                                    `Name (email)` label runs straight out of the card on a
+                                                    phone. Truncating the selected value is the fix; the
+                                                    placeholder is short enough not to need it, and blank
+                                                    genuinely does mean everyone. */}
+                                                <Combobox
+                                                    options={userOptions}
+                                                    value={field.value || ""}
+                                                    onChange={field.onChange}
+                                                    placeholder="All users"
                                                     emptyPlaceholder="No users found"
+                                                    itemClassName="whitespace-normal break-words"
+                                                    renderSelected={(option) => (
+                                                        <span className="min-w-0 flex-1 truncate text-left">{option.label}</span>
+                                                    )}
                                                 />
                                                 <FormMessage />
+                                            </FormItem>
+                                        )}/>
+                                        <FormField control={form.control} name="pushToPhones" render={({ field }) => (
+                                            <FormItem className="flex flex-row items-start justify-between gap-3 rounded-xl border bg-muted/30 p-3">
+                                                <div className="min-w-0 space-y-0.5">
+                                                    <FormLabel className="flex items-center gap-1.5 text-sm">
+                                                        <Smartphone className="h-4 w-4 shrink-0 text-primary" />
+                                                        Also push to phones
+                                                    </FormLabel>
+                                                    <FormDescription className="text-xs">
+                                                        Sends a real device notification on top of the in-app alert, and
+                                                        records who opens it under Analytics.
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={!!field.value}
+                                                        onCheckedChange={field.onChange}
+                                                        className="mt-0.5 shrink-0"
+                                                        aria-label="Also push to phones"
+                                                    />
+                                                </FormControl>
                                             </FormItem>
                                         )}/>
                                         <Button type="submit" disabled={isSaving}>
@@ -279,60 +393,70 @@ export default function AdminNotificationsPage() {
                     </div>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Sent Notifications</CardTitle>
-                            <CardDescription>History of previously sent notifications.</CardDescription>
+                            <CardTitle className="text-base sm:text-lg">Sent notifications</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Title</TableHead>
-                                        <TableHead>Target</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        {/* Target drops out below md and is restated inside the
+                                            Title cell — three columns do not fit a phone. */}
+                                        <TableHead className="hidden md:table-cell">Target</TableHead>
+                                        {/* No visible label: "Actions" is wider than the icon
+                                            button beneath it, and on a phone that header text
+                                            costs ~50px of the ~290px the card actually has. */}
+                                        <TableHead className="w-[56px] text-right"><span className="sr-only">Actions</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {isLoading ? (
                                         <TableRow><TableCell colSpan={3} className="text-center">Loading history...</TableCell></TableRow>
                                     ) : notifications && notifications.length > 0 ? (
-                                        notifications.map(notif => (
-                                            <TableRow key={notif.id} className={(notif as any).deleted ? 'opacity-80 bg-muted/20' : ''}>
-                                                <TableCell className="font-medium">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <p className={`font-semibold text-sm ${(notif as any).deleted ? 'line-through text-muted-foreground' : ''}`}>{notif.title}</p>
-                                                        {(notif as any).deleted && (
-                                                            <Badge variant="destructive" className="h-5 px-1.5 text-[10px] uppercase gap-1 flex items-center shadow-none">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                                                                Deleted
+                                        notifications.map(notif => {
+                                            const audience = notif.targetEmail ? `To: ${notif.targetEmail}` : 'All users';
+                                            return (
+                                            <TableRow key={notif.id} className={notif.deleted ? 'opacity-80 bg-muted/20' : ''}>
+                                                <TableCell className="align-top font-medium">
+                                                    {/* One width cap for the whole cell. A table column cannot
+                                                        shrink below its content, so without this the body text
+                                                        sets the table's width and the card scrolls sideways. */}
+                                                    <div className="max-w-[180px] space-y-1 sm:max-w-md">
+                                                        <div className="flex items-start gap-2">
+                                                            <p className={`min-w-0 break-words font-semibold text-sm ${notif.deleted ? 'line-through text-muted-foreground' : ''}`}>{notif.title}</p>
+                                                            {notif.deleted && (
+                                                                <Badge variant="destructive" className="mt-0.5 h-5 shrink-0 px-1.5 text-[10px] uppercase gap-1 flex items-center shadow-none">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                                                    Deleted
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className={`break-words text-xs ${notif.deleted ? 'line-through text-muted-foreground/70' : 'text-muted-foreground'}`}>{notif.body}</p>
+                                                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5 md:hidden">
+                                                            <Badge variant="outline" className="max-w-full truncate px-1 text-[10px] font-sans">
+                                                                {audience}
                                                             </Badge>
-                                                        )}
+                                                            <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">{destinationLabel(notif.link)}</span>
+                                                        </div>
                                                     </div>
-                                                    <p className={`text-xs ${(notif as any).deleted ? 'line-through text-muted-foreground/70' : 'text-muted-foreground'} whitespace-normal break-words max-w-[200px] sm:max-w-md`}>{notif.body}</p>
-                                                    {(notif as any).deleted && (
-                                                        <p className="text-[10px] text-destructive italic mt-1 w-full break-words whitespace-normal max-w-[200px] sm:max-w-md">
-                                                            🚫 This message was deleted. But admins can still see the original content.
-                                                        </p>
-                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-xs font-mono text-muted-foreground">
-                                                    <div>{(notif as any).link || '/support'}</div>
-                                                    {(notif as any).targetEmail ? (
-                                                        <Badge variant="outline" className="mt-1 text-[10px] font-sans border-primary/20 text-primary bg-primary/5 px-1">
-                                                            To: {(notif as any).targetEmail}
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="mt-1 text-[10px] font-sans px-1 text-slate-500">
-                                                            All Users
-                                                        </Badge>
-                                                    )}
+                                                <TableCell className="hidden align-top text-xs font-mono text-muted-foreground md:table-cell">
+                                                    <div className="max-w-[220px] break-all">{notif.link || '/support'}</div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={`mt-1 block max-w-[220px] truncate px-1 text-[10px] font-sans ${notif.targetEmail ? 'border-primary/20 text-primary bg-primary/5' : 'text-muted-foreground'}`}
+                                                    >
+                                                        {audience}
+                                                    </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="destructive" size="icon" onClick={() => setNotificationToDelete(notif)} disabled={(notif as any).deleted}>
-                                                        <Trash2 className="h-4 w-4" />
+                                                <TableCell className="align-top text-right">
+                                                    <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => setNotificationToDelete(notif)} disabled={notif.deleted}>
+                                                        <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <TableRow><TableCell colSpan={3} className="text-center">No notifications sent yet.</TableCell></TableRow>
                                     )}
@@ -342,11 +466,17 @@ export default function AdminNotificationsPage() {
                     </Card>
                 </div>
             </div>
+                </TabsContent>
+
+                <TabsContent value="analytics" className="mt-0">
+                    <PushAnalytics />
+                </TabsContent>
+            </Tabs>
             <AlertDialog open={!!notificationToDelete} onOpenChange={(open) => !open && setNotificationToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription className="break-words">
                             This action cannot be undone. This will permanently delete the notification titled "<strong>{notificationToDelete?.title}</strong>".
                         </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -523,6 +523,13 @@ export interface AdminNotification {
     body: string;
     sentBy: string;
     createdAt: any;
+    /** Where a tap sends the recipient. Absent means `/support`. */
+    link?: string | null;
+    /** Set when the alert was aimed at one user; absent or null means everyone. */
+    targetEmail?: string | null;
+    /** Soft delete: the row stays visible to admins, struck through. */
+    deleted?: boolean;
+    deletedAt?: any;
 }
 
 export interface UserNotification {
@@ -533,6 +540,62 @@ export interface UserNotification {
     createdAt: any;
     isGlobal?: boolean;
     queuedActionId?: string;
+}
+
+/**
+ * One phone push, recorded at send time so the admin can answer "how many did we
+ * send and who opened them".
+ *
+ * `deviceCount` and `recipientCount` differ on purpose: one person with a phone
+ * and a laptop is one recipient and two devices, and conflating them makes the
+ * click-through rate wrong in both directions.
+ */
+export interface PushCampaign {
+    id: string;
+    title: string;
+    body: string;
+    /** Deep link the notification opens. `/` when the sender left it blank. */
+    link: string;
+    /** Which code path sent it — tells a broadcast apart from a payment receipt. */
+    source: 'broadcast' | 'alert' | 'test' | 'system';
+    audience: 'all' | 'user';
+    /** Human label for the audience, e.g. "All devices" or the target's email. */
+    audienceLabel?: string | null;
+    sentBy?: string | null;
+    sentByEmail?: string | null;
+    sentAt: any;
+    /** Tokens the send was attempted against. */
+    deviceCount: number;
+    /** Devices FCM accepted. */
+    successCount: number;
+    failureCount: number;
+    /** Distinct users behind those devices. */
+    recipientCount: number;
+    /** Total opens, incremented by the recipient on click. Re-opens count. */
+    clickCount?: number;
+    lastClickAt?: any;
+}
+
+/**
+ * Per-person delivery row under `push_campaigns/{id}/recipients/{userId}`.
+ *
+ * Name and email are denormalised at send time: the admin board needs to show
+ * who clicked without reading a `users` doc per row, and a renamed or deleted
+ * account should not rewrite history.
+ */
+export interface PushRecipient {
+    id: string;
+    userId: string;
+    userName?: string | null;
+    userEmail?: string | null;
+    deviceCount: number;
+    successCount: number;
+    failureCount: number;
+    sentAt: any;
+    /** First open. Absent means this person never opened it. */
+    clickedAt?: any;
+    lastClickedAt?: any;
+    clickCount?: number;
 }
 
 export interface SystemBroadcast {

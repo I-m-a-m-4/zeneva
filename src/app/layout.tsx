@@ -22,6 +22,7 @@ import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
 import { FirestoreRecovery } from '@/components/shared/firestore-recovery';
 import { ClientSideInitializer } from '@/components/shared/client-initializer';
+import { PushClickTracker } from '@/components/shared/push-click-tracker';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
 
@@ -303,6 +304,10 @@ export default function RootLayout({
           <FirebaseClientProvider>
             <PWAProvider>
               <UserActivityTracker />
+              {/* Inside the Firebase provider on purpose: attributing a tapped
+                  push needs the signed-in uid, and it has to cover every route
+                  because a notification can deep-link anywhere. */}
+              <PushClickTracker />
               <GlobalAnnouncement />
               <Loader />
               <InstallPrompt />
