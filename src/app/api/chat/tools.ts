@@ -49,14 +49,112 @@ function toMillis(value: any): number {
     return Number.isNaN(parsed) ? 0 : parsed;
   }
   if (typeof value?.seconds === 'number') return value.seconds * 1000;
+  // A Timestamp that has been through JSON — the Admin SDK's own serialised
+  // shape. Without this it falls through to 0 and the receipt reads as undated.
+  if (typeof value?._seconds === 'number') return value._seconds * 1000;
   return 0;
 }
+
+/**
+ * Daily revenue buckets over a window, and an honest account of what did not fit.
+ *
+ * Every day-by-day tool needs this, and each used to inline it — which is how
+ * two of them ended up *silently discarding* receipts. The old shape was
+ * `if (buckets.has(key))`, so a receipt whose `createdAt` was unreadable (key
+ * `1970-01-01`) or dated ahead of today simply vanished, and the tool then
+ * reported the sum of the surviving buckets as the period's revenue. That is how
+ * one tool could answer "millions in the last 7 days" while another answered
+ * "₦22,090 across the last 90" from the same collection: the first bounded its
+ * window explicitly, the second dropped whatever the buckets could not place and
+ * never said so.
+ *
+ * A total that quietly excludes rows is worse than a total that admits a gap, so
+ * the misses come back as counts for the caller to surface.
+ */
+function bucketByDay(
+  receipts: any[],
+  days: number,
+): {
+  /** Day key → revenue, oldest first. One entry per day in the window, zeros included. */
+  daily: Map<string, number>;
+  /** Receipts placed in a bucket. */
+  counted: number;
+  /** Receipts whose `createdAt` could not be read at all. */
+  undated: number;
+  /** Receipts dated after today — a wrong device clock or a bad backdate. */
+  future: number;
+  /** Receipts older than the window. Expected on a cache hit; not an error. */
+  older: number;
+  /**
+   * Revenue of the receipts that are genuinely broken — undated or future-dated.
+   * Deliberately excludes `older`, which is why this is not simply "everything
+   * that missed a bucket": a receipt from before the window did not fail to be
+   * placed, it was never in scope. `receiptsSince()` normally filters those out,
+   * but a cache hit can hand over the whole book, and folding them in here would
+   * make the note below announce most of the shop's lifetime takings as a data
+   * problem. Zero means the day-by-day figures are whole.
+   */
+  brokenRevenue: number;
+} {
+  const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const now = Date.now();
+
+  const daily = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) daily.set(dayKey(now - i * DAY_MS), 0);
+
+  const todayKey = dayKey(now);
+  const oldestKey = dayKey(now - (days - 1) * DAY_MS);
+
+  let counted = 0, undated = 0, future = 0, older = 0, brokenRevenue = 0;
+
+  for (const r of receipts) {
+    const amount = r.total ?? 0;
+    const ms = toMillis(r.createdAt);
+
+    if (!ms) { undated++; brokenRevenue += amount; continue; }
+
+    const key = dayKey(ms);
+    if (key > todayKey) { future++; brokenRevenue += amount; continue; }
+    if (key < oldestKey) { older++; continue; }
+
+    daily.set(key, round2((daily.get(key) ?? 0) + amount));
+    counted++;
+  }
+
+  return { daily, counted, undated, future, older, brokenRevenue: round2(brokenRevenue) };
+}
+
+/**
+ * The sentence a tool adds when bucketing could not place everything. Null when
+ * nothing was dropped, so a clean read carries no noise.
+ */
+function unplacedNote(b: ReturnType<typeof bucketByDay>, currency: string): string | null {
+  const parts: string[] = [];
+  if (b.undated) parts.push(`${b.undated} with no readable date`);
+  if (b.future) parts.push(`${b.future} dated in the future (check the device clock)`);
+  if (!parts.length) return null;
+  return `${parts.join(' and ')} — ${currency}${b.brokenRevenue.toLocaleString()} of takings — could not be placed on a day and is excluded from the figures above. The day-by-day totals are therefore lower than this shop's true revenue.`;
+}
+
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Only 'paid' receipts count as revenue. Legacy docs have no status — treat
  *  those as paid, which is how the rest of the app reads them. */
 const isPaid = (r: any) => (r.status ?? 'paid') === 'paid';
+
+/**
+ * A service has no stock to run out of.
+ *
+ * Services live in the same `products` collection and carry `stock: 0` because
+ * the field is shared, not because there is none left. Every stock alert has to
+ * skip them, or Zen AI tells an owner to restock a haircut and buries the items
+ * that genuinely did run out. Mirrors `isService` on the inventory page.
+ */
+const isServiceItem = (p: any) =>
+  p?.categoryType === 'service' ||
+  String(p?.category ?? '').toLowerCase() === 'service' ||
+  String(p?.category ?? '').toLowerCase() === 'services';
 
 const PERIOD_DAYS: Record<string, number> = {
   today: 1, yesterday: 1, last7days: 7, last30days: 30, last90days: 90, thisMonth: 31, lastMonth: 31,
@@ -517,7 +615,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               .map((x) => x.p);
           }
           if (lowStockOnly) {
-            products = products.filter((p) => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5));
+            products = products.filter((p) => !isServiceItem(p) && (p.stock ?? 0) <= (p.lowStockThreshold ?? 5));
           }
           const total = products.length;
           return {
@@ -680,7 +778,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       execute: async ({ limit }) => {
         try {
           const items = (await allProducts())
-            .filter((p) => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5))
+            .filter((p) => !isServiceItem(p) && (p.stock ?? 0) <= (p.lowStockThreshold ?? 5))
             .sort((a, b) => (a.stock ?? 0) - (b.stock ?? 0));
           return {
             type: 'PRODUCT_LIST',
@@ -1182,15 +1280,12 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       execute: async ({ days }) => {
         try {
           const receipts = (await receiptsSince(days)).filter(isPaid);
+          const bucketed = bucketByDay(receipts, days);
           const buckets = new Map<string, { revenue: number; transactions: number }>();
-          for (let i = days - 1; i >= 0; i--) {
-            const d = new Date(Date.now() - i * DAY_MS);
-            buckets.set(d.toISOString().slice(0, 10), { revenue: 0, transactions: 0 });
-          }
+          for (const [date, revenue] of bucketed.daily) buckets.set(date, { revenue, transactions: 0 });
           for (const r of receipts) {
-            const key = new Date(toMillis(r.createdAt)).toISOString().slice(0, 10);
-            const b = buckets.get(key);
-            if (b) { b.revenue = round2(b.revenue + (r.total ?? 0)); b.transactions++; }
+            const b = buckets.get(new Date(toMillis(r.createdAt)).toISOString().slice(0, 10));
+            if (b) b.transactions++;
           }
           const series = [...buckets.entries()].map(([date, v]) => ({
             date,
@@ -1201,6 +1296,7 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
           const revenues = series.map((s) => s.revenue);
           const best = series[revenues.indexOf(Math.max(...revenues))];
           const total = round2(revenues.reduce((s, v) => s + v, 0));
+          const unplaced = unplacedNote(bucketed, currency);
           return {
             type: 'CHART', chartKind: 'line',
             title: `Daily sales — last ${days} days`,
@@ -1213,6 +1309,10 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
               { label: 'Transactions', value: series.reduce((s, v) => s + v.transactions, 0), format: 'number' },
             ],
             note: best ? `Best day was ${best.date}.` : undefined,
+            // Surfaced rather than swallowed: if this is set, the chart above is
+            // incomplete and the model must say so instead of quoting the total.
+            dataGap: unplaced,
+            caveat: unplaced ?? undefined,
             currency,
             bestDay: best ? { date: best.date, revenue: best.revenue } : null,
             total,
@@ -1985,37 +2085,42 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       execute: async ({ aheadDays, basedOnDays }) => {
         try {
           const receipts = (await receiptsSince(basedOnDays)).filter(isPaid);
+          const bucketed = bucketByDay(receipts, basedOnDays);
 
-          const buckets = new Map<string, number>();
-          for (let i = basedOnDays - 1; i >= 0; i--) {
-            buckets.set(new Date(Date.now() - i * DAY_MS).toISOString().slice(0, 10), 0);
-          }
-          for (const r of receipts) {
-            const key = new Date(toMillis(r.createdAt)).toISOString().slice(0, 10);
-            if (buckets.has(key)) buckets.set(key, round2((buckets.get(key) ?? 0) + (r.total ?? 0)));
-          }
-
-          const daily = [...buckets.values()];
+          const daily = [...bucketed.daily.values()];
           const daysWithSales = daily.filter((v) => v > 0).length;
           const observed = round2(daily.reduce((s, v) => s + v, 0));
+          const unplaced = unplacedNote(bucketed, currency);
 
           /*
            * The honest refusal. A handful of sales cannot support a projection,
            * and the failure mode is not a vague answer — it is a confident
            * multi-year figure built from one transaction, which an owner could
            * actually plan against. Hand back the facts and say why instead.
+           *
+           * But refuse for the right reason. This used to conclude "only 1 day of
+           * sales in the last 90" from the bucketed data alone, while receipts the
+           * bucketing had thrown away sat in the same result set — so the tool told
+           * owners their shop had barely traded when it had. If anything went
+           * unplaced, that is the finding, and the refusal has to say so rather
+           * than making a claim about how little the shop sold.
            */
           if (daysWithSales < 7) {
+            const dropped = bucketed.undated + bucketed.future;
             return {
               type: 'METRICS',
-              title: 'Not enough trading history to project',
+              title: dropped ? 'Cannot project — the sales dates need fixing' : 'Not enough trading history to project',
               insufficientData: true,
               currency,
               tiles: [
                 { label: `Revenue, last ${basedOnDays}d`, value: observed, format: 'currency' },
                 { label: 'Days with a sale', value: daysWithSales, format: 'number' },
+                ...(dropped ? [{ label: 'Sales with a bad date', value: dropped, format: 'number' as const }] : []),
               ],
-              caveat: `A projection needs at least 7 days that actually had sales; this book has ${daysWithSales}. Record more trading and ask again — a forecast from this little data would be a guess dressed up as a number.`,
+              dataGap: unplaced,
+              caveat: dropped
+                ? `${unplaced} So the ${daysWithSales} day(s) counted above is not how much this shop has traded — it is how much of its trading carries a date that can be placed on a calendar. Fix those receipts' dates and ask again.`
+                : `A projection needs at least 7 days that actually had sales; this book has ${daysWithSales}. Record more trading and ask again — a forecast from this little data would be a guess dressed up as a number.`,
             };
           }
 
