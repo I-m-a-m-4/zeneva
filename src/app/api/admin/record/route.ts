@@ -7,7 +7,7 @@ import { OUT_DIR, VIDEO_EXT, hasFfmpeg, hostReason, jobSlot } from './_host';
 import {
     FLOW_IDS, DEVICE_IDS, THEME_IDS, FORMAT_IDS, FPS_RANGE, QUALITY_RANGE,
     VOICE_IDS, DEFAULT_VOICE, VOICE_STYLE_MAX,
-    recipeId, recipeToWire,
+    cleanRecordUrl, recipeId, recipeToWire,
     type JobStatus, type Recipe, type RecorderStatus, type RecorderTake,
 } from '@/lib/marketing/recorder';
 
@@ -318,6 +318,21 @@ function buildArgs(body: any): string[] {
         '--fps', String(fps),
         '--quality', String(quality),
     ];
+    // Where to point the browser. Absent or null keeps the CLI's own default, so a
+    // caller that never sends this behaves exactly as it did before the field
+    // existed. Re-validated here rather than trusted from the panel: this is the
+    // one value in the request that names a host, and the panel is not the only
+    // thing that can post to this route.
+    if (body?.url != null && body.url !== '') {
+        const url = cleanRecordUrl(body.url);
+        if (!url) {
+            throw new Error(
+                'That is not an address the recorder can open — http:// or https://, '
+                + 'and no username or password in the URL.',
+            );
+        }
+        args.push('--url', url);
+    }
     if (music) {
         args.push('--music', music, '--music-volume', musicVolume.toFixed(3));
     } else {

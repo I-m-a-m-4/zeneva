@@ -187,6 +187,20 @@ export class Recorder {
      */
     this.pauses = [];
     this.pausedAt = null;
+
+    /**
+     * Spans the *flow* asked not to be filmed, as [start, end, label].
+     *
+     * Same effect as a pause and a different owner, which is why it is a second
+     * flag rather than a reuse of the first. A page reload is plumbing: the white
+     * flash, the boot loader, and — on a dev server — the on-demand compile of a
+     * route nobody warmed. None of it is the product, and all of it used to land
+     * in the middle of a take. Held, it costs zero video time, so the encoded film
+     * cuts straight from the frame before the navigation to the frame after it.
+     */
+    this.blinds = [];
+    this.blindAt = null;
+    this.blindLabel = '';
   }
 
   /** Hold the capture. Frames keep arriving; they are just not written. */
@@ -205,6 +219,40 @@ export class Recorder {
 
   get paused() {
     return this.pausedAt !== null;
+  }
+
+  /**
+   * Stop filming for something that must not appear in the video.
+   *
+   * Deliberately not `pause()`. Both stop frames reaching the file, but they
+   * belong to different people: one is the operator holding the take, the other
+   * is the flow saying "the next second is plumbing". Sharing one flag would mean
+   * a navigation that finished while the operator was paused resumed the
+   * recording under them — and the reverse, an operator resume that started
+   * filming a reload. Two flags, two owners, and `#emit` checks both.
+   *
+   * Returns false if already held, so the caller knows whether it owns the
+   * release. Nesting is not supported and does not need to be: the only caller
+   * is a navigation, and a navigation cannot be inside another one.
+   */
+  blind(label = '') {
+    if (this.blindAt !== null) return false;
+    this.blindAt = Date.now() / 1000;
+    this.blindLabel = label;
+    return true;
+  }
+
+  unblind() {
+    if (this.blindAt === null) return false;
+    this.blinds.push([this.blindAt, Date.now() / 1000, this.blindLabel]);
+    this.blindAt = null;
+    this.blindLabel = '';
+    return true;
+  }
+
+  /** Wall-clock seconds kept out of the film. For the run log. */
+  get blindSeconds() {
+    return this.blinds.reduce((s, [a, b]) => s + (b - a), 0);
   }
 
   async start() {
@@ -285,7 +333,7 @@ export class Recorder {
 
   /** One sampler tick: append the newest frame `count` times, or nothing. */
   #emit(count) {
-    if (this.pausedAt !== null || this.fd === null || !this.latest) return;
+    if (this.pausedAt !== null || this.blindAt !== null || this.fd === null || !this.latest) return;
 
     // Nothing has painted for a long time: either the page is a still image or
     // the renderer is wedged, and from here those are the same thing. Stop the
@@ -343,6 +391,9 @@ export class Recorder {
 
   async stop({ tailHoldMs = 700 } = {}) {
     this.stopped = true;
+    // A take aborted mid-navigation leaves a span open. Closing it here keeps the
+    // run log honest rather than silently losing the last hold.
+    this.unblind();
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     try {
@@ -387,6 +438,21 @@ export class Recorder {
   }
 
   /**
+   * Was this wall-clock instant actually inside the captured window?
+   *
+   * `videoTimeFor` has to answer with a number for anything it is handed, so it
+   * clamps: an instant from before the first frame maps to 0. That is right for
+   * placing a mark that arrives a hair early, and wrong for a mark that belongs
+   * to something the camera never saw — and the recorder types a full email and
+   * password into a login form before capture begins. Clamped, those 22
+   * keystrokes and 3 clicks all landed on frame zero, so every scored take opened
+   * on a single splat of ticks. Asking this first turns that clamp into a drop.
+   */
+  captured(wallSeconds) {
+    return this.marks.length > 0 && wallSeconds >= this.marks[0];
+  }
+
+  /**
    * Map a wall-clock instant (epoch seconds, as `Date.now()/1000` gives) onto the
    * encoded video's own timeline.
    *
@@ -396,6 +462,9 @@ export class Recorder {
    * still diverge across a pause and across a stall, which is exactly what makes
    * this function necessary rather than decorative. Sound effects are placed with
    * it so a click tick stays on the frame where the button actually depresses.
+   *
+   * Clamps at both ends. Callers placing a mark that may predate the capture
+   * should filter with `captured()` first.
    */
   videoTimeFor(wallSeconds) {
     const m = this.marks;
@@ -453,6 +522,22 @@ export class Recorder {
      * `-filter_complex_threads 8` land inside run-to-run noise. Dropping the
      * camera filter entirely saves under a second. The stage is decode-bound and
      * already at its floor; the time worth cutting is upstream of here.
+     */
+    /*
+     * Keyframe spacing is left at the encoder's default on purpose.
+     *
+     * It is tempting to add `-g fps` so the studio's instant (stream-copy) trim
+     * can start anywhere: a copy can only begin on a keyframe, so at the default
+     * spacing an instant cut of one of these takes can start at 0s, 8.3s, 16.6s…
+     * and nowhere else. Measured on a 42s mobile take, `-g 30` moved the nearest
+     * keyframe to 3s exactly as intended — and took the file from 1646 KB to
+     * 4336 KB. Screen content is the worst case for it, not the best: a still page
+     * makes P-frames nearly empty, so forcing an I-frame every second is most of
+     * the bitrate.
+     *
+     * So every take would pay 2.6x for a feature only some takes use. The studio's
+     * exact trim re-encodes instead and lands on the frame asked for, which costs
+     * a couple of seconds at cut time and nothing at all to the takes nobody cuts.
      */
     const codec = webm
       ? ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf + 12), '-row-mt', '1',

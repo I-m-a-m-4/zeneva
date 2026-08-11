@@ -22,7 +22,7 @@
  * the overlay is purely what the camera sees.
  */
 (function () {
-  if (window.__zen && window.__zen.__v === 6) return;
+  if (window.__zen && window.__zen.__v === 7) return;
 
   var NS = 'http://www.w3.org/2000/svg';
   var Z = 2147483000;
@@ -603,9 +603,21 @@
 
   // ---------------------------------------------------------------- API
   window.__zen = {
-    __v: 6,
+    __v: 7,
 
     mount: function () { mount(); return true; },
+
+    /**
+     * Everything about the cursor that a fresh document would forget.
+     *
+     * A hard navigation gets a brand-new overlay with the defaults — invisible,
+     * and in desktop mode even on a phone take — so the driver reads this before
+     * navigating and hands it straight back afterwards. Without it, the cursor
+     * blinked out at every route change and a mobile take grew an arrow pointer.
+     */
+    state: function () {
+      return { visible: st.visible, mode: st.mode, x: st.x, y: st.y };
+    },
 
     mode: function (m) {
       st.mode = m === 'touch' ? 'touch' : 'desktop';

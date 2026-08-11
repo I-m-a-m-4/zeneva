@@ -15,6 +15,47 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OVERLAY_SRC = readFileSync(path.join(HERE, 'overlay.js'), 'utf8');
 
+/**
+ * Hide Next.js's own dev-mode UI from the camera.
+ *
+ * A take against `npm run dev` records the black dev-tools pill in the corner of
+ * every single frame — the recorder is pointed at localhost, so it is always
+ * there, and no amount of trimming removes something that is in the picture.
+ *
+ * `nextjs-portal` is the light-DOM host element Next attaches its whole dev
+ * overlay to (its own `devtool-style-inject.js` finds it with exactly that
+ * selector), and everything else — indicator, dev-tools menu, error overlay —
+ * lives in that element's shadow root. Hiding the host therefore hides all of it,
+ * including the red error overlay: wanted here, since an error box painted over
+ * the app is not footage either, and a broken app still fails the flow on the
+ * next selector rather than passing quietly. The other two selectors are older
+ * Next builds; a selector that matches nothing costs nothing.
+ *
+ * Done here rather than with `devIndicators: false` in `next.config.ts` because
+ * this way it is true for the recording browser and nothing else — the operator
+ * keeps their indicator in their own browser, and the app ships unchanged.
+ */
+const HIDE_DEV_UI = `
+(function () {
+  try {
+    var ID = '__zen_no_dev_ui';
+    var css = 'nextjs-portal,nextjs-toast,#__next-build-watcher,'
+      + '#__next-prerender-indicator{display:none!important}';
+    var add = function () {
+      if (document.getElementById(ID)) return;
+      var s = document.createElement('style');
+      s.id = ID;
+      s.textContent = css;
+      // head is not parsed yet at document-start; a style element applies from
+      // anywhere in the document, and this is re-run on DOMContentLoaded anyway.
+      (document.head || document.documentElement).appendChild(s);
+    };
+    add();
+    document.addEventListener('DOMContentLoaded', add);
+  } catch (e) { /* the film is worth more than the rule */ }
+})();
+`;
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const clamp01 = (n) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5);
@@ -94,6 +135,14 @@ export class Page {
     /** Called with a short human label each time the flow starts something. */
     this.onStep = onStep;
     /**
+     * Run something with the camera held, so it never reaches the file.
+     *
+     * Set by the runner once the recorder exists — `(label, fn) => Promise`. Null
+     * everywhere else (warming, the login, the CLI's dry paths), where "not
+     * filmed" is already true and the work just runs.
+     */
+    this.offCamera = null;
+    /**
      * Wall-clock instants (epoch seconds) of every click and keystroke, for the
      * audio pass to hang ticks on. Recorded here rather than inferred from the
      * flow script because only this layer knows when the input event was truly
@@ -139,6 +188,7 @@ export class Page {
       source:
         `try{localStorage.setItem('theme',${JSON.stringify(theme)});` +
         `localStorage.removeItem('zeneva_needs_tour');}catch(e){}\n` +
+        HIDE_DEV_UI + '\n' +
         OVERLAY_SRC,
     });
   }
@@ -180,14 +230,60 @@ export class Page {
     return this.eval(`window.__zen && window.__zen.${call}`, { awaitPromise });
   }
 
-  async goto(pathOrUrl, { waitFor = 'settled' } = {}) {
+  /**
+   * Go to a route with a real browser navigation — and keep it out of the film.
+   *
+   * A hard navigation is honest plumbing and terrible footage: a white flash, the
+   * app's boot loader, and against a dev server the on-demand compile of whatever
+   * route was not warmed. Held (see `Recorder.blind`), the whole span costs zero
+   * video time, so the take cuts from the last frame of the old screen straight to
+   * the first painted frame of the new one — which is what an instant app
+   * transition looks like, and is the one thing a viewer will not question.
+   *
+   * Only *this* is hidden. A route change the flow reaches by clicking a link stays
+   * in the picture (see `waitForPath`): that transition is the app working, and
+   * cutting it would hide the product rather than the plumbing. Pass
+   * `{ filmed: true }` to record a reload on purpose.
+   */
+  async goto(pathOrUrl, { waitFor = 'settled', filmed = false } = {}) {
     await this.checkpoint(`open ${pathOrUrl}`);
-    await this.releaseCamera();
+
+    // Pull the camera back and *wait* for it here, unlike the release on a
+    // click-driven route change. A hidden navigation has nothing left to hide the
+    // move behind: an unresolved punch-out would be applied to the first frames of
+    // the page we cut *to*, so the new screen would open zoomed into wherever the
+    // old one's subject used to be, then pull out. Costs 420ms of filmed pull-back
+    // on the only takes that have a camera punched in at all.
+    const released = await this.releaseCamera();
+    if (released) await sleep(released.ms + 60);
+
+    // A new document gets a brand-new overlay with the defaults — cursor hidden,
+    // desktop pointer even on a phone take. Read the state now and hand it back
+    // afterwards, or the cut lands on a screen with no cursor.
+    let before = null;
+    try {
+      before = await this.zen('state()');
+    } catch { /* first navigation of the run: there is no overlay yet */ }
+
     const url = /^https?:/.test(pathOrUrl) ? pathOrUrl : `${this.baseUrl}${pathOrUrl}`;
-    const loaded = this.cdp.once('Page.loadEventFired');
-    await this.cdp.send('Page.navigate', { url });
-    await Promise.race([loaded, sleep(30_000)]);
-    if (waitFor === 'settled') await this.waitForSettled();
+    const run = async () => {
+      const loaded = this.cdp.once('Page.loadEventFired');
+      await this.cdp.send('Page.navigate', { url });
+      await Promise.race([loaded, sleep(30_000)]);
+      if (waitFor === 'settled') await this.waitForSettled();
+      if (before && typeof before === 'object') {
+        await this.zen(`mode(${JSON.stringify(before.mode === 'touch' ? 'touch' : 'desktop')})`);
+        await this.zen(`place(${Math.round(before.x)},${Math.round(before.y)})`);
+        await this.zen(`show(${before.visible === true})`);
+        // Let the restored cursor paint before filming resumes: the first frame
+        // written after a hold is whatever Chrome most recently sent, which could
+        // otherwise be from a moment before this landed.
+        if (before.visible === true) await sleep(140);
+      }
+    };
+
+    if (filmed || !this.offCamera) await run();
+    else await this.offCamera(`open ${pathOrUrl}`, run);
     return url;
   }
 

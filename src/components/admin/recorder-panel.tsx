@@ -23,8 +23,8 @@ import { FlowTitleCards } from '@/components/admin/recorder-cards';
 import { RecorderTrim } from '@/components/admin/recorder-trim';
 import {
   FLOWS, DEVICES, FLOW_IDS, DEVICE_IDS, THEME_IDS, FPS_RANGE, QUALITY_RANGE,
-  VOICE_IDS, VOICES, VOICE_STYLE_MAX,
-  defaultRequest, takeCount, estimateSeconds, durationLabel,
+  VOICE_IDS, VOICES, VOICE_STYLE_MAX, DEFAULT_RECORD_URL,
+  cleanRecordUrl, defaultRequest, takeCount, estimateSeconds, durationLabel,
   type Recipe, type RecorderRequest, type RecorderStatus, type RecorderTake,
   type FlowId, type DeviceId, type ThemeId, type VoiceId,
 } from '@/lib/marketing/recorder';
@@ -220,6 +220,13 @@ export function RecorderPanel() {
   const noFfmpeg = status?.ffmpeg === false;
   const count = takeCount(req);
   const eta = estimateSeconds(req);
+
+  // The target, judged by the same function the route will judge it with. A typo
+  // is caught here so it costs a keystroke rather than a rejected run; the route
+  // still re-checks, because the panel is not the only thing that can post.
+  const target = req.url === null ? DEFAULT_RECORD_URL : cleanRecordUrl(req.url);
+  const badUrl = req.url !== null && target === null;
+  const remote = target !== null && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(target);
 
   return (
     <div className="space-y-6">
@@ -863,6 +870,39 @@ export function RecorderPanel() {
                 ))}
               </div>
 
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <Label htmlFor="rec-url" className="text-xs text-muted-foreground">
+                  App to record
+                </Label>
+                <Input
+                  id="rec-url"
+                  value={req.url ?? ''}
+                  disabled={running}
+                  spellCheck={false}
+                  placeholder={DEFAULT_RECORD_URL}
+                  className="h-8 font-mono text-xs"
+                  // Empty means "the default", not "an empty URL" — so the field
+                  // can be cleared back to localhost without retyping it.
+                  onChange={(e) => setReq((r) => ({ ...r, url: e.target.value.trim() || null }))}
+                />
+                {badUrl ? (
+                  <p className="text-[11px] leading-relaxed text-destructive">
+                    Needs to start with http:// or https://, with no username or password in it.
+                  </p>
+                ) : remote ? (
+                  <p className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-500">
+                    Recording a hosted site: no dev-mode indicator in shot and no route to
+                    compile, so the footage is cleaner — but the bot signs the recorder account
+                    into that site for real. Keep &ldquo;let it save&rdquo; off unless you mean it.
+                  </p>
+                ) : (
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    Leave it for the local dev server. A hosted URL records the product as
+                    customers see it — nothing to compile, and no dev indicator to hide.
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-3 rounded-lg border border-border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor="rec-headed" className="text-xs font-normal">
@@ -917,7 +957,7 @@ export function RecorderPanel() {
                 <Button
                   className="w-full gap-2"
                   size="lg"
-                  disabled={!!blocked || noCreds || noFfmpeg || starting}
+                  disabled={!!blocked || noCreds || noFfmpeg || badUrl || starting}
                   onClick={start}
                 >
                   {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

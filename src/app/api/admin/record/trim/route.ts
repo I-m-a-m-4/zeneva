@@ -170,6 +170,7 @@ const finite = (v: unknown): number | null => {
 type Marks = {
     clicks?: unknown;
     keys?: unknown;
+    zooms?: unknown;
     narration?: unknown;
     [key: string]: unknown;
 };
@@ -178,16 +179,18 @@ type Marks = {
  * Re-time the marks sidecar onto the cut.
  *
  * Worth doing rather than dropping: the sidecar is the only record of when each
- * click, keystroke and spoken line happened, and it cannot be recovered once the
- * frame sequence is gone. Carrying it means a cut can still be re-scored or
- * re-narrated by `add-audio.mjs` with everything landing on the right frames —
- * without it, a trimmed take is a file you can never touch the audio of again.
+ * click, keystroke, camera move and spoken line happened, and it cannot be
+ * recovered once the frame sequence is gone. Carrying it means a cut can still be
+ * re-scored or re-narrated by `add-audio.mjs` with everything landing on the right
+ * frames — without it, a trimmed take is a file you can never touch the audio of
+ * again.
  *
  * A mark outside the window is dropped rather than clamped. Clamping would pile
  * every click from the discarded head onto frame zero, which sounds exactly like
- * the bug it would look like. A narration line is kept when the instant it
- * *started* falls inside the cut — a sentence that began before the in-point is
- * gone, because half a spoken sentence is worse than none.
+ * the bug it would look like. Anything with a duration — a spoken line, a camera
+ * move — is kept when the instant it *started* falls inside the cut: half a spoken
+ * sentence is worse than none, and a zoom is already baked into the picture, so
+ * the sidecar is only describing what the footage does.
  */
 function retimeMarks(src: Marks, from: number, to: number, seconds: number, take: string): Marks {
     const inside = (t: number) => t >= from - 1e-6 && t <= to + 1e-6;
@@ -198,16 +201,21 @@ function retimeMarks(src: Marks, from: number, to: number, seconds: number, take
         .filter((t) => Number.isFinite(t) && inside(t))
         .map(rebase);
 
-    const lines = (v: unknown) => (Array.isArray(v) ? v : [])
-        .filter((l: any) => typeof l?.text === 'string' && Number.isFinite(Number(l?.at)) && inside(Number(l.at)))
-        .map((l: any) => ({ text: String(l.text), at: rebase(Number(l.at)) }));
+    /** Marks that are objects carrying an `at`: narration lines, camera moves. */
+    const stamped = (v: unknown, keep: (o: any) => boolean = () => true) => (Array.isArray(v) ? v : [])
+        .filter((o: any) => o && typeof o === 'object'
+            && Number.isFinite(Number(o.at)) && inside(Number(o.at)) && keep(o))
+        // Spread first so every other field — a zoom's dur/from/to/px/py — survives
+        // a cut untouched. Only the clock changes.
+        .map((o: any) => ({ ...o, at: rebase(Number(o.at)) }));
 
     return {
         ...src,
         duration: Number(seconds.toFixed(3)),
         clicks: times(src.clicks),
         keys: times(src.keys),
-        narration: lines(src.narration),
+        zooms: stamped(src.zooms),
+        narration: stamped(src.narration, (o) => typeof o.text === 'string'),
         // Provenance, so a folder of cuts is still readable a month later.
         trimmedFrom: { name: take, start: Number(from.toFixed(3)), end: Number(to.toFixed(3)) },
     };
@@ -252,7 +260,10 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         source = resolveTake(body?.name);
-        mode = TRIM_MODES.includes(body?.mode) ? body.mode : 'fast';
+        // A request that does not name a mode gets the one that does what its two
+        // points say, matching the studio's default. Falling back to the cheap
+        // copy would quietly move the in-point on a caller who never chose that.
+        mode = TRIM_MODES.includes(body?.mode) ? body.mode : 'exact';
 
         const rawStart = finite(body?.start);
         const rawEnd = finite(body?.end);

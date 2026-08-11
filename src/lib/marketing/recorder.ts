@@ -245,6 +245,47 @@ export const DEVICES: Record<DeviceId, { label: string; note: string; w: number;
   mobile: { label: 'Mobile', note: '1080×1920 · Reels / Shorts / TikTok', w: 1080, h: 1920 },
 };
 
+/**
+ * Where the bot points its browser, when the studio does not say.
+ *
+ * The recorder's own default, repeated here because the panel has to show it in a
+ * field before the CLI ever sees the request.
+ */
+export const DEFAULT_RECORD_URL = 'http://localhost:9007';
+
+/**
+ * A target the recorder can be pointed at, or null if it cannot be one.
+ *
+ * The hosted site is the better subject: nothing to warm, because its routes are
+ * already built, and no dev-mode indicator to hide. It is also the one string in
+ * the request that names something off this machine, so it is narrowed hard —
+ * http(s) only, no credentials in the URL, query and fragment dropped, and the
+ * trailing slash removed because the driver joins routes onto it directly
+ * (`${baseUrl}/dashboard`, which a kept slash would turn into `//dashboard`).
+ *
+ * Shared with the route so the panel can reject a typo without a round trip. The
+ * check that counts is the one the route runs, on the far side of the process
+ * boundary — the copy a caller posting its own JSON cannot skip.
+ */
+export function cleanRecordUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  // A URL carrying a login is a credential in a request body and then in argv,
+  // which is readable by every process on the machine. The account belongs in
+  // `.env.recorder` — that is the entire reason that file exists.
+  if (u.username || u.password) return null;
+  if (!u.hostname) return null;
+  let base = `${u.protocol}//${u.host}${u.pathname}`;
+  while (base.endsWith('/')) base = base.slice(0, -1);
+  return base;
+}
+
 /** Options the panel may send. Everything here is enumerated or clamped. */
 export type RecorderRequest = {
   flows: FlowId[];
@@ -253,6 +294,16 @@ export type RecorderRequest = {
   format: FormatId;
   fps: number;
   quality: number;
+  /**
+   * The app to record, or null for the recorder's default dev server.
+   *
+   * Pointing this at the live site records the product as customers see it, and
+   * costs the take two things worth knowing about: the bot signs a real account
+   * into production, and `--commit` there would write to a real business. The
+   * dev-server compile and the dev indicator are both gone, which is the reason
+   * to want it.
+   */
+  url: string | null;
   /** Basename of a track in `marketing-music/`, or null for no bed. */
   music: string | null;
   musicVolume: number;
@@ -342,6 +393,7 @@ export function defaultRequest(): RecorderRequest {
     format: 'mp4',
     fps: FPS_RANGE.default,
     quality: QUALITY_RANGE.default,
+    url: null,
     music: null,
     musicVolume: 0.28,
     clickSfx: true,
@@ -453,14 +505,20 @@ export type JobStatus = {
 /**
  * How a cut is made. Both are offered because neither is strictly better.
  *
+ * `exact` re-encodes, so the cut starts on the frame asked for. It costs real
+ * time on a long take (roughly a fifth of the clip's length) and a generation of
+ * quality, which on flat UI footage at crf 18 is invisible — but it is a
+ * re-encode, and worth saying so. It is the default, because it is the one that
+ * does what the in and out points say.
+ *
  * `fast` copies the streams untouched — a second or two regardless of length,
  * and the picture is bit-for-bit the take that was approved. The cost is that a
- * copied cut can only begin on a keyframe, so the in-point moves *earlier* to
- * the nearest one, by up to a second on an mp4 and further on a webm.
- *
- * `exact` re-encodes, so the cut starts on the frame asked for. It costs real
- * time on a long take and a generation of quality, which on flat UI footage at
- * crf 18 is invisible — but it is a re-encode, and worth saying so.
+ * copied cut can only begin on a keyframe, and the recorder's takes carry one
+ * about every 8.3s (x264's default spacing), so an in-point of 3s becomes 0s.
+ * Measured on one: `-g fps` at capture time would fix that and cost 2.6x the
+ * file size on every take, which is why the encoder is left alone and this mode
+ * is honest about moving the in-point instead. Right choice when the in-point is
+ * 0 and you are only trimming the end — then it is exact *and* instant.
  */
 export const TRIM_MODES = ['fast', 'exact'] as const;
 export type TrimMode = (typeof TRIM_MODES)[number];

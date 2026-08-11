@@ -602,6 +602,24 @@ async function record(opts, flowId, device, theme, creds, live) {
     // recorded as a freeze — see Recorder.pause.
     state.onPause = () => recorder?.pause();
     state.onResume = () => recorder?.resume();
+    /*
+     * What the flow says must not be filmed — a hard navigation, with its white
+     * flash and its boot loader and, in dev, the compile of an unwarmed route.
+     *
+     * Held rather than paused: they have the same effect on the file and
+     * different owners, so sharing one flag would let a route load resume a take
+     * the operator had paused. `finally` rather than a plain release, and
+     * `held` rather than an unconditional unblind, so a flow that throws
+     * mid-navigation cannot leave the camera off for the rest of the take.
+     */
+    page.offCamera = async (label, fn) => {
+      const held = recorder?.blind(label) === true;
+      try {
+        return await fn();
+      } finally {
+        if (held) recorder.unblind();
+      }
+    };
     await recorder.start();
     state.phase = 'recording';
     ctl.setStep('rolling');
@@ -643,6 +661,13 @@ async function record(opts, flowId, device, theme, creds, live) {
     log(`captured ${stats.count} frames over ${recorder.seconds.toFixed(1)}s `
       + `(${recorder.paintedFps.toFixed(0)} fps painted → ${opts.fps} written)`
       + (stats.dropped ? ` — ${stats.dropped} dropped` : ''));
+    // Worth a line: this is the difference between the take's wall clock and its
+    // running time, and if it ever reads as most of the take then something is
+    // navigating that should be clicking.
+    if (recorder.blinds.length) {
+      log(`hidden: ${recorder.blinds.length} page load(s), `
+        + `${recorder.blindSeconds.toFixed(1)}s kept out of the film`);
+    }
 
     const outFile = path.join(opts.outDir, `zeneva-${stamp}.${opts.format}`);
     log('encoding…');
@@ -653,6 +678,24 @@ async function record(opts, flowId, device, theme, creds, live) {
     // constant rate, but they still separate across a pause and across a stall,
     // so the conversion stays.
     const toVideoTime = (t) => recorder.videoTimeFor(t);
+
+    /*
+     * Marks from before the first frame are dropped, not placed.
+     *
+     * `page.marks` starts filling the moment the page exists, which is a login
+     * form: an email, a password and three clicks, all before capture starts.
+     * `videoTimeFor` clamps anything that early to 0, so those 25 marks used to
+     * arrive as one splat of ticks on frame zero of every take. The flow's own
+     * marks are all inside the window, so this drops exactly the ones that were
+     * never filmed.
+     */
+    const filmed = (t) => recorder.captured(t);
+    const clicks = page.marks.clicks.filter(filmed);
+    const keys = page.marks.keys.filter(filmed);
+    const spoken = page.marks.narration.filter((n) => filmed(n.at));
+    const unfilmed = (page.marks.clicks.length - clicks.length)
+      + (page.marks.keys.length - keys.length);
+    if (unfilmed) log(`marks: ${unfilmed} from before the first frame (login) dropped`);
 
     /*
      * Camera moves, resolved into what the filter needs.
@@ -703,7 +746,7 @@ async function record(opts, flowId, device, theme, creds, live) {
      */
     const narrationFile = opts.narrate
       ? await synthNarration({
-          lines: page.marks.narration.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
+          lines: spoken.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
           dir: opts.outDir,
           stamp,
           voice: opts.voice,
@@ -723,8 +766,8 @@ async function record(opts, flowId, device, theme, creds, live) {
       // louder than music of equal level, and its job is to not be silence
       // rather than to be noticed. An explicit --music-volume overrides this.
       musicVolume: synth && !opts.musicVolumeSet ? 0.22 : opts.musicVolume,
-      clicks: opts.clickSfx ? page.marks.clicks.map(toVideoTime) : [],
-      keys: opts.typingSfx ? page.marks.keys.map(toVideoTime) : [],
+      clicks: opts.clickSfx ? clicks.map(toVideoTime) : [],
+      keys: opts.typingSfx ? keys.map(toVideoTime) : [],
       narration: narrationFile,
     });
 
@@ -750,12 +793,12 @@ async function record(opts, flowId, device, theme, creds, live) {
       JSON.stringify({
         flow: flowId, device: dev.id, theme,
         duration: recorder.videoSeconds,
-        clicks: page.marks.clicks.map(toVideoTime),
-        keys: page.marks.keys.map(toVideoTime),
+        clicks: clicks.map(toVideoTime),
+        keys: keys.map(toVideoTime),
         // The spoken script, with the instant each line landed. This is what
         // lets a re-score re-narrate without re-shooting — the caption timings
         // die with the frame sequence otherwise.
-        narration: page.marks.narration.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
+        narration: spoken.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
         // Not read back by add-audio — recorded so a re-score can see where the
         // camera was, since a beat that lands mid-punch reads differently from
         // one on a static frame.

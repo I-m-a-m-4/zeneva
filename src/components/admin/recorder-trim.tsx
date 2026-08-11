@@ -63,7 +63,7 @@ export function RecorderTrim({
   const [playing, setPlaying] = React.useState(false);
   const [inAt, setInAt] = React.useState(0);
   const [outAt, setOutAt] = React.useState(0);
-  const [mode, setMode] = React.useState<TrimMode>('fast');
+  const [mode, setMode] = React.useState<TrimMode>('exact');
   const [busy, setBusy] = React.useState(false);
 
   // Typed values are held as text while they are being typed: parsing on every
@@ -279,7 +279,7 @@ export function RecorderTrim({
       {/* -------------------------------------------------- how, then do it */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
         <div className="flex items-center gap-1.5">
-          {(['fast', 'exact'] as const).map((m) => (
+          {(['exact', 'fast'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -294,10 +294,17 @@ export function RecorderTrim({
               {m}
             </button>
           ))}
-          <p className="ml-1 max-w-[22rem] text-[11px] leading-snug text-muted-foreground">
-            {mode === 'fast'
-              ? 'Copies the streams — instant, same picture, but the clip starts at the nearest keyframe before your in-point.'
-              : 'Re-encodes so it starts exactly where you set it. Slower on a long take.'}
+          {/*
+            Exact is the default because it is the one that does what the two
+            points say. Fast can only begin on a keyframe, and these takes carry
+            one about every eight seconds — so it is the right choice when you are
+            trimming the end and leaving the start at zero, and the wrong one
+            otherwise. Saying which is which here is cheaper than a surprise.
+          */}
+          <p className="ml-1 max-w-[23rem] text-[11px] leading-snug text-muted-foreground">
+            {mode === 'exact'
+              ? 'Starts on the exact frame you set. Re-encodes, so a long take takes a few seconds.'
+              : 'Instant and lossless, but it can only start on a keyframe — best when you are only trimming the end.'}
           </p>
         </div>
 
