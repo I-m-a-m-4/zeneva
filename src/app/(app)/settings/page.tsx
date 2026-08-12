@@ -938,6 +938,7 @@ function SettingsPageContent() {
                                     // Fallback (iOS etc.)
                                     window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
                                 }
+                            }}
                         >
 
                             <Star className="me-2 h-4 w-4" />
