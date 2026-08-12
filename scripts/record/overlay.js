@@ -57,6 +57,27 @@
     return n;
   }
 
+  /**
+   * Resolve a freshly built subtree's styles, so the transitions that follow have a
+   * from-value to leave.
+   *
+   * Creating an element with `opacity:0` in its style attribute and flipping it to
+   * `1` inside one `requestAnimationFrame` looks like it animates, and does not:
+   * rAF callbacks run *before* the frame's style recalculation, so the from-state
+   * is never resolved, the browser only ever sees the final value, and the element
+   * cuts straight in. In footage that reads as a card appearing between two frames
+   * — measured at exactly one frame of change in the band, identically for all four
+   * motions, which is also why every motion looked the same on film.
+   *
+   * Measured, not assumed: during an entrance `document.getAnimations()` listed one
+   * animation (the page's own) without this call and six with it, the scrim ramping
+   * 0.05, 0.22, 0.37, 0.58, 0.83 instead of jumping to 1. Reading `offsetWidth`
+   * forces style and layout, which is what puts the from-value on record.
+   */
+  function settleStyles(node) {
+    if (node) void node.offsetWidth;
+  }
+
   // ---------------------------------------------------------------- mount
   function mount() {
     // `page.mjs` injects this file with `addScriptToEvaluateOnNewDocument`, which
@@ -548,6 +569,7 @@
       capWrap
     );
     c.textContent = textStr;
+    settleStyles(c);
     requestAnimationFrame(function () { c.style.opacity = '1'; c.style.transform = 'translateY(0)'; });
     if (ms) {
       setTimeout(function () {
@@ -688,6 +710,10 @@
       btn.textContent = cta;
     }
 
+    // One read of the finished subtree, so every from-state above is resolved before
+    // the flip below. Without it the whole card hard-cuts in on a single frame and
+    // all four motions look identical on film. See `settleStyles`.
+    settleStyles(scrim);
     requestAnimationFrame(function () {
       scrim.style.opacity = '1';
       if (pic) pic.style.transform = 'scale(1)';
