@@ -68,6 +68,8 @@ function processManifest(filePath) {
     { match: 'android.permission.CAMERA', tag: '<uses-permission android:name="android.permission.CAMERA" />' },
     { match: 'android.permission.RECORD_AUDIO', tag: '<uses-permission android:name="android.permission.RECORD_AUDIO" />' },
     { match: 'android.permission.MODIFY_AUDIO_SETTINGS', tag: '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' },
+    { match: 'android.permission.POST_NOTIFICATIONS', tag: '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' },
+    { match: 'android.permission.VIBRATE', tag: '<uses-permission android:name="android.permission.VIBRATE" />' },
     { match: 'android.hardware.camera"', tag: '<uses-feature android:name="android.hardware.camera" android:required="false" />' },
     { match: 'android.hardware.camera.autofocus', tag: '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />' },
     { match: 'android.hardware.microphone', tag: '<uses-feature android:name="android.hardware.microphone" android:required="false" />' },

@@ -81,8 +81,8 @@ export async function sendNotificationToUser(
             // opens the running app window instead.
             android: {
                 notification: {
-                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
                     defaultVibrateTimings: true,
+                    defaultSound: true,
                 },
                 data: {
                     url,
@@ -204,8 +204,8 @@ export async function broadcastToAllDevices(payload: {
             // opens the running app window instead.
             android: {
                 notification: {
-                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
                     defaultVibrateTimings: true,
+                    defaultSound: true,
                 },
                 data: {
                     url,

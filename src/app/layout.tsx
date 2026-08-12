@@ -23,6 +23,7 @@ import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
 import { FirestoreRecovery } from '@/components/shared/firestore-recovery';
 import { ClientSideInitializer } from '@/components/shared/client-initializer';
 import { PushClickTracker } from '@/components/shared/push-click-tracker';
+import { NativeNotificationListener } from '@/components/shared/native-notification-listener';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
 
@@ -327,6 +328,7 @@ export default function RootLayout({
                   push needs the signed-in uid, and it has to cover every route
                   because a notification can deep-link anywhere. */}
               <PushClickTracker />
+              <NativeNotificationListener />
               <GlobalAnnouncement />
               <Loader />
               <InstallPrompt />
