@@ -148,9 +148,15 @@ export function parseRecipe(raw) {
     title: text(raw.title ?? 'Custom recording', 'title', 80),
     route,
     open: raw.open ? card(raw.open, 'open') : null,
-    end: raw.end
-      ? card(raw.end, 'end')
-      : { title: 'Zeneva', subtitle: 'Retail, handled.', cta: 'Start free', ms: 2600 },
+    // Through `card()` rather than written out, so every card leaving this file
+    // has the same six fields whether it was authored or defaulted. It played
+    // correctly either way — an absent motion is `rise` downstream — but a
+    // default that is shaped differently from an override is the kind of
+    // asymmetry that eventually gets read as meaningful.
+    end: card(
+      raw.end ?? { title: 'Zeneva', subtitle: 'Retail, handled.', cta: 'Start free', ms: 2600 },
+      'end',
+    ),
     steps: out,
   };
 }

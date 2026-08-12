@@ -471,6 +471,7 @@ export function RecorderPanel() {
                 <FlowTitleCards
                   cards={req.cards}
                   disabled={running}
+                  hasKey={!!status?.narration}
                   onChange={(cards) => setReq((r) => ({ ...r, cards }))}
                 />
               </div>
@@ -479,6 +480,7 @@ export function RecorderPanel() {
               <RecorderRecipe
                 recipe={req.recipe}
                 disabled={running}
+                hasKey={!!status?.narration}
                 onChange={(recipe: Recipe | null) => setReq((r) => ({ ...r, recipe }))}
               />
 

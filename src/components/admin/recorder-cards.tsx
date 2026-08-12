@@ -454,11 +454,13 @@ export function SlideWriter({
  * it differs.
  */
 export function FlowTitleCards({
-  cards, disabled, onChange,
+  cards, disabled, hasKey, onChange,
 }: {
   /** Current overrides, keyed by flow id. */
   cards: RecorderRequest['cards'];
   disabled?: boolean;
+  /** Whether a Gemini key is on the recorder's machine. */
+  hasKey?: boolean;
   onChange: (next: RecorderRequest['cards']) => void;
 }) {
   const [open, setOpen] = React.useState<FlowId | null>(null);
@@ -474,13 +476,46 @@ export function FlowTitleCards({
     const base = FLOW_CARD_DEFAULTS[id][slot];
     // An override that re-states the default is not an override. Only real edits
     // are sent, so a run that leaves the copy alone carries nothing at all.
+    //
+    // Motion and image are part of that comparison, not an afterthought: without
+    // them, changing *only* the look would compare equal to the default and be
+    // dropped on the way out — the operator would pick "Wipe", see the badge go
+    // away, and get the old animation with no indication why.
     const same = next != null && next.title === base.title && next.subtitle === base.subtitle
-      && next.cta === base.cta && (next.ms ?? 2200) === (base.ms ?? 2200);
+      && next.cta === base.cta && (next.ms ?? 2200) === (base.ms ?? 2200)
+      && (next.motion ?? DEFAULT_MOTION) === (base.motion ?? DEFAULT_MOTION)
+      && (next.image ?? null) === (base.image ?? null);
 
     const flow = { ...(cards[id] ?? {}) };
     if (next === undefined || same) delete flow[slot];
     else flow[slot] = next;
 
+    const rest = { ...cards };
+    if (Object.keys(flow).length) rest[id] = flow;
+    else delete rest[id];
+    onChange(rest);
+  };
+
+  /**
+   * Apply a written pair to both slots at once.
+   *
+   * A slot the writer left empty is left alone rather than switched off — the
+   * model failing to produce a closing card is not an instruction to remove the
+   * one already there.
+   */
+  const applyPair = (id: FlowId, pair: SlidePair) => {
+    const base = FLOW_CARD_DEFAULTS[id];
+    const flow = { ...(cards[id] ?? {}) };
+    for (const slot of ['open', 'end'] as const) {
+      const slide = pair[slot];
+      if (!slide) continue;
+      // The written words replace the copy; a picture already chosen for this slot
+      // stays, because the writer never produces one and losing an upload to a
+      // rewrite of the text would be infuriating.
+      const existing = slot in flow ? flow[slot] : base[slot];
+      const image = existing?.image ?? null;
+      flow[slot] = { ...slide, ...(image ? { image } : {}) };
+    }
     const rest = { ...cards };
     if (Object.keys(flow).length) rest[id] = flow;
     else delete rest[id];
@@ -516,19 +551,27 @@ export function FlowTitleCards({
               </span>
             </button>
             {isOpen && (
-              <div className="grid gap-3 border-t border-border p-3 sm:grid-cols-2">
-                {(['open', 'end'] as const).map((slot) => (
-                  <TitleCardEditor
-                    key={slot}
-                    slot={slot}
-                    card={slot === 'open' ? openCard : endCard}
-                    disabled={disabled}
-                    dirty={dirty(slot)}
-                    fallback={FLOW_CARD_DEFAULTS[id][slot]}
-                    onReset={() => set(id, slot, undefined)}
-                    onChange={(next) => set(id, slot, next)}
-                  />
-                ))}
+              <div className="space-y-3 border-t border-border p-3">
+                <SlideWriter
+                  hasKey={hasKey}
+                  disabled={disabled}
+                  flowLabel={FLOWS[id].title}
+                  onApply={(pair) => applyPair(id, pair)}
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(['open', 'end'] as const).map((slot) => (
+                    <TitleCardEditor
+                      key={slot}
+                      slot={slot}
+                      card={slot === 'open' ? openCard : endCard}
+                      disabled={disabled}
+                      dirty={dirty(slot)}
+                      fallback={FLOW_CARD_DEFAULTS[id][slot]}
+                      onReset={() => set(id, slot, undefined)}
+                      onChange={(next) => set(id, slot, next)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

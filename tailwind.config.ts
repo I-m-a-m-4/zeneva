@@ -12,6 +12,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        sans: ['"DM Sans"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
         headline: ['"Bricolage Grotesque"', 'sans-serif'],
         display: ['"Bricolage Grotesque"', 'sans-serif'],

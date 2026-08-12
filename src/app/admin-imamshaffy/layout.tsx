@@ -190,10 +190,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, isUserLoading, router, pathname]);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     const auth = getAuth();
-    await signOut(auth);
     router.push('/admin-imamshaffy/login');
+    signOut(auth).catch((err) => console.error('Sign out error:', err));
   };
 
   const isLinkActive = (href: string) => {

@@ -233,7 +233,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   // fetched per send rather than cached because Firebase rotates it hourly and
   // a stale one 401s mid-conversation.
   const transport = React.useMemo(() => new DefaultChatTransport({
-    api: apiBase('/api/chat'),
+    api: apiBase() + '/api/chat',
     prepareSendMessagesRequest: async ({ messages, body }) => {
       const token = await getAuth().currentUser?.getIdToken();
       const headers: Record<string, string> = {};
@@ -989,6 +989,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
 export default function ZenAIPage() {
   const { user } = useUser();
   const { business } = usePOS();
+  const firestore = useFirestore();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -1013,7 +1014,7 @@ export default function ZenAIPage() {
         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
       </div>
     }>
-      <ZenAIChat businessId={businessId} user={user} firestore={useFirestore()} />
+      <ZenAIChat businessId={businessId} user={user} firestore={firestore} />
     </React.Suspense>
   );
 }

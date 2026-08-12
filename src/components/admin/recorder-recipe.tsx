@@ -15,7 +15,7 @@ import {
   STEP_KINDS, STEP_LABELS, blankRecipe, recipeSeconds, durationLabel,
   type Recipe, type RecipeStep, type StepKind, type TargetSpec,
 } from '@/lib/marketing/recorder';
-import { TitleCardEditor } from './recorder-cards';
+import { TitleCardEditor, SlideWriter } from './recorder-cards';
 import { RecorderPresets } from './recorder-presets';
 
 /**
@@ -102,9 +102,11 @@ type Props = {
   recipe: Recipe | null;
   onChange: (recipe: Recipe | null) => void;
   disabled?: boolean;
+  /** Whether a Gemini key is on the recorder's machine, for the slide writer. */
+  hasKey?: boolean;
 };
 
-export function RecorderRecipe({ recipe, onChange, disabled }: Props) {
+export function RecorderRecipe({ recipe, onChange, disabled, hasKey }: Props) {
   const [adding, setAdding] = React.useState(false);
 
   const patch = (next: Partial<Recipe>) => {
@@ -208,16 +210,32 @@ export function RecorderRecipe({ recipe, onChange, disabled }: Props) {
       {/* Title cards. Both optional, and both are what makes a screen recording
           read as an advert rather than a support ticket attachment. Same editor
           the coded flows use — see recorder-cards.tsx. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(['open', 'end'] as const).map((slot) => (
-          <TitleCardEditor
-            key={slot}
-            slot={slot}
-            card={recipe[slot] ?? null}
-            disabled={disabled}
-            onChange={(next) => patch({ [slot]: next } as Partial<Recipe>)}
-          />
-        ))}
+      <div className="space-y-3">
+        <SlideWriter
+          hasKey={hasKey}
+          disabled={disabled}
+          flowLabel={recipe.title}
+          onApply={(pair) => {
+            // Only the slots the writer filled in. A recipe's cards live directly
+            // on the recipe rather than in an override map, so an untouched slot
+            // keeps whatever is already there.
+            const next: Partial<Recipe> = {};
+            if (pair.open) next.open = { ...pair.open, ...(recipe.open?.image ? { image: recipe.open.image } : {}) };
+            if (pair.end) next.end = { ...pair.end, ...(recipe.end?.image ? { image: recipe.end.image } : {}) };
+            patch(next);
+          }}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(['open', 'end'] as const).map((slot) => (
+            <TitleCardEditor
+              key={slot}
+              slot={slot}
+              card={recipe[slot] ?? null}
+              disabled={disabled}
+              onChange={(next) => patch({ [slot]: next } as Partial<Recipe>)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Steps */}
