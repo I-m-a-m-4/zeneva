@@ -805,13 +805,42 @@
     },
   };
 
-  mount();
-  // Next.js swaps whole subtrees on navigation; if anything ever detaches the
-  // overlay, put it straight back rather than losing the cursor mid-take.
-  new MutationObserver(function () {
-    if (!root || !document.documentElement.contains(root)) {
-      root = null;
-      mount();
+  /*
+   * Listeners before the eager call, for exactly the reason `HIDE_DEV_UI` documents
+   * in `page.mjs`: at document-start there is nothing to append to, so the first
+   * mount is *expected* to do nothing and something has to come back for it later.
+   * Registering first means a failure in the eager path can never cost us the
+   * second chance — and the previous version's `observe(document.documentElement)`
+   * threw on a null documentElement, so the remount observer was never installed
+   * at all. A take then ran against an overlay with a working API and no DOM: no
+   * cursor, no title cards, and nothing anywhere reporting a problem.
+   *
+   * `document` itself is watched as well as <html>, because the <html> this script
+   * sees is not the one the take runs against — the parser replaces it, which
+   * detaches the overlay along with any observer bound only to the old one.
+   */
+  var watching = null;
+  var keep = new MutationObserver(function () { boot(); });
+
+  function boot() {
+    mount();
+    // Watch whatever <html> is current, whether or not the overlay went in: the
+    // parser appends <body> to it, and that is the moment mounting becomes possible.
+    // `waitForSettled` can be satisfied while the document is still parsing, so
+    // waiting for DOMContentLoaded alone would let a take start un-mounted.
+    var de = document.documentElement;
+    if (de && watching !== de) {
+      watching = de;
+      keep.disconnect();
+      keep.observe(document, { childList: true, subtree: false });
+      // Next.js swaps whole subtrees on navigation; if anything ever detaches the
+      // overlay, put it straight back rather than losing the cursor mid-take.
+      keep.observe(de, { childList: true, subtree: false });
     }
-  }).observe(document.documentElement, { childList: true, subtree: false });
+  }
+
+  keep.observe(document, { childList: true, subtree: false });
+  document.addEventListener('DOMContentLoaded', boot);
+  document.addEventListener('readystatechange', boot);
+  boot();
 })();

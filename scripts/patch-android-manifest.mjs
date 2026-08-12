@@ -75,25 +75,29 @@ function processManifest(filePath) {
 
   const missing = entries.filter((e) => !content.includes(e.match));
 
-  if (missing.length === 0) {
-    console.log('SUCCESS: All hardware permissions already defined in Manifest. Skipping injection.');
-    return;
-  }
-
-  if (!content.includes('<application')) {
-    console.error('CRITICAL ERROR: AndroidManifest formatting corrupted. No <application> anchor tag present.');
-    process.exit(1);
-  }
-
-  const block = `
+  if (missing.length > 0 && content.includes('<application')) {
+    const block = `
     <!-- Zeneva System-level Hardware Integrations -->
 ${missing.map((e) => `    ${e.tag}`).join('\n')}
 `;
+    content = content.replace('<application', `${block}\n    <application`);
+  }
 
-  const patched = content.replace('<application', `${block}\n    <application`);
-  fs.writeFileSync(filePath, patched, 'utf8');
-  console.log(`SUCCESS: Patched AndroidManifest.xml with ${missing.length} hardware entr${missing.length === 1 ? 'y' : 'ies'}:`);
-  missing.forEach((e) => console.log(`  + ${e.match}`));
+  // Inject host domain intent filter so Android Credential Manager associates zeneva.space with the app
+  if (!content.includes('android:host="zeneva.space"') && content.includes('</activity>')) {
+    const domainFilter = `
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="zeneva.space" />
+        </intent-filter>
+    `;
+    content = content.replace('</activity>', `${domainFilter}\n    </activity>`);
+  }
+
+  fs.writeFileSync(filePath, content, 'utf8');
+  console.log(`SUCCESS: Patched AndroidManifest.xml with hardware entries and zeneva.space domain binding.`);
 }
 
 patchManifest().catch(console.error);
