@@ -21,42 +21,37 @@ interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
  * broken product photo.
  */
 export function CachedImage({ src, className, alt, fallback, ...props }: CachedImageProps) {
-  const [displaySrc, setDisplaySrc] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const [displaySrc, setDisplaySrc] = useState<string | undefined>(src || undefined);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [skipped, setSkipped] = useState(false);
+  const [useFallbackUrl, setUseFallbackUrl] = useState(false);
 
   useEffect(() => {
     if (!src) {
-      setLoading(false);
-      setSkipped(true);
+      setError(true);
       return;
     }
 
-    // Known-dead host: skip straight to the placeholder, no fetch attempt.
-    if (ImageManager.isKnownUnreachable(src)) {
-      setLoading(false);
-      setSkipped(true);
-      return;
-    }
+    setError(false);
+    setUseFallbackUrl(false);
+    setDisplaySrc(src);
 
     let isMounted = true;
 
     async function load() {
-      setLoading(true);
-      setError(false);
-      setSkipped(false);
+      if (ImageManager.isKnownUnreachable(src as string)) {
+        return;
+      }
 
       try {
         const localUri = await ImageManager.getLocalUri(src as string);
-        if (isMounted) {
+        if (isMounted && localUri) {
           setDisplaySrc(localUri);
-          setLoading(false);
         }
       } catch (err) {
+        // Local cache resolution failed; keep using the original raw src URL.
         if (isMounted) {
-          setError(true);
-          setLoading(false);
+          setDisplaySrc(src);
         }
       }
     }
@@ -69,18 +64,20 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
   }, [src]);
 
   const handleError = useCallback(() => {
-    setError(true);
-    setLoading(false);
-    if (src) ImageManager.markUnreachable(src);
-  }, [src]);
+    if (!useFallbackUrl && displaySrc !== src && src) {
+      // If the local cached URI failed to load, fallback to the original HTTP src URL
+      setUseFallbackUrl(true);
+      setDisplaySrc(src);
+    } else {
+      // Both local cache and raw src failed
+      setError(true);
+      if (src) ImageManager.markUnreachable(src);
+    }
+  }, [src, displaySrc, useFallbackUrl]);
 
-  if (loading) {
-    return <Skeleton className={cn("w-full h-full bg-muted/50 rounded-lg", className)} />;
-  }
-
-  if (error || skipped || !displaySrc) {
+  if (!src || error) {
     return (
-      <div className={cn("flex items-center justify-center bg-muted rounded-lg", className)}>
+      <div className={cn("flex items-center justify-center bg-muted rounded-lg w-full h-full", className)}>
         {fallback ?? <ImageOff className="h-5 w-5 text-muted-foreground/50" />}
       </div>
     );
@@ -88,9 +85,9 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
 
   return (
     <img
-      src={displaySrc}
-      className={cn("transition-opacity duration-300", loading ? "opacity-0" : "opacity-100", className)}
-      alt={alt}
+      src={displaySrc || src}
+      className={cn("transition-opacity duration-300", className)}
+      alt={alt || ''}
       onError={handleError}
       {...props}
     />

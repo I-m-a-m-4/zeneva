@@ -107,6 +107,21 @@ export default function WelcomePage() {
 
   return (
     <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        html, body {
+          overflow: hidden !important;
+          background-color: #000000 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        ::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+      `}} />
       <div className="relative h-[100dvh] w-full overflow-hidden bg-black font-sans selection:bg-white/20 overscroll-none">
       {/* Background Videos */}
       {slides.map((slide, index) => (
@@ -143,8 +158,8 @@ export default function WelcomePage() {
         and on a tablet they cap out at the original design sizes. The column
         never scrolls: the flexible spacer absorbs whatever room is left over.
       */}
-      <div className="relative z-10 flex h-full flex-col px-[clamp(1rem,5vw,1.75rem)] pt-[clamp(0.75rem,2.5vh,1.5rem)] pb-[max(clamp(1.5rem,5vh,3.5rem),env(safe-area-inset-bottom,1.5rem))]"
-           style={{ paddingBottom: 'max(clamp(1.5rem, 5vh, 3.5rem), calc(env(safe-area-inset-bottom, 0px) + 2.5rem))' }}>
+      <div className="relative z-10 flex h-full flex-col px-[clamp(1rem,5vw,1.75rem)] pt-[clamp(0.75rem,2.5vh,1.5rem)] pb-[max(clamp(2.5rem,7vh,5.5rem),env(safe-area-inset-bottom,2.5rem))]"
+           style={{ paddingBottom: 'max(clamp(2.5rem, 7vh, 5.5rem), calc(env(safe-area-inset-bottom, 0px) + 3.75rem))' }}>
 
         {/* Top Bar (Logo & Controls) */}
         <div className="flex flex-none items-start justify-between">
