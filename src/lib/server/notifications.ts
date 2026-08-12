@@ -67,16 +67,32 @@ export async function sendNotificationToUser(
             notification: {
                 title: payload.title,
                 body: payload.body,
-                imageUrl: 'https://zeneva.app/zeneva.png', // Optional: precise URL if possible, or relative if PWA
-                // icon: '/zeneva.png', // Note: icon is often ignored by FCM on iOS/Android unless handled in SW
+                imageUrl: 'https://zeneva.app/zeneva.png',
             },
             data: {
                 url,
-                icon: '/zeneva.png', // Send in data for SW to use
-                // Read by the `notificationclick` handler in
-                // public/firebase-messaging-sw.js. Must be a string — FCM rejects a
-                // data payload with a non-string value.
+                icon: '/zeneva.png',
                 campaignId: campaignId || '',
+            },
+            // Without this, the Firebase Android SDK defaults to an
+            // `intent://play.google.com/store/apps/details?id=com.zeneva.app`
+            // click action, which crashes inside the TWA WebView with
+            // ERR_UNKNOWN_URL_SCHEME. Explicitly pointing at the app origin
+            // opens the running app window instead.
+            android: {
+                notification: {
+                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                    defaultVibrateTimings: true,
+                },
+                data: {
+                    url,
+                    campaignId: campaignId || '',
+                },
+            },
+            webpush: {
+                fcmOptions: {
+                    link: `https://zeneva.space${url.startsWith('/') ? url : '/' + url}`,
+                },
             },
             tokens: tokens,
         };
@@ -180,6 +196,26 @@ export async function broadcastToAllDevices(payload: {
                 url,
                 icon: '/zeneva.png',
                 campaignId: campaignId || '',
+            },
+            // Without this, the Firebase Android SDK defaults to an
+            // `intent://play.google.com/store/apps/details?id=com.zeneva.app`
+            // click action, which crashes inside the TWA WebView with
+            // ERR_UNKNOWN_URL_SCHEME. Explicitly pointing at the app origin
+            // opens the running app window instead.
+            android: {
+                notification: {
+                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                    defaultVibrateTimings: true,
+                },
+                data: {
+                    url,
+                    campaignId: campaignId || '',
+                },
+            },
+            webpush: {
+                fcmOptions: {
+                    link: `https://zeneva.space${url.startsWith('/') ? url : '/' + url}`,
+                },
             },
             tokens: chunk.map((t) => t.token),
         };

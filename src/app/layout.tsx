@@ -82,7 +82,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Zeneva',
   },
   openGraph: {
@@ -215,7 +215,26 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         <link rel="dns-prefetch" href="https://code.iconify.design" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+        {/*
+          Load only the two fonts the UI actually uses (DM Sans for body,
+          Plus Jakarta Sans for headlines). display=optional means the browser
+          never blocks rendering waiting for the font — it uses a system fallback
+          on the first paint and swaps silently if the font arrives within ~100ms.
+          Removing the three unused families (Instrument Serif, Inter, Bricolage
+          Grotesque) saves ~200 KB of font data per cold load.
+        */}
+        <link
+          rel="preload"
+          as="style"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=optional"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=optional"
+          rel="stylesheet"
+        />
+        {/* Dark status bar on Android Chrome and desktop browsers */}
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)" />
         <Script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js" strategy="afterInteractive" />
         
         {/* Google Analytics */}

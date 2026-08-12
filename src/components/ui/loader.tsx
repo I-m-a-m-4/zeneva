@@ -1,55 +1,44 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import NProgress from 'nprogress';
 
-export default function Loader() {
+// Configure NProgress once: no spinner, fast trickle.
+NProgress.configure({ showSpinner: false, minimum: 0.15, trickleSpeed: 150 });
 
+export default function Loader() {
+  const pathname = usePathname();
+
+  // Stop the bar whenever the route actually lands.
   useEffect(() => {
-    const handleAnchorClick = (event: MouseEvent) => {
-      const targetUrl = (event.currentTarget as HTMLAnchorElement).href;
-      const currentUrl = window.location.href;
-      if (targetUrl !== currentUrl) {
-        NProgress.start();
+    NProgress.done();
+  }, [pathname]);
+
+  // One delegated listener on the document instead of one per <a>.
+  // The old MutationObserver approach re-ran on every DOM mutation across
+  // the whole app — that was the primary cause of sluggish navigation on mobile.
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const anchor = (e.target as Element).closest('a');
+      if (!anchor) return;
+      if (anchor.target === '_blank') return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+      try {
+        const url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+        if (url.pathname !== window.location.pathname) {
+          NProgress.start();
+        }
+      } catch {
+        // Not a parseable URL — skip
       }
     };
 
-    const handleMutation = () => {
-      const anchorElements = document.querySelectorAll('a');
-      anchorElements.forEach((anchor) => {
-        if (anchor.target === '_blank') return;
-        anchor.addEventListener('click', handleAnchorClick);
-      });
-    };
-
-    const mutationObserver = new MutationObserver(handleMutation);
-    mutationObserver.observe(document, { childList: true, subtree: true });
-
-    // Initial run
-    handleMutation();
-
-    return () => {
-      mutationObserver.disconnect();
-      // Clean up event listeners from anchors
-      const anchorElements = document.querySelectorAll('a');
-      anchorElements.forEach((anchor) => {
-        if (anchor.target === '_blank') return;
-        anchor.removeEventListener('click', handleAnchorClick);
-      });
-    };
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
   }, []);
-
-  if (!process.browser) return null; // Ensure client-side only if needed, though 'use client' handles it mostly.
-
-  // We need to return the UI for the loader if NProgress is running, but NProgress modifies the DOM directly.
-  // The user asked for "THAT LOADING SPINNER PAGE THAT SHOWIS THE ROLLING CRICLE AND LOADING WORKSPACE TEXT"
-  // If this component IS that page, it should return JSX. 
-  // However, the current code returns `null` and relies on `nprogress` which is a top-bar loader.
-  // The user likely refers to a different component, OR wants this component to RENDER an overlay.
-  // Given the description, I will create a global overlay that shows when NProgress is started? 
-  // Standard NProgress doesn't have "Loading Workspace" text.
-  // WAIT: "Loading Workspace" usually appears on initial load or auth check.
-  // I should check `src/firebase/provider.tsx` or `client-provider.tsx` to see if there's an auth loader.
 
   return null;
 }

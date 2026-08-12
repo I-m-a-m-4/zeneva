@@ -29,6 +29,7 @@ import { validateProposal, buildSaleFromProposal } from '@/components/ai-insight
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import { aiDailyLimit, effectivePlan } from '@/lib/plan';
+import { apiBase } from '@/lib/platform';
 
 /**
  * One message in the chat transcript.
@@ -232,7 +233,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   // fetched per send rather than cached because Firebase rotates it hourly and
   // a stale one 401s mid-conversation.
   const transport = React.useMemo(() => new DefaultChatTransport({
-    api: '/api/chat',
+    api: apiBase('/api/chat'),
     prepareSendMessagesRequest: async ({ messages, body }) => {
       const token = await getAuth().currentUser?.getIdToken();
       const headers: Record<string, string> = {};
@@ -947,7 +948,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="absolute bottom-0 left-0 right-0 p-4 pb-6 md:p-5 md:pb-8 bg-gradient-to-t from-background via-background/90 to-transparent z-20"
+          className="absolute bottom-0 left-0 right-0 p-4 pb-20 md:p-5 md:pb-8 bg-gradient-to-t from-background via-background/90 to-transparent z-20"
         >
           <div className="max-w-3xl mx-auto">
             <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all">
@@ -987,18 +988,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ZenAIPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
-  const [businessId, setBusinessId] = React.useState<string | null>(null);
+  const { business } = usePOS();
+  const [mounted, setMounted] = React.useState(false);
 
-  useEffect(() => {
-    if (!user || !firestore) return;
-    getDoc(doc(firestore, `users/${user.uid}`))
-      .then(snap => {
-        if (snap.exists()) setBusinessId(snap.data().businessId ?? null);
-      });
-  }, [user, firestore]);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (!businessId || !user) {
+  const businessId = business?.id;
+
+  // Render the initial server shell loader during hydration to match the SSR output
+  if (!mounted || !businessId || !user) {
     return (
       <div className="flex flex-col h-screen bg-background items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
@@ -1007,15 +1007,13 @@ export default function ZenAIPage() {
     );
   }
 
-  // ZenAIChat reads `?q=` via useSearchParams, which needs a Suspense boundary
-  // above it or the route opts out of static rendering at build time.
   return (
     <React.Suspense fallback={
       <div className="flex flex-col h-screen bg-background items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
       </div>
     }>
-      <ZenAIChat businessId={businessId} user={user} firestore={firestore} />
+      <ZenAIChat businessId={businessId} user={user} firestore={useFirestore()} />
     </React.Suspense>
   );
 }

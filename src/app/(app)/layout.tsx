@@ -325,20 +325,21 @@ export default function AuthenticatedLayout({
   // --- Helpers & Hooks (Above early returns to avoid Rule of Hooks violations) ---
   
   const handleLogout = () => {
-    setIsLoggingOut(true);
-    signOut(getAuth())
-      .then(() => {
-        // No need to redirect here. The auth listener will handle it.
-      })
-      .catch((error) => {
-        toast({
-          variant: "destructive",
-          title: "Logout Failed",
-          description: "An unexpected error occurred. Please try again.",
-        });
-        setIsLoggingOut(false);
+    // Navigate immediately — Firebase clears the local auth token synchronously,
+    // so the UI can transition to the welcome page right away without waiting
+    // for the network round-trip. The signOut() call completes in the background.
+    router.replace(signedOutLandingRoute());
+    signOut(getAuth()).catch(() => {
+      // Rare: if sign-out fails (e.g. no network), the auth listener will
+      // detect the user is still signed in and bring them back to /dashboard.
+      toast({
+        variant: "destructive",
+        title: "Logout Failed",
+        description: "An unexpected error occurred. Please try again.",
       });
+    });
   };
+
 
   const getInitials = (name?: string) => {
     if (!name?.trim()) return "";
@@ -1388,11 +1389,11 @@ export default function AuthenticatedLayout({
                 exit affordance went missing on mobile. Sticky so it survives scrolling.
               */}
               {isImpersonating && (
-                <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 no-print animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[9999] no-print animate-in fade-in slide-in-from-bottom-4 duration-300">
                   <Button
                     size="sm"
                     variant="destructive"
-                    className="shadow-lg hover:shadow-xl font-medium border border-destructive-foreground/10 h-9 px-4 rounded-full flex items-center gap-1.5"
+                    className="shadow-[0_4px_20px_rgba(239,68,68,0.4)] hover:shadow-[0_6px_25px_rgba(239,68,68,0.6)] font-semibold border border-destructive-foreground/10 h-9 px-4 rounded-full flex items-center gap-1.5 transition-all"
                     aria-label="Exit impersonation and return to the admin panel"
                     onClick={async () => {
                       // Must clear the impersonation state BEFORE navigating. The old

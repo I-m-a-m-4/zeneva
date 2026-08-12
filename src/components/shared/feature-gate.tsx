@@ -156,54 +156,24 @@ export default function FeatureGate({
   }
 
   const UpgradeNotice = () => (
-    <div className="bg-background border rounded-2xl shadow-xl max-w-2xl w-full p-8 text-left">
-        <h3 className="text-3xl font-extrabold tracking-tight mb-2">Unlock {featureName}</h3>
-        <p className="text-muted-foreground text-lg mb-6">{featureDescription}</p>
+    <div className="bg-background border rounded-2xl shadow-xl max-w-md w-full p-6 text-left">
+        <h3 className="text-2xl font-bold tracking-tight mb-1">Unlock {featureName}</h3>
+        <p className="text-muted-foreground text-sm mb-4">{featureDescription}</p>
         
-        <div className="relative bg-gradient-to-r from-orange-50 via-orange-50/50 to-transparent dark:from-orange-950/20 dark:via-orange-950/10 dark:to-transparent rounded-xl p-8 mb-8 overflow-hidden border">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-            <div className="relative z-10 sm:w-2/3">
-                <h4 className="text-xl font-bold mb-4">
-                    Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'} so you can:
-                </h4>
-                <ul className="space-y-3">
-                    <li className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-sm font-medium">Access detailed analytical reports and deep-dive metrics</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-sm font-medium">Unlock advanced Zen AI capabilities and smart forecasting</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-sm font-medium">Manage unlimited products, customers, and complex inventory</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-sm font-medium">Track your business growth securely from any device</span>
-                    </li>
-                </ul>
-            </div>
-            
-            <div className="absolute -right-8 top-1/2 -translate-y-1/2 w-1/2 flex-col items-center justify-center gap-6 opacity-90 pointer-events-none hidden sm:flex z-10 translate-x-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_40px_rgba(249,115,22,0.3)] backdrop-blur-xl rotate-[-5deg] hover:rotate-0 transition-transform">
-                    <AnalyticsIcon className="w-12 h-12" />
-                </div>
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_40px_rgba(249,115,22,0.3)] backdrop-blur-xl rotate-[5deg] hover:rotate-0 transition-transform">
-                    <PremiumCoinIcon className="w-12 h-12" />
-                </div>
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_40px_rgba(249,115,22,0.3)] backdrop-blur-xl rotate-[-5deg] hover:rotate-0 transition-transform">
-                    <AIIcon className="w-12 h-12" />
-                </div>
-            </div>
+        <div className="relative bg-gradient-to-r from-orange-50 via-orange-50/50 to-transparent dark:from-orange-950/20 dark:via-orange-950/10 dark:to-transparent rounded-xl p-4 mb-4 border">
+            <h4 className="text-sm font-bold text-orange-900 dark:text-orange-400 mb-1">
+                Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'}
+            </h4>
+            <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">
+                Get full access to analytical reports, AI capabilities, and unlimited inventory tracking.
+            </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Button asChild size="lg" className="w-full sm:w-auto text-base h-12 px-8">
+        <div className="flex items-center justify-between gap-4">
+            <Button asChild size="default" className="text-sm h-10 px-6">
                 <Link href="/billing">Get {requiredPlan === 'business' ? 'Business' : 'Pro'} Plan</Link>
             </Button>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
                 Starting at <span className="font-semibold text-foreground">{currency === 'NGN' ? (requiredPlan === 'business' ? '₦30,000' : '₦10,000') : (requiredPlan === 'business' ? '$30' : '$10')}/mo</span>.
             </div>
         </div>
@@ -211,47 +181,17 @@ export default function FeatureGate({
   );
 
   const RichSectionNotice = () => (
-    <div className="bg-background border rounded-xl shadow-xl max-w-xl w-full p-4 sm:p-5 text-left border-orange-100 dark:border-orange-950/40 relative z-20">
-        <h3 className="text-lg font-bold tracking-tight mb-0.5 text-stone-900 dark:text-stone-100">Unlock {featureName}</h3>
-        <p className="text-muted-foreground text-[11px] leading-normal mb-3">{featureDescription}</p>
+    <div className="bg-background border rounded-xl shadow-xl max-w-sm w-full p-4 text-left border-orange-100 dark:border-orange-950/40 relative z-20">
+        <h3 className="text-base font-bold tracking-tight mb-0.5 text-stone-900 dark:text-stone-100">Unlock {featureName}</h3>
+        <p className="text-muted-foreground text-xs leading-normal mb-3">{featureDescription}</p>
         
-        <div className="relative bg-gradient-to-r from-orange-50 via-orange-50/50 to-transparent dark:from-orange-950/10 dark:via-orange-950/5 to-transparent rounded-lg p-4 mb-3 overflow-hidden border border-orange-100/50 dark:border-orange-950/20">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-            <div className="relative z-10 sm:w-2/3">
-                <h4 className="text-[11px] font-bold mb-2 text-orange-950 dark:text-orange-400">
-                    Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'} so you can:
-                </h4>
-                <ul className="space-y-1">
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Access detailed reports and deep-dive metrics</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Unlock advanced Zen AI forecasting capabilities</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Manage unlimited products & complex inventory</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Track your growth securely from any device</span>
-                    </li>
-                </ul>
-            </div>
-            
-            <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-1/4 flex-col items-center justify-center gap-2.5 opacity-90 pointer-events-none hidden sm:flex z-10 translate-x-2">
-                <div className="p-1.5 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_20px_rgba(249,115,22,0.2)] backdrop-blur-xl rotate-[-5deg]">
-                    <AnalyticsIcon className="w-7 h-7" />
-                </div>
-                <div className="p-1.5 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_20px_rgba(249,115,22,0.2)] backdrop-blur-xl rotate-[5deg]">
-                    <PremiumCoinIcon className="w-7 h-7" />
-                </div>
-                <div className="p-1.5 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-white/20 shadow-[0_0_20px_rgba(249,115,22,0.2)] backdrop-blur-xl rotate-[-5deg]">
-                    <AIIcon className="w-7 h-7" />
-                </div>
-            </div>
+        <div className="bg-gradient-to-r from-orange-50 via-orange-50/50 to-transparent dark:from-orange-950/10 dark:via-orange-950/5 to-transparent rounded-lg p-3 mb-3 border border-orange-100/50 dark:border-orange-950/20">
+            <h4 className="text-xs font-bold text-orange-950 dark:text-orange-400 mb-1">
+                Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'}
+            </h4>
+            <p className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">
+                Unlocks reports, Zen AI tools, and unlimited products/inventory.
+            </p>
         </div>
 
         <div className="flex items-center justify-between gap-4">
@@ -266,38 +206,24 @@ export default function FeatureGate({
   );
 
   const CompactUpgradeNotice = () => (
-    <div className="bg-background border rounded-xl shadow-xl max-w-sm w-full p-4 text-left border-orange-100/80 dark:border-orange-950/40 relative z-20">
-        <h3 className="text-base font-bold tracking-tight mb-0.5 text-stone-900 dark:text-stone-100">Unlock {featureName}</h3>
-        <p className="text-muted-foreground text-[11px] leading-normal mb-3">{featureDescription}</p>
+    <div className="bg-background border rounded-xl shadow-xl max-w-xs w-full p-3.5 text-left border-orange-100/80 dark:border-orange-950/40 relative z-20">
+        <h3 className="text-sm font-bold tracking-tight mb-0.5 text-stone-900 dark:text-stone-100">Unlock {featureName}</h3>
         
-        <div className="relative bg-gradient-to-r from-orange-50/70 via-orange-50/30 to-transparent dark:from-orange-950/10 dark:via-orange-950/5 to-transparent rounded-lg p-3 mb-3 border border-orange-100/30 dark:border-orange-950/10">
-            <div className="relative z-10">
-                <h4 className="text-[11px] font-bold mb-1.5 text-orange-900 dark:text-orange-400">
-                    Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'} so you can:
-                </h4>
-                <ul className="space-y-1">
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Access detailed reports and deep-dive metrics</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Unlock advanced Zen AI forecasting capabilities</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-orange-600 mt-0.5 shrink-0" />
-                        <span className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">Manage unlimited products, customers, and inventory</span>
-                    </li>
-                </ul>
-            </div>
+        <div className="bg-gradient-to-r from-orange-50/70 via-orange-50/30 to-transparent dark:from-orange-950/10 dark:via-orange-950/5 to-transparent rounded-lg p-2.5 mb-2.5 border border-orange-100/30 dark:border-orange-950/10">
+            <h4 className="text-xs font-bold text-orange-950 dark:text-orange-400 mb-0.5">
+                Requires {requiredPlan === 'business' ? 'Business' : 'Pro'} Plan
+            </h4>
+            <p className="text-[10px] text-stone-700 dark:text-stone-300 leading-tight">
+                Unlock detailed statistics, AI analytics, and more.
+            </p>
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-            <Button asChild size="sm" className="text-[11px] h-8 px-3.5 bg-orange-600 hover:bg-orange-700 text-white font-medium">
-                <Link href="/billing">Get {requiredPlan === 'business' ? 'Business' : 'Pro'}</Link>
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+            <Button asChild size="sm" className="text-[10px] h-7 px-3 bg-orange-600 hover:bg-orange-700 text-white font-medium">
+                <Link href="/billing">Upgrade</Link>
             </Button>
-            <div className="text-[11px] text-muted-foreground">
-                Starting at <span className="font-semibold text-foreground">{currency === 'NGN' ? (requiredPlan === 'business' ? '₦30,000' : '₦10,000') : (requiredPlan === 'business' ? '$30' : '$10')}/mo</span>.
+            <div className="text-[10px] text-muted-foreground">
+                {currency === 'NGN' ? (requiredPlan === 'business' ? '₦30,000' : '₦10,000') : (requiredPlan === 'business' ? '$30' : '$10')}/mo
             </div>
         </div>
     </div>

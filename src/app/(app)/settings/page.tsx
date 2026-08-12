@@ -927,23 +927,19 @@ function SettingsPageContent() {
                                 const isDesktopApp = (window as any).__TAURI__ || ua.includes('tauri');
 
                                 if (isAndroid) {
-                                    // Android — open Play Store review page directly
-                                    window.open('market://details?id=com.zeneva.app', '_blank');
-                                    setTimeout(() => {
-                                        window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
-                                    }, 800);
+                                    // Android — HTTPS URL is intercepted by Android and opens the Play Store app.
+                                    // market:// is a native-only deep link that crashes in WebView/PWA.
+                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
                                 } else if (isDesktopApp || !isMobile) {
-                                    // Windows desktop app or desktop browser — open Microsoft Store
-                                    window.open('ms-windows-store://review/?ProductId=9nvn0f8njwmj', '_blank');
-                                    setTimeout(() => {
-                                        window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
-                                    }, 800);
+                                    // Desktop app or desktop browser — try the ms-windows-store protocol first
+                                    // (works in native Tauri), fall back to the web listing.
+                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
                                 } else {
                                     // Fallback (iOS etc.)
                                     window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
                                 }
-                            }}
                         >
+
                             <Star className="me-2 h-4 w-4" />
                             {t('settings.writeReview')}
                         </Button>

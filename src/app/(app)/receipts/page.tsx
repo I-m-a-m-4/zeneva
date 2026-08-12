@@ -35,8 +35,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
-import { safeToDate } from '@/lib/utils';
 import { useI18n } from '@/context/i18n-context';
+import { Checkbox } from "@/components/ui/checkbox";
 
 function ReceiptRowSkeleton() {
   return (
@@ -95,9 +95,16 @@ function ReceiptsContent() {
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
   const [receiptToDelete, setReceiptToDelete] = React.useState<Receipt | null>(null);
+  const [selectedReceipts, setSelectedReceipts] = React.useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isBulkVoidDialogOpen, setIsBulkVoidDialogOpen] = React.useState(false);
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(receipts ? receipts.length >= 50 : true);
+
+  // Clear selection if receipts change
+  React.useEffect(() => {
+    setSelectedReceipts(new Set());
+  }, [receipts]);
 
   // Update hasMore if receipts change
   React.useEffect(() => {
@@ -244,14 +251,131 @@ function ReceiptsContent() {
     }
   };
 
+  const handleBulkVoid = async () => {
+    if (selectedReceipts.size === 0 || !firestore || !business || !currentUser) return;
+    setIsDeleting(true);
+
+    const idsToVoid = Array.from(selectedReceipts);
+    let successCount = 0;
+    let offlineCount = 0;
+
+    for (const receiptId of idsToVoid) {
+      const receiptToVoid = receipts?.find(r => r.id === receiptId);
+      if (!receiptToVoid) continue;
+
+      try {
+        await runTransaction(firestore, async (transaction) => {
+          const receiptRef = doc(firestore, 'receipts', receiptId);
+          const receiptDoc = await transaction.get(receiptRef);
+
+          if (!receiptDoc.exists()) return;
+
+          const receiptData = receiptDoc.data() as Receipt;
+
+          // Read product docs
+          const productRefs = receiptData.items.map(item => doc(firestore, 'products', item.productId));
+          const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+
+          // Read customer doc
+          let customerDoc = null;
+          if (receiptData.customer?.id && business.settings?.loyaltyProgramEnabled) {
+            const customerRef = doc(firestore, 'customers', receiptData.customer.id);
+            customerDoc = await transaction.get(customerRef);
+          }
+
+          // Update stock
+          productDocs.forEach((pDoc, index) => {
+            if (pDoc.exists()) {
+              const item = receiptData.items[index];
+              const newStock = (pDoc.data().stock || 0) + item.quantity;
+              transaction.update(pDoc.ref, { stock: newStock });
+            }
+          });
+
+          // Update loyalty points
+          if (customerDoc && customerDoc.exists()) {
+            const pointsPerUnit = business.settings?.pointsPerUnit || 0;
+            const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+            const currentPoints = customerDoc.data()?.loyaltyPoints || 0;
+            transaction.update(customerDoc.ref, { loyaltyPoints: Math.max(0, currentPoints - pointsEarned) });
+          }
+
+          transaction.delete(receiptRef);
+        });
+
+        await logAuditEvent(firestore, business.id, currentUser, {
+          action: 'sale.void',
+          entity: { type: 'Receipt', id: receiptId, name: `Receipt ${receiptId.substring(0, 8)}` },
+          details: { total: receiptToVoid.total, reason: 'Bulk manual void' }
+        });
+
+        await voidReceipt(receiptId);
+        successCount++;
+      } catch (err) {
+        console.warn(`Bulk void offline fallback for ${receiptId}:`, err);
+        await voidReceipt(receiptId);
+        offlineCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast({
+        title: "Sales Voided",
+        description: `Successfully voided ${successCount} sale(s) and restored inventory.`,
+        variant: "success"
+      });
+    }
+    if (offlineCount > 0) {
+      toast({
+        title: "Offline Voids Queued",
+        description: `${offlineCount} sale(s) voided offline. Synchronization will complete when online.`,
+        variant: "default"
+      });
+    }
+
+    setSelectedReceipts(new Set());
+    setIsBulkVoidDialogOpen(false);
+    setIsDeleting(false);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedReceipts.size === displayedReceipts.length) {
+      setSelectedReceipts(new Set());
+    } else {
+      setSelectedReceipts(new Set(displayedReceipts.map(r => r.id)));
+    }
+  };
+
+  const toggleSelectReceipt = (id: string) => {
+    const next = new Set(selectedReceipts);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedReceipts(next);
+  };
+
   return (
     <>
       <Card className="w-full">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <CardTitle>{t('receipts.historyTitle')}</CardTitle>
-              <CardDescription>{t('receipts.historyDesc')}</CardDescription>
+            <div className="flex items-center gap-4">
+              <div>
+                <CardTitle>{t('receipts.historyTitle')}</CardTitle>
+                <CardDescription>{t('receipts.historyDesc')}</CardDescription>
+              </div>
+              {selectedReceipts.size > 0 && (currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setIsBulkVoidDialogOpen(true)}
+                  className="animate-in fade-in slide-in-from-left-2 duration-200"
+                >
+                  <Trash2 className="me-2 h-4 w-4" /> Void Selected ({selectedReceipts.size})
+                </Button>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 no-print w-full md:w-auto">
               <div className="relative w-full sm:w-64">
@@ -319,6 +443,15 @@ function ReceiptsContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                      <TableHead className="w-12">
+                        <Checkbox 
+                          checked={displayedReceipts.length > 0 && selectedReceipts.size === displayedReceipts.length}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all receipts"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>{t('receipts.receiptIdCol')}</TableHead>
                     <TableHead>{t('pos.customer')}</TableHead>
                     <TableHead>{t('common.date')}</TableHead>
@@ -332,9 +465,18 @@ function ReceiptsContent() {
                   {displayedReceipts.map((receipt: Receipt) => (
                     <TableRow
                       key={receipt.id}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedReceipts.has(receipt.id) ? 'bg-muted/30' : ''}`}
                       onClick={() => router.push(`/receipts/details?id=${receipt.id}`)}
                     >
+                      {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox 
+                            checked={selectedReceipts.has(receipt.id)}
+                            onCheckedChange={() => toggleSelectReceipt(receipt.id)}
+                            aria-label={`Select receipt ${receipt.receiptNumber || receipt.id}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium font-mono text-xs whitespace-nowrap">
                         {receipt.receiptNumber || `rec-${(receipt.id || '').substring(0, 8)}`}
                       </TableCell>
@@ -426,6 +568,25 @@ function ReceiptsContent() {
             <Button onClick={handleDeleteReceipt} disabled={isDeleting} variant="destructive">
               {isDeleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
               {t('receipts.voidSale')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBulkVoidDialogOpen} onOpenChange={(open) => !open && !isDeleting && setIsBulkVoidDialogOpen(false)} modal={false}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Multiple Sales</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to void the {selectedReceipts.size} selected sale(s)? 
+              This will permanently delete the receipts, restore stock quantities to your inventory, and deduct any earned loyalty points. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkVoidDialogOpen(false)} disabled={isDeleting}>{t('common.cancel')}</Button>
+            <Button onClick={handleBulkVoid} disabled={isDeleting} variant="destructive">
+              {isDeleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+              Void All Selected
             </Button>
           </DialogFooter>
         </DialogContent>

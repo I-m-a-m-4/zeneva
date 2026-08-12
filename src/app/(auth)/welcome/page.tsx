@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import { AppConfig } from '@/lib/config';
-import Head from 'next/head';
 
 const slides = [
   {
@@ -41,6 +40,35 @@ export default function WelcomePage() {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
     }
   };
+
+  // Force the mobile browser status bar / address bar chrome to black so it
+  // blends with the dark video — theme-color meta in <Head> doesn't reach the
+  // App Router shell, so we set it imperatively on mount and restore on unmount.
+  useEffect(() => {
+    const existing = document.querySelector('meta[name="theme-color"]');
+    const prev = existing?.getAttribute('content') ?? null;
+    if (existing) {
+      existing.setAttribute('content', '#000000');
+    } else {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.content = '#000000';
+      document.head.appendChild(meta);
+    }
+    // Also paint the html/body black so overscroll bounce areas are dark
+    document.documentElement.style.backgroundColor = '#000000';
+    document.body.style.backgroundColor = '#000000';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      const el = document.querySelector('meta[name="theme-color"]');
+      if (el) el.setAttribute('content', prev ?? '#ffffff');
+      document.documentElement.style.backgroundColor = '';
+      document.body.style.backgroundColor = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   // When currentIndex changes, manage play state
   useEffect(() => {
@@ -79,10 +107,6 @@ export default function WelcomePage() {
 
   return (
     <>
-      <Head>
-        {/* Force the mobile browser chrome (status bar) to be dark to match the video */}
-        <meta name="theme-color" content="#000000" />
-      </Head>
       <div className="relative h-[100dvh] w-full overflow-hidden bg-black font-sans selection:bg-white/20 overscroll-none">
       {/* Background Videos */}
       {slides.map((slide, index) => (
@@ -119,7 +143,8 @@ export default function WelcomePage() {
         and on a tablet they cap out at the original design sizes. The column
         never scrolls: the flexible spacer absorbs whatever room is left over.
       */}
-      <div className="relative z-10 flex h-full flex-col px-[clamp(1rem,5vw,1.75rem)] pt-[clamp(0.75rem,2.5vh,1.5rem)] pb-[clamp(1rem,4vh,3rem)]">
+      <div className="relative z-10 flex h-full flex-col px-[clamp(1rem,5vw,1.75rem)] pt-[clamp(0.75rem,2.5vh,1.5rem)] pb-[max(clamp(1.5rem,5vh,3.5rem),env(safe-area-inset-bottom,1.5rem))]"
+           style={{ paddingBottom: 'max(clamp(1.5rem, 5vh, 3.5rem), calc(env(safe-area-inset-bottom, 0px) + 2.5rem))' }}>
 
         {/* Top Bar (Logo & Controls) */}
         <div className="flex flex-none items-start justify-between">

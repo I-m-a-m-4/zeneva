@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { useAuth, useFirestore } from '@/firebase';
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import Link from 'next/link';
@@ -184,26 +184,94 @@ export default function SignupPage() {
     }
   }, [invitationCode, firestore, router, form, toast]);
 
+  // Handle getRedirectResult when the page mounts after a Google redirect login
+  useEffect(() => {
+    if (!auth || !firestore) return;
+    
+    let isMounted = true;
+    
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result || !isMounted) return;
+        const user = result.user;
+        
+        setIsGoogleLoading(true);
+        try {
+          const userDocRef = doc(firestore, `users/${user.uid}`);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          if (!userDocSnap.exists()) {
+            await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
+            await waitForUserProfile(firestore, user.uid);
+          }
+          
+          triggerRefresh();
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+        } catch (profileErr: any) {
+          console.error("Failed to create profile after redirect:", profileErr);
+          toast({
+            variant: "destructive",
+            title: "Profile Setup Failed",
+            description: "We logged you in but couldn't create your profile. Please try again.",
+          });
+        } finally {
+          if (isMounted) setIsGoogleLoading(false);
+        }
+      })
+      .catch((error: any) => {
+        console.error("Redirect auth error:", error);
+        toast({
+          variant: "destructive",
+          title: "Authentication Failed",
+          description: error.message || "Failed to complete redirect sign-in.",
+        });
+      });
+      
+    return () => {
+      isMounted = false;
+    };
+  }, [auth, firestore, router, invitationCode, triggerRefresh, toast]);
+
   const handleGoogleSignup = async () => {
     if (!auth || !firestore) return;
     setIsGoogleLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Create profile document with Google profile data if it does not already exist
-      const userDocRef = doc(firestore, `users/${user.uid}`);
-      const userDocSnap = await getDoc(userDocRef);
       
-      if (!userDocSnap.exists()) {
-        await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
-        await waitForUserProfile(firestore, user.uid);
+      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+      const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+      
+      if (isTauri || isWebView) {
+        // Popups fail inside Tauri and WebViews. Use redirect.
+        await signInWithRedirect(auth, provider);
+        return;
       }
 
-      triggerRefresh();
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+
+        // Create profile document with Google profile data if it does not already exist
+        const userDocRef = doc(firestore, `users/${user.uid}`);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (!userDocSnap.exists()) {
+          await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
+          await waitForUserProfile(firestore, user.uid);
+        }
+
+        triggerRefresh();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+      } catch (popupError: any) {
+        // Fallback to redirect if popup gets blocked or is unsupported
+        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/operation-not-supported-in-this-environment') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupError;
+        }
+      }
     } catch (error: any) {
       console.error("Google auth error:", error);
       toast({

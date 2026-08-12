@@ -73,7 +73,13 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
             </CardContent>
             <CardHeader className="px-4 py-1 flex-grow">
                 <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground flex items-center gap-1.5 flex-wrap">
-                    {product.name}
+                    <Link
+                        href={`/inventory/details?id=${product.id}`}
+                        className="hover:text-primary hover:underline transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {product.name}
+                    </Link>
                     {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? (
                         <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">{t('pos.serviceBadge')}</Badge>
                     ) : (
@@ -81,6 +87,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                     )}
                 </CardTitle>
             </CardHeader>
+
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">
                     <span className="text-lg font-bold text-foreground dark:text-white">{currencySymbol}{product.price.toLocaleString()}</span>

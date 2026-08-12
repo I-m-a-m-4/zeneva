@@ -76,6 +76,11 @@ export class ImageManager {
    */
   static isKnownUnreachable(url: string): boolean {
     if (!url) return false;
+    // The failure cache is only meaningful in Tauri where the native HTTP
+    // fetcher can hang silently for many seconds. In the browser the network
+    // stack handles retries on its own, so skip this entirely.
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri) return false;
     loadFailures();
     const failedAt = failedUrls.get(url);
     if (failedAt === undefined) return false;
@@ -87,9 +92,13 @@ export class ImageManager {
     return true;
   }
 
-  /** Record a URL as unreachable so the next render skips it. */
+  /** Record a URL as unreachable so the next render skips it (Tauri only). */
   static markUnreachable(url: string) {
     if (!url) return;
+    // Only track failures inside Tauri where native HTTP fetches can silently
+    // stall the UI. In a browser the network layer already handles this.
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    if (!isTauri) return;
     loadFailures();
     failedUrls.set(url, Date.now());
     persistFailures();

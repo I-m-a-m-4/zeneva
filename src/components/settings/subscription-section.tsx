@@ -447,50 +447,7 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
         );
     }
 
-    if (isMobileApp) {
-        return (
-            <Card className="mt-6 border-muted bg-muted/20">
-                <CardHeader>
-                    <CardTitle className="text-lg">Subscription Details</CardTitle>
-                    <CardDescription>
-                        Manage your account details and subscription status.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex justify-between py-2 border-b">
-                        <span className="text-sm font-medium">Current Plan</span>
-                        <Badge variant="secondary" className="capitalize font-semibold">
-                            {effectivePlan(businessInstance) === 'starter' ? 'Starter (Free)' : effectivePlan(businessInstance)}
-                        </Badge>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                        <span className="text-sm font-medium">Status</span>
-                        <span className="text-sm text-muted-foreground font-medium">
-                            {isPaidPlanExpired(businessInstance) ? 'Ended — now on Starter' : 'Active'}
-                        </span>
-                    </div>
-                    {/* Only a purchased plan has a date worth showing. The free plan
-                        never expires, and older free accounts still carry a leftover
-                        trial date that would read as a deadline if we printed it. */}
-                    {isPaidPlan(businessInstance) && businessInstance.trialExpiresAt && (
-                        <div className="flex justify-between py-2">
-                            <span className="text-sm font-medium">
-                                {isPaidPlanExpired(businessInstance) ? 'Ended On' : 'Renews On'}
-                            </span>
-                            <span className="text-sm text-muted-foreground font-medium">
-                                {format(safeToDate(businessInstance.trialExpiresAt), 'PPP')}
-                            </span>
-                        </div>
-                    )}
-                </CardContent>
-                <CardFooter className="flex-col items-center">
-                    <p className="text-xs text-muted-foreground text-center max-w-sm leading-relaxed">
-                        To upgrade your plan, manage subscriptions, or change billing cycles, please visit your account dashboard on the web at zeneva.space using a desktop or mobile browser. Premium features will unlock automatically in this app once updated.
-                    </p>
-                </CardFooter>
-            </Card>
-        );
-    }
+
 
     return (
         <div className="space-y-6 mt-6">
