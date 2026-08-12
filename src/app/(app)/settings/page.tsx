@@ -917,33 +917,15 @@ function SettingsPageContent() {
                         <CardDescription>{t('settings.reviewDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button 
-                            variant="outline" 
-                            className="w-full border-primary text-primary hover:bg-primary hover:text-white"
-                            onClick={() => {
-                                const ua = navigator.userAgent.toLowerCase();
-                                const isAndroid = ua.includes('android');
-                                const isMobile = isAndroid || ua.includes('iphone') || ua.includes('ipad');
-                                const isDesktopApp = (window as any).__TAURI__ || ua.includes('tauri');
-
-                                if (isAndroid) {
-                                    // Android — HTTPS URL is intercepted by Android and opens the Play Store app.
-                                    // market:// is a native-only deep link that crashes in WebView/PWA.
-                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
-                                } else if (isDesktopApp || !isMobile) {
-                                    // Desktop app or desktop browser — try the ms-windows-store protocol first
-                                    // (works in native Tauri), fall back to the web listing.
-                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
-                                } else {
-                                    // Fallback (iOS etc.)
-                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
-                                }
-                            }}
+                        <a 
+                            href="https://play.google.com/store/apps/details?id=com.zeneva.app"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-primary text-primary bg-background hover:bg-primary hover:text-white h-10 py-2 px-4 w-full"
                         >
-
                             <Star className="me-2 h-4 w-4" />
                             {t('settings.writeReview')}
-                        </Button>
+                        </a>
                     </CardContent>
                 </Card>
 
