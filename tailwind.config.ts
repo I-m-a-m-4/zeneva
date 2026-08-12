@@ -12,8 +12,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"DM Sans"', 'sans-serif'],
-        body: ['"DM Sans"', 'sans-serif'],
+        sans: ['"DM Sans"', '"Plus Jakarta Sans"', 'sans-serif'],
+        body: ['"DM Sans"', '"Plus Jakarta Sans"', 'sans-serif'],
+        jakarta: ['"Plus Jakarta Sans"', '"DM Sans"', 'sans-serif'],
+        'font-jakarta': ['"Plus Jakarta Sans"', '"DM Sans"', 'sans-serif'],
         headline: ['"Bricolage Grotesque"', 'sans-serif'],
         display: ['"Bricolage Grotesque"', 'sans-serif'],
         code: ['"Source Code Pro"', 'monospace'],
