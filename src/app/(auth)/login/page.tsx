@@ -142,6 +142,8 @@ export default function LoginPage() {
           throw popupError;
         }
       }
+    } catch (error: any) {
+      console.error("Google auth error:", error);
       const isCancellation = 
         error?.code === 'auth/popup-closed-by-user' || 
         error?.code === 'auth/cancelled-popup-request' || 
