@@ -221,11 +221,19 @@ export default function SignupPage() {
       })
       .catch((error: any) => {
         console.error("Redirect auth error:", error);
-        toast({
-          variant: "destructive",
-          title: "Authentication Failed",
-          description: error.message || "Failed to complete redirect sign-in.",
-        });
+        const isCancellation = 
+          error?.code === 'auth/popup-closed-by-user' || 
+          error?.code === 'auth/cancelled-popup-request' || 
+          error?.code === 'auth/user-cancelled' || 
+          error?.code === 'auth/redirect-cancelled-by-user';
+
+        if (!isCancellation) {
+          toast({
+            variant: "destructive",
+            title: "Authentication Failed",
+            description: error.message || "Failed to complete redirect sign-in.",
+          });
+        }
       });
       
     return () => {
@@ -238,6 +246,7 @@ export default function SignupPage() {
     setIsGoogleLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       
       const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
       const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
@@ -274,11 +283,19 @@ export default function SignupPage() {
       }
     } catch (error: any) {
       console.error("Google auth error:", error);
-      toast({
-        variant: "destructive",
-        title: "Google Authentication Failed",
-        description: error.message || "Please try again.",
-      });
+      const isCancellation = 
+        error?.code === 'auth/popup-closed-by-user' || 
+        error?.code === 'auth/cancelled-popup-request' || 
+        error?.code === 'auth/user-cancelled' || 
+        error?.code === 'auth/redirect-cancelled-by-user';
+
+      if (!isCancellation) {
+        toast({
+          variant: "destructive",
+          title: "Google Authentication Failed",
+          description: error.message || "Please try again.",
+        });
+      }
       setIsGoogleLoading(false);
     }
   };
