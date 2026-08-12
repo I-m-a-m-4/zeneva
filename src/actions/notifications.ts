@@ -157,3 +157,31 @@ export async function pushAlertToPhones(input: {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Direct push notification to a target user (e.g. from Admin Support Chat or Payment Confirmation).
+ */
+export async function sendDirectUserPush(
+    targetUserId: string,
+    payload: { title: string; body: string; url?: string },
+    idToken?: string
+) {
+    try {
+        const admin = await requireSuperAdmin(idToken);
+        const url = payload.url || '/support';
+
+        // 1. Send FCM Push Notification
+        await sendNotificationToUser(targetUserId, {
+            title: payload.title,
+            body: payload.body,
+            url,
+            source: 'support',
+            sentBy: admin.uid,
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('sendDirectUserPush error:', error);
+        return { success: false, error: error.message };
+    }
+}

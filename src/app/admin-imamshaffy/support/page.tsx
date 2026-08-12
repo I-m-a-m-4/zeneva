@@ -21,6 +21,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic';
 import { useI18n } from '@/context/i18n-context';
 import { Bot } from 'lucide-react';
+import { sendDirectUserPush } from '@/actions/notifications';
 
 interface AISupportLog {
     id: string;
@@ -314,6 +315,23 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 lastMessageSnippet: payload.text,
                 lastMessageAt: serverTimestamp(),
             });
+
+            if (thread.userId) {
+                await addDoc(collection(firestore, `users/${thread.userId}/notifications`), {
+                    title: '💬 New Message from Support',
+                    body: payload.text,
+                    url: '/support',
+                    type: 'support',
+                    createdAt: serverTimestamp(),
+                    read: false,
+                }).catch(() => {});
+
+                sendDirectUserPush(thread.userId, {
+                    title: '💬 New Message from Support',
+                    body: payload.text,
+                    url: '/support'
+                }).catch((err) => console.warn('Support push error:', err));
+            }
 
             setReply('');
             setAttachedImage(null);
