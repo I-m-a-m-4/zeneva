@@ -27,6 +27,19 @@ import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
 
 import { ThemeProvider } from '@/components/theme-provider';
+import { DM_Sans, Plus_Jakarta_Sans } from 'next/font/google';
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+  display: 'swap',
+});
 
 const siteUrl = 'https://zeneva.space';
 
@@ -207,7 +220,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" suppressHydrationWarning>
+    <html lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" className={cn(dmSans.variable, jakarta.variable)} suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="QGYrHkSlC71065ymk6dZc6DFesm14JeSPw-myjzZVso" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -215,22 +228,9 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         <link rel="dns-prefetch" href="https://code.iconify.design" />
-        {/*
-          Load only the two fonts the UI actually uses (DM Sans for body,
-          Plus Jakarta Sans for headlines). display=optional means the browser
-          never blocks rendering waiting for the font — it uses a system fallback
-          on the first paint and swaps silently if the font arrives within ~100ms.
-          Removing the three unused families (Instrument Serif, Inter, Bricolage
-          Grotesque) saves ~200 KB of font data per cold load.
-        */}
         <link
-          rel="preload"
-          as="style"
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=optional"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=optional"
           rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap"
         />
         {/* Dark status bar on Android Chrome and desktop browsers */}
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
