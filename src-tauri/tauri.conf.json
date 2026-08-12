@@ -10,6 +10,7 @@
     "beforeBuildCommand": "node scripts/tauri-prebuild.mjs && node scripts/tauri-postbuild.mjs && node scripts/post-build-cleanup.mjs && node scripts/patch-android-manifest.mjs"
   },
   "app": {
+    "domain": "zeneva.app",
     "windows": [
       {
         "label": "main",
