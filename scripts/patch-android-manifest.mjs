@@ -75,6 +75,10 @@ function processManifest(filePath) {
 
   const missing = entries.filter((e) => !content.includes(e.match));
 
+  if (!content.includes('android:usesCleartextTraffic="true"') && content.includes('<application')) {
+    content = content.replace('<application', '<application android:usesCleartextTraffic="true"');
+  }
+
   if (missing.length > 0 && content.includes('<application')) {
     const block = `
     <!-- Zeneva System-level Hardware Integrations -->
