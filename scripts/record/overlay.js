@@ -59,6 +59,22 @@
 
   // ---------------------------------------------------------------- mount
   function mount() {
+    // `page.mjs` injects this file with `addScriptToEvaluateOnNewDocument`, which
+    // runs before the parser has built anything at all: `document.documentElement`
+    // is null there, and `document.body` with it. Verified, not assumed — a probe
+    // reported hasDocEl:false, readyState:"loading", and `appendChild` of null.
+    //
+    // Returning instead of throwing is the whole point. The first version threw out
+    // of here on every document, which skipped the remount listeners at the bottom
+    // of this file, so a take ran against an overlay that had a working API and no
+    // DOM: `place()` and `show()` still answered `true`, `card()` returned silently
+    // at its `if (!cardWrap)` guard, and the only symptom was footage with no
+    // cursor and no title cards. Only `moveTo()` re-mounted, which is why the
+    // cursor appeared partway in while the opening card never did.
+    //
+    // Waiting for `body` rather than just `documentElement` also keeps the overlay
+    // a sibling after <head> and <body> instead of inserting it ahead of the parser.
+    if (!document.body) return;
     if (root && document.documentElement.contains(root)) return;
     root = document.createElement('div');
     root.id = '__zen_overlay';
