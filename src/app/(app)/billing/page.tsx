@@ -81,7 +81,7 @@ const LifetimeAccessStatus = () => (
 
 function BillingPage() {
   const { user, isUserLoading } = useUser();
-  const { business: currentBusiness, currentUserProfile: userProfile, isLoading: isPosLoading } = usePOS();
+  const { business: currentBusiness, currentUserProfile: userProfile, isLoading: isPosLoading, isImpersonating } = usePOS();
   const firestore = useFirestore();
 
   const subscriptionHistoryQuery = useMemoFirebase(() => {
@@ -109,6 +109,16 @@ function BillingPage() {
         <PageTitle title="Billing & Subscriptions" subtitle="Manage your plan, view payment history, and upgrade your account." />
         <RefreshButton />
       </div>
+
+      {isImpersonating && (
+        <div className="flex items-center gap-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-4 py-3 text-sm text-orange-700 dark:text-orange-400">
+          <span className="text-lg">⚠️</span>
+          <div>
+            <p className="font-semibold">You are viewing this page as an impersonated user.</p>
+            <p className="text-xs opacity-80">Billing button clicks are blocked. Stop impersonating to make real changes.</p>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

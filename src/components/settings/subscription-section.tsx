@@ -19,6 +19,7 @@ import useDodoPayments from '@/hooks/use-dodopayments';
 import { track } from '@vercel/analytics';
 import { AI_MONTHLY_LIMITS, effectivePlan, isPaidPlan, isPaidPlanExpired } from '@/lib/plan';
 import { apiBase } from '@/lib/platform';
+import { usePOS } from '@/context/pos-context';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
@@ -103,6 +104,7 @@ const PaystackSubscriptionButton = ({
     const { toast } = useToast();
     const firestore = useFirestore();
     const { initializePayment, isScriptLoaded } = usePaystack();
+    const { isImpersonating } = usePOS();
 
     const handleSuccessfulPayment = useCallback(async (transaction: { reference: string }) => {
         if (!firestore || !userProfile || !businessInstance) {
@@ -161,6 +163,14 @@ const PaystackSubscriptionButton = ({
     }, [firestore, userProfile, businessInstance, plan, cycle, finalAmount, toast, setProcessingPlan]);
     
     const handleSubscribe = useCallback(() => {
+        if (isImpersonating) {
+            toast({
+                variant: 'destructive',
+                title: 'Action blocked during impersonation',
+                description: 'You cannot initiate billing on behalf of a user. Stop impersonating first.',
+            });
+            return;
+        }
         if (!isScriptLoaded) {
             toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
             return;
@@ -248,7 +258,7 @@ const PaystackSubscriptionButton = ({
                 setProcessingPlan(null);
             },
         });
-    }, [initializePayment, userProfile, businessInstance, plan, finalAmount, isProcessing, setProcessingPlan, handleSuccessfulPayment, toast]);
+    }, [initializePayment, userProfile, businessInstance, plan, finalAmount, isProcessing, setProcessingPlan, handleSuccessfulPayment, toast, isImpersonating]);
 
     const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
 
@@ -286,8 +296,17 @@ const DodoSubscriptionButton = ({
     const { toast } = useToast();
     const firestore = useFirestore();
     const { initializeCheckout, isScriptLoaded } = useDodoPayments();
+    const { isImpersonating } = usePOS();
 
     const handleSubscribe = useCallback(async () => {
+        if (isImpersonating) {
+            toast({
+                variant: 'destructive',
+                title: 'Action blocked during impersonation',
+                description: 'You cannot initiate billing on behalf of a user. Stop impersonating first.',
+            });
+            return;
+        }
         if (!isScriptLoaded) {
             toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
             return;
@@ -383,7 +402,7 @@ const DodoSubscriptionButton = ({
         } finally {
             setProcessingPlan(null);
         }
-    }, [isScriptLoaded, isProcessing, plan, userProfile, businessInstance, cycle, finalAmount, initializeCheckout, toast, setProcessingPlan, firestore]);
+    }, [isScriptLoaded, isProcessing, plan, userProfile, businessInstance, cycle, finalAmount, initializeCheckout, toast, setProcessingPlan, firestore, isImpersonating]);
 
     const buttonText = isCurrentPlan ? 'Renew Subscription' : `Subscribe to ${plan.name}`;
 
