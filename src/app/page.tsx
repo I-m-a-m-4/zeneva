@@ -296,7 +296,7 @@ export default function Home() {
                             {/* Right Column: UI Mockups */}
                             <div className="mt-8 sm:mt-0 relative [perspective:1000px]">
                                 <Image
-                                    src="/hero computer img.png"
+                                    src="/hero computer img2.png"
                                     alt="Product UI"
                                     width={1600}
                                     height={1200}
