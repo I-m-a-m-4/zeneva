@@ -29,7 +29,7 @@ import { Combobox } from '@/components/ui/combobox';
 const onboardingSchema = z.object({
   organizationName: z.string().min(3, 'Organization name is required.'),
   industry: z.string().min(1, 'Please select an industry.'),
-  address: z.string().min(5, 'Address is required.'),
+  address: z.string().optional(),
   state: z.string().min(2, 'State is required.'),
   country: z.string().min(2, 'Country is required.'),
   currency: z.string().min(1, 'Currency is required.'),
@@ -199,6 +199,18 @@ export default function OnboardingPage() {
     setMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    const authUser = getAuth().currentUser;
+    if (authUser && firestore && mounted) {
+      import('firebase/firestore').then(({ setDoc, doc, serverTimestamp }) => {
+        setDoc(doc(firestore, 'users', authUser.uid), {
+          onboardingStep: step,
+          onboardingLastActive: serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      });
+    }
+  }, [step, firestore, mounted]);
+
 
 
   const [currencies, setCurrencies] = React.useState(ALL_CURRENCIES);
@@ -362,7 +374,7 @@ export default function OnboardingPage() {
                     <CardContent className="pt-2 pb-2 space-y-5">
                       <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><MapPin className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Store Location</CardTitle>
                       <FormField control={form.control} name="address" render={({ field }) => (
-                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Business Address <span className="text-destructive">*</span></FormLabel><FormControl><Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="Street Address" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Business Address</FormLabel><FormControl><Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="Street Address" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                       )} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <FormField control={form.control} name="state" render={({ field }) => (

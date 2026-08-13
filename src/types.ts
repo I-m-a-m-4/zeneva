@@ -61,6 +61,7 @@ export type TopSellingItem = Product & {
 export type UserRole = 'admin' | 'manager' | 'vendor_operator';
 
 export interface UserProfile {
+    onboardingStep?: number;
     id: string;
     businessId: string;
     name: string;

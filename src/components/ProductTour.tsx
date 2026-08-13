@@ -202,7 +202,7 @@ export function ProductTour() {
       const driverObj = driver({
         showProgress: true,
         animate: true,
-        allowClose: false,
+        allowClose: true,
         doneBtnText: "Let's Go →",
         nextBtnText: "Next →",
         prevBtnText: "← Back",

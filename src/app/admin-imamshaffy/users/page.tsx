@@ -509,7 +509,7 @@ export default function UsersPage() {
                             {/* Columns that drop out by breakpoint are restated
                                 here so nothing is lost on a narrow screen. */}
                             <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
-                              {business?.name || (user.email ? 'No business' : 'Pending Signup')}
+                              {business?.name || (user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? 'No business' : 'Pending Signup'))}
                               <span className="sm:hidden">
                                 {' · '}
                                 {toDate(user.lastSeen)
@@ -519,7 +519,7 @@ export default function UsersPage() {
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">{user.email ? '—' : 'Pending Signup'}</span>}</span>
+                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">{user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? '—' : 'Pending Signup')}</span>}</span>
                           </TableCell>
                           <TableCell>
                             <Badge variant={(user.role || 'vendor_operator') === 'admin' ? 'default' : 'secondary'} className="whitespace-nowrap capitalize">
