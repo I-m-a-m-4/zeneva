@@ -184,27 +184,32 @@ export default function SignupPage() {
     }
   }, [invitationCode, firestore, router, form, toast]);
 
-  // Handle getRedirectResult when the page mounts after a Google redirect login
+  // Handle getRedirectResult only for Tauri/WebView clients that used redirect
   useEffect(() => {
     if (!auth || !firestore) return;
-    
+
+    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+    const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+    // Only wait for redirect result on native clients that can't use popups
+    if (!isTauri && !isWebView) return;
+
     let isMounted = true;
-    
+
     getRedirectResult(auth)
       .then(async (result) => {
         if (!result || !isMounted) return;
         const user = result.user;
-        
+
         setIsGoogleLoading(true);
         try {
           const userDocRef = doc(firestore, `users/${user.uid}`);
           const userDocSnap = await getDoc(userDocRef);
-          
+
           if (!userDocSnap.exists()) {
             await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
             await waitForUserProfile(firestore, user.uid);
           }
-          
+
           triggerRefresh();
           await new Promise(resolve => setTimeout(resolve, 1500));
           router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
@@ -219,23 +224,10 @@ export default function SignupPage() {
           if (isMounted) setIsGoogleLoading(false);
         }
       })
-      .catch((error: any) => {
-        console.error("Redirect auth error:", error);
-        const isCancellation = 
-          error?.code === 'auth/popup-closed-by-user' || 
-          error?.code === 'auth/cancelled-popup-request' || 
-          error?.code === 'auth/user-cancelled' || 
-          error?.code === 'auth/redirect-cancelled-by-user';
-
-        if (!isCancellation) {
-          toast({
-            variant: "destructive",
-            title: "Authentication Failed",
-            description: error.message || "Failed to complete redirect sign-in.",
-          });
-        }
+      .catch(() => {
+        // Silently ignore — redirect result errors are expected when no redirect was in progress
       });
-      
+
     return () => {
       isMounted = false;
     };
@@ -247,66 +239,69 @@ export default function SignupPage() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      
+
       const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
       const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
-      
+
       if (isTauri || isWebView) {
-        // Popups fail inside Tauri and WebViews. Use redirect.
+        // Popups don't work inside Tauri webviews or Android WebViews — redirect only for those
         await signInWithRedirect(auth, provider);
         return;
       }
 
+      // Always use popup on web — never fall back to redirect (it breaks the UX)
+      let result;
       try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-
-        // Create profile document with Google profile data if it does not already exist
-        const userDocRef = doc(firestore, `users/${user.uid}`);
-        const userDocSnap = await getDoc(userDocRef);
-        
-        if (!userDocSnap.exists()) {
-          await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
-          await waitForUserProfile(firestore, user.uid);
-        }
-
-        triggerRefresh();
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+        result = await signInWithPopup(auth, provider);
       } catch (popupError: any) {
-        // Fallback to redirect if popup gets blocked, unsupported, or internal error occurs
-        if (
-          popupError?.code === 'auth/popup-blocked' || 
-          popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
-          popupError?.code === 'auth/internal-error' ||
-          popupError?.code === 'auth/network-request-failed'
-        ) {
-          await signInWithRedirect(auth, provider);
+        if (popupError?.code === 'auth/internal-error') {
+          // Firebase internal errors are usually transient. Wait briefly and retry once.
+          await new Promise(resolve => setTimeout(resolve, 1200));
+          result = await signInWithPopup(auth, provider);
         } else {
           throw popupError;
         }
       }
+
+      const user = result.user;
+
+      // Create profile document if this is a brand-new Google sign-in
+      const userDocRef = doc(firestore, `users/${user.uid}`);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
+        await waitForUserProfile(firestore, user.uid);
+      }
+
+      triggerRefresh();
+      // Brief pause so the POS context has time to pick up the new auth state
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+
     } catch (error: any) {
       console.error("Google auth error:", error);
-      const isCancellation = 
-        error?.code === 'auth/popup-closed-by-user' || 
-        error?.code === 'auth/cancelled-popup-request' || 
-        error?.code === 'auth/user-cancelled' || 
-        error?.code === 'auth/redirect-cancelled-by-user';
+      const isCancellation =
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/user-cancelled';
 
       if (!isCancellation) {
-        const errorDesc = error?.code === 'auth/internal-error'
-          ? "Google Authentication encountered a temporary system issue. Switching to redirect auth..."
-          : (error.message || "Please try again.");
         toast({
           variant: "destructive",
-          title: "Google Authentication Failed",
-          description: errorDesc,
+          title: "Google Sign-In Failed",
+          description:
+            error?.code === 'auth/popup-blocked'
+              ? "Your browser blocked the sign-in popup. Please allow popups for this site and try again."
+              : error?.code === 'auth/internal-error'
+              ? "Google Authentication is temporarily unavailable. Please try again in a moment."
+              : (error.message || "Please try again."),
         });
       }
       setIsGoogleLoading(false);
     }
   };
+
 
   const onSubmit = async (data: SignupFormValues) => {
     if (!auth || !firestore) return;
