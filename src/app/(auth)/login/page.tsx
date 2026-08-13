@@ -125,12 +125,6 @@ export default function LoginPage() {
       
       const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
       const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
-      
-      if (isTauri || isWebView) {
-        // Popups fail inside Tauri and WebViews. Use redirect.
-        await signInWithRedirect(auth, provider);
-        return;
-      }
 
       try {
         await signInWithPopup(auth, provider);
