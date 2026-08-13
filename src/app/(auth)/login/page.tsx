@@ -125,12 +125,23 @@ export default function LoginPage() {
       
       const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
       const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+      
+      if (isTauri || isWebView) {
+        // Popups fail inside Tauri and WebViews. Use redirect.
+        await signInWithRedirect(auth, provider);
+        return;
+      }
 
       try {
         await signInWithPopup(auth, provider);
         // AuthLayout handles the redirection once auth state changes
       } catch (popupError: any) {
-        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/operation-not-supported-in-this-environment') {
+        if (
+          popupError?.code === 'auth/popup-blocked' || 
+          popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
+          popupError?.code === 'auth/internal-error' ||
+          popupError?.code === 'auth/network-request-failed'
+        ) {
           await signInWithRedirect(auth, provider);
         } else {
           throw popupError;
@@ -145,10 +156,13 @@ export default function LoginPage() {
         error?.code === 'auth/redirect-cancelled-by-user';
 
       if (!isCancellation) {
+        const errorDesc = error?.code === 'auth/internal-error'
+          ? "Google Authentication encountered a temporary system issue. Switching to redirect auth..."
+          : (error.message || "Please try again.");
         toast({
           variant: "destructive",
           title: "Google Authentication Failed",
-          description: error.message || "Please try again.",
+          description: errorDesc,
         });
       }
       setIsGoogleLoading(false);

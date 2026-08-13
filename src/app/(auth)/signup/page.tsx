@@ -250,6 +250,12 @@ export default function SignupPage() {
       
       const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
       const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+      
+      if (isTauri || isWebView) {
+        // Popups fail inside Tauri and WebViews. Use redirect.
+        await signInWithRedirect(auth, provider);
+        return;
+      }
 
       try {
         const result = await signInWithPopup(auth, provider);
@@ -268,8 +274,13 @@ export default function SignupPage() {
         await new Promise(resolve => setTimeout(resolve, 1500));
         router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
       } catch (popupError: any) {
-        // Fallback to redirect if popup gets blocked or is unsupported
-        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/operation-not-supported-in-this-environment') {
+        // Fallback to redirect if popup gets blocked, unsupported, or internal error occurs
+        if (
+          popupError?.code === 'auth/popup-blocked' || 
+          popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
+          popupError?.code === 'auth/internal-error' ||
+          popupError?.code === 'auth/network-request-failed'
+        ) {
           await signInWithRedirect(auth, provider);
         } else {
           throw popupError;
@@ -284,10 +295,13 @@ export default function SignupPage() {
         error?.code === 'auth/redirect-cancelled-by-user';
 
       if (!isCancellation) {
+        const errorDesc = error?.code === 'auth/internal-error'
+          ? "Google Authentication encountered a temporary system issue. Switching to redirect auth..."
+          : (error.message || "Please try again.");
         toast({
           variant: "destructive",
           title: "Google Authentication Failed",
-          description: error.message || "Please try again.",
+          description: errorDesc,
         });
       }
       setIsGoogleLoading(false);
