@@ -34,12 +34,8 @@ export function useNativeNotifications() {
 
         if (Notification.permission === "granted") {
           createNotif();
-        } else if (Notification.permission !== "denied") {
-          const permission = await Notification.requestPermission();
-          if (permission === "granted") {
-            createNotif();
-          }
         }
+        // Do not prompt for permissions on the web if they haven't explicitly enabled it
         return;
       }
 
