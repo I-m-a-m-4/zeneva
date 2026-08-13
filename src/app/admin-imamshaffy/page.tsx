@@ -92,6 +92,8 @@ import {
     RefreshCw,
     Share2,
     Languages,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -823,6 +825,14 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
     // Filters for the first-run list, so it is queryable rather than a top-N peek.
     const [signupSearch, setSignupSearch] = useState('');
     const [signupFilter, setSignupFilter] = useState<'all' | 'activated' | 'inactive'>('all');
+    // Tracks which user rows have been expanded to show their full page trail.
+    const [expandedSignupIds, setExpandedSignupIds] = useState<Set<string>>(new Set());
+    const toggleSignupExpand = (id: string) =>
+        setExpandedSignupIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
 
     // Every session's route log, across all users. Capped so a large tenant
     // can't turn opening this tab into an unbounded read.
@@ -1339,14 +1349,67 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                 </Select>
                             </div>
                         </CardHeader>
-                        <CardContent className="max-h-[520px] space-y-3 overflow-y-auto">
+                        <CardContent className="max-h-[620px] space-y-3 overflow-y-auto">
+
+                            {/* ── Behaviour insights panel ── */}
+                            {visibleSignups.length > 0 && (() => {
+                                // Compute quick path insights from current visible set
+                                const withSteps = visibleSignups.filter(s => s.steps.length > 0);
+                                const hitOnboarding = withSteps.filter(s => s.steps.some(p => p.label === '/onboarding')).length;
+                                const hitDashboard  = withSteps.filter(s => s.steps.some(p => p.label === '/dashboard')).length;
+                                const hitPOS        = withSteps.filter(s => s.steps.some(p => p.label === '/sales/pos/select-products')).length;
+                                const loopedBack    = withSteps.filter(s => {
+                                    const seen = new Set<string>();
+                                    for (const p of s.steps) {
+                                        if (seen.has(p.label)) return true;
+                                        seen.add(p.label);
+                                    }
+                                    return false;
+                                }).length;
+                                const bounced = withSteps.filter(s => s.steps.length === 1).length;
+                                const pct = (n: number) => withSteps.length ? `${Math.round((n / withSteps.length) * 100)}%` : '—';
+                                const insights: { icon: string; text: string; tone: string }[] = [];
+                                if (hitOnboarding) insights.push({ icon: '🎯', text: `${pct(hitOnboarding)} of activated users reached /onboarding.`, tone: 'text-primary' });
+                                if (hitDashboard)  insights.push({ icon: '📊', text: `${pct(hitDashboard)} made it to the dashboard — good activation signal.`, tone: 'text-green-600' });
+                                if (hitPOS)        insights.push({ icon: '🛒', text: `${pct(hitPOS)} tried the POS in their first session — strong intent.`, tone: 'text-emerald-600' });
+                                if (loopedBack)    insights.push({ icon: '🔄', text: `${pct(loopedBack)} revisited the same page — possible confusion or deliberate exploration.`, tone: 'text-amber-600' });
+                                if (bounced)       insights.push({ icon: '🚪', text: `${bounced} user${bounced !== 1 ? 's' : ''} opened only one page before leaving.`, tone: 'text-destructive' });
+                                const loginLoop = withSteps.filter(s => {
+                                    const seq = s.steps.map(p => p.label);
+                                    for (let i = 0; i < seq.length - 1; i++) {
+                                        if ((seq[i] === '/login' || seq[i] === '/signup') && (seq[i+1] === '/login' || seq[i+1] === '/signup')) return true;
+                                    }
+                                    return false;
+                                }).length;
+                                if (loginLoop) insights.push({ icon: '⚠️', text: `${loginLoop} user${loginLoop !== 1 ? 's' : ''} ping-ponged between /login and /signup — auth confusion.`, tone: 'text-orange-600' });
+                                if (insights.length === 0) return null;
+                                return (
+                                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 mb-1">
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">🔍 Behavioural Insights</p>
+                                        <ul className="space-y-1">
+                                            {insights.map((ins, i) => (
+                                                <li key={i} className={`text-xs ${ins.tone} flex items-start gap-1.5`}>
+                                                    <span>{ins.icon}</span>
+                                                    <span>{ins.text}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                );
+                            })()}
+
                             {visibleSignups.length === 0 ? (
                                 <p className="py-8 text-center text-sm text-muted-foreground">
                                     {behavior.newSignupCount === 0
                                         ? `No signups in ${rangeLabel.toLowerCase()}.`
                                         : 'No signups match this search or filter.'}
                                 </p>
-                            ) : visibleSignups.map(({ user: u, steps, startedAt, signedUpAt, isFirstSession }) => (
+                            ) : visibleSignups.map(({ user: u, steps, startedAt, signedUpAt, isFirstSession }) => {
+                                const isExpanded = expandedSignupIds.has(u.id);
+                                const PREVIEW = 12;
+                                const visibleSteps = isExpanded ? steps : steps.slice(0, PREVIEW);
+                                const hiddenCount  = steps.length - PREVIEW;
+                                return (
                                 <div key={u.id} className="rounded-lg border p-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="min-w-0">
@@ -1388,24 +1451,32 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                             Signed up but has not opened a tracked page yet.
                                         </p>
                                     ) : (
-                                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                                            {steps.slice(0, 12).map((s, i) => (
-                                                <span key={`${s.at}-${i}`} className="flex items-center gap-1.5">
-                                                    {i > 0 && <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />}
-                                                    <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px]">
-                                                        {s.label}
+                                        <>
+                                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                                {visibleSteps.map((s, i) => (
+                                                    <span key={`${s.at}-${i}`} className="flex items-center gap-1.5">
+                                                        {i > 0 && <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />}
+                                                        <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px]">
+                                                            {s.label}
+                                                        </span>
                                                     </span>
-                                                </span>
-                                            ))}
-                                            {steps.length > 12 && (
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    +{steps.length - 12} more
-                                                </span>
+                                                ))}
+                                            </div>
+                                            {steps.length > PREVIEW && (
+                                                <button
+                                                    onClick={() => toggleSignupExpand(u.id)}
+                                                    className="mt-2 flex items-center gap-1 text-[11px] text-primary hover:underline"
+                                                >
+                                                    {isExpanded
+                                                        ? <><ChevronUp className="h-3 w-3" /> Collapse</>  
+                                                        : <><ChevronDown className="h-3 w-3" /> Show all {hiddenCount} more pages</>}
+                                                </button>
                                             )}
-                                        </div>
+                                        </>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </CardContent>
                     </Card>
                 </>
