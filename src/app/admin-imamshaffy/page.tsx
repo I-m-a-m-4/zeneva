@@ -152,6 +152,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+} from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { rankBusinesses } from '@/lib/outreach-scoring';
@@ -833,6 +840,8 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
             if (next.has(id)) next.delete(id); else next.add(id);
             return next;
         });
+    // The user whose full journey detail sheet is open.
+    const [journeyDetailUser, setJourneyDetailUser] = useState<(typeof visibleSignups)[0] | null>(null);
 
     // Every session's route log, across all users. Capped so a large tenant
     // can't turn opening this tab into an unbounded read.
@@ -1410,7 +1419,7 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                 const visibleSteps = isExpanded ? steps : steps.slice(0, PREVIEW);
                                 const hiddenCount  = steps.length - PREVIEW;
                                 return (
-                                <div key={u.id} className="rounded-lg border p-3">
+                                <div key={u.id} className="rounded-lg border p-3 cursor-pointer hover:border-primary/60 hover:bg-muted/30 transition-colors" onClick={() => setJourneyDetailUser({ user: u, steps, startedAt, signedUpAt, isFirstSession })}>
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-semibold">{u.name || u.email}</p>
@@ -1464,7 +1473,7 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                             </div>
                                             {steps.length > PREVIEW && (
                                                 <button
-                                                    onClick={() => toggleSignupExpand(u.id)}
+                                                    onClick={e => { e.stopPropagation(); toggleSignupExpand(u.id); }}
                                                     className="mt-2 flex items-center gap-1 text-[11px] text-primary hover:underline"
                                                 >
                                                     {isExpanded
@@ -1479,10 +1488,203 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                             })}
                         </CardContent>
                     </Card>
+
+                    {/* ── Per-user journey detail Sheet ── */}
+                    <Sheet open={!!journeyDetailUser} onOpenChange={open => { if (!open) setJourneyDetailUser(null); }}>
+                        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+                            {journeyDetailUser && (() => {
+                                const { user: ju, steps: js, startedAt: jStart, signedUpAt: jSignup } = journeyDetailUser;
+
+                                // --- compute analytics ---
+                                // Page frequency
+                                const freq = new Map<string, number>();
+                                js.forEach(s => freq.set(s.label, (freq.get(s.label) || 0) + 1));
+                                const freqSorted = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+
+                                // Time between steps (ms)
+                                const gaps: { from: string; to: string; ms: number }[] = [];
+                                for (let i = 0; i < js.length - 1; i++) {
+                                    const ms = js[i + 1].at - js[i].at;
+                                    if (ms >= 0 && ms < 30 * 60 * 1000) { // ignore gaps > 30 min (idle)
+                                        gaps.push({ from: js[i].label, to: js[i + 1].label, ms });
+                                    }
+                                }
+                                const totalSessionMs = gaps.reduce((n, g) => n + g.ms, 0);
+                                const avgGapMs = gaps.length ? totalSessionMs / gaps.length : 0;
+
+                                // Time spent per page (sum of all gaps where `from` = that page)
+                                const timePerPage = new Map<string, number>();
+                                gaps.forEach(g => timePerPage.set(g.from, (timePerPage.get(g.from) || 0) + g.ms));
+
+                                // Loop detection (same page visited more than once)
+                                const loops = [...freq.entries()].filter(([, c]) => c > 1).map(([p, c]) => ({ page: p, count: c }));
+
+                                // Where they stopped (last page visited)
+                                const lastPage = js[js.length - 1]?.label ?? '—';
+
+                                // Key journey stages
+                                const hitOnboarding = js.some(s => s.label === '/onboarding');
+                                const hitDashboard  = js.some(s => s.label === '/dashboard');
+                                const hitPOS        = js.some(s => s.label === '/sales/pos/select-products');
+                                const hitInventory  = js.some(s => s.label === '/inventory');
+                                const hitBilling    = js.some(s => s.label === '/billing');
+                                const hitSettings   = js.some(s => s.label === '/settings');
+                                const loginLoops    = js.filter(s => s.label === '/login' || s.label === '/signup').length;
+
+                                const fmtMs = (ms: number) => {
+                                    if (ms < 1000) return '<1s';
+                                    if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+                                    return `${Math.round(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+                                };
+                                const fmtTime = (at: number) => {
+                                    try { return format(new Date(at), 'HH:mm:ss'); } catch { return '—'; }
+                                };
+
+                                // Auto-generated insights
+                                const observations: { icon: string; text: string; tone: string }[] = [];
+                                if (js.length === 0) observations.push({ icon: '👻', text: 'Never opened a page after signing up.', tone: 'text-destructive' });
+                                if (js.length === 1) observations.push({ icon: '🚪', text: `Bounced on the first page (${js[0]?.label}).`, tone: 'text-destructive' });
+                                if (hitPOS && !hitOnboarding) observations.push({ icon: '⚡', text: 'Skipped onboarding and went straight to the POS — likely has prior experience.', tone: 'text-emerald-600' });
+                                if (hitPOS && hitOnboarding) observations.push({ icon: '✅', text: 'Completed onboarding and used the POS — strong activation.', tone: 'text-green-600' });
+                                if (!hitDashboard && js.length > 3) observations.push({ icon: '🗺️', text: 'Explored several pages but never reached the dashboard — may be disoriented.', tone: 'text-amber-600' });
+                                if (loginLoops > 3) observations.push({ icon: '⚠️', text: `Hit /login or /signup ${loginLoops} times — likely had auth trouble.`, tone: 'text-orange-600' });
+                                if (loops.length > 0) observations.push({ icon: '🔄', text: `Revisited: ${loops.map(l => `${l.page} ×${l.count}`).join(', ')}.`, tone: 'text-amber-600' });
+                                if (hitBilling) observations.push({ icon: '💳', text: 'Visited /billing — upgrade intent detected.', tone: 'text-primary' });
+                                if (totalSessionMs > 5 * 60 * 1000) observations.push({ icon: '⏱️', text: `Active for ~${fmtMs(totalSessionMs)} in their first session.`, tone: 'text-muted-foreground' });
+                                if (totalSessionMs > 0 && totalSessionMs < 60 * 1000 && js.length > 5) observations.push({ icon: '⚡', text: 'Very fast navigation — possibly a power user or just clicking through quickly.', tone: 'text-blue-600' });
+                                if (hitSettings) observations.push({ icon: '⚙️', text: 'Visited /settings in first session — exploring account control early.', tone: 'text-muted-foreground' });
+                                if (hitInventory && hitPOS) observations.push({ icon: '📦', text: 'Explored both Inventory and POS — treating the app as an end-to-end workflow.', tone: 'text-emerald-600' });
+                                if (lastPage === '/login' || lastPage === '/signup') observations.push({ icon: '🔐', text: 'Last page was an auth page — may have logged out or hit an auth error.', tone: 'text-destructive' });
+
+                                return (
+                                    <>
+                                        <SheetHeader className="pb-4 border-b">
+                                            <SheetTitle className="text-lg">{ju.name || ju.email}</SheetTitle>
+                                            <SheetDescription className="text-xs text-muted-foreground">
+                                                {ju.email} · Joined {jSignup ? formatDistanceToNow(jSignup, { addSuffix: true }) : 'unknown'} · {js.length} pages in first session
+                                            </SheetDescription>
+                                        </SheetHeader>
+
+                                        <div className="mt-4 space-y-5">
+
+                                            {/* Key milestone badges */}
+                                            <div>
+                                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">Journey Milestones</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {[
+                                                        { label: 'Onboarding', hit: hitOnboarding },
+                                                        { label: 'Dashboard',  hit: hitDashboard },
+                                                        { label: 'POS',        hit: hitPOS },
+                                                        { label: 'Inventory',  hit: hitInventory },
+                                                        { label: 'Billing',    hit: hitBilling },
+                                                        { label: 'Settings',   hit: hitSettings },
+                                                    ].map(m => (
+                                                        <span key={m.label} className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${m.hit ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-muted/40 border-muted text-muted-foreground line-through'}`}>
+                                                            {m.hit ? '✓ ' : ''}{m.label}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Session stats */}
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {[
+                                                    { label: 'Pages visited', value: js.length },
+                                                    { label: 'Unique pages', value: freq.size },
+                                                    { label: 'Session time', value: totalSessionMs > 0 ? fmtMs(totalSessionMs) : '—' },
+                                                    { label: 'Avg per page', value: avgGapMs > 0 ? fmtMs(avgGapMs) : '—' },
+                                                    { label: 'Looped pages', value: loops.length },
+                                                    { label: 'Last page', value: lastPage.length > 12 ? lastPage.slice(0, 12) + '…' : lastPage },
+                                                ].map(stat => (
+                                                    <div key={stat.label} className="rounded-lg border bg-muted/30 p-2 text-center">
+                                                        <p className="text-base font-bold">{stat.value}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Observations */}
+                                            {observations.length > 0 && (
+                                                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">🔍 Observations</p>
+                                                    <ul className="space-y-1.5">
+                                                        {observations.map((o, i) => (
+                                                            <li key={i} className={`text-xs flex items-start gap-1.5 ${o.tone}`}>
+                                                                <span className="shrink-0">{o.icon}</span>
+                                                                <span>{o.text}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {/* Page frequency table */}
+                                            {freqSorted.length > 0 && (
+                                                <div>
+                                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">Page Frequency</p>
+                                                    <div className="rounded-lg border overflow-hidden text-xs">
+                                                        <table className="w-full">
+                                                            <thead className="bg-muted/50">
+                                                                <tr>
+                                                                    <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Page</th>
+                                                                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Visits</th>
+                                                                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Time spent</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y">
+                                                                {freqSorted.map(([page, count]) => (
+                                                                    <tr key={page} className="hover:bg-muted/20">
+                                                                        <td className="px-3 py-1.5 font-mono text-[11px]">{page}</td>
+                                                                        <td className="px-3 py-1.5 text-right tabular-nums">
+                                                                            {count}{count > 1 && <span className="ml-1 text-amber-600 text-[10px]">🔄</span>}
+                                                                        </td>
+                                                                        <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                                                            {timePerPage.has(page) ? fmtMs(timePerPage.get(page)!) : '—'}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Full step-by-step timeline */}
+                                            {js.length > 0 && (
+                                                <div>
+                                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">Full Page Timeline</p>
+                                                    <ol className="relative border-l border-muted ml-2 space-y-1">
+                                                        {js.map((s, i) => {
+                                                            const gap = i < js.length - 1 ? js[i + 1].at - s.at : null;
+                                                            const isLoop = (freq.get(s.label) || 0) > 1;
+                                                            return (
+                                                                <li key={`${s.at}-${i}`} className="pl-4 relative">
+                                                                    <span className={`absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full border-2 ${isLoop ? 'bg-amber-400 border-amber-500' : i === 0 ? 'bg-primary border-primary' : 'bg-muted border-muted-foreground/40'}`} />
+                                                                    <div className="flex items-baseline gap-2">
+                                                                        <span className="font-mono text-[11px] font-medium">{s.label}</span>
+                                                                        <span className="text-[10px] text-muted-foreground tabular-nums">{fmtTime(s.at)}</span>
+                                                                        {gap !== null && gap >= 0 && gap < 30 * 60 * 1000 && (
+                                                                            <span className="text-[10px] text-muted-foreground/60">→ {fmtMs(gap)}</span>
+                                                                        )}
+                                                                    </div>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ol>
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                        </SheetContent>
+                    </Sheet>
                 </>
             )}
 
             {/* Per-User Table */}
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">

@@ -610,6 +610,13 @@ export default function AuthenticatedLayout({
   }, [permissionPopup, firestore, currentUserProfile]);
 
   React.useEffect(() => {
+    // Permission update popups are only meaningful in the native Tauri app — the
+    // browser manages its own notification prompt via the OS chrome. Showing this
+    // modal on the web just confuses users who clicked "Allow" or "Block" and
+    // never expected a second dialog.
+    const isNative = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+    if (!isNative) return;
+
     if (userNotifications && userNotifications.length > 0) {
       // Check for unread permission updates to show as a popup
       const unreadPermissionNotifs = userNotifications.filter(n => !n.read && (n as any).type === 'permission_update');
