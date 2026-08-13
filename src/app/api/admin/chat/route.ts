@@ -17,7 +17,7 @@
  * edited through the forms on the page, where they are validated and audited.
  */
 
-import { getGoogleModel } from '@/lib/gemini';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
@@ -27,7 +27,9 @@ import { createCapTableTools } from './cap-table-tools';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// AI Provider is dynamically loaded on demand via getGoogleModel
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+});
 
 const SYSTEM_PROMPT = `You are Zen, advising the founder of Zeneva on their own company's equity.
 
@@ -150,7 +152,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: getGoogleModel('gemini-2.5-flash'),
+    model: google('gemini-2.5-flash'),
     system: SYSTEM_PROMPT,
     messages: modelMessages,
     // Lower than the merchant route's 24. These tools are few and cheap, and a
