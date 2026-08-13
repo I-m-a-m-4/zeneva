@@ -137,7 +137,7 @@ export default function AchievementsPage() {
           // adminApiFetch, not a bare relative fetch: in the Tauri bundle a relative
           // path resolves against tauri://localhost and 404s. It also attaches the
           // ID token the endpoint now requires.
-          const data = await adminApiFetch('/api/admin/metrics');
+          const data = await adminApiFetch('/api/admin/metrics', { timeoutMs: 90000 });
           const revivedData = reviveTimestamps(data);
           setAdminData(revivedData);
       } catch (error: any) {
