@@ -95,6 +95,8 @@ export const createUserProfileDocument = async (
       role: userRole,
       surveyCompleted: surveyCompleted,
       status: 'active',
+      // Record how this user signed up so the admin can filter/segment by auth method.
+      authProvider: user.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
     };
 
     if (branchId) {

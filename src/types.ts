@@ -109,6 +109,12 @@ export interface UserProfile {
      */
     invitationCode?: string;
     /**
+     * How this account was initially authenticated — 'google' for Continue with
+     * Google, 'email' for email/password. Written once at signup; absent on
+     * accounts created before this field was introduced.
+     */
+    authProvider?: 'google' | 'email';
+    /**
      * Which lifecycle ("drip") notifications this account has already been
      * sent, as `{ [stageId]: Timestamp }` — see
      * src/lib/lifecycle-notifications.ts.
