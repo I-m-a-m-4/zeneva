@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import {
@@ -191,7 +191,7 @@ export default function OutreachPage() {
 
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'contacted' | 'not_contacted'>('all');
-  const [planFilter, setPlanFilter] = React.useState<'all' | 'pro' | 'starter'>('all');
+  const [planFilter, setPlanFilter] = React.useState<'all' | 'pro' | 'starter' | 'early_pro'>('all');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   const filtered = React.useMemo(() => {
@@ -202,6 +202,10 @@ export default function OutreachPage() {
       const plan = (r.business.plan ?? 'starter').toLowerCase();
       if (planFilter === 'pro' && plan !== 'pro') return false;
       if (planFilter === 'starter' && plan === 'pro') return false;
+      if (planFilter === 'early_pro') {
+        if (plan !== 'pro') return false;
+        if (r.lastLog) return false; // Early pro = Pro and not contacted yet
+      }
       if (!term) return true;
       return (
         (r.business.name ?? '').toLowerCase().includes(term) ||
@@ -224,7 +228,7 @@ export default function OutreachPage() {
   }, [rows]);
 
   const [selected, setSelected] = React.useState<BusinessRow | null>(null);
-  const [dialogTab, setDialogTab] = React.useState<'push' | 'note'>('push');
+  const [dialogTab, setDialogTab] = React.useState<'push' | 'note' | 'email-template'>('push');
   const [pushTitle, setPushTitle] = React.useState('');
   const [pushBody, setPushBody] = React.useState('');
   const [noteText, setNoteText] = React.useState('');
@@ -329,12 +333,13 @@ export default function OutreachPage() {
             </SelectContent>
           </Select>
           <Select value={planFilter} onValueChange={v => setPlanFilter(v as any)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[160px]">
               <Crown className="mr-2 h-3.5 w-3.5" /><SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All plans</SelectItem>
               <SelectItem value="pro">Pro only</SelectItem>
+              <SelectItem value="early_pro">Early Pro Adopters</SelectItem>
               <SelectItem value="starter">Starter only</SelectItem>
             </SelectContent>
           </Select>
@@ -473,7 +478,7 @@ export default function OutreachPage() {
           </DialogHeader>
 
           <div className="flex rounded-lg border p-1 gap-1">
-            {(['push', 'note'] as const).map(tab => (
+            {(['push', 'note', 'email-template'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setDialogTab(tab)}
@@ -482,12 +487,54 @@ export default function OutreachPage() {
                   dialogTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {tab === 'push' ? <><Bell className="mr-1.5 inline h-3.5 w-3.5" />Send Push</> : <><StickyNote className="mr-1.5 inline h-3.5 w-3.5" />Log Contact</>}
+                {tab === 'push' ? <><Bell className="mr-1.5 inline h-3.5 w-3.5" />Send Push</> : tab === 'note' ? <><StickyNote className="mr-1.5 inline h-3.5 w-3.5" />Log Contact</> : <><Mail className="mr-1.5 inline h-3.5 w-3.5" />Email Template</>}
               </button>
             ))}
           </div>
 
-          {dialogTab === 'push' ? (
+          {dialogTab === 'email-template' ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">A beautiful template to send to early adopters. Copy this to your email client to welcome them.</p>
+              <div 
+                className="bg-white text-black rounded-md overflow-y-auto max-h-[300px] border shadow-inner p-4"
+                dangerouslySetInnerHTML={{ __html: `
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #111; margin-top: 0; font-size: 20px;">Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}! 🚀</h2>
+                    <p style="font-size: 15px;">I'm Imam, the founder of Zeneva. I noticed you recently upgraded your business <strong>${selected?.business.name ?? 'account'}</strong> to our Pro plan.</p>
+                    <p style="font-size: 15px;">As one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.</p>
+                    <p style="font-size: 15px;">If you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.</p>
+                    <p style="font-size: 15px;">Thank you for being part of our journey.</p>
+                    <br/>
+                    <p style="font-size: 15px; margin-bottom: 4px;">Best regards,</p>
+                    <p style="font-size: 16px; font-weight: bold; margin-top: 0; margin-bottom: 2px;">Imam Shaffy</p>
+                    <p style="font-size: 13px; color: #666; margin-top: 0;">Founder, Zeneva</p>
+                  </div>
+                ` }}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
+                <Button 
+                  onClick={() => {
+                    const html = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto;"><h2 style="color: #111; margin-top: 0; font-size: 20px;">Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}! 🚀</h2><p style="font-size: 15px;">I'm Imam, the founder of Zeneva. I noticed you recently upgraded your business <strong>${selected?.business.name ?? 'account'}</strong> to our Pro plan.</p><p style="font-size: 15px;">As one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.</p><p style="font-size: 15px;">If you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.</p><p style="font-size: 15px;">Thank you for being part of our journey.</p><br/><p style="font-size: 15px; margin-bottom: 4px;">Best regards,</p><p style="font-size: 16px; font-weight: bold; margin-top: 0; margin-bottom: 2px;">Imam Shaffy</p><p style="font-size: 13px; color: #666; margin-top: 0;">Founder, Zeneva</p></div>`;
+                    navigator.clipboard.writeText(html);
+                    toast({ title: 'Copied HTML!', description: 'You can now paste this into an email client that supports raw HTML.' });
+                  }}
+                  variant="secondary"
+                >
+                  Copy HTML
+                </Button>
+                <Button 
+                  onClick={() => {
+                    const text = `Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}!\n\nI'm Imam, the founder of Zeneva. I noticed you recently upgraded your business ${selected?.business.name ?? 'account'} to our Pro plan.\n\nAs one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.\n\nIf you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.\n\nThank you for being part of our journey.\n\nBest regards,\nImam Shaffy\nFounder, Zeneva`;
+                    navigator.clipboard.writeText(text);
+                    toast({ title: 'Copied Text!', description: 'You can now paste this as plain text.' });
+                  }}
+                >
+                  Copy Text
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : dialogTab === 'push' ? (
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">Title</label>
