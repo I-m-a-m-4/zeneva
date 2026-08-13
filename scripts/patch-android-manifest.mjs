@@ -77,9 +77,8 @@ function processManifest(filePath) {
 
   const missing = entries.filter((e) => !content.includes(e.match));
 
-  if (!content.includes('android:usesCleartextTraffic="true"') && content.includes('<application')) {
-    content = content.replace('<application', '<application android:usesCleartextTraffic="true"');
-  }
+  // Cleartext traffic is managed via gradle placeholders (${usesCleartextTraffic})
+  // so we do not inject static android:usesCleartextTraffic attributes directly into <application>
 
   if (missing.length > 0 && content.includes('<application')) {
     const block = `
