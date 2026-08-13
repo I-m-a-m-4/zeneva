@@ -176,7 +176,7 @@ function ReceiptContent() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 py-4">
+    <div className="flex flex-col items-center gap-6 py-4 min-h-screen">
       {user && (
         <div className="w-full max-w-2xl flex justify-start no-print">
           <Button variant="ghost" asChild size="sm">
@@ -207,6 +207,26 @@ function ReceiptContent() {
           <Share2 className="mr-2 h-4 w-4" /> Share
         </Button>
       </div>
+
+      {/* Subtle Footer CTA for visitors */}
+      <footer className="w-full max-w-2xl mt-auto pt-6 pb-4 border-t text-center no-print">
+        <div className="flex flex-col items-center gap-1 px-4">
+          <p className="text-xs font-semibold text-foreground">
+            Create Professional Receipts Like This
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Manage your sales, inventory, and invoices with Zeneva POS.
+          </p>
+          <Link 
+            href="https://zeneva.space" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs font-bold text-primary hover:underline mt-1.5"
+          >
+            Get Started Free
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

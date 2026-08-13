@@ -42,6 +42,8 @@ export async function getCountryFromIP(): Promise<string> {
   const providers: Array<{ url: string; read: (data: any) => string | undefined }> = [
     { url: 'https://ipwho.is/', read: (d) => (d?.success ? d.country : undefined) },
     { url: 'https://ipapi.co/json/', read: (d) => d?.country_name },
+    { url: 'https://api.db-ip.com/v2/free/self', read: (d) => d?.countryName },
+    { url: 'https://api.country.is/', read: (d) => d?.country },
   ];
 
   for (const provider of providers) {
@@ -56,11 +58,13 @@ export async function getCountryFromIP(): Promise<string> {
     }
   }
 
-  // Cache result
-  try {
-    sessionStorage.setItem('zeneva_ip_country', country);
-  } catch (e) {
-    // Ignore storage errors
+  // Cache result if valid
+  if (country !== 'Unknown') {
+    try {
+      sessionStorage.setItem('zeneva_ip_country', country);
+    } catch (e) {
+      // Ignore storage errors
+    }
   }
 
   return country;

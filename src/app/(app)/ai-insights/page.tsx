@@ -28,7 +28,7 @@ import { ToolResult } from '@/components/ai-insights/tool-renderer';
 import { validateProposal, buildSaleFromProposal } from '@/components/ai-insights/proposal-guard';
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
-import { aiDailyLimit, effectivePlan } from '@/lib/plan';
+import { aiMonthlyLimit, effectivePlan } from '@/lib/plan';
 import { apiBase } from '@/lib/platform';
 
 /**
@@ -574,17 +574,18 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   ];
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
   const plan = effectivePlan(businessData);
-  const dailyLimit = aiDailyLimit(businessData);
+  const monthlyLimit = aiMonthlyLimit(businessData);
   
   let used = 0;
-  if (businessData?.aiUsageCurrentDate === todayStr) {
+  if (businessData?.aiUsageCurrentDate === currentMonthStr) {
     used = businessData?.aiUsageCount || 0;
   }
   const bonus = businessData?.aiBonusCredits || 0;
   
-  const remaining = Math.max(0, dailyLimit - used);
-  const isUsingBonus = used >= dailyLimit && bonus > 0;
+  const remaining = Math.max(0, monthlyLimit - used);
+  const isUsingBonus = used >= monthlyLimit && bonus > 0;
 
   return (
     <div className="flex h-full min-h-0 bg-background text-foreground relative overflow-hidden">
@@ -806,7 +807,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                       {businessData && (
                         <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                           <Gauge className="w-3.5 h-3.5 text-orange-500" />
-                          {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} daily AI responses left`}
+                          {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} monthly AI responses left`}
                         </span>
                       )}
                     </div>
@@ -971,7 +972,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
               {businessData && (
                 <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5 text-orange-500" />
-                  {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} daily AI responses left`}
+                  {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} monthly AI responses left`}
                 </span>
               )}
             </div>

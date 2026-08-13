@@ -233,9 +233,10 @@ export function UserActivityTracker() {
 
                     // Detect country from IP once per session
                     let country = sessionStorage.getItem('zeneva_session_country') || '';
+                    if (country === 'Unknown') country = '';
                     if (!country) {
                         country = await getCountryFromIP();
-                        if (country) {
+                        if (country && country !== 'Unknown') {
                             sessionStorage.setItem('zeneva_session_country', country);
                         }
                     }

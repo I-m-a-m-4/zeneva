@@ -94,6 +94,7 @@ import {
   SEGMENT_BADGE_CLASS,
   type UserSegment,
 } from '@/components/admin/user-detail/user-segments';
+import { useDeferredMobileRender } from '@/hooks/use-deferred-render';
 
 function useCurrentUserProfile() {
   const { user } = useUser();
@@ -175,6 +176,7 @@ export default function UsersPage() {
   const { toast } = useToast();
 
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
+  const shouldRenderRows = useDeferredMobileRender(80);
   const [invitationToRevoke, setInvitationToRevoke] = React.useState<Invitation | null>(null);
   const [userToUpdate, setUserToUpdate] = React.useState<{ user: UserProfile; action: 'activate' | 'deactivate' } | null>(null);
 
@@ -216,18 +218,39 @@ export default function UsersPage() {
 
   const bizIndex = React.useMemo(() => businessIndex(businesses), [businesses]);
 
+  const [accountTypeFilter, setAccountTypeFilter] = React.useState<'all' | 'registered' | 'incomplete'>('all');
+
   const summary = React.useMemo(() => {
     const all = users ?? [];
-    const counts = segmentCounts(all);
+    const registered = all.filter(u => Boolean(u.email || u.name || u.phone));
+    const incomplete = all.filter(u => !u.email && !u.name && !u.phone);
+    const counts = segmentCounts(registered);
     const outdated = all.filter(u => u.appVersion && u.appVersion !== AppConfig.version).length;
     const blocked = all.filter(u => u.status === 'inactive' || u.status === 'suspended').length;
-    return { total: all.length, counts, outdated, blocked };
+    
+    const conversionRate = all.length > 0 ? (registered.length / all.length) * 100 : 0;
+    const abandonmentRate = all.length > 0 ? (incomplete.length / all.length) * 100 : 0;
+    
+    return { 
+      total: all.length, 
+      registeredCount: registered.length, 
+      incompleteCount: incomplete.length, 
+      conversionRate,
+      abandonmentRate,
+      counts, 
+      outdated, 
+      blocked 
+    };
   }, [users]);
 
   const visibleUsers = React.useMemo(() => {
     const term = search.trim().toLowerCase();
 
     const filtered = (users ?? []).filter(u => {
+      const isRegistered = Boolean(u.email || u.name || u.phone);
+      if (accountTypeFilter === 'registered' && !isRegistered) return false;
+      if (accountTypeFilter === 'incomplete' && isRegistered) return false;
+
       if (roleFilter !== 'all' && (u.role || 'vendor_operator') !== roleFilter) return false;
       if (statusFilter !== 'all' && (u.status || 'active') !== statusFilter) return false;
       if (planFilter !== 'all' && planOf(u, bizIndex).toLowerCase() !== planFilter) return false;
@@ -239,17 +262,18 @@ export default function UsersPage() {
         (u.name || '').toLowerCase().includes(term) ||
         (u.email || '').toLowerCase().includes(term) ||
         (u.phone || '').toLowerCase().includes(term) ||
-        (business?.name || '').toLowerCase().includes(term)
+        (business?.name || '').toLowerCase().includes(term) ||
+        (!isRegistered && 'incomplete signup'.includes(term))
       );
     });
 
     return filtered.sort((a, b) => {
       if (sortBy === 'usage') return (b.totalUsageSeconds ?? 0) - (a.totalUsageSeconds ?? 0);
-      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'name') return (a.name || 'Incomplete Signup').localeCompare(b.name || 'Incomplete Signup');
       const key = sortBy === 'joined' ? 'createdAt' : 'lastSeen';
       return (toDate((b as any)[key])?.getTime() ?? 0) - (toDate((a as any)[key])?.getTime() ?? 0);
     });
-  }, [users, bizIndex, search, roleFilter, statusFilter, planFilter, segmentFilter, sortBy]);
+  }, [users, accountTypeFilter, bizIndex, search, roleFilter, statusFilter, planFilter, segmentFilter, sortBy]);
 
   const handleExport = () => {
     const rows = [
@@ -344,13 +368,14 @@ export default function UsersPage() {
 
             {canManageUsers && (
               <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                  <StatTile label="Total users" value={summary.total.toLocaleString()} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+                  <StatTile label="Total accounts" value={summary.total.toLocaleString()} hint={`${summary.registeredCount} registered · ${summary.incompleteCount} visitors`} />
+                  <StatTile label="Registered" value={`${summary.registeredCount.toLocaleString()} (${summary.conversionRate.toFixed(1)}%)`} hint="Completion rate" />
+                  <StatTile label="Incomplete" value={`${summary.incompleteCount.toLocaleString()} (${summary.abandonmentRate.toFixed(1)}%)`} hint="Drop-off rate" />
                   <StatTile label="Power users" value={summary.counts.power} hint="Active 7d, 5h+ total" />
                   <StatTile label="Active" value={summary.counts.active} hint="Seen in last 7 days" />
                   <StatTile label="At risk" value={summary.counts.at_risk} hint="Quiet 8–30 days" />
                   <StatTile label="Dormant" value={summary.counts.dormant} hint="Quiet 30+ days" />
-                  <StatTile label="Blocked" value={summary.blocked} hint="Inactive or suspended" />
                 </div>
 
                 {/* One filter row, scoping the table and the export below it. */}
@@ -365,6 +390,14 @@ export default function UsersPage() {
                       aria-label="Search users"
                     />
                   </div>
+                  <Select value={accountTypeFilter} onValueChange={(v) => setAccountTypeFilter(v as any)}>
+                    <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Account Type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All accounts ({summary.total})</SelectItem>
+                      <SelectItem value="registered">Registered ({summary.registeredCount})</SelectItem>
+                      <SelectItem value="incomplete">Incomplete ({summary.incompleteCount})</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Select value={segmentFilter} onValueChange={setSegmentFilter}>
                     <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Segment" /></SelectTrigger>
                     <SelectContent>
@@ -438,7 +471,8 @@ export default function UsersPage() {
                 <Table>
                   <UserTableHeader />
                   <TableBody>
-                    {visibleUsers.map((user) => {
+                    {shouldRenderRows ? (
+                      visibleUsers.map((user) => {
                       const business = user.businessId ? bizIndex.get(user.businessId) : undefined;
                       const segment = segmentOf(user);
                       const outdated = !!user.appVersion && user.appVersion !== AppConfig.version;
@@ -455,12 +489,21 @@ export default function UsersPage() {
                           }}
                         >
                           <TableCell>
-                            <div className="font-medium">{user.name}</div>
-                            <div className="break-all text-xs text-muted-foreground">{user.email}</div>
+                            <div className="font-medium flex items-center gap-1.5">
+                              {user.name || <span className="text-amber-600 dark:text-amber-400 font-semibold">Incomplete Signup</span>}
+                              {!user.name && !user.email && (
+                                <Badge variant="outline" className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200">
+                                  Visitor
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="break-all text-xs text-muted-foreground">
+                              {user.email || <span className="italic opacity-60">No email provided</span>}
+                            </div>
                             {/* Columns that drop out by breakpoint are restated
                                 here so nothing is lost on a narrow screen. */}
                             <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
-                              {business?.name || 'No business'}
+                              {business?.name || (user.email ? 'No business' : 'Pending Signup')}
                               <span className="sm:hidden">
                                 {' · '}
                                 {toDate(user.lastSeen)
@@ -470,7 +513,7 @@ export default function UsersPage() {
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">—</span>}</span>
+                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">{user.email ? '—' : 'Pending Signup'}</span>}</span>
                           </TableCell>
                           <TableCell>
                             <Badge variant={(user.role || 'vendor_operator') === 'admin' ? 'default' : 'secondary'} className="whitespace-nowrap capitalize">
@@ -548,7 +591,14 @@ export default function UsersPage() {
                           </TableCell>
                         </TableRow>
                       );
-                    })}
+                    })
+                  ) : (
+                    <>
+                      <UserRowSkeleton />
+                      <UserRowSkeleton />
+                      <UserRowSkeleton />
+                    </>
+                  )}
                   </TableBody>
                 </Table>
               </div>

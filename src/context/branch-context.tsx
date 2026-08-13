@@ -88,6 +88,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           const cachedBranches = JSON.parse(cachedBranchesStr);
           if (cachedBranches && cachedBranches.length > 0) {
             setBranches(cachedBranches);
+            setIsLoadingBranches(false); // Render cache immediately, validate in background
           }
         } catch (e) {
           console.error("Failed to parse cached branches", e);
@@ -102,58 +103,67 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         const targetUserId = impersonatedId || user.uid;
         lastLoadedUserIdRef.current = targetUserId;
 
-        const userDocRef = doc(firestore, 'users', targetUserId);
-        const userDocSnap = await withFirestoreRetry(() => getDoc(userDocRef), {
-          label: 'BranchProvider user profile',
-        });
+        // Try getting cached businessId first to avoid an extra DB read
+        let businessId = typeof window !== 'undefined' ? localStorage.getItem('zeneva_cached_business_id') : null;
         
-        if (userDocSnap.exists()) {
-          const businessId = userDocSnap.data().businessId;
-          const isValidBusinessId = businessId && 
-                                    businessId !== 'undefined' && 
-                                    businessId !== 'null' && 
-                                    businessId !== 'none' && 
-                                    businessId.trim() !== '';
-          
-          if (isValidBusinessId) {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('zeneva_cached_business_id', businessId);
-            }
+        if (!businessId || businessId === 'undefined' || businessId === 'null' || businessId === 'none') {
+          const userDocRef = doc(firestore, 'users', targetUserId);
+          const userDocSnap = await withFirestoreRetry(() => getDoc(userDocRef), {
+            label: 'BranchProvider user profile',
+          });
+          if (userDocSnap.exists()) {
+            businessId = userDocSnap.data().businessId;
+          }
+        }
+        
+        const isValidBusinessId = businessId && 
+                                  businessId !== 'undefined' && 
+                                  businessId !== 'null' && 
+                                  businessId !== 'none' && 
+                                  businessId.trim() !== '';
+        
+        if (isValidBusinessId) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('zeneva_cached_business_id', businessId);
+          }
 
-            const branchesQuery = query(
-              collection(firestore, 'branches'),
-              where('businessId', '==', businessId),
-              orderBy('createdAt', 'asc')
-            );
-            
-            const branchesSnap = await withFirestoreRetry(() => getDocs(branchesQuery), {
+          const branchesQuery = query(
+            collection(firestore, 'branches'),
+            where('businessId', '==', businessId),
+            orderBy('createdAt', 'asc')
+          );
+          
+          const businessDocRef = doc(firestore, 'businessInstances', businessId);
+
+          // Fetch branches and business instance in parallel
+          const [branchesSnap, businessDocSnap] = await Promise.all([
+            withFirestoreRetry(() => getDocs(branchesQuery), {
               label: 'BranchProvider branches',
-            });
-            let fetchedBranches = branchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Branch));
-            
-            // Ensure a primary branch exists with ID = businessId
-            let correctPrimary = fetchedBranches.find(b => b.id === businessId && b.isPrimary);
-            
-            // Fetch the business instance info to get its name & address
-            let businessName = 'Main Store (Primary)';
-            let businessAddress = '';
-            try {
-              const businessDocRef = doc(firestore, 'businessInstances', businessId);
-              const businessDocSnap = await withFirestoreRetry(
-                () => getDoc(businessDocRef),
-                { label: 'BranchProvider business instance' },
-              );
-              if (businessDocSnap.exists()) {
-                businessName = businessDocSnap.data().name || businessName;
-                businessAddress = businessDocSnap.data().address || '';
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('zeneva_cached_business_name', businessName);
-                  localStorage.setItem('zeneva_cached_business_address', businessAddress);
-                }
-              }
-            } catch (err) {
+            }),
+            withFirestoreRetry(() => getDoc(businessDocRef), {
+              label: 'BranchProvider business instance',
+            }).catch(err => {
               console.error("Failed to fetch business info for primary branch sync", err);
+              return null;
+            })
+          ]);
+
+          let fetchedBranches = branchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Branch));
+          
+          // Ensure a primary branch exists with ID = businessId
+          let correctPrimary = fetchedBranches.find(b => b.id === businessId && b.isPrimary);
+          
+          // Fetch the business instance info to get its name & address
+          let businessName = 'Main Store (Primary)';
+          let businessAddress = '';
+          if (businessDocSnap && businessDocSnap.exists()) {
+            businessName = businessDocSnap.data().name || businessName;
+            businessAddress = businessDocSnap.data().address || '';
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('zeneva_cached_business_name', businessName);
+              localStorage.setItem('zeneva_cached_business_address', businessAddress);
             }
+          }
             
             if (!correctPrimary) {
               try {
@@ -228,7 +238,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           } else {
             setBranches([]);
           }
-        }
       } catch (err: any) {
         if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
           setBranches([]);

@@ -12,13 +12,31 @@ export default function Loader() {
 
   // Stop the bar whenever the route actually lands.
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      window.matchMedia('(max-width: 768px)').matches
+    );
+
+    if (isMobile) {
+      NProgress.start = () => NProgress;
+      NProgress.done = () => NProgress;
+      NProgress.inc = () => NProgress;
+      NProgress.set = () => NProgress;
+      return;
+    }
+
     NProgress.done();
   }, [pathname]);
 
   // One delegated listener on the document instead of one per <a>.
-  // The old MutationObserver approach re-ran on every DOM mutation across
-  // the whole app — that was the primary cause of sluggish navigation on mobile.
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      window.matchMedia('(max-width: 768px)').matches
+    );
+
+    if (isMobile) return;
+
     const handleClick = (e: MouseEvent) => {
       const anchor = (e.target as Element).closest('a');
       if (!anchor) return;

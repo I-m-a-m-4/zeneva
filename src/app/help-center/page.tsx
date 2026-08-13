@@ -267,8 +267,8 @@ const ARTICLES: Article[] = [
     id: 'zen-ai-limits',
     category: 'ai-reports',
     q: 'How many Zen AI messages do I get?',
-    a: 'A daily allowance that depends on your plan: 20 a day on Starter, 100 on Pro, and 500 on Business. The allowance resets each day.',
-    keywords: ['ai', 'limit', 'quota', 'messages', 'daily', 'allowance'],
+    a: 'A monthly allowance that depends on your plan: 30 a month on Starter, 3,000 on Pro, and 15,000 on Business. The allowance resets each month.',
+    keywords: ['ai', 'limit', 'quota', 'messages', 'monthly', 'allowance'],
   },
   {
     id: 'reports',

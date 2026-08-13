@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import useDodoPayments from '@/hooks/use-dodopayments';
 import { track } from '@vercel/analytics';
-import { AI_DAILY_LIMITS, effectivePlan, isPaidPlan, isPaidPlanExpired } from '@/lib/plan';
+import { AI_MONTHLY_LIMITS, effectivePlan, isPaidPlan, isPaidPlanExpired } from '@/lib/plan';
 import { apiBase } from '@/lib/platform';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
@@ -40,7 +40,7 @@ const plans = [
             'Up to 1,500 products & 5 staff accounts',
             'Advanced Point of Sale (POS) with barcode scanning',
             'Invoicing & Debt Management',
-            `Zen AI — ${AI_DAILY_LIMITS.pro} messages/day`,
+            `Zen AI — ${AI_MONTHLY_LIMITS.pro.toLocaleString()} messages/month`,
             'Smart Bulk Inventory Import',
             'Shareable Receipt Links (WhatsApp/SMS)',
             'Backorders & Backdating',
@@ -60,7 +60,7 @@ const plans = [
             'Unlimited products & staff accounts',
             'Multi-Branch Management',
             'Integrated Zeneva Terminal (Anti-Theft)',
-            `Zen AI — ${AI_DAILY_LIMITS.business} messages/day`,
+            `Zen AI — ${AI_MONTHLY_LIMITS.business.toLocaleString()} messages/month`,
             'AI Business Performance Dashboard',
             'Advanced Customer Intelligence (CRM+)',
             'Inventory Velocity Reports (ABC Analysis)',

@@ -213,8 +213,9 @@ export default function AdminAIUsage() {
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((b: any) => b.aiUsageCount > 0 || b.aiBonusCredits > 0 || b.aiToolUsageCounts)
         .sort((a: any, b: any) => {
-          const aCount = a.aiUsageCurrentDate === todayStr ? a.aiUsageCount || 0 : 0;
-          const bCount = b.aiUsageCurrentDate === todayStr ? b.aiUsageCount || 0 : 0;
+          const currentMonthStr = todayStr.substring(0, 7);
+          const aCount = a.aiUsageCurrentDate === currentMonthStr ? a.aiUsageCount || 0 : 0;
+          const bCount = b.aiUsageCurrentDate === currentMonthStr ? b.aiUsageCount || 0 : 0;
           if (bCount !== aCount) return bCount - aCount;
           const aLife = Object.values(a.aiToolUsageCounts || {}).reduce((s: number, n: any) => s + n, 0);
           const bLife = Object.values(b.aiToolUsageCounts || {}).reduce((s: number, n: any) => s + n, 0);
@@ -475,9 +476,10 @@ export default function AdminAIUsage() {
         0,
       ) as number;
       const favourite = topEntries(b.aiToolUsageCounts || {}, 1)[0];
+      const currentMonthStr = todayStr.substring(0, 7);
       return {
         ...b,
-        todayUsage: b.aiUsageCurrentDate === todayStr ? b.aiUsageCount || 0 : 0,
+        todayUsage: b.aiUsageCurrentDate === currentMonthStr ? b.aiUsageCount || 0 : 0,
         windowTurns: windowed[b.id] ?? 0,
         lifetimeCalls: lifetime,
         favouriteTool: favourite ? labelForTool(favourite.key) : null,
@@ -635,7 +637,7 @@ export default function AdminAIUsage() {
         </MetricCard>
 
         <MetricCard
-          label="Businesses Using AI Today"
+          label="Businesses Using AI This Month"
           value={activeToday.toLocaleString()}
           unit={`/ ${businessRows.length} active`}
           icon={Users}
@@ -1591,7 +1593,7 @@ export default function AdminAIUsage() {
                 <tr>
                   <th className="px-6 py-4 font-medium">Business Name</th>
                   <th className="px-6 py-4 font-medium">Plan</th>
-                  <th className="px-6 py-4 font-medium text-center">Today</th>
+                  <th className="px-6 py-4 font-medium text-center">This Month</th>
                   <th className="px-6 py-4 font-medium text-center">{rangeLabel}</th>
                   <th className="px-6 py-4 font-medium">Favourite Tool</th>
                   <th className="px-6 py-4 font-medium text-center">Lifetime Calls</th>
@@ -1647,7 +1649,7 @@ export default function AdminAIUsage() {
                           <DialogHeader>
                             <DialogTitle>Grant Bonus AI Credits</DialogTitle>
                             <DialogDescription>
-                              Add bonus AI queries to {b.name}. These credits do not expire and will be used if the daily tier limit is reached.
+                              Add bonus AI queries to {b.name}. These credits do not expire and will be used if the monthly tier limit is reached.
                             </DialogDescription>
                           </DialogHeader>
                           <div className="py-4">

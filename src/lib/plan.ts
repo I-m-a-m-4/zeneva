@@ -40,11 +40,11 @@ export const STAFF_LIMITS: Record<PlanId, number> = {
   business: 1000000,
 };
 
-/** Daily Zen AI message allowance per plan. */
-export const AI_DAILY_LIMITS: Record<PlanId, number> = {
-  starter: 20,
-  pro: 100,
-  business: 500,
+/** Monthly Zen AI message allowance per plan. */
+export const AI_MONTHLY_LIMITS: Record<PlanId, number> = {
+  starter: 30,
+  pro: 3000,
+  business: 15000,
 };
 
 /**
@@ -119,9 +119,9 @@ export function staffLimit(business: BusinessLike): number {
   return STAFF_LIMITS[effectivePlan(business)];
 }
 
-/** Daily Zen AI allowance in force right now. */
-export function aiDailyLimit(business: BusinessLike): number {
-  return AI_DAILY_LIMITS[effectivePlan(business)];
+/** Monthly Zen AI allowance in force right now. */
+export function aiMonthlyLimit(business: BusinessLike): number {
+  return AI_MONTHLY_LIMITS[effectivePlan(business)];
 }
 
 /** Pro-tier features: also available to Business and lifetime. */

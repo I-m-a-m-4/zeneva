@@ -3,7 +3,7 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 
 import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createZenTools } from './tools';
-import { aiDailyLimit, effectivePlan } from '@/lib/plan';
+import { aiMonthlyLimit, effectivePlan } from '@/lib/plan';
 import {
   AI_DAILY_COLLECTION,
   aiDailyDocId,
@@ -387,23 +387,24 @@ export async function POST(req: Request) {
   const currency = businessData?.settings?.currency || 'NGN';
   
   // Allowance follows the plan actually in force, so a lapsed Pro/Business
-  // subscription drops back to the free tier's daily cap.
-  const dailyLimit = aiDailyLimit(businessData);
+  // subscription drops back to the free tier's monthly cap.
+  const monthlyLimit = aiMonthlyLimit(businessData);
 
   let businessCount = 0;
-  if (businessData?.aiUsageCurrentDate === todayStr) {
+  const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
+  if (businessData?.aiUsageCurrentDate === currentMonthStr) {
     businessCount = businessData?.aiUsageCount || 0;
   }
   
   let bonusCredits = businessData?.aiBonusCredits || 0;
   let useBonusCredit = false;
 
-  if (businessCount >= dailyLimit) {
+  if (businessCount >= monthlyLimit) {
     if (bonusCredits > 0) {
       useBonusCredit = true;
     } else {
       recordBlocked(db, 'plan_limit', todayStr);
-      return new Response(JSON.stringify({ error: `Daily AI limit of ${dailyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until tomorrow.` }), {
+      return new Response(JSON.stringify({ error: `Monthly AI limit of ${monthlyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until next month.` }), {
         status: 429, headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -469,8 +470,9 @@ export async function POST(req: Request) {
         for (const [name, n] of Object.entries(toolCounts)) {
           updates[`aiToolUsageCounts.${name}`] = FieldValue.increment(n);
         }
-        if (businessData?.aiUsageCurrentDate !== todayStr) {
-          updates.aiUsageCurrentDate = todayStr;
+        const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
+        if (businessData?.aiUsageCurrentDate !== currentMonthStr) {
+          updates.aiUsageCurrentDate = currentMonthStr;
           updates.aiUsageCount = 1;
         } else {
           updates.aiUsageCount = FieldValue.increment(1);
