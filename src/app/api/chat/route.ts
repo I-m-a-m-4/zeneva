@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { getGoogleModel } from '@/lib/gemini';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -28,6 +28,7 @@ import {
 // Anything added here must be checked both ways: does it catch the attack, and
 // does it survive a product catalogue full of shouty brand names?
 // ─────────────────────────────────────────────────────────────────────────────
+// injection detection code...
 const INJECTION_PATTERNS = [
   // Adjectives stack ("all previous", "any prior"), so allow a run of them
   // rather than one. Bounded to keep it away from a whole sentence.
@@ -74,12 +75,7 @@ function textOf(message: any): string {
     .join(' ');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AI Provider
-// ─────────────────────────────────────────────────────────────────────────────
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
+// AI Provider is dynamically loaded on demand via getGoogleModel
 
 /**
  * Record a turn that never reached the model, on the day rollup the admin board
@@ -434,7 +430,7 @@ export async function POST(req: Request) {
   const startedAt = Date.now();
 
   const result = streamText({
-    model: google('gemini-2.5-flash'),
+    model: getGoogleModel('gemini-2.5-flash'),
     system: `${SYSTEM_PROMPT}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
     messages: modelMessages,
     // Every tool call costs a step, and a real question ("how did last month
