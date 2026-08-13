@@ -353,7 +353,7 @@ export const SEGMENT_META: Record<
     tone: 'info',
   },
   onboarding_stalled: {
-    label: 'Stalled onboarding',
+    label: 'Stalled setup',
     blurb: 'Signed up but never recorded a sale.',
     tone: 'warn',
   },
