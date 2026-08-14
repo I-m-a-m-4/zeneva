@@ -3,12 +3,13 @@
 import React from 'react';
 import { useBranch } from '@/context/branch-context';
 import { usePOS } from '@/context/pos-context';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Store, Building2, ChevronDown } from 'lucide-react';
+import { Store, Building2, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 interface BranchSwitcherProps {
   variant?: 'sidebar' | 'header' | 'sheet';
@@ -19,6 +20,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   const { activeBranchId, setActiveBranchId, branches, isLoadingBranches } = useBranch();
   const { currentUserProfile, business } = usePOS();
   const { state } = useSidebar();
+  const router = useRouter();
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
 
   const isOwner = currentUserProfile && (
@@ -95,6 +97,20 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
               {branch.name} {branch.isPrimary ? '(Primary)' : ''}
             </DropdownMenuItem>
           ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={() => {
+              if (business?.plan === 'starter' || !business?.plan) {
+                router.push('/billing');
+              } else {
+                router.push('/settings/branches');
+              }
+            }}
+            className="text-primary font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Create a new branch
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     );
