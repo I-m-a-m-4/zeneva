@@ -18,9 +18,10 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe } from "lucide-react";
+import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe, Lock } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 import type { UserProfile, Invitation } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -251,6 +252,8 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
     const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
     const [isUpdatingRole, setIsUpdatingRole] = React.useState(false);
     const [openMenuUserId, setOpenMenuUserId] = React.useState<string | null>(null);
+    const [showProModal, setShowProModal] = React.useState(false);
+    const router = useRouter();
 
     const { business: businessInstance, currentUserProfile, isLoading: isPosLoading, users } = usePOS();
     const { activeBranchId } = useBranch();
@@ -448,15 +451,31 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-tight">Plan: {businessInstance.plan || 'starter'}</span>
                                     </div>
                                 )}
-                                <Button size="lg" className="h-9 gap-1" onClick={() => setIsAddUserDialogOpen(true)} disabled={isLimitReached}>
-                                    <PlusCircle className="h-3.5 w-3.5" />
+                                <Button 
+                                    size="lg" 
+                                    className="h-9 gap-1" 
+                                    onClick={() => {
+                                        if (!businessInstance?.plan || businessInstance?.plan === 'starter') {
+                                            setShowProModal(true);
+                                        } else {
+                                            setIsAddUserDialogOpen(true);
+                                        }
+                                    }} 
+                                    disabled={businessInstance?.plan && businessInstance?.plan !== 'starter' && isLimitReached}
+                                >
+                                    {(!businessInstance?.plan || businessInstance?.plan === 'starter') ? <Lock className="h-3.5 w-3.5" /> : <PlusCircle className="h-3.5 w-3.5" />}
                                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                                         Invite User
                                     </span>
+                                    {(!businessInstance?.plan || businessInstance?.plan === 'starter') && (
+                                        <div className="ml-1 flex items-center gap-1 bg-primary/20 text-primary text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
+                                            Pro
+                                        </div>
+                                    )}
                                 </Button>
                             </div>
                         </div>
-                        {isLimitReached && (
+                        {isLimitReached && businessInstance?.plan !== 'starter' && (
                             <Alert variant="warning" className="mt-4">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertTitle>Plan Limit Reached</AlertTitle>
@@ -742,6 +761,28 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                         <AlertDialogAction onClick={handleUpdateUserRole} disabled={isUpdatingRole}>
                             {isUpdatingRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Change Role
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={showProModal} onOpenChange={setShowProModal}>
+                <AlertDialogContent className="sm:max-w-[425px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-xl">
+                            <Lock className="w-5 h-5 text-primary" />
+                            Pro Feature
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="pt-2 text-base">
+                            Staff management and multiple user accounts are available exclusively on Pro and Business plans. Upgrade your plan to invite team members.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
+                        <AlertDialogCancel onClick={() => setShowProModal(false)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => {
+                            setShowProModal(false);
+                            router.push('/billing');
+                        }}>
+                            View Plans
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
