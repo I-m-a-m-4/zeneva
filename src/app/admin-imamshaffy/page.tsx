@@ -3947,7 +3947,7 @@ function AdminDashboardContent({
                             <DailyActiveUsersChart users={users || []} receipts={convertedReceipts || []} />
                             <FeatureStickinessChart businesses={businesses || []} products={products || []} />
                             <div className="lg:col-span-2">
-                                <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} />
+                                <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} businesses={businesses || []} />
                             </div>
                         </div>
                     </div>

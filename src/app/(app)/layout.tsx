@@ -203,6 +203,8 @@ export default function AuthenticatedLayout({
   
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (pathname === '/onboarding') return; // Wait until they finish onboarding
+    
     const seenCeoMessage = sessionStorage.getItem('zeneva_seen_ceo_msg');
     if (!seenCeoMessage) {
       const timer = setTimeout(() => {
@@ -214,7 +216,7 @@ export default function AuthenticatedLayout({
       }, 3000); // Show 3s after load
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [pathname]);
 
   const isPremium = businessInstance?.plan === 'pro' || businessInstance?.plan === 'business';
 
@@ -1229,10 +1231,9 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-blue-900 via-blue-700 to-orange-500 p-[2px] shadow-sm")}>
-                            <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-sidebar")}>
-                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
-                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-600 p-[2px] animate-gradient")}>
+                            <Avatar className={cn("h-8 w-8 border border-transparent", isPremium && "border-2 border-background")}>
+                              <AvatarFallback className="bg-muted text-foreground font-semibold">
                                 {fallbackInitials}
                               </AvatarFallback>
                             </Avatar>
@@ -1392,10 +1393,9 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-blue-900 via-blue-700 to-orange-500 p-[2px] shadow-sm")}>
-                            <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-background")}>
-                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
-                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-600 p-[2px] animate-gradient")}>
+                            <Avatar className={cn("h-8 w-8 border border-transparent", isPremium && "border-2 border-background")}>
+                              <AvatarFallback className="bg-muted text-foreground font-semibold">
                                 {fallbackInitials}
                               </AvatarFallback>
                             </Avatar>

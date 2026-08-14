@@ -117,7 +117,11 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' },
-        }
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(200%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -128,6 +132,7 @@ export default {
         'fade-up': 'fadeUp 0.8s ease-out forwards',
         'float': 'float 6s ease-in-out infinite',
         'spin-slow': 'spin 8s linear infinite',
+        'shimmer': 'shimmer 1.4s infinite linear',
       },
     },
   },

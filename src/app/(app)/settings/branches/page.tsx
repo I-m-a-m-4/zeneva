@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { collection, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { Store, MapPin, Plus, Trash2, Loader2, AlertTriangle, Users, Package, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Store, MapPin, Plus, Trash2, Loader2, AlertTriangle, Users, Package, TrendingUp, CheckCircle2, X, Sparkles, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/types';
 import { cn } from '@/lib/utils';
@@ -131,12 +131,21 @@ export default function BranchesSettingsPage() {
   
   const [isAdding, setIsAdding] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
   const [newBranchAddress, setNewBranchAddress] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<{ id: string; name: string } | null>(null);
   const [confirmBranchName, setConfirmBranchName] = useState('');
+
+  const handleAddNewBranchClick = () => {
+    if (isBusinessPlan) {
+      setIsDialogOpen(true);
+    } else {
+      setIsUpgradeOpen(true);
+    }
+  };
 
   const handleSelectBranch = (branchId: string) => {
     setActiveBranchId(branchId);
@@ -288,12 +297,12 @@ export default function BranchesSettingsPage() {
                   onClick={() => { if (isBusinessPlan) handleSelectBranch(branch.id); }}
                   className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
                     isCurrentlySelected
-                      ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/30 hover:bg-muted/5 bg-gradient-to-br from-card to-card/95"
+                      ? "border-orange-500/40 bg-gradient-to-b from-orange-500/10 via-background to-background shadow-md border-2"
+                      : "border-border hover:border-orange-500/30 bg-gradient-to-b from-card to-card/95 hover:from-orange-500/5 hover:to-background"
                   }`}
                 >
                   {branch.isPrimary && (
-                    <div className="absolute top-0 right-0 bg-primary/95 text-primary-foreground text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm z-10">
+                    <div className="absolute top-0 right-0 bg-orange-500 text-white text-[9px] font-extrabold px-3 py-1 rounded-bl-lg uppercase tracking-widest shadow-sm z-10">
                       Primary
                     </div>
                   )}
@@ -301,13 +310,13 @@ export default function BranchesSettingsPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
                         <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                          <div className={`p-1.5 rounded-lg ${isCurrentlySelected ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                          <div className={`p-1.5 rounded-lg ${isCurrentlySelected ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-500/10 text-orange-500'}`}>
                             <Store className="h-4.5 w-4.5" />
                           </div>
                           <span className="truncate max-w-[200px] xs:max-w-[280px] sm:max-w-[400px]" title={branch.name}>{branch.name}</span>
                         </CardTitle>
                         {isCurrentlySelected && (
-                          <span className="flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/15 border border-primary/30 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap shadow-2xs">
+                          <span className="flex items-center gap-1 text-[10px] text-orange-600 dark:text-orange-400 font-bold bg-orange-500/15 border border-orange-500/30 px-2.5 py-0.5 rounded-full select-none whitespace-nowrap shadow-2xs">
                             <CheckCircle2 className="h-3 w-3" /> Active Branch
                           </span>
                         )}
@@ -336,7 +345,7 @@ export default function BranchesSettingsPage() {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 w-full" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                         <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                          <Users className="h-3.5 w-3.5 text-primary/70" /> Staff
+                          <Users className="h-3.5 w-3.5 text-orange-500" /> Staff
                         </p>
                         <p className="text-sm font-extrabold text-black dark:text-white mt-1">
                           {stats.activeUsersCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">/ {stats.usersCount} online</span>
@@ -344,7 +353,7 @@ export default function BranchesSettingsPage() {
                       </div>
                       <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                         <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                          <Package className="h-3.5 w-3.5 text-primary/70" /> Catalog
+                          <Package className="h-3.5 w-3.5 text-orange-500" /> Catalog
                         </p>
                         <p className="text-sm font-extrabold text-black dark:text-white mt-1">
                           {stats.productsCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">items</span>
@@ -360,7 +369,7 @@ export default function BranchesSettingsPage() {
                       </div>
                       <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-xl border border-muted/50 text-center">
                         <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1 select-none">
-                          <Store className="h-3.5 w-3.5 text-primary/70" /> Txns
+                          <Store className="h-3.5 w-3.5 text-orange-500" /> Txns
                         </p>
                         <p className="text-sm font-extrabold text-black dark:text-white mt-1">
                           {stats.salesCount} <span className="text-xs font-normal text-black/60 dark:text-white/60">sales</span>
@@ -381,11 +390,11 @@ export default function BranchesSettingsPage() {
                     <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
                       <p className="text-[10px] text-black/70 dark:text-white/70 font-semibold">ID: {branch.id.slice(0, 8)}</p>
                       {isCurrentlySelected ? (
-                        <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 w-full sm:w-auto">
+                        <span className="flex items-center justify-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-lg border border-orange-500/20 w-full sm:w-auto">
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Currently Operating Branch
                         </span>
                       ) : (
-                        <Button size="sm" variant="outline" className="text-xs font-bold border-primary/40 text-primary hover:bg-primary hover:text-white h-8 w-full sm:w-auto" onClick={() => handleSelectBranch(branch.id)}>
+                        <Button size="sm" variant="outline" className="text-xs font-bold border-orange-500/40 text-orange-500 hover:bg-orange-500 hover:text-white h-8 w-full sm:w-auto" onClick={() => handleSelectBranch(branch.id)}>
                           Switch to this Branch
                         </Button>
                       )}
@@ -414,48 +423,77 @@ export default function BranchesSettingsPage() {
 
       {!isBusinessPlan && (
         <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] pointer-events-auto">
-          <Card className="w-full max-w-lg border-2 border-primary/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-            <CardHeader className="text-center pt-8 pb-4">
-              <div className="mx-auto mb-6 relative">
-                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 animate-pulse" />
-                <div className="relative z-10 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Store className="h-8 w-8 text-primary" />
+          <Card className="w-full max-w-lg border border-dashed border-orange-500/40 shadow-md bg-gradient-to-b from-orange-500/10 via-background to-background backdrop-blur-md overflow-hidden relative">
+            {/* Close button that redirects back to settings */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-4 top-4 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 z-20"
+              onClick={() => router.push('/settings')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+
+            <CardHeader className="text-center pt-10 pb-4">
+              {/* Premium LinkedIn-style Highlighted Icon with sparkles */}
+              <div className="mx-auto mb-6 relative w-24 h-24 flex items-center justify-center">
+                {/* Background glow and sparkles */}
+                <div className="absolute inset-0 bg-amber-500/10 blur-xl rounded-full scale-150 animate-pulse" />
+                <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-amber-500 animate-bounce" />
+                <Sparkles className="absolute -bottom-2 -left-2 h-4 w-4 text-amber-400 opacity-75" />
+                <div className="absolute top-8 -left-4 h-2.5 w-2.5 rounded-full bg-amber-300 animate-ping" />
+                <div className="absolute bottom-8 -right-4 h-2 w-2 rounded-full bg-amber-400" />
+                
+                {/* Center branded logo card */}
+                <div className="relative z-10 w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-pink-600 p-[3px] shadow-lg">
+                  <div className="w-full h-full bg-background rounded-[13px] flex items-center justify-center">
+                    <Store className="h-9 w-9 text-orange-500" />
+                  </div>
                 </div>
               </div>
-              <CardTitle className="text-3xl font-black tracking-tight text-foreground">
+
+              <CardTitle className="text-2xl sm:text-3xl font-black tracking-tight text-foreground px-4">
                 Multi-Branch Management
               </CardTitle>
-              <CardDescription className="text-base mt-2 px-6">
+              <CardDescription className="text-sm sm:text-base mt-2 px-6">
                 Scale your business across multiple locations. Assign staff, inventory, and track sales per branch — all from one dashboard.
               </CardDescription>
             </CardHeader>
-            <CardContent className="px-8 pb-8 space-y-6">
-              <div className="p-5 rounded-2xl bg-muted/40 border border-border/50">
-                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider font-mono">Business Plan Features</h4>
-                <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Unlimited Branches</strong>: Add as many store locations or warehouses as you need.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Per-Branch Inventory</strong>: Manage separate stock levels for each location.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Staff Assignment</strong>: Assign operators to specific branches for access control.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Consolidated Reports</strong>: View cross-branch analytics in one place.</span>
-                  </li>
-                </ul>
+            <CardContent className="px-6 sm:px-8 pb-8 space-y-6">
+              <div className="space-y-3.5">
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground text-left">
+                    <strong className="text-foreground font-semibold">Unlimited Branches</strong>: Add as many store locations or warehouses as you need.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground text-left">
+                    <strong className="text-foreground font-semibold">Per-Branch Inventory</strong>: Manage separate stock levels for each location.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground text-left">
+                    <strong className="text-foreground font-semibold">Staff Assignment</strong>: Assign operators to specific branches for access control.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground text-left">
+                    <strong className="text-foreground font-semibold">Consolidated Reports</strong>: View cross-branch analytics in one place.
+                  </p>
+                </div>
               </div>
-              <Button asChild className="w-full h-12 shadow-lg font-bold hover:scale-[1.02] active:scale-95 transition-all duration-300">
-                <a href="/billing">
-                  Upgrade to Business Plan
-                </a>
-              </Button>
+
+              <div className="pt-2">
+                <Button asChild className="w-full h-12 bg-orange-400 hover:bg-orange-500 text-white hover:text-white font-extrabold rounded-full shadow-md hover:scale-[1.01] active:scale-95 transition-all duration-300">
+                  <a href="/billing">
+                    Upgrade to Business Plan
+                  </a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

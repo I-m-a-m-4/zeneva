@@ -12,7 +12,7 @@ import type { AuditLog } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, History, User, FileText, Package, Bot, Lightbulb, Flame, ShieldAlert, Info, CheckCircle, Search } from 'lucide-react';
+import { Loader2, History, User, FileText, Package, Bot, Lightbulb, Flame, ShieldAlert, ShieldCheck, Info, CheckCircle, Search } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import FeatureGate from '@/components/shared/feature-gate';
@@ -168,7 +168,7 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Bot className="text-primary" /> Upgrade to Business Plan
+                        <ShieldCheck className="text-primary h-5 w-5" /> Upgrade to Business Plan
                     </DialogTitle>
                     <DialogDescription>
                         The Automated Audit Assistant is a Business Plan feature. It scans your logs for suspicious patterns to help you detect issues like internal theft or operational mistakes.
@@ -525,6 +525,12 @@ export default function AuditLogPage() {
                 hasLifetimeAccess={business?.accessLevel === 'lifetime'}
                 featureName="Audit Log"
                 featureDescription="Keep a detailed, secure record of all critical system events to enhance security and accountability."
+                icon={ShieldCheck}
+                featurePoints={[
+                    { title: "Activity Tracking", description: "Monitor all user actions and system events seamlessly." },
+                    { title: "Threat Detection", description: "Identify suspicious patterns like unauthorized access or unusual deletions." },
+                    { title: "Enhanced Accountability", description: "Maintain a verifiable history of operations for compliance." }
+                ]}
             >
                 <AuditLogPageContent />
             </FeatureGate>

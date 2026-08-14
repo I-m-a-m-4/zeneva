@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ShieldCheck, Zap } from 'lucide-react';
+import { Check, ShieldCheck, Zap, Sparkles, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -92,6 +92,11 @@ const AIIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+interface FeaturePoint {
+  title: string;
+  description: string;
+}
+
 interface FeatureGateProps {
   children: React.ReactNode;
   requiredPlan: 'pro' | 'business';
@@ -99,6 +104,8 @@ interface FeatureGateProps {
   hasLifetimeAccess: boolean;
   featureName: string;
   featureDescription: string;
+  featurePoints?: FeaturePoint[];
+  icon?: React.ElementType;
   className?: string;
   placeholderContent?: React.ReactNode;
   isLoading?: boolean;
@@ -113,6 +120,8 @@ export default function FeatureGate({
   hasLifetimeAccess,
   featureName,
   featureDescription,
+  featurePoints,
+  icon: Icon = BarChart2,
   className,
   placeholderContent,
   isLoading,
@@ -156,28 +165,14 @@ export default function FeatureGate({
   }
 
   const UpgradeNotice = () => (
-    <div className="bg-background border rounded-2xl shadow-xl max-w-md w-full p-6 text-left">
-        <h3 className="text-2xl font-bold tracking-tight mb-1">Unlock {featureName}</h3>
-        <p className="text-muted-foreground text-sm mb-4">{featureDescription}</p>
-        
-        <div className="relative bg-gradient-to-r from-orange-50 via-orange-50/50 to-transparent dark:from-orange-950/20 dark:via-orange-950/10 dark:to-transparent rounded-xl p-4 mb-4 border">
-            <h4 className="text-sm font-bold text-orange-900 dark:text-orange-400 mb-1">
-                Upgrade to {requiredPlan === 'business' ? 'Business' : 'Pro'}
-            </h4>
-            <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">
-                Get full access to analytical reports, AI capabilities, and unlimited inventory tracking.
-            </p>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-            <Button asChild size="default" className="text-sm h-10 px-6">
-                <Link href="/billing">Get {requiredPlan === 'business' ? 'Business' : 'Pro'} Plan</Link>
-            </Button>
-            <div className="text-xs text-muted-foreground">
-                Starting at <span className="font-semibold text-foreground">{currency === 'NGN' ? (requiredPlan === 'business' ? '₦30,000' : '₦10,000') : (requiredPlan === 'business' ? '$30' : '$10')}/mo</span>.
-            </div>
-        </div>
-    </div>
+    <FeatureGateUpgradeCard
+      featureName={featureName}
+      featureDescription={featureDescription}
+      requiredPlan={requiredPlan}
+      icon={Icon}
+      featurePoints={featurePoints}
+      currency={currency}
+    />
   );
 
   const RichSectionNotice = () => (
@@ -254,6 +249,72 @@ export default function FeatureGate({
         <ActiveNotice />
       </div>
       <div className="opacity-30 blur-[4px] pointer-events-none select-none transition-all duration-500">{children}</div>
+    </div>
+  );
+}
+
+export function FeatureGateUpgradeCard({
+  featureName,
+  featureDescription,
+  requiredPlan,
+  icon: Icon = BarChart2,
+  featurePoints,
+  currency = 'USD'
+}: {
+  featureName: string;
+  featureDescription: string;
+  requiredPlan: 'pro' | 'business';
+  icon?: React.ElementType;
+  featurePoints?: { title: string; description: string }[];
+  currency?: 'USD' | 'NGN';
+}) {
+  const defaultFeaturePoints = [
+    { title: "Analytical Reports", description: "Get full access to detailed business graphs and analytics." },
+    { title: "AI Executive Briefing", description: "Obtain automated ratings and smart health advice for your store." },
+    { title: "Unlimited Access", description: "Track items, branches, and logs without limits." }
+  ];
+
+  const pointsToDisplay = featurePoints || defaultFeaturePoints;
+
+  return (
+    <div className="bg-background border border-dashed border-orange-500/40 bg-gradient-to-b from-orange-500/10 via-background to-background backdrop-blur-md overflow-hidden rounded-xl max-w-lg w-full p-8 text-center relative">
+        {/* Premium Highlighted Icon with sparkles */}
+        <div className="mx-auto mb-6 relative w-24 h-24 flex items-center justify-center">
+          <div className="absolute inset-0 bg-amber-500/10 blur-xl rounded-full scale-150 animate-pulse" />
+          <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-amber-500 animate-bounce" />
+          <Sparkles className="absolute -bottom-2 -left-2 h-4 w-4 text-amber-400 opacity-75" />
+          <div className="absolute top-8 -left-4 h-2.5 w-2.5 rounded-full bg-amber-300 animate-ping" />
+          <div className="absolute bottom-8 -right-4 h-2 w-2 rounded-full bg-amber-400" />
+          
+          <div className="relative z-10 w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-pink-600 p-[3px] shadow-lg">
+            <div className="w-full h-full bg-background rounded-[13px] flex items-center justify-center">
+              <Icon className="h-9 w-9 text-orange-500" />
+            </div>
+          </div>
+        </div>
+
+        <h3 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">Unlock {featureName}</h3>
+        <p className="text-muted-foreground text-sm mb-6 leading-relaxed px-4">{featureDescription}</p>
+        
+        <div className="space-y-3.5 mb-8">
+          {pointsToDisplay.map((point, index) => (
+            <div key={index} className="flex items-start gap-3">
+              <Check className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-muted-foreground text-left font-medium">
+                <strong className="text-foreground font-semibold">{point.title}</strong>: {point.description}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-3 pt-2">
+            <Button asChild className="w-full h-12 bg-orange-400 hover:bg-orange-500 text-white hover:text-white font-extrabold rounded-full shadow-md hover:scale-[1.01] active:scale-95 transition-all duration-300">
+                <Link href="/billing">Get {requiredPlan === 'business' ? 'Business' : 'Pro'} Plan</Link>
+            </Button>
+            <div className="text-xs text-muted-foreground font-semibold">
+                Starting at <span className="font-extrabold text-foreground">{currency === 'NGN' ? (requiredPlan === 'business' ? '₦30,000' : '₦10,000') : (requiredPlan === 'business' ? '$30' : '$10')}/mo</span>.
+            </div>
+        </div>
     </div>
   );
 }

@@ -18,13 +18,15 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, User, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe, Lock } from "lucide-react";
+import { PlusCircle, User, Users, MoreHorizontal, AlertCircle, Trash2, Mail, UserCheck, UserX, Loader2, Globe, Lock } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, deleteDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Invitation } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -388,8 +390,6 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
 
     return (
         <>
-            <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
-            
             <div className="grid gap-6 md:grid-cols-2">
                 <Card className="md:col-span-2 border-primary/10 bg-primary/5 shadow-none overflow-hidden">
                     <CardHeader className="pb-3">
@@ -765,34 +765,27 @@ function UserManagementDashboard({ businessId, currentUserId, inviterName }: { b
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <AlertDialog open={showProModal} onOpenChange={setShowProModal}>
-                <AlertDialogContent className="sm:max-w-[425px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-xl">
-                            <Lock className="w-5 h-5 text-primary" />
-                            Pro Feature
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="pt-2 text-base">
-                            Staff management and multiple user accounts are available exclusively on Pro and Business plans. Upgrade your plan to invite team members.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
-                        <AlertDialogCancel onClick={() => setShowProModal(false)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => {
-                            setShowProModal(false);
-                            router.push('/billing');
-                        }}>
-                            View Plans
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <Dialog open={showProModal} onOpenChange={setShowProModal}>
+                <DialogContent className="max-w-lg p-0 bg-transparent border-none shadow-none">
+                    <FeatureGateUpgradeCard
+                        featureName="Staff Management"
+                        featureDescription="Invite team members and manage role-based access control for your business."
+                        requiredPlan="pro"
+                        icon={Users}
+                        featurePoints={[
+                            { title: "Team Collaboration", description: "Invite staff to help manage your business operations." },
+                            { title: "Role-Based Access", description: "Assign specific permissions (Cashier, Manager, Admin) to control access." },
+                            { title: "Audit Accountability", description: "Track which staff member performed specific actions in the POS." }
+                        ]}
+                    />
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
 
 export default function UsersPage() {
-    const { currentUserProfile: currentUser, isLoading: isPosLoading } = usePOS();
+    const { currentUserProfile: currentUser, business, isLoading: isPosLoading } = usePOS();
     const isLoading = isPosLoading || !currentUser?.businessId;
 
     if (isLoading) {
@@ -814,5 +807,10 @@ export default function UsersPage() {
         );
     }
 
-    return <UserManagementDashboard businessId={currentUser.businessId} currentUserId={currentUser.id} inviterName={currentUser.name} />;
+    return (
+        <>
+            <PageTitle title="User & Staff Management" subtitle="Invite and manage roles for your business." />
+            <UserManagementDashboard businessId={currentUser.businessId} currentUserId={currentUser.id} inviterName={currentUser.name} />
+        </>
+    );
 }

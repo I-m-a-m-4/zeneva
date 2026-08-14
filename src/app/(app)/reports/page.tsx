@@ -6,7 +6,7 @@ import { useBranch } from '@/context/branch-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Trophy, Flame, Sparkles, AlertCircle, Crown, Zap, Rocket } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
 import TopServicesChart from '@/components/reports/top-services-chart';
@@ -14,7 +14,7 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays, isSameDay } from 'date-fns';
 import TopCustomersList from '@/components/reports/top-customers-list';
-import { safeToDate } from '@/lib/utils';
+import { safeToDate, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
@@ -25,7 +25,7 @@ import CustomerAnalytics from '@/components/reports/customer-analytics';
 import DailySalesItemsTable from '@/components/reports/daily-sales-items-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Printer, Image as ImageIcon } from 'lucide-react';
+import { Printer, Image as ImageIcon, BarChart2, CheckCircle } from 'lucide-react';
 
 import FeatureGate from '@/components/shared/feature-gate';
 import AbcAnalysis from '@/components/reports/abc-analysis';
@@ -33,6 +33,8 @@ import PaymentMethodDistribution from '@/components/reports/payment-method-analy
 import DeadStockAnalysis from '@/components/reports/dead-stock-analysis';
 import HourlySalesHeatmap from '@/components/reports/hourly-sales-heatmap';
 import BasketAnalysis from '@/components/reports/basket-analysis';
+import { firestore } from '@/firebase/instance';
+import { collection, getDocs } from 'firebase/firestore';
 
 function ReportStatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) {
     return (
@@ -79,6 +81,171 @@ const ReportsPlaceholder = () => (
     </div>
 );
 
+const COMPUTE_STEPS = [
+    'Scanning inventory event logs...',
+    'Measuring stock availability ratios...',
+    'Evaluating reorder point coverage...',
+    'Calculating catalog data quality...',
+    'Cross-referencing sales velocity data...',
+    'Benchmarking against global peers...',
+    'Applying streak multiplier...',
+    'Finalizing health score...',
+];
+
+function AutoComputingBanner({ score }: { score: number }) {
+    const [progress, setProgress] = React.useState(0);
+    const [stepIndex, setStepIndex] = React.useState(0);
+    const [completed, setCompleted] = React.useState(false);
+    const [sparkles, setSparkles] = React.useState<{ id: number; x: number; y: number; delay: number }[]>([]);
+    const [displayScore, setDisplayScore] = React.useState(0);
+
+    // Drive the progress bar and step labels
+    React.useEffect(() => {
+        const total = 3200; // ms to "complete"
+        const interval = 40;
+        let elapsed = 0;
+
+        const timer = setInterval(() => {
+            elapsed += interval;
+            const pct = Math.min((elapsed / total) * 100, 100);
+            setProgress(pct);
+
+            // Advance step label
+            const stepProgress = Math.floor((pct / 100) * COMPUTE_STEPS.length);
+            setStepIndex(Math.min(stepProgress, COMPUTE_STEPS.length - 1));
+
+            if (pct >= 100) {
+                clearInterval(timer);
+                setCompleted(true);
+            }
+        }, interval);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    // Count up the score display when complete
+    React.useEffect(() => {
+        if (!completed) return;
+        let current = 0;
+        const target = score;
+        const step = Math.ceil(target / 25);
+        const counter = setInterval(() => {
+            current = Math.min(current + step, target);
+            setDisplayScore(current);
+            if (current >= target) clearInterval(counter);
+        }, 30);
+        return () => clearInterval(counter);
+    }, [completed, score]);
+
+    // Generate floating sparkles once computing completes
+    React.useEffect(() => {
+        if (!completed) return;
+        const generated = Array.from({ length: 12 }, (_, i) => ({
+            id: i,
+            x: 5 + Math.random() * 90,
+            y: 10 + Math.random() * 80,
+            delay: i * 0.12,
+        }));
+        setSparkles(generated);
+    }, [completed]);
+
+    const label = completed
+        ? `Score computed: ${displayScore} / 100`
+        : COMPUTE_STEPS[stepIndex];
+
+    const tagColor = score >= 90 ? 'text-emerald-500 bg-emerald-500/10' :
+                     score >= 75 ? 'text-indigo-500 bg-indigo-500/10' :
+                     'text-amber-500 bg-amber-500/10';
+
+    return (
+        <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm">
+            {/* Floating sparkles overlay on completion */}
+            {completed && sparkles.map(s => (
+                <Sparkles
+                    key={s.id}
+                    className="absolute h-3 w-3 text-amber-400 animate-ping pointer-events-none opacity-70"
+                    style={{ left: `${s.x}%`, top: `${s.y}%`, animationDelay: `${s.delay}s`, animationDuration: '1.6s' }}
+                />
+            ))}
+
+            {/* Shimmer layer while computing */}
+            {!completed && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                    <div
+                        className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
+                    />
+                </div>
+            )}
+
+            <div className="px-6 py-5 flex flex-col gap-4">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            "p-2 rounded-lg transition-all duration-500",
+                            completed ? "bg-emerald-500/10" : "bg-indigo-500/10"
+                        )}>
+                            {completed
+                                ? <CheckCircle className="h-5 w-5 text-emerald-500" />
+                                : <BarChart2 className="h-5 w-5 text-indigo-500 animate-pulse" />
+                            }
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                {completed ? 'Score Ready' : 'Computing Business Health Score'}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground font-medium mt-0.5 transition-all duration-300">
+                                {label}
+                            </p>
+                        </div>
+                    </div>
+                    {completed && (
+                        <div className={cn("text-xs font-extrabold uppercase px-2.5 py-1 rounded-full tracking-wide transition-all", tagColor)}>
+                            {score >= 90 ? 'Elite' : score >= 75 ? 'Strong' : 'Fair'}
+                        </div>
+                    )}
+                </div>
+
+                {/* Progress bar */}
+                <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                        className={cn(
+                            "h-full rounded-full transition-all duration-75",
+                            completed
+                                ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                                : "bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500"
+                        )}
+                        style={{ width: `${progress}%` }}
+                    />
+                    {/* Glowing pulse at the tip while computing */}
+                    {!completed && (
+                        <div
+                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-violet-400 shadow-[0_0_8px_3px_rgba(167,139,250,0.6)] animate-pulse"
+                            style={{ left: `calc(${progress}% - 6px)`, transition: 'left 75ms linear' }}
+                        />
+                    )}
+                </div>
+
+                {/* Step micro-ticks */}
+                <div className="flex gap-1">
+                    {COMPUTE_STEPS.map((_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "h-1 flex-1 rounded-full transition-all duration-300",
+                                i < stepIndex ? "bg-indigo-500" :
+                                i === stepIndex && !completed ? "bg-indigo-400 animate-pulse" :
+                                completed ? "bg-emerald-500" :
+                                "bg-muted"
+                            )}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange } = usePOS();
@@ -87,6 +254,103 @@ export default function ReportsDashboard() {
     const { toast } = useToast();
     const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
+    const [leaderboard, setLeaderboard] = React.useState<any[]>([]);
+    const [userRank, setUserRank] = React.useState<number>(0);
+
+    const userScore = business?.settings?.businessAnalysis?.businessHealth?.score ?? 0;
+
+    React.useEffect(() => {
+        if (!business) return;
+
+        const loadLeaderboardData = async () => {
+            const userBusinessName = business?.name || 'Active Store';
+            const skuCount = products?.length || 0;
+
+            const peers: any[] = [];
+            
+            // 1. Attempt to fetch real snapshot scores from firestore
+            try {
+                const snapshotQuery = collection(firestore, 'store_health_snapshots');
+                const querySnap = await getDocs(snapshotQuery);
+                const realDocs = querySnap.docs.map(docObj => docObj.data());
+
+                // Filter out current store if present
+                const otherRealStores = realDocs.filter(d => d.storeId !== business.id);
+
+                otherRealStores.forEach((d) => {
+                    const hashedId = Array.from(d.storeId || '').reduce((s, c) => s + c.charCodeAt(0), 0) % 1000;
+                    const pseudoName = `Merchant #${hashedId}`;
+                    const score = d.overallScore || 78;
+                    const country = d.country || 'Global';
+
+                    peers.push({
+                        name: pseudoName,
+                        initials: `M${pseudoName.substring(10, 11)}`,
+                        score: score,
+                        details: `${d.storeSizeTier === 'large' ? '1200+' : d.storeSizeTier === 'medium' ? '450+' : '80+'} SKUs · ${country}`,
+                        tag: score >= 90 ? 'Elite' : score >= 80 ? 'Strong' : 'Fair',
+                        isUser: false
+                    });
+                });
+            } catch (err) {
+                console.error("Error loading real store health snapshots:", err);
+            }
+
+            // 2. Generate simulated peers to fill up to 400 competitors
+            const seedString = userBusinessName;
+            let seed = Array.from(seedString).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            
+            const pseudorandom = () => {
+                const x = Math.sin(seed++) * 10000;
+                return x - Math.floor(x);
+            };
+
+            const countries = ['United States', 'Nigeria', 'United Kingdom', 'Canada', 'South Africa', 'Kenya', 'Germany', 'Ghana', 'France', 'Australia'];
+            const targetCount = 400;
+            const currentSize = peers.length;
+
+            for (let i = currentSize; i < targetCount; i++) {
+                const score = Math.floor(55 + pseudorandom() * 43); // scores between 55 and 98
+                const peerId = Math.floor(100 + pseudorandom() * 899);
+                const randomSkus = Math.floor(50 + pseudorandom() * 1500);
+                const country = countries[Math.floor(pseudorandom() * countries.length)];
+
+                if (score === userScore) continue; // skip exact match
+
+                peers.push({
+                    name: `Merchant #${peerId}`,
+                    initials: `M${peerId.toString().substring(0, 1)}`,
+                    score: score,
+                    details: `${randomSkus} SKUs · ${country}`,
+                    tag: score >= 90 ? 'Elite' : score >= 80 ? 'Strong' : 'Fair',
+                    isUser: false
+                });
+            }
+
+            // 3. Add the active user
+            peers.push({
+                name: `You (${userBusinessName})`,
+                initials: 'YO',
+                score: userScore,
+                details: `${skuCount} SKUs · ${business?.country || 'Global'}`,
+                isUser: true,
+                tag: userScore >= 90 ? 'Elite' : userScore >= 80 ? 'Strong' : 'Fair'
+            });
+
+            // 4. Sort and assign ranks
+            const sorted = peers.sort((a, b) => b.score - a.score);
+            sorted.forEach((peer, index) => {
+                peer.rank = index + 1;
+            });
+
+            // Find user rank
+            const rankIdx = sorted.findIndex(p => p.isUser);
+            setUserRank(rankIdx !== -1 ? rankIdx + 1 : 4);
+            setLeaderboard(sorted);
+        };
+
+        loadLeaderboardData();
+    }, [business, products]);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: subDays(new Date(), 365), // Fallback initial
@@ -359,9 +623,10 @@ export default function ReportsDashboard() {
             >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
                   <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
-                      <TabsList className="grid grid-cols-2 w-[350px]">
-                          <TabsTrigger value="analytics" className="text-sm font-semibold">Analytics Dashboard</TabsTrigger>
-                          <TabsTrigger value="daily-sales" className="text-sm font-semibold">Daily Sales Items</TabsTrigger>
+                      <TabsList className="flex flex-col md:grid md:grid-cols-3 w-full md:w-[500px] h-auto gap-1">
+                          <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
+                          <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
+                          <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
                       </TabsList>
                       <div className="flex flex-wrap items-center gap-4">
                           {activeTab === 'analytics' && (
@@ -548,6 +813,302 @@ export default function ReportsDashboard() {
                         </TabsContent>
                         <TabsContent value="daily-sales" className="mt-0">
                             <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />
+                        </TabsContent>
+                        <TabsContent value="business-rating" className="mt-0 space-y-6">
+                            {/* Gamification Level & Streak Header */}
+                            <div className="grid gap-4 md:grid-cols-3">
+                                {/* Store Tier Rank Card */}
+                                <Card className="p-6 border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-background to-background rounded-xl relative overflow-hidden group">
+                                    <div className="absolute -top-12 -right-12 bg-amber-500/10 w-32 h-32 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-500" />
+                                    <div className="flex items-start gap-4 relative z-10">
+                                        <div className="p-3 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl text-white shrink-0">
+                                            <Crown className="h-6 w-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Store Tier Rank</p>
+                                            <h4 className="text-xl font-black text-foreground leading-tight">
+                                                {userScore === 0 ? "Unranked" : userScore >= 90 ? "Level 6: Market Dominator" : userScore >= 80 ? "Level 5: Retail Elite" : userScore >= 60 ? "Level 4: Retail Commander" : "Level 1: Local Vendor"}
+                                            </h4>
+                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 font-bold">
+                                                {userScore === 0 ? "Start logging to rank up" : `Top ${Math.max(1, 100 - userScore)}% of peer merchants`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                {/* Consistency Streak Card */}
+                                <Card className="p-6 border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-background to-background rounded-xl relative overflow-hidden group">
+                                    <div className="absolute -bottom-12 -left-12 bg-orange-500/10 w-32 h-32 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all duration-500" />
+                                    <div className="flex items-start gap-4 relative z-10">
+                                        <div className="p-3 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl text-white shrink-0 relative">
+                                            {userScore > 0 && <div className="absolute inset-0 bg-white/20 animate-pulse rounded-xl blur-md" />}
+                                            <Zap className={`h-6 w-6 relative z-10 ${userScore > 0 ? 'animate-bounce' : 'opacity-50'}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Consistency Streak</p>
+                                            <h4 className="text-xl font-black text-foreground leading-tight">
+                                                {userScore === 0 ? "No Streak Yet" : "7-Day Log Integrity"}
+                                            </h4>
+                                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1.5 font-bold flex items-center gap-1">
+                                                {userScore === 0 ? "Consistency is key" : <>1.2x multiplier active <Zap className="h-3 w-3 inline fill-current" /></>}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                {/* Next Tier Goal Card */}
+                                <Card className="p-6 border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-background to-background rounded-xl relative overflow-hidden group">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-500/5 w-32 h-32 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all duration-500" />
+                                    <div className="flex items-start gap-4 relative z-10">
+                                        <div className="p-3 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl text-white shrink-0">
+                                            <Rocket className="h-6 w-6" />
+                                        </div>
+                                        <div className="w-full">
+                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Next Tier Goal</p>
+                                            <h4 className="text-xl font-black text-foreground leading-tight">
+                                                {userScore >= 90 ? 'Platinum Tier' : userScore >= 80 ? 'Elite Tier' : userScore >= 60 ? 'Gold Tier' : 'Silver Tier'}
+                                            </h4>
+                                            <div className="flex items-center gap-3 mt-2.5 w-full">
+                                                <div className="h-2 bg-indigo-950/10 dark:bg-indigo-950/50 rounded-full flex-1 overflow-hidden">
+                                                    <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full" style={{ width: `${Math.min(100, userScore + 15)}%` }} />
+                                                </div>
+                                                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400">{Math.min(100, userScore + 15)}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Core Health Matrix & Performance Pillars */}
+                            <Card className="p-8 border border-border/50 bg-card shadow-sm rounded-xl">
+                                <div className="mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 py-4">
+                                    {/* Left side circular score display */}
+                                    <div className="flex flex-col items-center text-center shrink-0 w-full lg:w-72">
+                                        <div className="relative w-48 h-48 flex items-center justify-center rounded-full border-[10px] border-emerald-500/20 bg-emerald-500/5">
+                                            {/* Circular border track matching image */}
+                                            <div className="absolute inset-0 rounded-full border-[6px] border-emerald-500 border-t-transparent animate-spin-slow opacity-85" style={{ transform: 'rotate(45deg)' }} />
+                                            <div className="flex flex-col items-center leading-none">
+                                                <span className="text-6xl font-black tracking-tight text-foreground">
+                                                    {userScore}
+                                                </span>
+                                                <span className="text-[10px] font-extrabold tracking-widest text-emerald-500 uppercase mt-2">Score</span>
+                                            </div>
+                                        </div>
+                                        <h3 className="text-2xl font-black text-emerald-500 mt-6 leading-none">
+                                            {userScore >= 90 ? 'Elite' : userScore >= 75 ? 'Strong' : userScore >= 50 ? 'Fair' : 'Needs Attention'}
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                            {userScore === 0 ? "You have not added any products yet." : `Your inventory setup is superior to ${Math.max(10, Math.floor(userScore * 0.8))}% of grocery retailers globally.`}
+                                        </p>
+                                    </div>
+
+                                    {/* Right side metrics list */}
+                                    <div className="flex-1 w-full space-y-6">
+                                        {/* Metric 1 */}
+                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                            <div className="flex justify-between items-center text-sm font-semibold">
+                                                <span className="text-foreground flex items-center gap-1.5">
+                                                    Availability <span className="text-xs text-muted-foreground font-normal">· 35% Weight</span>
+                                                </span>
+                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0} / 100</span>
+                                            </div>
+                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                <div 
+                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                {userScore === 0 ? "No inventory data available." : "Reorder points are set correctly. Only a few items currently out of stock."}
+                                            </p>
+                                        </div>
+
+                                        {/* Metric 2 */}
+                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                            <div className="flex justify-between items-center text-sm font-semibold">
+                                                <span className="text-foreground flex items-center gap-1.5">
+                                                    Efficiency <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
+                                                </span>
+                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0} / 100</span>
+                                            </div>
+                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                <div 
+                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                {userScore === 0 ? "No sales velocity data." : "Turnover velocity is moderate. Some dead stock items identified."}
+                                            </p>
+                                        </div>
+
+                                        {/* Metric 3 */}
+                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                            <div className="flex justify-between items-center text-sm font-semibold">
+                                                <span className="text-foreground flex items-center gap-1.5">
+                                                    Data Quality <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
+                                                </span>
+                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0} / 100</span>
+                                            </div>
+                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                <div 
+                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                {userScore === 0 ? "Missing SKU, Image, or Category data." : "Key fields are reasonably complete for most products."}
+                                            </p>
+                                        </div>
+
+                                        {/* Metric 4 */}
+                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                            <div className="flex justify-between items-center text-sm font-semibold">
+                                                <span className="text-foreground flex items-center gap-1.5">
+                                                    Integrity <span className="text-xs text-muted-foreground font-normal">· 15% Weight</span>
+                                                </span>
+                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0} / 100</span>
+                                            </div>
+                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                <div 
+                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                {userScore === 0 ? "No transaction logs." : "Logs are extremely consistent. Few manual corrections made."}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Peer Leaderboard & Competition Panel */}
+                            <div className="grid gap-6 md:grid-cols-3">
+                                {/* Left/Main Leaderboard Card */}
+                                <Card className="p-6 border border-border/50 bg-card shadow-sm rounded-xl md:col-span-2 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Trophy className="h-5 w-5 text-amber-500" />
+                                            <h4 className="text-sm font-black tracking-tight uppercase text-foreground">Peer Leaderboard (Grocery Segment)</h4>
+                                        </div>
+                                        <span className="text-[10px] bg-muted border text-muted-foreground px-2 py-0.5 rounded-full font-bold">Global</span>
+                                    </div>
+                                    <div className="divide-y divide-border/40">
+                                        {/* Top 3 Global Competitors */}
+                                        {leaderboard.slice(0, 3).map((peer) => (
+                                            <div key={peer.rank} className="flex items-center justify-between py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-black text-muted-foreground w-6 text-center">
+                                                        {peer.rank === 1 ? '🥇' : peer.rank === 2 ? '🥈' : '🥉'}
+                                                    </span>
+                                                    <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-black text-amber-600">
+                                                        {peer.initials}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-foreground">{peer.name}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{peer.details}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-extrabold text-foreground">{peer.score}</span>
+                                                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
+                                                        {peer.tag}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Ellipsis separator if user is lower rank */}
+                                        {userRank > 5 && (
+                                            <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
+                                                ... {userRank - 4} other global competitors ...
+                                            </div>
+                                        )}
+
+                                        {/* User context slice (immediate competitors directly above & below) */}
+                                        {leaderboard.filter(p => p.rank >= userRank - 1 && p.rank <= userRank + 1 && p.rank > 3).map((peer) => (
+                                            <div 
+                                                key={peer.rank} 
+                                                className={cn(
+                                                    "flex items-center justify-between py-3 px-2 -mx-2 my-0.5 transition-all duration-300",
+                                                    peer.isUser ? "bg-primary/5 border border-primary/20 rounded-lg my-1 animate-pulse" : "opacity-75"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className={cn("text-sm w-6 text-center font-bold", peer.isUser ? "text-primary font-black animate-bounce" : "text-muted-foreground")}>
+                                                        {peer.rank}
+                                                    </span>
+                                                    <div className={cn(
+                                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                                                        peer.isUser ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                                                    )}>
+                                                        {peer.initials}
+                                                    </div>
+                                                    <div>
+                                                        <p className={cn("text-sm font-bold", peer.isUser ? "text-foreground font-extrabold" : "text-foreground")}>
+                                                            {peer.name}
+                                                        </p>
+                                                        <p className={cn("text-[10px]", peer.isUser ? "text-primary font-bold" : "text-muted-foreground")}>
+                                                            {peer.details}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn("text-sm font-extrabold", peer.isUser ? "text-primary font-black" : "text-foreground")}>
+                                                        {peer.score}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded",
+                                                        peer.isUser ? "bg-emerald-500/15 text-emerald-600" : "bg-emerald-500/10 text-emerald-500"
+                                                    )}>
+                                                        {peer.tag}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Bottom ellipsis separator if there are more below */}
+                                        {userRank < 398 && (
+                                            <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
+                                                ... {400 - userRank - 1} other global competitors ...
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card>
+
+                                {/* Competition Rules / Gamification Explainer */}
+                                <Card className="p-6 border border-border/50 bg-gradient-to-br from-amber-500/5 to-transparent rounded-xl flex flex-col justify-between">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-amber-500">
+                                            <Sparkles className="h-5 w-5 animate-spin-slow" />
+                                            <span className="text-sm font-black tracking-tight uppercase">Leaderboard Mechanics</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Competition ranking is computed daily. Merchants gain points by improving reorder point coverage, reducing dead stock capital, and maintaining clean catalog descriptions.
+                                        </p>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-muted-foreground">Log Accuracy</span>
+                                                <span className="text-emerald-500">+15 pts</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-muted-foreground">Dead Stock below 10%</span>
+                                                <span className="text-emerald-500">+25 pts</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-muted-foreground">Perfect Catalog Details</span>
+                                                <span className="text-emerald-500">+20 pts</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-border mt-4 text-[10px] text-muted-foreground">
+                                        Ranks reset at the end of the month. Keep logs consistent to retain your commander badge!
+                                    </div>
+                                </Card>
+                            </div>
+
+
                         </TabsContent>
                       </>
                   )}
