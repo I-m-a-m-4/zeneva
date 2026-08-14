@@ -204,6 +204,7 @@ function InventoryPageContent() {
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
+  const [showHealthModal, setShowHealthModal] = React.useState(false);
 
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
@@ -766,19 +767,19 @@ function InventoryPageContent() {
           {/* Left Column: Metric Cards */}
           <div className="flex flex-col gap-4">
             <Card 
-              className={cn("cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
               onClick={() => setHealthFilter('all')}
             >
-              <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
                 <span className="text-2xl font-bold">{healthMetrics.total}</span>
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('inventory.healthTotalIssues')}</span>
               </CardContent>
             </Card>
             <Card 
-              className={cn("cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
               onClick={() => setHealthFilter('low-stock')}
             >
-              <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
                 <span className="text-2xl font-bold text-orange-600">{healthMetrics.lowStock}</span>
                 <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">{t('inventory.healthLowStock')}</span>
               </CardContent>
@@ -786,8 +787,8 @@ function InventoryPageContent() {
           </div>
 
           {/* Middle Column: Overall Score */}
-          <div className="flex items-stretch lg:order-none order-first">
-            <Card className="w-full bg-gradient-to-br from-slate-50 to-muted/30 dark:from-slate-900/30 dark:to-muted/10 border-border overflow-hidden">
+          <div className="flex items-stretch lg:order-none order-first cursor-pointer" onClick={() => setShowHealthModal(true)}>
+            <Card className="w-full bg-gradient-to-br from-slate-50 to-muted/30 dark:from-slate-900/30 dark:to-muted/10 border-border overflow-hidden transition-all hover:shadow-md hover:border-primary/50">
               <CardContent className="p-5 flex flex-col items-center justify-center h-full text-center gap-4">
                 <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Overall Health Score</h3>
                 
@@ -830,6 +831,7 @@ function InventoryPageContent() {
                    healthMetrics.score >= 70 ? "Your inventory is okay, but needs a bit of attention." : 
                    "Your inventory needs urgent attention to prevent lost sales."}
                 </p>
+                <div className="text-[10px] text-primary underline underline-offset-2 opacity-80 mt-1">Tap to learn more</div>
               </CardContent>
             </Card>
           </div>
@@ -837,19 +839,19 @@ function InventoryPageContent() {
           {/* Right Column: Metric Cards */}
           <div className="flex flex-col gap-4">
             <Card 
-              className={cn("cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
               onClick={() => setHealthFilter('out-of-stock')}
             >
-              <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
                 <span className="text-2xl font-bold text-red-600">{healthMetrics.outOfStock}</span>
                 <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">{t('inventory.healthOutOfStock')}</span>
               </CardContent>
             </Card>
             <Card 
-              className={cn("cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
               onClick={() => setHealthFilter('missing-image')}
             >
-              <CardContent className="p-4 flex flex-col gap-1 text-center">
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
                 <span className="text-2xl font-bold text-blue-600">{healthMetrics.missingImages}</span>
                 <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
               </CardContent>
@@ -857,6 +859,37 @@ function InventoryPageContent() {
           </div>
         </div>
       )}
+
+      {/* Health Score Explanation Modal */}
+      <Dialog open={showHealthModal} onOpenChange={setShowHealthModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>How Your Health Score is Calculated</DialogTitle>
+            <DialogDescription>
+              We measure three key retail metrics to determine the health of your inventory. Keep these high to maximize sales and minimize operations issues.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <h4 className="font-semibold text-sm">1. Availability ({healthMetrics.availabilityScore}%)</h4>
+              <p className="text-xs text-muted-foreground">Measures how much of your catalog is currently in stock. Stockouts directly result in lost sales and frustrated customers.</p>
+            </div>
+            <div className="grid gap-2">
+              <h4 className="font-semibold text-sm">2. Completeness ({healthMetrics.completenessScore}%)</h4>
+              <p className="text-xs text-muted-foreground">Measures how many products have images. Good visual data is crucial for Point of Sale speed and customer trust.</p>
+            </div>
+            <div className="grid gap-2">
+              <h4 className="font-semibold text-sm">3. Accuracy ({healthMetrics.accuracyScore}%)</h4>
+              <p className="text-xs text-muted-foreground">Measures how much of your catalog avoids negative stock. Negative stock means you sold items you didn't officially record as received.</p>
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-start">
+            <Button type="button" variant="secondary" onClick={() => setShowHealthModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
