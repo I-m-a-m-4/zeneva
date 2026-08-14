@@ -348,7 +348,7 @@ export default function SignupPage() {
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold">Create an account</h1>
               <p className="text-balance text-sm sm:text-base text-muted-foreground">
-                Enter your information to create your account
+                Join forward-thinking retail brands streamlining their operations with Zeneva.
               </p>
             </div>
 
