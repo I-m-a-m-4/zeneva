@@ -110,13 +110,13 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
                 router.push('/settings/branches');
               }
             }}
-            className="text-primary font-medium flex items-center justify-between cursor-pointer"
+            className="text-muted-foreground font-medium flex items-center justify-between cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Create branch
             </div>
-            <div className="flex items-center gap-1 bg-primary/10 text-primary text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
+            <div className="flex items-center gap-1 bg-muted text-muted-foreground text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
               <Lock className="w-2.5 h-2.5" />
               Pro
             </div>
@@ -154,7 +154,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     return (
       <div className={cn("flex items-center", className)}>
         {renderButton(
-          "h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 border border-border focus:ring-1 text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5",
+          "h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5",
           "h-3.5 w-3.5",
           "",
           "h-3 w-3"
@@ -168,7 +168,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
       <div className={cn("w-full py-1.5", className)}>
         <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 tracking-wider px-1">Current Branch</p>
         {renderButton(
-          "w-full h-11 bg-muted/40 border-2 border-border focus:ring-1 text-sm font-bold text-foreground rounded-xl px-3 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-all justify-between gap-2",
+          "w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-all justify-between gap-2",
           "h-4 w-4",
           "",
           "h-4 w-4"
@@ -180,7 +180,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   return (
     <div className={cn("px-2 py-2 w-full", isCollapsed && "hidden", className)}>
       {renderButton(
-        "w-full h-9 bg-muted/30 border border-border focus:ring-1 justify-between font-normal hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 gap-2",
+        "w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary justify-between font-normal hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 gap-2",
         "h-4 w-4",
         "text-xs",
         "h-4 w-4"
