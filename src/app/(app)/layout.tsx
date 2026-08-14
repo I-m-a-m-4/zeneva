@@ -199,6 +199,8 @@ export default function AuthenticatedLayout({
 
   const [ipCountry, setIpCountry] = React.useState<string | null>(null);
 
+  const isPremium = businessInstance?.plan === 'pro' || businessInstance?.plan === 'business';
+
   React.useEffect(() => {
     getCountryFromIP().then(country => {
       setIpCountry(country);
@@ -1177,12 +1179,14 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <Avatar className="h-8 w-8">
-                            {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
-                            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                              {fallbackInitials}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-green-500 via-red-500 to-blue-500 p-[2px] shadow-sm")}>
+                            <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-sidebar")}>
+                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
+                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                                {fallbackInitials}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
                         )}
                         <div className="flex flex-col items-start group-data-[state=collapsed]:hidden truncate">
                           {isUserLoading ? (
@@ -1334,16 +1338,18 @@ export default function AuthenticatedLayout({
 
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative h-8 w-8 rounded-full flex">
+                      <Button variant="ghost" className="relative h-9 w-9 rounded-full flex justify-center items-center p-0">
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <Avatar className="h-8 w-8">
-                            {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
-                            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                              {fallbackInitials}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-green-500 via-red-500 to-blue-500 p-[2px] shadow-sm")}>
+                            <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-background")}>
+                              {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
+                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                                {fallbackInitials}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
                         )}
                       </Button>
                     </DropdownMenuTrigger>
