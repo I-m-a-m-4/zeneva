@@ -339,9 +339,9 @@ export default function AddProductPage() {
       // 4. Navigate immediately
       toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
       
-      // Ensure we release loading states immediately so the button isn't stuck if transition has small lag
-      isSubmitting.current = false;
-      setIsSaving(false);
+      // We intentionally do NOT reset `isSubmitting` and `isSaving` to false here.
+      // Resetting them would allow double-clicks to trigger another submission 
+      // while the Next.js router is still transitioning to the new page.
 
       router.push('/inventory');
 
