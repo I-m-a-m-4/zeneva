@@ -70,8 +70,10 @@ export default function RetentionCohortChart({ users, receipts }: RetentionCohor
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Retention Cohort Heatmap</CardTitle>
-        <CardDescription>Percentage of monthly cohorts remaining active (selling) over time.</CardDescription>
+        <CardTitle>Retention Cohort Analysis</CardTitle>
+        <CardDescription>
+          Tracks how many businesses from each monthly cohort remain active (made a sale) in subsequent months.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -91,9 +93,10 @@ export default function RetentionCohortChart({ users, receipts }: RetentionCohor
                   <TableCell className="font-medium text-xs whitespace-nowrap">{row.month}</TableCell>
                   <TableCell className="text-center text-xs font-bold">{row.total}</TableCell>
                   {row.retention.map((ret: any) => (
-                    <TableCell key={ret.index} className={`text-center p-0`}>
-                        <div className={`h-10 w-full flex items-center justify-center text-[11px] font-bold ${getHeatmapColor(ret.percentage)} m-0.5 rounded-sm`}>
-                            {ret.percentage.toFixed(0)}%
+                    <TableCell key={ret.index} className={`text-center p-0 min-w-[100px]`}>
+                        <div className={`h-12 w-full flex flex-col items-center justify-center ${getHeatmapColor(ret.percentage)} m-0.5 rounded-sm p-1 leading-tight`}>
+                            <span className="font-bold text-xs">{ret.count} {ret.count === 1 ? 'store' : 'stores'}</span>
+                            <span className="text-[10px] font-medium opacity-85">{ret.percentage.toFixed(0)}% retained</span>
                         </div>
                     </TableCell>
                   ))}
@@ -104,6 +107,15 @@ export default function RetentionCohortChart({ users, receipts }: RetentionCohor
               ))}
             </TableBody>
           </Table>
+        </div>
+        <div className="mt-4 pt-4 border-t border-border/50 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+          <p className="font-semibold text-foreground mb-1">💡 Insight & How to read:</p>
+          <p>
+            The rows represent users who joined in a specific month (a <strong>cohort</strong>). 
+            The columns show the number of those businesses that made at least one sale in the months following their sign-up. 
+            For example, <em>Month 0</em> is their sign-up month, and <em>Month 1</em> is the month after. 
+            This helps track long-term user engagement and platform stickiness based on actual platform usage (sales).
+          </p>
         </div>
       </CardContent>
     </Card>
