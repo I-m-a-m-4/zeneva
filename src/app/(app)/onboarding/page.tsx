@@ -27,6 +27,7 @@ import { ALL_CURRENCIES } from '@/lib/constants';
 import { Combobox } from '@/components/ui/combobox';
 
 const onboardingSchema = z.object({
+  name: z.string().min(2, 'Your name is required.'),
   organizationName: z.string().min(3, 'Organization name is required.'),
   industry: z.string().min(1, 'Please select an industry.'),
   address: z.string().optional(),
@@ -135,7 +136,7 @@ const COUNTRY_OPTIONS = Object.keys(COUNTRY_CODES).map((name) => ({
 }));
 
 const steps = [
-  { name: 'Profile', icon: Building, fields: ['organizationName', 'industry'] },
+  { name: 'Business Profile', icon: Building, fields: ['name', 'organizationName', 'industry'] },
   { name: 'Location', icon: MapPin, fields: ['address', 'state', 'country'] },
   { name: 'Currency', icon: Landmark, fields: ['currency'] },
 ];
@@ -218,6 +219,7 @@ export default function OnboardingPage() {
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
+      name: currentUserProfile?.name || '',
       organizationName: business?.name || '',
       industry: '',
       address: '',
@@ -267,6 +269,7 @@ export default function OnboardingPage() {
       // 2. Update User Profile
       const userDocRef = doc(firestore, 'users', authUser.uid);
       batch.update(userDocRef, {
+        name: data.name,
         surveyCompleted: true,
       });
 
@@ -281,7 +284,8 @@ export default function OnboardingPage() {
           clickable: false
       });
 
-      await batch.commit();
+      // Fire and forget the commit so it doesn't block on slow networks
+      batch.commit().catch(err => console.error('Failed to commit onboarding data:', err));
 
       // Set a bypass flag so the layout guard doesn't block the redirect
       // while the Firestore real-time listener catches up with the surveyCompleted change
@@ -292,9 +296,6 @@ export default function OnboardingPage() {
 
       // Trigger a local context refresh
       triggerRefresh();
-
-      // Wait for the Firestore listener to propagate the surveyCompleted: true update
-      await new Promise(resolve => setTimeout(resolve, 2000));
 
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       router.push('/dashboard');
@@ -350,6 +351,9 @@ export default function OnboardingPage() {
                   {step === 1 && (
                     <CardContent className="pt-2 pb-2 space-y-5">
                       <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><Building className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> Business Profile</CardTitle>
+                      <FormField control={form.control} name="name" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Your Full Name <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="e.g. Bello Imam" className="h-10 sm:h-12 text-sm shadow-none" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                      )} />
                       <FormField control={form.control} name="organizationName" render={({ field }) => (
                         <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">Store / Business Name <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="e.g. Zenith Supermarket" className="h-10 sm:h-12 text-sm shadow-none" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                       )} />
