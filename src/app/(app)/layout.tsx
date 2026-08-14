@@ -1179,7 +1179,7 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-green-500 via-red-500 to-blue-500 p-[2px] shadow-sm")}>
+                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-blue-900 via-blue-700 to-orange-500 p-[2px] shadow-sm")}>
                             <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-sidebar")}>
                               {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ''} />}
                               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
@@ -1342,7 +1342,7 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-green-500 via-red-500 to-blue-500 p-[2px] shadow-sm")}>
+                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-blue-900 via-blue-700 to-orange-500 p-[2px] shadow-sm")}>
                             <Avatar className={cn("h-8 w-8", isPremium && "border-2 border-background")}>
                               {user?.photoURL && <AvatarImage src={user.photoURL} alt={currentUserProfile?.name || ""} />}
                               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
