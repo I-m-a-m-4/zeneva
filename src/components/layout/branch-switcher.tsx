@@ -16,7 +16,7 @@ interface BranchSwitcherProps {
 }
 
 export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitcherProps) {
-  const { activeBranchId, setActiveBranchId, branches, isMultiBranchEnabled, isLoadingBranches } = useBranch();
+  const { activeBranchId, setActiveBranchId, branches, isLoadingBranches } = useBranch();
   const { currentUserProfile, business } = usePOS();
   const { state } = useSidebar();
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
@@ -26,7 +26,10 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     business?.ownerId === currentUserProfile.id
   );
 
-  if (isLoadingBranches) {
+  const hasMultipleBranches = branches.length > 1;
+  const canShowName = branches.length > 0 || !!business?.name;
+
+  if (isLoadingBranches && !canShowName) {
     if (variant === 'header') {
       return (
         <div className={cn("flex items-center", className)}>
@@ -49,106 +52,41 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     );
   }
 
-  if (!isMultiBranchEnabled) return null;
-
-  const currentBranchName = activeBranchId === 'all' 
+  const currentBranchName = activeBranchId === 'all' && hasMultipleBranches
     ? 'All Branches' 
-    : branches.find(b => b.id === activeBranchId)?.name || 'Select Branch';
+    : branches.find(b => b.id === activeBranchId)?.name || business?.name || 'Main Store';
 
-  if (variant === 'header') {
-    return (
-      <div className={cn("flex items-center", className)}>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              disabled={!isOwner} 
-              className="h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5"
-            >
-              <div className="flex items-center gap-1.5 truncate">
-                {activeBranchId === 'all' ? (
-                  <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                ) : (
-                  <Store className="h-3.5 w-3.5 text-primary shrink-0" />
-                )}
-                <span className="truncate">{currentBranchName}</span>
-              </div>
-              <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            <DropdownMenuItem onClick={() => setActiveBranchId('all')} className="font-semibold text-primary">
-              All Branches
-            </DropdownMenuItem>
-            {branches.map(branch => (
-              <DropdownMenuItem key={branch.id} onClick={() => setActiveBranchId(branch.id)}>
-                {branch.name} {branch.isPrimary ? '(Primary)' : ''}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const renderButtonContent = (iconClass: string, textClass: string) => (
+    <div className="flex items-center gap-2 truncate">
+      {activeBranchId === 'all' && hasMultipleBranches ? (
+        <Building2 className={cn("shrink-0 text-primary", iconClass)} />
+      ) : (
+        <Store className={cn("shrink-0 text-primary", iconClass)} />
+      )}
+      <span className={cn("truncate", textClass)}>{currentBranchName}</span>
+    </div>
+  );
+
+  const renderButton = (btnClass: string, iconClass: string, textClass: string, chevronClass: string) => {
+    const btn = (
+      <Button 
+        variant={variant === 'header' ? 'ghost' : 'outline'} 
+        disabled={!isOwner && hasMultipleBranches} 
+        className={cn(btnClass, !hasMultipleBranches && "pointer-events-none")}
+      >
+        {renderButtonContent(iconClass, textClass)}
+        {hasMultipleBranches && <ChevronDown className={cn("opacity-50 shrink-0", chevronClass)} />}
+      </Button>
     );
-  }
 
-  if (variant === 'sheet') {
+    if (!hasMultipleBranches) return btn;
+
     return (
-      <div className={cn("w-full py-1.5", className)}>
-        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 tracking-wider px-1">Current Branch</p>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="outline" 
-              disabled={!isOwner} 
-              className="w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-all justify-between gap-2"
-            >
-              <div className="flex items-center gap-2 truncate">
-                {activeBranchId === 'all' ? (
-                  <Building2 className="h-4 w-4 text-primary shrink-0" />
-                ) : (
-                  <Store className="h-4 w-4 text-primary shrink-0" />
-                )}
-                <span className="truncate">{currentBranchName}</span>
-              </div>
-              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[280px]">
-            <DropdownMenuItem onClick={() => setActiveBranchId('all')} className="font-semibold text-primary">
-              All Branches
-            </DropdownMenuItem>
-            {branches.map(branch => (
-              <DropdownMenuItem key={branch.id} onClick={() => setActiveBranchId(branch.id)}>
-                {branch.name} {branch.isPrimary ? '(Primary)' : ''}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("px-2 py-2 w-full", isCollapsed && "hidden", className)}>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button 
-            variant="outline" 
-            disabled={!isOwner} 
-            className="w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary justify-between font-normal hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 gap-2"
-          >
-            <div className="flex items-center gap-2 truncate">
-              {activeBranchId === 'all' ? (
-                <Building2 className="h-4 w-4 text-primary shrink-0" />
-              ) : (
-                <Store className="h-4 w-4 text-primary shrink-0" />
-              )}
-              <span className="truncate text-xs">{currentBranchName}</span>
-            </div>
-            <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-          </Button>
+          {btn}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[220px]">
+        <DropdownMenuContent align="start" className={variant === 'sheet' ? "w-[280px]" : "w-[200px]"}>
           <DropdownMenuItem onClick={() => setActiveBranchId('all')} className="font-semibold text-primary">
             All Branches
           </DropdownMenuItem>
@@ -159,6 +97,44 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+    );
+  };
+
+  if (variant === 'header') {
+    return (
+      <div className={cn("flex items-center", className)}>
+        {renderButton(
+          "h-8 md:h-9 px-2 sm:px-2.5 bg-muted/40 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 border border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-xs sm:text-sm font-semibold text-foreground rounded-lg max-w-[130px] xs:max-w-[170px] sm:max-w-[220px] transition-all shadow-2xs justify-between gap-1.5",
+          "h-3.5 w-3.5",
+          "",
+          "h-3 w-3"
+        )}
+      </div>
+    );
+  }
+
+  if (variant === 'sheet') {
+    return (
+      <div className={cn("w-full py-1.5", className)}>
+        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 tracking-wider px-1">Current Branch</p>
+        {renderButton(
+          "w-full h-11 bg-muted/40 border-2 border-dashed border-primary/40 focus:ring-1 focus:ring-primary text-sm font-bold text-foreground rounded-xl px-3 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-all justify-between gap-2",
+          "h-4 w-4",
+          "",
+          "h-4 w-4"
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("px-2 py-2 w-full", isCollapsed && "hidden", className)}>
+      {renderButton(
+        "w-full h-9 bg-muted/30 border-dashed focus:ring-1 focus:ring-primary justify-between font-normal hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 gap-2",
+        "h-4 w-4",
+        "text-xs",
+        "h-4 w-4"
+      )}
     </div>
   );
 }
