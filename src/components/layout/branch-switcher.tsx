@@ -116,10 +116,12 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
               <Plus className="w-4 h-4" />
               Create branch
             </div>
-            <div className="flex items-center gap-1 bg-muted text-muted-foreground text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
-              <Lock className="w-2.5 h-2.5" />
-              Pro
-            </div>
+            {(!business?.plan || business?.plan === 'starter') && (
+              <div className="flex items-center gap-1 bg-muted text-muted-foreground text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
+                <Lock className="w-2.5 h-2.5" />
+                Pro
+              </div>
+            )}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
