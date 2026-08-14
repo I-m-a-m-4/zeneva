@@ -52,13 +52,13 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     );
   }
 
-  const currentBranchName = activeBranchId === 'all' && hasMultipleBranches
+  const currentBranchName = activeBranchId === 'all'
     ? 'All Branches' 
     : branches.find(b => b.id === activeBranchId)?.name || business?.name || 'Main Store';
 
   const renderButtonContent = (iconClass: string, textClass: string) => (
     <div className="flex items-center gap-2 truncate">
-      {activeBranchId === 'all' && hasMultipleBranches ? (
+      {activeBranchId === 'all' ? (
         <Building2 className={cn("shrink-0 text-primary", iconClass)} />
       ) : (
         <Store className={cn("shrink-0 text-primary", iconClass)} />
@@ -71,15 +71,13 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     const btn = (
       <Button 
         variant={variant === 'header' ? 'ghost' : 'outline'} 
-        disabled={!isOwner && hasMultipleBranches} 
-        className={cn(btnClass, !hasMultipleBranches && "pointer-events-none")}
+        disabled={!isOwner} 
+        className={btnClass}
       >
         {renderButtonContent(iconClass, textClass)}
-        {hasMultipleBranches && <ChevronDown className={cn("opacity-50 shrink-0", chevronClass)} />}
+        <ChevronDown className={cn("opacity-50 shrink-0", chevronClass)} />
       </Button>
     );
-
-    if (!hasMultipleBranches) return btn;
 
     return (
       <DropdownMenu modal={false}>
