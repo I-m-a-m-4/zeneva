@@ -4,8 +4,9 @@ import React from 'react';
 import { useBranch } from '@/context/branch-context';
 import { usePOS } from '@/context/pos-context';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Store, Building2, ChevronDown, Plus } from 'lucide-react';
+import { Store, Building2, ChevronDown, Plus, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +22,7 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   const { currentUserProfile, business } = usePOS();
   const { state } = useSidebar();
   const router = useRouter();
+  const [showProModal, setShowProModal] = React.useState(false);
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
 
   const isOwner = currentUserProfile && (
@@ -82,7 +84,8 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     );
 
     return (
-      <DropdownMenu modal={false}>
+      <>
+        <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           {btn}
         </DropdownMenuTrigger>
@@ -99,21 +102,52 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
-            onClick={() => {
+            onClick={(e) => {
               if (business?.plan === 'starter' || !business?.plan) {
-                router.push('/billing');
+                e.preventDefault();
+                setShowProModal(true);
               } else {
                 router.push('/settings/branches');
               }
             }}
-            className="text-primary font-medium flex items-center gap-2 cursor-pointer"
+            className="text-primary font-medium flex items-center justify-between cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            Create a new branch
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Create branch
+            </div>
+            <div className="flex items-center gap-1 bg-primary/10 text-primary text-[9px] uppercase px-1.5 py-0.5 rounded-sm font-bold">
+              <Lock className="w-2.5 h-2.5" />
+              Pro
+            </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    );
+
+      <Dialog open={showProModal} onOpenChange={setShowProModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Lock className="w-5 h-5 text-primary" />
+              Pro Feature
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              Multi-branch management is available exclusively on Pro and Business plans. Upgrade your plan to add more store locations.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowProModal(false)}>Cancel</Button>
+            <Button onClick={() => {
+              setShowProModal(false);
+              router.push('/billing');
+            }}>
+              View Plans
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
   };
 
   if (variant === 'header') {
