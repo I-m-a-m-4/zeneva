@@ -249,6 +249,11 @@ export default function OnboardingPage() {
     try {
       const batch = writeBatch(firestore);
       
+      let localTimezone = 'Africa/Lagos';
+      try {
+        localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos';
+      } catch {}
+      
       // 1. Update Business Instance
       const businessDocRef = doc(firestore, 'businessInstances', bId);
       batch.update(businessDocRef, {
@@ -259,7 +264,7 @@ export default function OnboardingPage() {
         'settings.country': data.country,
         'settings.currency': data.currency,
         'settings.language': 'English',
-        'settings.timezone': 'Africa/Lagos',
+        'settings.timezone': localTimezone,
         'settings.inventoryStartDate': new Date(),
         'settings.fiscalYearStart': 'January',
       });

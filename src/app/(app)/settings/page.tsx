@@ -212,7 +212,13 @@ function SettingsPageContent() {
     }, []);
 
     const [currency, setCurrency] = React.useState('NGN');
-    const [timezone, setTimezone] = React.useState('Africa/Lagos');
+    const [timezone, setTimezone] = React.useState(() => {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos';
+        } catch {
+            return 'Africa/Lagos';
+        }
+    });
     const [defaultTaxRate, setDefaultTaxRate] = React.useState('0');
     const [paymentBankCode, setPaymentBankCode] = React.useState('');
     const [paymentBankAccountId, setPaymentBankAccountId] = React.useState('');
@@ -263,7 +269,11 @@ function SettingsPageContent() {
             setLogoPreview(business.settings?.logoUrl || null);
 
             setCurrency(business.settings?.currency || 'NGN');
-            setTimezone(business.settings?.timezone || 'Africa/Lagos');
+            let localTimezone = 'Africa/Lagos';
+            try {
+                localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos';
+            } catch {}
+            setTimezone(business.settings?.timezone || localTimezone);
             setDefaultTaxRate(String(business.settings?.defaultTaxRate || 0));
             setPaymentBankCode(business.settings?.paymentBankCode || '');
             setPaymentBankAccountId(business.settings?.paymentBankAccountId || '');

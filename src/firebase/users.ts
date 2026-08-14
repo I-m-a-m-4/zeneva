@@ -75,13 +75,20 @@ export const createUserProfileDocument = async (
       // No trial date. Starter is free forever, so a countdown here would be a
       // lie — and it used to be read as a lockout deadline. `trialExpiresAt` is
       // now written only by the billing flow, for real paying customers.
+      let localTimezone = 'Africa/Lagos';
+      try {
+          localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos';
+      } catch (e) {
+          console.warn("Could not determine local timezone, defaulting to Africa/Lagos");
+      }
+
       const newBusiness: Omit<BusinessInstance, 'id'> = {
         name: displayName,
         createdAt: serverTimestamp(),
         ownerId: user.uid,
         plan: 'starter',
         status: 'active',
-        settings: { currency: 'NGN', timezone: 'Africa/Lagos', defaultTaxRate: 0, productCategories: [] }
+        settings: { currency: 'NGN', timezone: localTimezone, defaultTaxRate: 0, productCategories: [] }
       };
       batch.set(businessDocRef, newBusiness);
     }
