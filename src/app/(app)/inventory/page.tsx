@@ -768,7 +768,7 @@ function InventoryPageContent() {
           {/* Left Column: Metric Cards */}
           <div className="flex flex-col gap-4">
             <Card 
-              className={cn("flex-1 cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-muted/50 border-2", healthFilter === 'all' ? "border-orange-500 bg-orange-50/10 dark:bg-orange-950/10" : "border-transparent")}
               onClick={() => setHealthFilter('all')}
             >
               <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
@@ -777,7 +777,7 @@ function InventoryPageContent() {
               </CardContent>
             </Card>
             <Card 
-              className={cn("flex-1 cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20 border-2", healthFilter === 'low-stock' ? "border-orange-500 bg-orange-50 dark:bg-orange-950/20" : "border-transparent")}
               onClick={() => setHealthFilter('low-stock')}
             >
               <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
@@ -840,7 +840,7 @@ function InventoryPageContent() {
           {/* Right Column: Metric Cards */}
           <div className="flex flex-col gap-4">
             <Card 
-              className={cn("flex-1 cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20 border-2", healthFilter === 'out-of-stock' ? "border-orange-500 bg-red-50 dark:bg-red-950/20" : "border-transparent")}
               onClick={() => setHealthFilter('out-of-stock')}
             >
               <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
@@ -849,7 +849,7 @@ function InventoryPageContent() {
               </CardContent>
             </Card>
             <Card 
-              className={cn("flex-1 cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
+              className={cn("flex-1 cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20 border-2", healthFilter === 'missing-image' ? "border-orange-500 bg-blue-50 dark:bg-blue-950/20" : "border-transparent")}
               onClick={() => setHealthFilter('missing-image')}
             >
               <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
