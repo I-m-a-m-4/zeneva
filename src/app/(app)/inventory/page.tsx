@@ -550,7 +550,7 @@ function InventoryPageContent() {
                   <ListFilter className="h-3.5 w-3.5" />
                   <span>{t('inventory.filter')}</span>
                   {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="rounded-full h-5 w-5 p-0 flex items-center justify-center ms-1">{activeFilterCount}</Badge>
+                    <span className="bg-secondary text-secondary-foreground rounded-full h-5 w-5 p-0 flex items-center justify-center ms-1 text-[10px] font-semibold">{activeFilterCount}</span>
                   )}
                 </Button>
               </DropdownMenuTrigger>
