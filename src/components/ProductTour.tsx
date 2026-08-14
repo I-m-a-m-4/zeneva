@@ -25,12 +25,6 @@ export function ProductTour() {
         --driver-radius: 14px;
       }
 
-      /* ── Overlay ──────────────────────────────────────────────────── */
-      .driver-overlay {
-        background: rgba(255, 255, 255, 0.7) !important;
-        /* Note: Removed backdrop-filter because it applies to the whole SVG, blurring the cutout hole */
-      }
-
       /* ── Popover shell ────────────────────────────────────────────── */
       .driver-popover {
         background: var(--driver-popover-bg) !important;
