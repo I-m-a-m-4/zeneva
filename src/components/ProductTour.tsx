@@ -27,7 +27,7 @@ export function ProductTour() {
 
       /* ── Overlay ──────────────────────────────────────────────────── */
       .driver-overlay {
-        background: rgba(0, 0, 0, 0.7) !important;
+        background: rgba(255, 255, 255, 0.7) !important;
         /* Note: Removed backdrop-filter because it applies to the whole SVG, blurring the cutout hole */
       }
 
