@@ -3381,7 +3381,7 @@ function AdminDashboardContent({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <HeartPulse className="h-5 w-5 text-primary" />
+                                <HeartPulse className="h-5 w-5 text-red-500 animate-pulse" />
                                 Platform Overview Command
                             </CardTitle>
                         </CardHeader>
