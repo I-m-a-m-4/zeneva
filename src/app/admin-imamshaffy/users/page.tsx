@@ -490,8 +490,8 @@ export default function UsersPage() {
                         >
                           <TableCell>
                             <div className="font-medium flex items-center gap-1.5">
-                              {user.name || <span className="text-amber-600 dark:text-amber-400 font-semibold">Incomplete Signup</span>}
-                              {!user.name && !user.email && (
+                              {user.name || business?.name || <span className="text-amber-600 dark:text-amber-400 font-semibold">Incomplete Signup</span>}
+                              {!user.name && !business?.name && !user.email && (
                                 <Badge variant="outline" className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200">
                                   Visitor
                                 </Badge>
