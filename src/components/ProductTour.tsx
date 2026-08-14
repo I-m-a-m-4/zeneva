@@ -139,6 +139,7 @@ export function ProductTour() {
       const isMobile = window.innerWidth < 768;
       
       const driverObj = driver({
+        overlayColor: 'rgba(0, 0, 0, 0.4)',
         showProgress: true,
         animate: true,
         allowClose: true,
