@@ -318,7 +318,8 @@ function InventoryPageContent() {
       }
       if (isUnhealthy) total++;
     });
-    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total };
+    const score = products.length > 0 ? Math.round(((products.length - total) / products.length) * 100) : 100;
+    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total, score };
   }, [products]);
 
   const displayedProducts = React.useMemo(() => {
@@ -749,7 +750,32 @@ function InventoryPageContent() {
       </div>
 
       {activeTab === 'health' && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="flex flex-col gap-4 mb-6">
+          <Card className="bg-gradient-to-r from-slate-50 to-muted/30 dark:from-slate-900/30 dark:to-muted/10 border-border overflow-hidden">
+            <CardContent className="p-5 flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-1 flex flex-col gap-2 w-full">
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-muted-foreground">Overall Health Score</h3>
+                  <span className={cn("text-2xl font-black", healthMetrics.score >= 90 ? "text-green-600" : healthMetrics.score >= 70 ? "text-orange-500" : "text-red-600")}>
+                    {healthMetrics.score}%
+                  </span>
+                </div>
+                <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={cn("h-full transition-all duration-1000 ease-out rounded-full shadow-[inset_0_-2px_4px_rgba(0,0,0,0.1)]", healthMetrics.score >= 90 ? "bg-green-500" : healthMetrics.score >= 70 ? "bg-orange-500" : "bg-red-500")}
+                    style={{ width: `${healthMetrics.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {healthMetrics.score >= 90 ? "Your inventory is in great shape! Products are well-stocked and detailed." : 
+                   healthMetrics.score >= 70 ? "Your inventory is okay, but some products need restocking or missing details." : 
+                   "Your inventory needs attention. Many items are out of stock or missing details."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card 
             className={cn("cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
             onClick={() => setHealthFilter('all')}
@@ -786,6 +812,7 @@ function InventoryPageContent() {
               <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
 
