@@ -147,7 +147,8 @@ export function ProductTour() {
       const driverObj = driver({
         showProgress: true,
         animate: true,
-        allowClose: false,
+        allowClose: true,
+        closeBtnText: "Skip",
         doneBtnText: "Let's Go!",
         nextBtnText: "Next",
         prevBtnText: "Back",
