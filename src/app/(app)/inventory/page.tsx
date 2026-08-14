@@ -304,7 +304,7 @@ function InventoryPageContent() {
   }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
   const healthMetrics = React.useMemo(() => {
-    if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0 };
+    if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0, score: 0, availabilityScore: 0, completenessScore: 0, accuracyScore: 0 };
     let missing = 0, oos = 0, low = 0, neg = 0, total = 0;
     products.forEach(p => {
       let isUnhealthy = false;
@@ -318,8 +318,20 @@ function InventoryPageContent() {
       }
       if (isUnhealthy) total++;
     });
-    const score = products.length > 0 ? Math.round(((products.length - total) / products.length) * 100) : 100;
-    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total, score };
+
+    const totalItems = products.length;
+    if (totalItems === 0) {
+       return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0, score: 100, availabilityScore: 100, completenessScore: 100, accuracyScore: 100 };
+    }
+
+    const availabilityScore = Math.max(0, Math.round(((totalItems - oos) / totalItems) * 100));
+    const completenessScore = Math.max(0, Math.round(((totalItems - missing) / totalItems) * 100));
+    const accuracyScore = Math.max(0, Math.round(((totalItems - neg) / totalItems) * 100));
+    
+    // Overall score is weighted average
+    const score = Math.round((availabilityScore + completenessScore + accuracyScore) / 3);
+
+    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total, score, availabilityScore, completenessScore, accuracyScore };
   }, [products]);
 
   const displayedProducts = React.useMemo(() => {
@@ -750,68 +762,98 @@ function InventoryPageContent() {
       </div>
 
       {activeTab === 'health' && (
-        <div className="flex flex-col gap-4 mb-6">
-          <Card className="bg-gradient-to-r from-slate-50 to-muted/30 dark:from-slate-900/30 dark:to-muted/10 border-border overflow-hidden">
-            <CardContent className="p-5 flex flex-col md:flex-row items-center gap-6">
-              <div className="flex-1 flex flex-col gap-2 w-full">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-muted-foreground">Overall Health Score</h3>
-                  <span className={cn("text-2xl font-black", healthMetrics.score >= 90 ? "text-green-600" : healthMetrics.score >= 70 ? "text-orange-500" : "text-red-600")}>
-                    {healthMetrics.score}%
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {/* Left Column: Metric Cards */}
+          <div className="flex flex-col gap-4">
+            <Card 
+              className={cn("cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
+              onClick={() => setHealthFilter('all')}
+            >
+              <CardContent className="p-4 flex flex-col gap-1 text-center">
+                <span className="text-2xl font-bold">{healthMetrics.total}</span>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('inventory.healthTotalIssues')}</span>
+              </CardContent>
+            </Card>
+            <Card 
+              className={cn("cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
+              onClick={() => setHealthFilter('low-stock')}
+            >
+              <CardContent className="p-4 flex flex-col gap-1 text-center">
+                <span className="text-2xl font-bold text-orange-600">{healthMetrics.lowStock}</span>
+                <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">{t('inventory.healthLowStock')}</span>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Middle Column: Overall Score */}
+          <div className="flex items-stretch lg:order-none order-first">
+            <Card className="w-full bg-gradient-to-br from-slate-50 to-muted/30 dark:from-slate-900/30 dark:to-muted/10 border-border overflow-hidden">
+              <CardContent className="p-5 flex flex-col items-center justify-center h-full text-center gap-4">
+                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Overall Health Score</h3>
+                
+                <div className="relative flex items-center justify-center">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle cx="64" cy="64" r="56" className="stroke-muted" strokeWidth="12" fill="none" />
+                    <circle 
+                      cx="64" cy="64" r="56" 
+                      className={cn("transition-all duration-1000 ease-out", healthMetrics.score >= 90 ? "stroke-green-500" : healthMetrics.score >= 70 ? "stroke-orange-500" : "stroke-red-500")}
+                      strokeWidth="12" fill="none" 
+                      strokeDasharray="351.85" 
+                      strokeDashoffset={351.85 - (351.85 * healthMetrics.score) / 100}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={cn("text-3xl font-black", healthMetrics.score >= 90 ? "text-green-600" : healthMetrics.score >= 70 ? "text-orange-500" : "text-red-600")}>
+                      {healthMetrics.score}%
+                    </span>
+                  </div>
                 </div>
-                <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={cn("h-full transition-all duration-1000 ease-out rounded-full shadow-[inset_0_-2px_4px_rgba(0,0,0,0.1)]", healthMetrics.score >= 90 ? "bg-green-500" : healthMetrics.score >= 70 ? "bg-orange-500" : "bg-red-500")}
-                    style={{ width: `${healthMetrics.score}%` }}
-                  />
+
+                <div className="flex w-full justify-between text-[10px] text-muted-foreground uppercase font-medium mt-2 px-2">
+                  <div className="flex flex-col items-center">
+                    <span>Avail</span>
+                    <span className="text-foreground">{healthMetrics.availabilityScore}%</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span>Complete</span>
+                    <span className="text-foreground">{healthMetrics.completenessScore}%</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span>Accur</span>
+                    <span className="text-foreground">{healthMetrics.accuracyScore}%</span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {healthMetrics.score >= 90 ? "Your inventory is in great shape! Products are well-stocked and detailed." : 
-                   healthMetrics.score >= 70 ? "Your inventory is okay, but some products need restocking or missing details." : 
-                   "Your inventory needs attention. Many items are out of stock or missing details."}
+
+                <p className="text-xs text-muted-foreground mt-2">
+                  {healthMetrics.score >= 90 ? "Your inventory is in great shape!" : 
+                   healthMetrics.score >= 70 ? "Your inventory is okay, but needs a bit of attention." : 
+                   "Your inventory needs urgent attention to prevent lost sales."}
                 </p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card 
-            className={cn("cursor-pointer transition-colors hover:bg-muted/50", healthFilter === 'all' && "border-primary")}
-            onClick={() => setHealthFilter('all')}
-          >
-            <CardContent className="p-4 flex flex-col gap-1 text-center">
-              <span className="text-2xl font-bold">{healthMetrics.total}</span>
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('inventory.healthTotalIssues')}</span>
-            </CardContent>
-          </Card>
-          <Card 
-            className={cn("cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
-            onClick={() => setHealthFilter('out-of-stock')}
-          >
-            <CardContent className="p-4 flex flex-col gap-1 text-center">
-              <span className="text-2xl font-bold text-red-600">{healthMetrics.outOfStock}</span>
-              <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">{t('inventory.healthOutOfStock')}</span>
-            </CardContent>
-          </Card>
-          <Card 
-            className={cn("cursor-pointer transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/20", healthFilter === 'low-stock' && "border-orange-500 bg-orange-50 dark:bg-orange-950/20")}
-            onClick={() => setHealthFilter('low-stock')}
-          >
-            <CardContent className="p-4 flex flex-col gap-1 text-center">
-              <span className="text-2xl font-bold text-orange-600">{healthMetrics.lowStock}</span>
-              <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">{t('inventory.healthLowStock')}</span>
-            </CardContent>
-          </Card>
-          <Card 
-            className={cn("cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
-            onClick={() => setHealthFilter('missing-image')}
-          >
-            <CardContent className="p-4 flex flex-col gap-1 text-center">
-              <span className="text-2xl font-bold text-blue-600">{healthMetrics.missingImages}</span>
-              <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column: Metric Cards */}
+          <div className="flex flex-col gap-4">
+            <Card 
+              className={cn("cursor-pointer transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20", healthFilter === 'out-of-stock' && "border-red-500 bg-red-50 dark:bg-red-950/20")}
+              onClick={() => setHealthFilter('out-of-stock')}
+            >
+              <CardContent className="p-4 flex flex-col gap-1 text-center">
+                <span className="text-2xl font-bold text-red-600">{healthMetrics.outOfStock}</span>
+                <span className="text-xs text-red-600/80 font-medium uppercase tracking-wider">{t('inventory.healthOutOfStock')}</span>
+              </CardContent>
+            </Card>
+            <Card 
+              className={cn("cursor-pointer transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20", healthFilter === 'missing-image' && "border-blue-500 bg-blue-50 dark:bg-blue-950/20")}
+              onClick={() => setHealthFilter('missing-image')}
+            >
+              <CardContent className="p-4 flex flex-col gap-1 text-center">
+                <span className="text-2xl font-bold text-blue-600">{healthMetrics.missingImages}</span>
+                <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
