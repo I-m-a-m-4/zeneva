@@ -135,9 +135,9 @@ export function ProductTour() {
     const timer = setTimeout(() => {
       // Remove it right before starting so it never runs again
       localStorage.removeItem("zeneva_needs_tour");
-      
+
       const isMobile = window.innerWidth < 768;
-      
+
       const driverObj = driver({
         overlayColor: 'rgba(0, 0, 0, 0.4)',
         showProgress: true,

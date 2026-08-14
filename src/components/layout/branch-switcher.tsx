@@ -52,13 +52,13 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
     );
   }
 
-  const currentBranchName = activeBranchId === 'all'
+  const currentBranchName = (activeBranchId === 'all' && hasMultipleBranches)
     ? 'All Branches' 
     : branches.find(b => b.id === activeBranchId)?.name || business?.name || 'Main Store';
 
   const renderButtonContent = (iconClass: string, textClass: string) => (
     <div className="flex items-center gap-2 truncate">
-      {activeBranchId === 'all' ? (
+      {activeBranchId === 'all' && hasMultipleBranches ? (
         <Building2 className={cn("shrink-0 text-primary", iconClass)} />
       ) : (
         <Store className={cn("shrink-0 text-primary", iconClass)} />
@@ -85,9 +85,11 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
           {btn}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={variant === 'sheet' ? "w-[280px]" : "w-[200px]"}>
-          <DropdownMenuItem onClick={() => setActiveBranchId('all')} className="font-semibold text-primary">
-            All Branches
-          </DropdownMenuItem>
+          {hasMultipleBranches && (
+            <DropdownMenuItem onClick={() => setActiveBranchId('all')} className="font-semibold text-primary">
+              All Branches
+            </DropdownMenuItem>
+          )}
           {branches.map(branch => (
             <DropdownMenuItem key={branch.id} onClick={() => setActiveBranchId(branch.id)}>
               {branch.name} {branch.isPrimary ? '(Primary)' : ''}
