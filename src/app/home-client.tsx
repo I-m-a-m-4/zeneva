@@ -67,6 +67,9 @@ import {
     History,
     FileText,
     Clock,
+    Lock,
+    Shield,
+    Globe,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -1026,13 +1029,55 @@ export default function Home() {
                         </div>
                     </section>
 
+                    {/* Trust & Privacy Section */}
+                    <section className="py-20 px-6 bg-slate-900 text-white relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay"></div>
+                        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>
+                        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+                        
+                        <div className="max-w-6xl mx-auto relative z-10">
+                            <div className="text-center max-w-2xl mx-auto mb-12">
+                                <ShieldCheck className="h-12 w-12 text-primary mx-auto mb-6" />
+                                <h2 className="text-3xl md:text-4xl font-light tracking-tight font-bricolage mb-4">
+                                    Enterprise-Grade Security
+                                </h2>
+                                <p className="text-lg text-slate-300 font-dm-sans">
+                                    Zeneva is built on infrastructure that complies with the world's strictest security standards. Your data is protected by the same systems trusted by top global enterprises.
+                                </p>
+                            </div>
 
-
-
-
-
-
-
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-md rounded-2xl p-6 text-center hover:bg-slate-800 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                                        <Lock className="h-5 w-5 text-emerald-400" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-2">256-bit Encryption</h3>
+                                    <p className="text-sm text-slate-400">Bank-level encryption for all your data at rest and in transit.</p>
+                                </div>
+                                <div className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-md rounded-2xl p-6 text-center hover:bg-slate-800 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                                        <Shield className="h-5 w-5 text-blue-400" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-2">SOC 2 Compliant</h3>
+                                    <p className="text-sm text-slate-400">Our cloud infrastructure undergoes regular rigorous SOC 2 & SOC 3 audits.</p>
+                                </div>
+                                <div className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-md rounded-2xl p-6 text-center hover:bg-slate-800 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                                        <Server className="h-5 w-5 text-indigo-400" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-2">ISO 27001 Certified</h3>
+                                    <p className="text-sm text-slate-400">Data centers certified for information security management.</p>
+                                </div>
+                                <div className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-md rounded-2xl p-6 text-center hover:bg-slate-800 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                                        <Globe className="h-5 w-5 text-orange-400" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-2">GDPR Ready</h3>
+                                    <p className="text-sm text-slate-400">Full data portability with easy exports and complete right to erasure.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
                     <section id="business-types" className="py-24 px-6 bg-white border-t border-slate-100">
                         <div className="max-w-7xl mx-auto">

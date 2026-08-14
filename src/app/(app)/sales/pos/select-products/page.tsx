@@ -90,7 +90,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">
-                    <span className="text-lg font-bold text-foreground dark:text-white"><span className="text-orange-500 mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-foreground dark:text-white"><span className="mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()}</span>
                     {product.baseUnit && <span className="text-[10px] text-muted-foreground">{t('pos.perUnit', { unit: product.baseUnit })}</span>}
                 </div>
 
@@ -114,10 +114,10 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                                     }
                                 }
                             }}>
-                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || t('pos.piece')} (<span className="text-orange-500 mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()})</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || t('pos.piece')} (<span className="mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()})</DropdownMenuRadioItem>
                                 {product.uomConversions.map((uom) => (
                                     <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
-                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || t('pos.pcs')}) - <span className="text-orange-500 mr-0.5">{currencySymbol}</span>{(uom.price || product.price).toLocaleString()}
+                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || t('pos.pcs')}) - <span className="mr-0.5">{currencySymbol}</span>{(uom.price || product.price).toLocaleString()}
                                     </DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>
@@ -203,7 +203,7 @@ const CartContents = () => {
                                         {item.product.name}
                                         {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
                                     </p>
-                                    <p className="text-xs text-muted-foreground"><span className="text-orange-500 mr-0.5">{currencySymbol}</span>{(item.product.price * item.quantity).toLocaleString()}</p>
+                                    <p className="text-xs text-muted-foreground"><span className="mr-0.5">{currencySymbol}</span>{(item.product.price * item.quantity).toLocaleString()}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Input
@@ -223,7 +223,7 @@ const CartContents = () => {
                     <Separator />
                     <div className="flex justify-between font-semibold">
                         <span>{t('common.subtotal')}</span>
-                        <span><span className="text-orange-500 mr-0.5">{currencySymbol}</span>{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span><span className="mr-0.5">{currencySymbol}</span>{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             )}

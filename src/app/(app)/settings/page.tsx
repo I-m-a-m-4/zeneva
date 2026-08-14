@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -297,6 +297,67 @@ function SettingsPageContent() {
             setPreventSalesOutsideHours(business.settings?.operatingHours?.preventSalesOutsideHours || false);
         }
     }, [business]);
+
+    const [isExporting, setIsExporting] = React.useState(false);
+
+    const handleExportData = async () => {
+        if (!currentUserProfile?.email) {
+            toast({
+                title: t('settings.dataExportError', { defaultValue: 'Export Failed' }),
+                description: t('settings.noEmailFound', { defaultValue: 'No email address found for your profile.' }),
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        try {
+            setIsExporting(true);
+            const data = {
+                userProfile: currentUserProfile,
+                businessDetails: business ? {
+                    id: business.id,
+                    name: business.name,
+                    address: business.address,
+                    settings: business.settings
+                } : null,
+                exportDate: new Date().toISOString(),
+                exportReason: 'GDPR Right to Portability'
+            };
+            
+            const response = await fetch('/api/export-data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: currentUserProfile.email,
+                    data
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to send export email');
+            }
+            
+            toast({
+                title: t('settings.dataExportSuccess', { defaultValue: 'Data Exported Successfully' }),
+                description: t('settings.dataExportEmailSent', { defaultValue: 'Your GDPR data payload has been emailed to you.' }),
+                variant: 'success'
+            });
+        } catch (err) {
+            console.error('Failed to export data:', err);
+            toast({
+                title: t('settings.dataExportError', { defaultValue: 'Export Failed' }),
+                description: t('settings.dataExportErrorDesc', { defaultValue: 'There was an error generating your data export.' }),
+                variant: 'destructive'
+            });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
 
     // Sessions state
     const [sessions, setSessions] = React.useState<any[]>([]);
@@ -1401,46 +1462,7 @@ function SettingsPageContent() {
                     </CardFooter>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />{t('settings.notificationsTitle')}</CardTitle>
-                        <CardDescription>{t('settings.notificationsDescription')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                                <Label className="text-base">{t('settings.pushNotifications')}</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    {permission === 'granted'
-                                        ? t('settings.pushGranted')
-                                        : permission === 'denied'
-                                            ? t('settings.pushDenied')
-                                            : t('settings.pushDefault')}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {permission === 'granted' && (
-                                    <Button
-                                        onClick={handleSendTestNotification}
-                                        variant="outline"
-                                        size="sm"
-                                    >
-                                        {t('settings.sendTest')}
-                                    </Button>
-                                )}
-                                <Button
-                                    onClick={fcmToken ? unsubscribe : requestPermission}
-                                    disabled={isFcmLoading}
-                                    variant={fcmToken ? "destructive" : "default"}
-                                    size="sm"
-                                >
-                                    {isFcmLoading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
-                                    {fcmToken ? t('settings.disable') : t('settings.enable')}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />{t('settings.securityTitle')}</CardTitle>
@@ -1517,6 +1539,25 @@ function SettingsPageContent() {
                                     )}
                                 </>
                             )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />{t('settings.privacyTitle', { defaultValue: 'Privacy & Data' })}</CardTitle>
+                        <CardDescription>{t('settings.privacyDescription', { defaultValue: 'Manage your data and privacy preferences.' })}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 gap-4">
+                            <div className="space-y-0.5">
+                                <Label className="text-base text-stone-900">{t('settings.dataExportTitle', { defaultValue: 'Data Export' })}</Label>
+                                <p className="text-sm text-muted-foreground">{t('settings.dataExportDesc', { defaultValue: 'Download a copy of your personal and business data to fulfill GDPR portability requirements.' })}</p>
+                            </div>
+                            <Button onClick={handleExportData} disabled={isExporting} variant="outline" className="shrink-0 gap-2">
+                                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                                {isExporting ? t('settings.exportingData', { defaultValue: 'Sending Email...' }) : t('settings.exportData', { defaultValue: 'Export Data' })}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>

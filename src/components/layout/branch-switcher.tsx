@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
+import { getCountryFromIP } from '@/lib/utils';
 
 interface BranchSwitcherProps {
   variant?: 'sidebar' | 'header' | 'sheet';
@@ -23,17 +25,36 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
   const { state } = useSidebar();
   const router = useRouter();
   const [showProModal, setShowProModal] = React.useState(false);
+  const [currency, setCurrency] = React.useState<'USD' | 'NGN'>('USD');
   const isCollapsed = variant === 'sidebar' && state === 'collapsed';
+
+  React.useEffect(() => {
+    if (showProModal) {
+      getCountryFromIP().then((country) => {
+        if (country === 'Nigeria') {
+          setCurrency('NGN');
+        } else {
+          setCurrency('USD');
+        }
+      });
+    }
+  }, [showProModal]);
 
   const isOwner = currentUserProfile && (
     currentUserProfile.role === 'owner' ||
     business?.ownerId === currentUserProfile.id
   );
 
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const hasMultipleBranches = branches.length > 1;
   const canShowName = branches.length > 0 || !!business?.name;
 
-  if (isLoadingBranches && !canShowName) {
+  if (!isMounted || (isLoadingBranches && !canShowName)) {
     if (variant === 'header') {
       return (
         <div className={cn("flex items-center", className)}>
@@ -127,25 +148,21 @@ export function BranchSwitcher({ variant = 'sidebar', className }: BranchSwitche
       </DropdownMenu>
 
       <Dialog open={showProModal} onOpenChange={setShowProModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Lock className="w-5 h-5 text-primary" />
-              Pro Feature
-            </DialogTitle>
-            <DialogDescription className="pt-2 text-base">
-              Multi-branch management is available exclusively on Pro and Business plans. Upgrade your plan to add more store locations.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4 gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowProModal(false)}>Cancel</Button>
-            <Button onClick={() => {
-              setShowProModal(false);
-              router.push('/billing');
-            }}>
-              View Plans
-            </Button>
-          </DialogFooter>
+        <DialogContent className="max-w-lg p-0 border-none bg-transparent shadow-none">
+          <DialogTitle className="sr-only">Upgrade to Pro</DialogTitle>
+          <FeatureGateUpgradeCard 
+            featureName="Multi-Branch Management"
+            featureDescription="Add and manage multiple store locations effortlessly. Keep inventory in sync across all your branches."
+            requiredPlan="pro"
+            icon={Store}
+            currency={currency}
+            featurePoints={[
+              { title: "Centralized Control", description: "Manage all branches from a single dashboard." },
+              { title: "Inventory Routing", description: "Transfer stock between different store locations." },
+              { title: "Branch Analytics", description: "Track performance per location to see what's working." }
+            ]}
+            onUpgradeClick={() => setShowProModal(false)}
+          />
         </DialogContent>
       </Dialog>
     </>

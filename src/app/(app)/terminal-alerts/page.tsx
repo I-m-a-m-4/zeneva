@@ -26,6 +26,7 @@ import {
   Printer
 } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc, where } from 'firebase/firestore';
+import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
 import { useFirestore } from '@/firebase';
 import { safeToDate, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -440,50 +441,18 @@ export default function TerminalAlertsPage() {
 
       {!hasAccess && (
         <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] pointer-events-auto">
-          <Card className="w-full max-w-lg border-2 border-orange-500/20 shadow-2xl bg-background/95 backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-            <CardHeader className="text-center pt-8 pb-4">
-              <div className="mx-auto mb-6 relative">
-                <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 animate-pulse" />
-                <div className="relative z-10 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Bell className="h-8 w-8 text-primary animate-bounce" />
-                </div>
-              </div>
-              <CardTitle className="text-3xl font-black tracking-tight text-foreground">
-                Zeneva Terminal Alerts
-              </CardTitle>
-              <CardDescription className="text-base mt-2 px-6">
-                Never ask customers for screenshots or call your bank again. Get instant audio notifications as soon as transfers hit your accounts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-8 pb-8 space-y-6">
-              <div className="p-5 rounded-2xl bg-muted/40 border border-border/50">
-                <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider font-mono">Premium Business Features</h4>
-                <ul className="text-sm space-y-2.5 text-muted-foreground font-medium">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Real-time Chimes</strong>: Sound alerts play instantly when operator receives transfers.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Permanent Store DVAs</strong>: Customers transfer directly to your static business account.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>Auto Payout Settlement</strong>: Money lands in your local bank automatically within 24 hours.</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>0% Processing Markups</strong>: Pay only standard processing gateway fees.</span>
-                  </li>
-                </ul>
-              </div>
-              <Button asChild className="w-full h-12 shadow-lg bg-orange-600 hover:bg-orange-700 text-white font-bold hover:scale-[1.02] active:scale-95 transition-all duration-300">
-                <Link href="/billing">
-                  Upgrade to Business Plan
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <FeatureGateUpgradeCard
+            featureName="Zeneva Terminal Alerts"
+            featureDescription="Never ask customers for screenshots or call your bank again. Get instant audio notifications as soon as transfers hit your accounts."
+            requiredPlan="business"
+            icon={Bell}
+            featurePoints={[
+              { title: "Real-time Chimes", description: "Sound alerts play instantly when operator receives transfers." },
+              { title: "Permanent Store DVAs", description: "Customers transfer directly to your static business account." },
+              { title: "Auto Payout Settlement", description: "Money lands in your local bank automatically within 24 hours." },
+              { title: "0% Processing Markups", description: "Pay only standard processing gateway fees." }
+            ]}
+          />
         </div>
       )}
     </div>

@@ -321,7 +321,7 @@ export default function OnboardingPage() {
   return (
     <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 overflow-y-auto backdrop-blur-sm">
       
-      <div className="w-full max-w-2xl space-y-5 sm:space-y-6 bg-white/95 backdrop-blur-xl border border-white/60 p-6 sm:p-8 rounded-xl my-auto shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      <div className="w-full max-w-2xl space-y-5 sm:space-y-6 bg-card/95 dark:bg-card/80 backdrop-blur-xl border border-border/60 p-6 sm:p-8 rounded-xl my-auto shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none">
         <div className="text-center mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
             Set Up Your Zeneva Store, {currentUserProfile?.name ? currentUserProfile.name.split(' ')[0] : 'Merchant'}

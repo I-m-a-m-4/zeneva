@@ -259,7 +259,8 @@ export function FeatureGateUpgradeCard({
   requiredPlan,
   icon: Icon = BarChart2,
   featurePoints,
-  currency = 'USD'
+  currency = 'USD',
+  onUpgradeClick
 }: {
   featureName: string;
   featureDescription: string;
@@ -267,6 +268,7 @@ export function FeatureGateUpgradeCard({
   icon?: React.ElementType;
   featurePoints?: { title: string; description: string }[];
   currency?: 'USD' | 'NGN';
+  onUpgradeClick?: () => void;
 }) {
   const defaultFeaturePoints = [
     { title: "Analytical Reports", description: "Get full access to detailed business graphs and analytics." },
@@ -308,7 +310,7 @@ export function FeatureGateUpgradeCard({
         </div>
 
         <div className="space-y-3 pt-2">
-            <Button asChild className="w-full h-12 bg-orange-400 hover:bg-orange-500 text-white hover:text-white font-extrabold rounded-full shadow-md hover:scale-[1.01] active:scale-95 transition-all duration-300">
+            <Button asChild onClick={onUpgradeClick} className="w-full h-12 bg-orange-400 hover:bg-orange-500 text-white hover:text-white font-extrabold rounded-full shadow-md hover:scale-[1.01] active:scale-95 transition-all duration-300">
                 <Link href="/billing">Get {requiredPlan === 'business' ? 'Business' : 'Pro'} Plan</Link>
             </Button>
             <div className="text-xs text-muted-foreground font-semibold">

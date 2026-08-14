@@ -214,6 +214,11 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
     }
 
+    match /error_logs/{logId} {
+      allow create: if true;
+      allow read, update, delete: if isSuperAdmin();
+    }
+
     // =================================================================
     // Multi-Tenant Collections
     // =================================================================

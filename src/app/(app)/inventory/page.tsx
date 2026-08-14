@@ -883,6 +883,11 @@ function InventoryPageContent() {
               <h4 className="font-semibold text-sm">3. Accuracy ({healthMetrics.accuracyScore}%)</h4>
               <p className="text-xs text-muted-foreground">Measures how much of your catalog avoids negative stock. Negative stock means you sold items you didn't officially record as received.</p>
             </div>
+            <div className="mt-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <p className="text-xs text-primary/90 font-medium">
+                <span className="font-bold">Solution:</span> Use the health filters at the top of this page (Out of Stock, Negative Stock, Missing Images) to find and fix these issues!
+              </p>
+            </div>
           </div>
           <DialogFooter className="sm:justify-start">
             <Button type="button" variant="secondary" onClick={() => setShowHealthModal(false)}>

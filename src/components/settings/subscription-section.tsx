@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, ArrowRight, Loader2, ShieldCheck, Zap, Briefcase } from 'lucide-react';
+import { Check, ArrowRight, Loader2, ShieldCheck, Star, Store } from 'lucide-react';
 import type { UserProfile, BusinessInstance } from '@/types';
 import { useFirestore, auth } from '@/firebase';
 import { writeBatch, doc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
@@ -515,9 +515,9 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                 <div className="flex justify-between items-start">
                                     <CardTitle className="flex items-center gap-2">
                                         {plan.planId === 'pro' ? (
-                                            <Zap className="h-5 w-5 text-indigo-500 shrink-0" />
+                                            <Star className="h-5 w-5 text-indigo-500 shrink-0" />
                                         ) : (
-                                            <Briefcase className="h-5 w-5 text-amber-500 shrink-0" />
+                                            <Store className="h-5 w-5 text-amber-500 shrink-0" />
                                         )}
                                         {plan.name}
                                     </CardTitle>

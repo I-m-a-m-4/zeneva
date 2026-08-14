@@ -1351,7 +1351,7 @@ export default function AuthenticatedLayout({
                           {allNotifications.slice(0, 6).map((notif: any) => (
                             <DropdownMenuItem
                               key={`${notif.isGlobal ? 'g' : 'u'}-${notif.id}`}
-                              className="flex cursor-pointer items-start gap-2.5 px-3 py-2.5"
+                              className="flex cursor-pointer items-start gap-2.5 px-3 py-2.5 focus:bg-muted focus:text-foreground hover:bg-muted"
                               onSelect={() => handleNotificationClick(notif)}
                             >
                               <span

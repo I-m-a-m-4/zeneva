@@ -369,7 +369,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   };
 
   return (
-    <Card ref={tableRef} className="flex flex-col min-h-0 w-full overflow-hidden bg-white relative">
+    <Card ref={tableRef} className="flex flex-col min-h-0 w-full overflow-hidden bg-card relative">
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-capture print:hidden">
           <div>
@@ -406,47 +406,47 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       
       {/* Daily Sales Summary Header */}
       <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-border/50 bg-muted/5">
-        <Card className="bg-slate-50 border-slate-200 shadow-none">
+        <Card className="bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-slate-500">Day's Cash Sales</CardTitle>
-            <Banknote className="h-4 w-4 text-slate-400" />
+            <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">Day's Cash Sales</CardTitle>
+            <Banknote className="h-4 w-4 text-slate-400 dark:text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{currencySymbol}{dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-slate-500 mt-1">Total physical cash expected in drawer</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{currencySymbol}{dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total physical cash expected in drawer</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50 border-blue-200 shadow-none">
+        <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-blue-600">Expected Bank Transfers</CardTitle>
-            <ArrowRightLeft className="h-4 w-4 text-blue-400" />
+            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">Expected Bank Transfers</CardTitle>
+            <ArrowRightLeft className="h-4 w-4 text-blue-400 dark:text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-900">{currencySymbol}{dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{currencySymbol}{dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">Total transfers processed via POS</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-violet-50 border-violet-200 shadow-none">
+        <Card className="bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-violet-600">Card Transactions</CardTitle>
-            <CreditCard className="h-4 w-4 text-violet-400" />
+            <CardTitle className="text-sm font-medium text-violet-600 dark:text-violet-400">Card Transactions</CardTitle>
+            <CreditCard className="h-4 w-4 text-violet-400 dark:text-violet-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-violet-900">{currencySymbol}{dailyCard.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-violet-600/70 mt-1">Total POS card payments collected</p>
+            <div className="text-2xl font-bold text-violet-900 dark:text-violet-200">{currencySymbol}{dailyCard.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-violet-600/70 dark:text-violet-400/70 mt-1">Total POS card payments collected</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-emerald-50 border-emerald-200 shadow-none">
+        <Card className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-emerald-600">Verified Transfers</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <CardTitle className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Verified Transfers</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-emerald-400 dark:text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-900">{currencySymbol}{dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing in terminal</p>
+            <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">{currencySymbol}{dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">Confirmed landing in terminal</p>
           </CardContent>
         </Card>
       </div>
