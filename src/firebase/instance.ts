@@ -64,9 +64,7 @@ try {
 function transportSettings(): FirestoreSettings {
   const inTauriShell =
     typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-  return inTauriShell
-    ? { experimentalForceLongPolling: true }
-    : { experimentalAutoDetectLongPolling: true };
+  return { experimentalAutoDetectLongPolling: true };
 }
 
 /**
