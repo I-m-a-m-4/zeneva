@@ -199,6 +199,23 @@ export default function AuthenticatedLayout({
 
   const [ipCountry, setIpCountry] = React.useState<string | null>(null);
 
+  const [showCeoMessage, setShowCeoMessage] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const seenCeoMessage = sessionStorage.getItem('zeneva_seen_ceo_msg');
+    if (!seenCeoMessage) {
+      const timer = setTimeout(() => {
+        setShowCeoMessage(true);
+        sessionStorage.setItem('zeneva_seen_ceo_msg', 'true');
+        setTimeout(() => {
+          setShowCeoMessage(false);
+        }, 5000); // Hide after 5s
+      }, 3000); // Show 3s after load
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   const isPremium = businessInstance?.plan === 'pro' || businessInstance?.plan === 'business';
 
   React.useEffect(() => {
@@ -1156,20 +1173,53 @@ export default function AuthenticatedLayout({
               </SidebarContent>
               <SidebarFooter className="p-2 pb-12 md:pb-8">
                 <SidebarMenu>
-                  {isMounted && visibleBottomLinks.map((link) => (
-                    <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={{ children: t(link.labelKey), side: 'right', sideOffset: 10 }}
-                        isActive={pathname.startsWith(link.href)}
-                      >
-                        <Link href={link.href}>
-                          <link.icon className="h-5 w-5" />
-                          <span className="group-data-[state=collapsed]:hidden">{t(link.labelKey)}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {isMounted && visibleBottomLinks.map((link) => {
+                    const isSupport = link.href === '/support';
+                    const content = (
+                      <SidebarMenuItem key={link.href} id={`tour-nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={{ children: t(link.labelKey), side: 'right', sideOffset: 10 }}
+                          isActive={pathname.startsWith(link.href)}
+                        >
+                          <Link href={link.href} className="relative">
+                            <link.icon className="h-5 w-5" />
+                            <span className="group-data-[state=collapsed]:hidden">{t(link.labelKey)}</span>
+                            {isSupport && showCeoMessage && (
+                              <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                              </span>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+
+                    if (isSupport) {
+                      return (
+                        <Popover key={link.href} open={showCeoMessage} onOpenChange={setShowCeoMessage}>
+                          <PopoverTrigger asChild>
+                            {content}
+                          </PopoverTrigger>
+                          <PopoverContent side="right" align="end" sideOffset={15} className="w-64 p-0 overflow-hidden shadow-xl border-orange-500/20 z-50">
+                            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 text-white flex items-center gap-2">
+                                <Avatar className="h-6 w-6 border border-white/20">
+                                    <AvatarImage src="/images/bello.jpg" />
+                                    <AvatarFallback className="text-[9px] text-orange-600">BI</AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs font-bold">Bello Imam, CEO</span>
+                            </div>
+                            <div className="p-3 text-xs text-muted-foreground bg-background">
+                                <p className="line-clamp-2">"Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally..."</p>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    }
+
+                    return content;
+                  })}
                 </SidebarMenu>
                 <Separator className="my-2 bg-sidebar-border" />
                 <DropdownMenu modal={false}>
