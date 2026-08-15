@@ -154,6 +154,9 @@ export default function TermsOfServicePage() {
               <p>
                 Zeneva provides a comprehensive business management platform that includes inventory management, a Point of Sale (POS) system, customer relationship management (CRM), sales analytics, and an optional public-facing e-commerce storefront.
               </p>
+              <p>
+                <strong>Security and Compliance:</strong> We are committed to providing a highly secure environment for your business data. The Service is hosted on enterprise-grade infrastructure that maintains strict international security certifications, including <strong>ISO/IEC 27001</strong>, and undergoes regular <strong>AICPA SOC 2</strong> and <strong>SOC 3</strong> audits. The platform also provides the necessary administrative and technical safeguards to support <strong>GDPR</strong> and <strong>HIPAA</strong> compliance requirements.
+              </p>
             </div>
             
             <div id="accounts" className="scroll-mt-28 mt-16 pt-8 border-t border-slate-100 dark:border-slate-800/50">

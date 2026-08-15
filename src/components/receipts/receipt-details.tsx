@@ -11,6 +11,7 @@ interface ReceiptDetailsProps {
     business?: BusinessInstance | null;
     currencySymbol?: string;
     isInvoice?: boolean;
+    amountReceived?: number;
 }
 
 const Watermark = ({ businessName }: { businessName: string }) => (
@@ -20,7 +21,7 @@ const Watermark = ({ businessName }: { businessName: string }) => (
 );
 
 const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
-    ({ receipt, business, currencySymbol = '₦', isInvoice = false }, ref) => {
+    ({ receipt, business, currencySymbol = '₦', isInvoice = false, amountReceived }, ref) => {
         const businessName = business?.name || 'Your Business';
         const businessAddress = business?.address || '';
 
@@ -198,6 +199,19 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             <span>Total</span>
                             <span>{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
+
+                        {receipt.paymentMethod === 'Cash' && amountReceived !== undefined && amountReceived > 0 && (
+                            <div className="space-y-1 mt-3 pt-3 border-t border-dashed border-gray-300 text-[10px] font-medium text-gray-600">
+                                <div className="flex justify-between">
+                                    <span>Cash Received</span>
+                                    <span>{currencySymbol}{amountReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between font-bold">
+                                    <span>Change</span>
+                                    <span>{currencySymbol}{Math.max(0, amountReceived - receipt.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                            </div>
+                        )}
 
                     </CardContent>
                     <div className="bg-gray-50/50 p-4 pt-2 text-center text-[9px] border-t border-dashed border-gray-200">

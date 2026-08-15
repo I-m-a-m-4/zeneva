@@ -1,15 +1,35 @@
-export const dynamic = 'force-static'; // [TAURI_INJECTED]
-// [TAURI_HIDDEN] export const dynamic = 'force-static';
 import { NextRequest, NextResponse } from 'next/server';
 import { AppConfig } from '@/lib/config';
 import { adminFirestore } from '@/firebase/admin';
 import crypto from 'crypto';
 
+/**
+ * GET /api/download/[platform] — resolve the latest release asset for a platform
+ * and redirect to it, logging the click.
+ *
+ * This file was `route.ts.bak`, so every desktop download button on /download
+ * (`/api/download/windows`, `macos-intel`, `macos-silicon`, `android`) answered
+ * the HTML 404 page instead of redirecting. The Microsoft Store, Play Store and
+ * GitHub links on that page kept working, which is why the breakage was easy to
+ * miss. If direct downloads 404 again, check the filename first.
+ *
+ * It also carried a build-injected `export const dynamic = 'force-static'`,
+ * which cannot be restored: the handler resolves the newest GitHub release per
+ * request and sets a visitor cookie, neither of which survives prerendering.
+ *
+ * No CORS block here on purpose. This is reached by plain link navigation, not
+ * fetch, so there is no preflight and no response body for a script to read.
+ */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { platform: string } }
+  { params }: { params: Promise<{ platform: string }> }
 ) {
-  const { platform } = params;
+  // Next 15 hands params in as a Promise. Destructuring it synchronously yields
+  // undefined, which would send every download to the `default` 400 branch.
+  const { platform } = await params;
   let version = AppConfig.version;
   let assets: Array<{ name: string; browser_download_url: string }> = [];
 

@@ -989,13 +989,22 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent>
                         <a 
-                            href="https://play.google.com/store/apps/details?id=com.zeneva.app"
+                            href={isTauri ? "ms-windows-store://review/?ProductId=9nvn0f8njwmj" : "market://details?id=com.zeneva.app"}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-primary text-primary bg-background hover:bg-primary hover:text-white h-10 py-2 px-4 w-full"
+                            onClick={(e) => {
+                                if (isTauri) {
+                                    e.preventDefault();
+                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
+                                } else {
+                                    e.preventDefault();
+                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
+                                }
+                            }}
                         >
                             <Star className="me-2 h-4 w-4" />
-                            {t('settings.writeReview')}
+                            {isTauri ? "Rate Zeneva on Microsoft Store" : "Rate Zeneva on Playstore"}
                         </a>
                     </CardContent>
                 </Card>

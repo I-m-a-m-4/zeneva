@@ -31,6 +31,16 @@ import {
   type OutreachSegment,
   type ScoredBusiness,
 } from '@/lib/outreach-scoring';
+/**
+ * Shared with the campaign templates rather than kept as a private copy here.
+ *
+ * The email body is HTML, and the name spliced into it comes from the `users`
+ * collection — a field any self-registered account sets for itself. Unescaped, a
+ * name like `<img src=x onerror=...>` is emailed as live markup and stored in
+ * `follow_up_logs`, where the audit dialog renders it back on the admin origin.
+ * Two copies of an escaper is how one of them ends up missing a case.
+ */
+import { escapeHtml } from '@/lib/email-templates';
 
 /** Badge colours per segment tone. Keyed off SEGMENT_META so the two cannot drift. */
 const TONE_CLASSES: Record<'danger' | 'warn' | 'info' | 'good', string> = {
@@ -49,22 +59,6 @@ const TONE_CLASSES: Record<'danger' | 'warn' | 'info' | 'good', string> = {
  */
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * The email body is HTML, and the name we splice into it comes from the `users`
- * collection — a field any self-registered account sets for itself. Unescaped,
- * a name like `<img src=x onerror=...>` is emailed as live markup and stored in
- * `follow_up_logs`, where the audit dialog renders it back on the admin origin.
- * Escape at the source so the stored record is clean too, not just the preview.
- */
-function escapeHtml(value: string): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 interface FollowUpLog {

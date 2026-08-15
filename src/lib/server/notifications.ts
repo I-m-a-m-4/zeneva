@@ -102,13 +102,39 @@ export async function sendNotificationToUser(
         // 3. Cleanup invalid tokens
         if (response.failureCount > 0) {
             const failedTokens: string[] = [];
+            const tokensToDelete: any[] = [];
+            
             response.responses.forEach((resp: any, idx: number) => {
                 if (!resp.success) {
                     failedTokens.push(tokens[idx]);
+                    const errorCode = resp.error?.code;
+                    // These errors mean the user uninstalled the app or revoked notification permissions
+                    if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
+                        tokensToDelete.push(tokens[idx]);
+                    }
                 }
             });
-            console.log('List of tokens that caused failures: ' + failedTokens);
-            // Optional: Delete from Firestore
+            
+            if (failedTokens.length > 0) {
+                console.log('List of tokens that caused failures: ' + failedTokens);
+            }
+            
+            if (tokensToDelete.length > 0) {
+                console.log(`User ${userId} uninstalled the app or revoked tokens. Deleting ${tokensToDelete.length} invalid tokens.`);
+                // Delete invalid tokens from Firestore
+                const batch = adminFirestore.batch();
+                tokensToDelete.forEach(token => {
+                    const tokenRef = adminFirestore.collection('users').doc(userId).collection('fcmTokens').doc(token);
+                    batch.delete(tokenRef);
+                });
+                await batch.commit();
+                
+                // If they have no valid tokens left, we can mark them as uninstalled
+                const remainingTokensCount = tokens.length - tokensToDelete.length;
+                if (remainingTokensCount === 0) {
+                     await adminFirestore.collection('users').doc(userId).update({ hasUninstalledApp: true, uninstalledAt: new Date() });
+                }
+            }
         }
 
         await finalizePushCampaign(campaignId, targets, response.responses.map((r: any) => r.success));

@@ -208,11 +208,19 @@ export default function SignupPage() {
           if (!userDocSnap.exists()) {
             await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
             await waitForUserProfile(firestore, user.uid);
+            triggerRefresh();
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+          } else {
+            const profileData = userDocSnap.data();
+            triggerRefresh();
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            if (profileData.surveyCompleted === false) {
+              router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+            } else {
+              router.push('/dashboard');
+            }
           }
-
-          triggerRefresh();
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
         } catch (profileErr: any) {
           console.error("Failed to create profile after redirect:", profileErr);
           toast({
@@ -240,21 +248,19 @@ export default function SignupPage() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-      const isWebView = typeof navigator !== 'undefined' && /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
-
-      if (isTauri || isWebView) {
-        // Popups don't work inside Tauri webviews or Android WebViews — redirect only for those
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
-      // Always use popup on web — never fall back to redirect (it breaks the UX)
+      // Always try popup first on web
       let result;
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupError: any) {
-        if (popupError?.code === 'auth/internal-error') {
+        if (
+          popupError?.code === 'auth/popup-blocked' ||
+          popupError?.code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          // Browser blocked the popup — fall back to redirect silently
+          await signInWithRedirect(auth, provider);
+          return;
+        } else if (popupError?.code === 'auth/internal-error') {
           // Firebase internal errors are usually transient. Wait briefly and retry once.
           await new Promise(resolve => setTimeout(resolve, 1200));
           result = await signInWithPopup(auth, provider);
@@ -272,12 +278,20 @@ export default function SignupPage() {
       if (!userDocSnap.exists()) {
         await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
         await waitForUserProfile(firestore, user.uid);
+        triggerRefresh();
+        // Brief pause so the POS context has time to pick up the new auth state
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+      } else {
+        const profileData = userDocSnap.data();
+        triggerRefresh();
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        if (profileData.surveyCompleted === false) {
+          router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
+        } else {
+          router.push('/dashboard');
+        }
       }
-
-      triggerRefresh();
-      // Brief pause so the POS context has time to pick up the new auth state
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
 
     } catch (error: any) {
       console.error("Google auth error:", error);
@@ -286,7 +300,11 @@ export default function SignupPage() {
         error?.code === 'auth/cancelled-popup-request' ||
         error?.code === 'auth/user-cancelled';
 
-      if (!isCancellation) {
+      if (isCancellation) {
+        // User closed the popup — silently reset loading, no error toast
+        setIsGoogleLoading(false);
+        return;
+      } else {
         toast({
           variant: "destructive",
           title: "Google Sign-In Failed",

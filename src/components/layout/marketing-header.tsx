@@ -24,6 +24,7 @@ export default function MarketingHeader() {
   const router = useRouter();
   const { t } = useI18n();
   const [mounted, setMounted] = React.useState(false);
+  const [showBanner, setShowBanner] = useState(true);
 
 
   React.useEffect(() => {
@@ -58,10 +59,39 @@ export default function MarketingHeader() {
   return (
     <>
       <header className={cn(
-        "fixed top-[var(--tauri-title-height,0)] z-50 w-full h-20 transition-all duration-300 bg-white shadow-sm border-b border-slate-100"
+        "fixed top-[var(--tauri-title-height,0)] z-50 w-full transition-all duration-300 shadow-sm border-b border-slate-100 flex flex-col"
       )}>
-        <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
-          {/* Logo */}
+        {/* Promotional Banner */}
+        {showBanner && (
+          <div className="w-full bg-[#f1dfd1] text-black h-12 flex items-center justify-between px-4 z-50">
+             {/* Left placeholder for symmetry */}
+             <div className="w-6 hidden sm:block" />
+
+             {/* Centered content */}
+             <div className="flex-1 flex items-center justify-center gap-2 sm:gap-3 text-sm min-w-0 px-1">
+                <span className="hidden md:inline-flex bg-transparent text-primary px-2 py-0.5 font-bold rounded text-[10px] uppercase tracking-wider border border-primary/30 shrink-0">
+                  Flash Sale
+                </span>
+                <span className="font-medium tracking-tight text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+                  <span className="truncate">Zeneva Premium for <span className="font-bold text-black">₦300,000/yr</span></span>
+                  <span className="text-black/50 line-through text-[10px] sm:text-xs shrink-0 hidden sm:inline">₦360,000</span>
+                  <span className="text-emerald-600 font-bold text-[10px] sm:text-xs tracking-tight shrink-0 hidden lg:inline">(Save ₦60,000!)</span>
+                </span>
+                <Link href="/pricing" onClick={() => setShowBanner(false)} className="bg-[#1e293b] text-white px-2 sm:px-4 py-1.5 rounded-md font-semibold hover:bg-[#0f172a] transition-all hover:scale-105 active:scale-95 text-[10px] sm:text-xs whitespace-nowrap ml-auto sm:ml-1 shadow-sm shrink-0">
+                  Claim offer
+                </Link>
+             </div>
+
+             {/* Close button */}
+             <button onClick={() => setShowBanner(false)} className="text-black/50 hover:text-black transition-colors p-1 flex-shrink-0" aria-label="Close banner">
+               <X className="h-4 w-4" />
+             </button>
+          </div>
+        )}
+
+        <div className="w-full h-20 bg-white">
+          <nav className="flex max-w-7xl mr-auto ml-auto h-full px-6 items-center justify-between">
+            {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center justify-center" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
               <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
@@ -119,13 +149,15 @@ export default function MarketingHeader() {
               )}
             </button>
           </div>
-        </nav>
+          </nav>
+        </div>
       </header>
 
       {/* Mobile Menu Panel */}
       <div className={cn(
-        "md:hidden fixed top-[calc(80px+var(--tauri-title-height,0px))] left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-transform duration-300 ease-in-out",
-        isMobileMenuOpen ? "translate-y-0" : "-translate-y-full"
+        "md:hidden fixed left-0 right-0 bottom-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto transition-all duration-300 ease-in-out",
+        showBanner ? "top-[calc(128px+var(--tauri-title-height,0px))]" : "top-[calc(80px+var(--tauri-title-height,0px))]",
+        isMobileMenuOpen ? "translate-y-0 opacity-100 visible" : "-translate-y-full opacity-0 invisible"
       )}>
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col items-center">

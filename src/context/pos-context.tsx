@@ -94,6 +94,8 @@ interface POSContextType {
   setDiscount: (discountAmount: number) => void;
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
+  amountReceived: number;
+  setAmountReceived: (amount: number) => void;
   autoPrint: boolean;
   setAutoPrint: (autoPrint: boolean) => void;
   resetPOS: () => void;
@@ -364,6 +366,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [taxRate, setTaxRate] = useState<number>(() => secureStorage.getItem<number>(POS_TAX_RATE_KEY) || 0);
   const [discount, setDiscount] = useState<number>(() => secureStorage.getItem<number>(POS_DISCOUNT_KEY) || 0);
   const [paymentMethod, setPaymentMethod] = useState<string>(() => secureStorage.getItem<string>(POS_PAYMENT_METHOD_KEY) || 'Cash');
+  const [amountReceived, setAmountReceived] = useState<number>(0);
   const [autoPrint, setAutoPrint] = useState<boolean>(() => {
     const s = secureStorage.getItem<boolean>(POS_AUTO_PRINT_KEY);
     return s === null ? true : s;
@@ -2527,7 +2530,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     cart, addToCart, removeFromCart, updateQuantity, clearCart,
     selectedCustomer, selectCustomer: setSelectedCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
-    paymentMethod, setPaymentMethod, autoPrint, setAutoPrint, resetPOS, currencySymbol, currencyCode, triggerRefresh,
+      paymentMethod,
+      setPaymentMethod,
+      amountReceived,
+      setAmountReceived,
+      autoPrint,
+      setAutoPrint,
+      resetPOS, currencySymbol, currencyCode, triggerRefresh,
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
     mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, optimisticProducts: [],
@@ -2545,7 +2554,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: resolveSubscriptionActive(business)
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

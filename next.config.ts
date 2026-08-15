@@ -204,6 +204,13 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(self), microphone=(self), geolocation=(), browsing-topics=()',
+          },
+          {
+            // Required for Firebase Google Auth popup to work.
+            // 'same-origin' (Next.js default) blocks window.closed polling
+            // which Firebase uses to detect when the user completes sign-in.
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
           }
         ],
       },

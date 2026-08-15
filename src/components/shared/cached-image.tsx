@@ -21,37 +21,49 @@ interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
  * broken product photo.
  */
 export function CachedImage({ src, className, alt, fallback, ...props }: CachedImageProps) {
-  const [displaySrc, setDisplaySrc] = useState<string | undefined>(src || undefined);
+  // If the user pasted multiple URLs separated by commas, only use the first one.
+  // IMPORTANT: data: URIs contain a comma as part of their format (e.g. "data:image/svg+xml;base64,PHN2...")
+  // so we must NOT split them. Only split plain http/https URLs.
+  const sanitizedSrc = typeof src === 'string' && !src.startsWith('data:') && !src.startsWith('blob:') && src.includes(',')
+    ? src.split(',')[0].trim()
+    : src;
+
+  const [displaySrc, setDisplaySrc] = useState<string | undefined>(sanitizedSrc || undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [useFallbackUrl, setUseFallbackUrl] = useState(false);
 
   useEffect(() => {
-    if (!src) {
+    if (!sanitizedSrc) {
       setError(true);
       return;
     }
 
     setError(false);
     setUseFallbackUrl(false);
-    setDisplaySrc(src);
+    setDisplaySrc(sanitizedSrc);
+
+    // data: and blob: URIs are self-contained — no network fetch needed
+    if (sanitizedSrc.startsWith('data:') || sanitizedSrc.startsWith('blob:')) {
+      return;
+    }
 
     let isMounted = true;
 
     async function load() {
-      if (ImageManager.isKnownUnreachable(src as string)) {
+      if (ImageManager.isKnownUnreachable(sanitizedSrc as string)) {
         return;
       }
 
       try {
-        const localUri = await ImageManager.getLocalUri(src as string);
+        const localUri = await ImageManager.getLocalUri(sanitizedSrc as string);
         if (isMounted && localUri) {
           setDisplaySrc(localUri);
         }
       } catch (err) {
         // Local cache resolution failed; keep using the original raw src URL.
         if (isMounted) {
-          setDisplaySrc(src);
+          setDisplaySrc(sanitizedSrc);
         }
       }
     }
@@ -61,21 +73,21 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
     return () => {
       isMounted = false;
     };
-  }, [src]);
+  }, [sanitizedSrc]);
 
   const handleError = useCallback(() => {
-    if (!useFallbackUrl && displaySrc !== src && src) {
+    if (!useFallbackUrl && displaySrc !== sanitizedSrc && sanitizedSrc) {
       // If the local cached URI failed to load, fallback to the original HTTP src URL
       setUseFallbackUrl(true);
-      setDisplaySrc(src);
+      setDisplaySrc(sanitizedSrc);
     } else {
       // Both local cache and raw src failed
       setError(true);
-      if (src) ImageManager.markUnreachable(src);
+      if (sanitizedSrc) ImageManager.markUnreachable(sanitizedSrc);
     }
-  }, [src, displaySrc, useFallbackUrl]);
+  }, [sanitizedSrc, displaySrc, useFallbackUrl]);
 
-  if (!src || error) {
+  if (!sanitizedSrc || error) {
     return (
       <div className={cn("flex items-center justify-center bg-muted rounded-lg w-full h-full", className)}>
         {fallback ?? <ImageOff className="h-5 w-5 text-muted-foreground/50" />}
@@ -85,7 +97,7 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
 
   return (
     <img
-      src={displaySrc || src}
+      src={displaySrc || sanitizedSrc}
       className={cn("transition-opacity duration-300", className)}
       alt={alt || ''}
       onError={handleError}

@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import ReactMarkdown from 'react-markdown';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -33,6 +34,11 @@ interface AISupportLog {
     response: string;
     createdAt: any;
 }
+
+const stripMarkdown = (str?: string) => {
+    if (!str) return '';
+    return str.replace(/[*_~`#]/g, '').replace(/^>+\s*/gm, '').trim();
+};
 
 function getCleanAudioSource(voiceUrl: string): string {
     if (!voiceUrl) return '';
@@ -299,7 +305,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 senderId: 'admin',
                 senderName: adminUser.name || 'Admin Support',
                 createdAt: serverTimestamp(),
-                isSeen: true
+                isSeen: false
             };
 
             if (reply.trim()) payload.text = reply;
@@ -406,7 +412,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                             voiceUrl: base64Audio,
                             voiceDuration: recordingSeconds,
                             createdAt: serverTimestamp(),
-                            isSeen: true
+                            isSeen: false
                         });
 
                         const threadRef = doc(firestore, 'supportThreads', thread.id);
@@ -505,7 +511,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 </span>
                 <div className="min-w-0 flex-1">
                     <h3 className="truncate font-bold text-sm md:text-base text-slate-800 dark:text-white">
-                        {thread.userName || 'Unknown user'}
+                        {thread.userName || thread.userEmail || 'Unknown user'}
                     </h3>
                     <p className="truncate text-[11px] md:text-xs text-muted-foreground">
                         {thread.subject}{thread.userEmail ? ` • ${thread.userEmail}` : ''}
@@ -595,7 +601,11 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                                         </div>
                                     )}
 
-                                    {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>}
+                                      {msg.text && (
+                                          <div className="text-sm leading-relaxed whitespace-pre-wrap break-words prose prose-sm dark:prose-invert max-w-none">
+                                              <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                          </div>
+                                      )}
 
                                     {/* Status tick and timestamp */}
                                     <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
@@ -898,7 +908,7 @@ export default function AdminSupportPage() {
                                                 <span className="min-w-0 flex-1">
                                                     <span className="flex items-baseline justify-between gap-2">
                                                         <span className={cn("min-w-0 truncate text-sm", unread ? 'font-bold text-primary' : 'font-semibold')}>
-                                                            {thread.userName || 'Unknown user'}
+                                                            {thread.userName || thread.userEmail || 'Unknown user'}
                                                         </span>
                                                         <span className={cn("shrink-0 text-[10px]", unread ? 'font-semibold text-primary' : 'text-muted-foreground')}>
                                                             {when}
@@ -906,7 +916,7 @@ export default function AdminSupportPage() {
                                                     </span>
                                                     <span className="mt-0.5 flex items-center gap-1.5">
                                                         <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? 'text-foreground' : 'text-muted-foreground')}>
-                                                            {thread.lastMessageSnippet || thread.subject}
+                                                            {stripMarkdown(thread.lastMessageSnippet) || thread.subject}
                                                         </span>
                                                         {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
                                                     </span>

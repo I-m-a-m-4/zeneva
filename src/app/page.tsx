@@ -22,6 +22,9 @@ import {
     WifiOff,
     Download,
     ShieldCheck,
+    Lock,
+    Shield,
+    Server,
     Clock,
     InfinityIcon,
     FileText,
@@ -60,6 +63,7 @@ import { HeroInputForm } from '@/components/home/hero-input-form';
 import { DashboardCarousel } from '@/components/home/dashboard-carousel';
 import { ZenAIInsights } from '@/components/home/zen-ai-insights';
 import { PricingPlans } from '@/components/home/pricing-plans';
+import { SecurityBadges } from '@/components/home/security-badges';
 
 // `question`/`answer` stay English on purpose: they are what the FAQPage
 // JSON-LD below publishes to crawlers, and the static export is prerendered in
@@ -919,6 +923,7 @@ export default function Home() {
                         </div>
                     </section>
 
+                    <SecurityBadges />
                     <MarketingFooter />
                 </div >
             </div >

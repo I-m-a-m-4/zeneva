@@ -26,7 +26,7 @@ import { formatNumber, formatDateTime } from '@/lib/i18n/format';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, amountReceived, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const { user } = useUser();
@@ -401,7 +401,7 @@ function ReviewPageContent() {
         // to prevent the auto-submit useEffect from re-firing.
         // It will be reset when the component unmounts or POS is reset.
 
-    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer, t, locale]);
+    }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, amountReceived, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer, t, locale]);
 
     // **Auto-Submit Logic**
     // We only want to trigger this ONCE when auto-prompted
@@ -437,7 +437,7 @@ function ReviewPageContent() {
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
                 <h2 className="text-2xl font-bold mb-4 font-headline no-print">{t('pos.reviewYourSale')}</h2>
-                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} />
+                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} amountReceived={amountReceived} />
             </div>
             <div className="no-print">
                 <div className="p-4 rounded-lg bg-card border space-y-4">

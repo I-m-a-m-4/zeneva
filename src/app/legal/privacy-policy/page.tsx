@@ -214,7 +214,9 @@ export default function PrivacyPolicyPage() {
                 We use administrative, technical, and physical security measures to protect your personal information and Business Data. This includes:
               </p>
               <ul>
-                <li><strong>Encryption at Rest:</strong> Sensitive business and transaction data is protected using bank-grade encryption to ensure information remains confidential even when stored locally.</li>
+                <li><strong>Enterprise-Grade Cloud Infrastructure:</strong> Zeneva is securely hosted on Google Cloud and Firebase. Our infrastructure complies with rigorous international security standards, including <strong>ISO/IEC 27001, 27017, and 27018</strong> certifications, and undergoes regular <strong>AICPA SOC 2 and SOC 3</strong> audits.</li>
+                <li><strong>GDPR & HIPAA Readiness:</strong> Our backend architecture provides the data controls necessary to help your business meet stringent privacy regulations like GDPR (General Data Protection Regulation) and HIPAA (Health Insurance Portability and Accountability Act), including comprehensive data export and erasure capabilities.</li>
+                <li><strong>Encryption at Rest:</strong> Sensitive business and transaction data is protected using 256-bit AES bank-grade encryption to ensure information remains confidential even when stored locally.</li>
                 <li><strong>Secure Transmission:</strong> All data transmitted between your device and our servers is encrypted using industry-standard SSL/TLS protocols.</li>
                 <li><strong>Multi-Tenant Isolation:</strong> We use strict logical boundaries to ensure your data is accessible only by you and your authorized staff.</li>
               </ul>

@@ -116,6 +116,19 @@ export interface UserProfile {
      */
     authProvider?: 'google' | 'email';
     /**
+     * True once this address has opted out of marketing email, written by
+     * `src/app/api/unsubscribe/route.ts` when the recipient confirms the
+     * unsubscribe link in a campaign footer.
+     *
+     * Set on *every* account sharing the address, because someone unsubscribes an
+     * inbox rather than a row. Only gates marketing: essential account mail
+     * (receipts, resets, security) is not a subscription and ignores this flag.
+     * `sendEmail` re-checks it server-side, since a campaign's recipient list is
+     * built once and goes stale the moment somebody unsubscribes mid-run.
+     */
+    marketingOptOut?: boolean;
+    marketingOptOutAt?: any;
+    /**
      * Which lifecycle ("drip") notifications this account has already been
      * sent, as `{ [stageId]: Timestamp }` — see
      * src/lib/lifecycle-notifications.ts.

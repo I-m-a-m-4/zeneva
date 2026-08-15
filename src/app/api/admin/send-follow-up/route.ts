@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/server/resend';
+import { sendEmail, MarketingOptOutError } from '@/lib/server/resend';
 import { requireSuperAdmin, corsHeaders } from '../_guard';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,21 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { to, name, subject, html, businessId, type } = body ?? {};
+    const {
+      to,
+      name,
+      subject,
+      html,
+      businessId,
+      type,
+      from,
+      replyTo,
+      // Campaign sends pass a complete document rendered by
+      // `src/lib/email-templates.ts`, so the transactional wrapper must be off.
+      wrap,
+      segment,
+      behaviorContext,
+    } = body ?? {};
 
     if (!to || !subject || !html) {
       return NextResponse.json(
@@ -39,7 +53,12 @@ export async function POST(req: Request) {
       subject,
       body: html,
       businessId,
-      type
+      type,
+      from,
+      replyTo,
+      wrap,
+      segment,
+      behaviorContext,
     });
 
     return NextResponse.json({
@@ -49,6 +68,18 @@ export async function POST(req: Request) {
     }, { headers: corsHeaders });
 
   } catch (error: any) {
+    // An unsubscribed recipient is a correct outcome, not a fault: answer 200 with
+    // `skipped` so a batch run reports it as skipped rather than sending the
+    // operator hunting for a delivery failure.
+    if (error instanceof MarketingOptOutError) {
+      return NextResponse.json({
+        success: false,
+        skipped: true,
+        reason: 'opted_out',
+        message: error.message,
+      }, { headers: corsHeaders });
+    }
+
     console.error('Send Follow-Up Error:', error);
     return NextResponse.json({
       success: false,

@@ -141,7 +141,7 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
                         {previewProducts.map((p, i) => (
                             <div key={`${p.id}-${i}`} className="border rounded-md overflow-hidden">
                                 <div className="w-full h-24 bg-muted relative">
-                                    {p.imageUrl && <Image src={p.imageUrl} alt={p.name} fill className="object-cover" />}
+                                    {p.imageUrl && <Image src={p.imageUrl.includes(',') ? p.imageUrl.split(',')[0].trim() : p.imageUrl} alt={p.name} fill className="object-cover" />}
                                 </div>
                                 <div className="p-2">
                                     <p className="text-xs font-medium truncate">{p.name}</p>

@@ -24,11 +24,57 @@ export const FLOW_IDS = ['pos', 'inventory', 'zen'] as const;
 export const DEVICE_IDS = ['desktop', 'mobile'] as const;
 export const THEME_IDS = ['light', 'dark'] as const;
 export const FORMAT_IDS = ['mp4', 'webm'] as const;
+export const STYLE_IDS = ['plain', 'cinematic'] as const;
 
 export type FlowId = (typeof FLOW_IDS)[number];
 export type DeviceId = (typeof DEVICE_IDS)[number];
 export type ThemeId = (typeof THEME_IDS)[number];
 export type FormatId = (typeof FORMAT_IDS)[number];
+export type StyleId = (typeof STYLE_IDS)[number];
+
+/**
+ * The two looks a take can be cut in.
+ *
+ * ## Why this is a style and not a filter
+ *
+ * `plain` and `cinematic` are different *pipelines*, not the same footage graded
+ * two ways. `plain` streams the live app at `fps` and samples it; `cinematic`
+ * screenshots the app at chosen beats and then animates those stills in a scene.
+ *
+ * That difference is the whole point, and it comes from a measurement. A browser
+ * only paints when the page changes, so a screen recording of a web app repeats
+ * frames through every still moment — takes in `marketing-out/` measure 21-50%
+ * unique frames against a 30fps container, which is what "it stutters" is. The
+ * reference promo this style is modelled on measures 97%, because every frame of
+ * it was rendered rather than sampled.
+ *
+ * No encoder setting closes that gap. Rendering does. So `cinematic` is the
+ * answer to "make it smoother" as much as it is the answer to "make it pretty" —
+ * the two asks turn out to be the same ask.
+ *
+ * ## What `cinematic` costs
+ *
+ * A still is a still: the take shows the app at the moments it was screenshotted,
+ * not a continuous session. That is the trade for smoothness and for text that
+ * stays sharp when the camera pushes in. When the point of a take is to prove the
+ * app really does something in one unbroken go, `plain` is the honest choice.
+ */
+export const STYLES: Record<StyleId, { label: string; hint: string }> = {
+  plain: {
+    label: 'Screen recording',
+    hint: 'The live app, captured as it runs. Honest and continuous, but only'
+      + ' repaints when something changes — so still moments repeat frames.',
+  },
+  cinematic: {
+    label: 'Cinematic',
+    hint: 'Screenshots the app, then animates the stills in 3D over a warm'
+      + ' gradient. Every frame is rendered, so it is smooth throughout and stays'
+      + ' sharp when the camera moves in.',
+  },
+};
+
+/** What a request with no `style` plays as — today's look, unchanged. */
+export const DEFAULT_STYLE: StyleId = 'plain';
 
 /**
  * The narration voices, mirroring `VOICES` in `scripts/record/narrate.mjs`.
@@ -351,6 +397,30 @@ export type RecorderRequest = {
   commit: boolean;
   /** Show the browser while it records, for debugging a broken selector. */
   headed: boolean;
+  /**
+   * Which look the take is cut in. See `STYLES`.
+   *
+   * `plain` is the screen recording this recorder has always produced, and is the
+   * default so that every existing preset, recipe and saved request keeps
+   * producing the same film.
+   */
+  style: StyleId;
+  /**
+   * Let the flows push the camera in.
+   *
+   * Off by default, and that is a deliberate change of behaviour: the coded flows
+   * are full of `page.punch()` calls and the operator never got a say in them.
+   * Gating it here rather than deleting those calls keeps the flows readable as
+   * choreography — a flow still says where it *would* frame, and the switch
+   * decides whether the camera obeys.
+   *
+   * There is a second reason to leave it off. A punch is applied at encode time,
+   * so it is an upscale of already-captured pixels rather than a re-render: past
+   * about 1.5x the text visibly softens (see `Page.punch`). `cinematic` does not
+   * use this path at all — it moves its camera in the scene, where a punch-in is
+   * a downscale of a 2x still and stays sharp.
+   */
+  punch: boolean;
   /**
    * A page to record that has no coded flow, or null to record only `flows`.
    *

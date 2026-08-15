@@ -69,7 +69,6 @@ import {
     Clock,
     Lock,
     Shield,
-    Globe,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -660,6 +659,7 @@ export default function Home() {
                                         hoverBg: "bg-[#EFF6FF]" // Light Blue
                                     },
                                     {
+                                        icon: Lock,
                                         title: "Granular User Permissions",
                                         description: "Securely manage your team by inviting staff and assigning roles with granular permissions for inventory, reports, and sales.",
                                         bgColor: "bg-yellow-100",
@@ -1222,7 +1222,7 @@ export default function Home() {
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 15,000 messages/month</li>i>imary" /> Zen AI — 500 messages/day</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 15,000 messages/month</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence (CRM+)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Inventory Velocity Reports (ABC Analysis)</li>

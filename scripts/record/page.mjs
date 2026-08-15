@@ -16,6 +16,16 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OVERLAY_SRC = readFileSync(path.join(HERE, 'overlay.js'), 'utf8');
 
 /**
+ * The cinematic compositor, injected only for `--style cinematic`.
+ *
+ * Read at import time like the overlay, but *conditionally* injected: a plain
+ * take should put exactly the bytes into the page that it always has, so that a
+ * take recorded before this file existed and one recorded after it are the same
+ * film. See `Page.prepare`.
+ */
+const SCENE_SRC = readFileSync(path.join(HERE, 'scene.js'), 'utf8');
+
+/**
  * Hide Next.js's own dev-mode UI from the camera.
  *
  * A take against `npm run dev` records the black dev-tools pill in the corner of
@@ -132,12 +142,34 @@ function virtualKeyCode(ch) {
 
 export class Page {
   /** @param {import('./cdp.mjs').Cdp} cdp */
-  constructor(cdp, { device, theme, baseUrl, log, gate = null, onStep = null }) {
+  constructor(cdp, { device, theme, baseUrl, log, gate = null, onStep = null, punch = false, cinematic = false }) {
     this.cdp = cdp;
     this.device = device;
     this.theme = theme;
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.log = log;
+    /**
+     * Whether `punch()` actually moves the camera.
+     *
+     * Off by default, which is a change: the coded flows are full of `punch()`
+     * calls and the operator never had a say. Gating here rather than editing
+     * `flows.mjs` keeps a flow readable as choreography — it still says where it
+     * *would* frame, and this decides whether the camera obeys.
+     *
+     * `wide()` and `releaseCamera()` are deliberately not gated. With no punches
+     * they collapse to no-ops anyway, via the `same` check in `buildZooms`, and
+     * leaving them live means a flow that punches with the switch *on* still gets
+     * pulled back out at the right moments.
+     */
+    this.allowPunch = Boolean(punch);
+    /**
+     * Cut this take in the cinematic style — see `scene.js`.
+     *
+     * Held here rather than read from a module-level flag because a single run
+     * records several takes and they do not have to agree: the operator can ask
+     * for a cinematic mobile cut and a plain desktop one in the same job.
+     */
+    this.cinematic = Boolean(cinematic);
     /**
      * Called before every action, and awaited. This is where a pause takes
      * effect: the gate simply does not resolve until the operator resumes.
@@ -204,7 +236,8 @@ export class Page {
         `try{localStorage.setItem('theme',${JSON.stringify(theme)});` +
         `localStorage.removeItem('zeneva_needs_tour');}catch(e){}\n` +
         HIDE_DEV_UI + '\n' +
-        OVERLAY_SRC,
+        OVERLAY_SRC +
+        (this.cinematic ? '\n' + SCENE_SRC : ''),
     });
   }
 
@@ -416,6 +449,20 @@ export class Page {
    * @param {{to?: number, ms?: number, wait?: boolean}} [opts]
    */
   async punch(spec, { to = 1.3, ms = 760, wait = true } = {}) {
+    /*
+     * Switched off by the operator (the default).
+     *
+     * The *hold* still happens. A punch is two things at once — "frame this" and
+     * "pause long enough for the viewer to look at it" — and only the first is
+     * being switched off. Returning early instead would quietly shorten every
+     * take by ms+90 per punch and slide the captions off the beats they were
+     * written for, which is a much worse bug than an unwanted camera move.
+     */
+    if (!this.allowPunch) {
+      if (wait) await sleep(ms + 90);
+      return null;
+    }
+
     let px = 0.5;
     let py = 0.5;
     if (spec) {
@@ -467,6 +514,72 @@ export class Page {
     // Overlaps a route load, so the move is never waited on — the camera rides
     // the navigation out.
     return this.#camera(1, 0.5, 0.5, 420, false);
+  }
+
+  // ------------------------------------------------------------- scene
+
+  /** Call into `scene.js`, the way `zen()` calls into `overlay.js`. */
+  scene(call, { awaitPromise = false } = {}) {
+    return this.eval(`window.__zenScene && window.__zenScene.${call}`, { awaitPromise });
+  }
+
+  /**
+   * One high-resolution still of whatever is on screen, as a `data:` URI.
+   *
+   * ## Why a screenshot and not a captured frame
+   *
+   * Supersampling the *stream* was measured and rejected — at dpr 1.5 the page
+   * painted 10-17fps against a sampler that needs 30 (see `Page.punch`). None of
+   * that applies to a single screenshot: it is one raster, off the timeline, and
+   * costs a few hundred milliseconds of a span the recorder is already holding.
+   *
+   * The extra resolution is the entire point. A still captured at 2x and then
+   * displayed at half size gives the scene's camera somewhere to push *into*,
+   * so a punch-in is a downscale and text stays sharp — where a punch applied to
+   * captured frames is an upscale and goes soft past about 1.5x.
+   *
+   * `deviceScaleFactor` does not change CSS pixel width, so raising it re-rasters
+   * without reflowing: no breakpoint moves and the shot frames what the operator
+   * just watched. It is restored before returning, including on failure, because
+   * leaving the page at 2x would quietly halve the capture rate for the rest of
+   * the take — the exact problem this method exists to avoid.
+   *
+   * @param {{ scale?: number, quality?: number }} [opts]
+   */
+  async shot({ scale = 2, quality = 94 } = {}) {
+    const { cdp, device } = this;
+    // The scene layer is opaque and would otherwise photograph itself. Cheap
+    // insurance: a flow that shoots a beat after mounting is a mistake, but it
+    // should look like a missing shot rather than a picture of the backdrop.
+    const mounted = this.cinematic ? await this.scene('root !== null') : false;
+    if (mounted) await this.scene('hide(true)');
+
+    const metrics = (dpr) => cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: device.width,
+      height: device.height,
+      deviceScaleFactor: dpr,
+      mobile: device.mobile,
+      screenOrientation: device.mobile
+        ? { angle: 0, type: 'portraitPrimary' }
+        : { angle: 0, type: 'landscapePrimary' },
+    });
+
+    try {
+      await metrics(Math.max(1, device.dpr * scale));
+      // One frame at the new scale before reading it back. Without this the
+      // screenshot can come from the pre-resize raster and land at the old size.
+      await sleep(90);
+      const res = await cdp.send('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality,
+        captureBeyondViewport: false,
+      });
+      if (!res?.data) throw new Error('captureScreenshot returned no data');
+      return `data:image/jpeg;base64,${res.data}`;
+    } finally {
+      await metrics(device.dpr).catch(() => { /* restoring is best effort */ });
+      if (mounted) await this.scene('hide(false)').catch(() => {});
+    }
   }
 
   // ------------------------------------------------------------- gestures

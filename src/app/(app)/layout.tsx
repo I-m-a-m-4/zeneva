@@ -858,6 +858,8 @@ export default function AuthenticatedLayout({
 
   const justCompletedOnboarding = typeof window !== 'undefined' && sessionStorage.getItem('zeneva_onboarding_complete') === 'true';
   if (currentUserProfile && currentUserProfile.surveyCompleted === false && pathname !== '/onboarding' && !justCompletedOnboarding) {
+    // Don't block indefinitely — redirect immediately so the user can complete onboarding
+    router.replace('/onboarding');
     return <AppLoader text="Finalizing your setup..." />;
   }
 

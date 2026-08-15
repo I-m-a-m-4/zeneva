@@ -23,6 +23,8 @@ import Link from 'next/link';
 import { zenevaSupportChat, type ZenevaSupportChatInput } from '@/ai/flows/support-chat-flow';
 import AIChat from '@/components/support/ai-chat';
 import { cn } from '@/lib/utils';
+import { usePOS } from '@/context/pos-context';
+import ReactMarkdown from 'react-markdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Edit2, Maximize2, Minimize2 } from 'lucide-react';
@@ -539,6 +541,8 @@ function VoiceNotePlayer({ voiceUrl, voiceDuration }: { voiceUrl: string; voiceD
 }
 
 function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
+    const router = useRouter();
+    const { currentBusiness } = usePOS();
     const firestore = useFirestore();
     const { toast } = useToast();
     const { t } = useI18n();
@@ -713,7 +717,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         const tempMessage = {
             id: tempId,
             senderId: userProfile.id,
-            senderName: userProfile.name,
+            senderName: userProfile.name || currentBusiness?.name || 'Unknown User',
             createdAt: new Date(),
             mediaUrl: localUrl,
             isUploading: true,
@@ -731,7 +735,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
                 const newThreadData: Omit<SupportThread, 'id'> = {
                     userId: userProfile.id,
-                    userName: userProfile.name,
+                    userName: userProfile.name || currentBusiness?.name || 'Unknown User',
                     userEmail: userProfile.email,
                     subject: 'Direct CEO Chat',
                     status: 'open',
@@ -749,7 +753,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             const messageRef = collection(firestore, 'supportThreads', currentThread.id, 'messages');
             await addDoc(messageRef, {
                 senderId: userProfile.id,
-                senderName: userProfile.name,
+                senderName: userProfile.name || currentBusiness?.name || 'Unknown User',
                 createdAt: serverTimestamp(),
                 mediaUrl: remoteUrl,
                 text: typedCaption || '📷 Sent an image'
@@ -787,7 +791,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
                 const newThreadData: Omit<SupportThread, 'id'> = {
                     userId: userProfile.id,
-                    userName: userProfile.name,
+                    userName: userProfile.name || currentBusiness?.name || 'Unknown User',
                     userEmail: userProfile.email,
                     subject: 'Direct CEO Chat',
                     status: 'open',
@@ -804,12 +808,24 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             const messageRef = collection(firestore, 'supportThreads', currentThread.id, 'messages');
             const payload: any = {
                 senderId: userProfile.id,
-                senderName: userProfile.name,
+                senderName: userProfile.name || currentBusiness?.name || 'Unknown User',
                 createdAt: serverTimestamp(),
                 text: message
             };
 
             await addDoc(messageRef, payload);
+
+            try {
+                fetch('/api/support/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message, 
+                        userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
+                        businessName: currentBusiness?.name 
+                    })
+                }).catch(e => console.error("Error calling notify API:", e));
+            } catch(e) {}
 
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
             await setDoc(threadRef, {
@@ -891,7 +907,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             const newThreadRef = doc(firestore, 'supportThreads', `${userProfile.id}_ceo_${Math.random().toString(36).substring(2, 10)}`);
                             const newThreadData: Omit<SupportThread, 'id'> = {
                                 userId: userProfile.id,
-                                userName: userProfile.name,
+                                userName: userProfile.name || currentBusiness?.name || 'Unknown User',
                                 userEmail: userProfile.email,
                                 subject: 'Direct CEO Chat',
                                 status: 'open',
@@ -908,7 +924,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                         const messagesRef = collection(firestore, `supportThreads/${currentThread.id}/messages`);
                         await addDoc(messagesRef, {
                             senderId: userProfile.id,
-                            senderName: userProfile.name,
+                            senderName: userProfile.name || currentBusiness?.name || 'Unknown User',
                             voiceUrl: base64Audio,
                             voiceDuration: recordingSeconds,
                             createdAt: serverTimestamp(),
@@ -1079,7 +1095,11 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                           </div>
                                       )}
 
-                                     {msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>}
+                                        {msg.text && (
+                                            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words prose prose-sm dark:prose-invert max-w-none">
+                                                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                            </div>
+                                        )}
 
                                      <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
                                          {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 me-0.5">{t('support.edited')} •</span>}

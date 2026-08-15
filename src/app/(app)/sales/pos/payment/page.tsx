@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/context/i18n-context';
 
 export default function PaymentPage() {
-    const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, currencySymbol, autoPrint, setAutoPrint } = usePOS();
+    const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, amountReceived, setAmountReceived, currencySymbol, autoPrint, setAutoPrint } = usePOS();
     const business = useBusiness();
     const router = useRouter();
     const { t } = useI18n();
@@ -114,6 +114,29 @@ export default function PaymentPage() {
                                     )}
                                 </AlertDescription>
                             </Alert>
+                        )}
+                        {paymentMethod === 'Cash' && (
+                            <div className="mt-6 p-4 rounded-lg border bg-card">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="amountReceived" className="font-semibold text-sm">Amount Received ({currencySymbol})</Label>
+                                        <Input 
+                                            id="amountReceived" 
+                                            type="number" 
+                                            placeholder="Enter cash received..."
+                                            value={amountReceived || ''} 
+                                            onChange={e => setAmountReceived(Number(e.target.value))}
+                                            className="h-12 text-lg font-medium"
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2">
+                                        <span className="text-muted-foreground font-medium">Change to Return:</span>
+                                        <span className={`text-xl font-bold ${amountReceived >= total ? 'text-emerald-600' : 'text-primary'}`}>
+                                            {currencySymbol}{Math.max(0, amountReceived - total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </CardContent>
                 </Card>

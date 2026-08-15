@@ -1,618 +1,371 @@
 'use client';
 
+/**
+ * Email marketing.
+ *
+ * This page replaced a "Strategic Outreach" screen that could not send an email.
+ * It sent a push notification, or rendered one hard-coded template for the
+ * operator to copy-paste by hand, and it read and wrote an `outreachLogs`
+ * collection that has no rule in `firestore.rules` — so its listener and every
+ * one of its writes failed with permission-denied, and "last contacted" was
+ * permanently blank. Push lives on the Alerts page; `outreachLogs` is gone rather
+ * than granted a rule, because `follow_up_logs` already is the record of what was
+ * sent and whether it was opened.
+ *
+ * The three tabs are the actual workflow: read behaviour, write to a segment, see
+ * who opened it.
+ *
+ * ## Reads
+ *
+ * `users` and `businessInstances` are fetched **once** with `getDocs`, not held
+ * open with `useCollection`. The previous page kept three live listeners on whole
+ * collections for as long as it stayed open; a marketing console has no reason to
+ * stream, and the platform owner pays for every one of those reads. The sent log
+ * is fetched only when the Results tab is first opened, for the same reason.
+ */
+
 import * as React from 'react';
 import {
-  useFirestore,
-  useCollection,
-  useMemoFirebase,
-  useUser,
-} from '@/firebase';
-import {
   collection,
+  getDocs,
+  limit as fsLimit,
+  orderBy,
   query,
-  doc,
-  setDoc,
-  serverTimestamp,
 } from 'firebase/firestore';
-import type { UserProfile, BusinessInstance } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, BanIcon, Mail, RefreshCw, Send, Users } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useFirestore } from '@/firebase';
+import { withFirestoreRetry } from '@/firebase/retry';
+import type { BusinessInstance, UserProfile } from '@/types';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Target,
-  Search,
-  Send,
-  MessageSquare,
-  Crown,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Users,
-  Filter,
-  Bell,
-  Phone,
-  Mail,
-  StickyNote,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-} from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
-import { pushAlertToPhones } from '@/actions/notifications';
-import { cn } from '@/lib/utils';
+  behaviorSegmentCounts,
+  profileAudience,
+  type BehaviorProfile,
+  type BehaviorSegment,
+} from '@/lib/behavior-segments';
+import AudienceTable from '@/components/admin/email-marketing/audience-table';
+import CampaignComposer from '@/components/admin/email-marketing/campaign-composer';
+import CampaignResults, {
+  type FollowUpLog,
+} from '@/components/admin/email-marketing/campaign-results';
+import { draftForSegment, type EmailDraft } from '@/lib/email-templates';
 
-interface OutreachLog {
-  id: string;
-  businessId: string;
-  contactedAt: any;
-  notes: string;
-  method: 'push' | 'email' | 'phone' | 'manual';
-  contactedBy: string;
-}
+/** How far back the results tab looks. Deep enough to cover any real campaign. */
+const LOG_LIMIT = 300;
 
-interface BusinessRow {
-  business: BusinessInstance;
-  owner: UserProfile | undefined;
-  lastLog: OutreachLog | null;
-  totalContacts: number;
-}
-
-function toDate(v: any): Date | null {
-  if (!v) return null;
-  if (typeof v.toDate === 'function') return v.toDate();
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function initialsOf(name?: string | null): string {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-const METHOD_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  push: { label: 'Push', icon: Bell, color: 'text-blue-500' },
-  email: { label: 'Email', icon: Mail, color: 'text-purple-500' },
-  phone: { label: 'Phone', icon: Phone, color: 'text-green-500' },
-  manual: { label: 'Note', icon: StickyNote, color: 'text-orange-500' },
-};
-
-function StatCard({ label, value, sub, icon: Icon, accent }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ElementType; accent: string;
+function HeaderStat({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
 }) {
   return (
-    <Card className="relative overflow-hidden">
-      <CardContent className="p-5">
-        <div className={cn('absolute right-4 top-4 rounded-full p-2', accent)}>
-          <Icon className="h-4 w-4 text-white" />
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="rounded-full bg-primary/10 p-2">
+          <Icon className="h-4 w-4 text-primary" />
         </div>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-        <p className="mt-1 text-3xl font-bold">{value}</p>
-        {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="text-xl font-bold tabular-nums">{value}</p>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function OutreachBadge({ log }: { log: OutreachLog | null }) {
-  if (!log) {
-    return (
-      <Badge variant="outline" className="gap-1 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
-        <AlertCircle className="h-3 w-3" />
-        Not contacted
-      </Badge>
-    );
-  }
-  const d = toDate(log.contactedAt);
-  return (
-    <Badge variant="outline" className="gap-1 border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400">
-      <CheckCircle2 className="h-3 w-3" />
-      {d ? formatDistanceToNow(d, { addSuffix: true }) : 'Contacted'}
-    </Badge>
-  );
-}
-
-export default function OutreachPage() {
+export default function EmailMarketingPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
 
-  const usersQuery = useMemoFirebase(() =>
-    firestore ? query(collection(firestore, 'users')) : null,
-    [firestore]
-  );
-  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const [users, setUsers] = React.useState<UserProfile[]>([]);
+  const [businesses, setBusinesses] = React.useState<BusinessInstance[]>([]);
+  const [audienceLoading, setAudienceLoading] = React.useState(true);
+  const [audienceError, setAudienceError] = React.useState<string | null>(null);
 
-  const businessesQuery = useMemoFirebase(() =>
-    firestore ? query(collection(firestore, 'businessInstances')) : null,
-    [firestore]
-  );
-  const { data: businesses, isLoading: bizLoading } = useCollection<BusinessInstance>(businessesQuery);
+  const [logs, setLogs] = React.useState<FollowUpLog[]>([]);
+  const [logsLoading, setLogsLoading] = React.useState(false);
+  const logsRequestedRef = React.useRef(false);
 
-  const outreachQuery = useMemoFirebase(() =>
-    firestore ? query(collection(firestore, 'outreachLogs')) : null,
-    [firestore]
-  );
-  const { data: outreachDocs, isLoading: outreachLoading } = useCollection<OutreachLog>(outreachQuery);
+  const [tab, setTab] = React.useState('audience');
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [segmentFilter, setSegmentFilter] = React.useState<BehaviorSegment | null>(null);
 
-  const isLoading = usersLoading || bizLoading || outreachLoading;
+  /**
+   * The campaign draft lives here, not in the composer.
+   *
+   * Radix unmounts inactive `TabsContent`, so a draft held inside the composer
+   * would be silently discarded every time the operator flipped back to the
+   * Audience tab to check who they were writing to.
+   */
+  const [templateSegment, setTemplateSegment] = React.useState<BehaviorSegment>('feature_focused');
+  const [draft, setDraft] = React.useState<EmailDraft>(() => draftForSegment('feature_focused'));
+  /** Latches so the seeding below runs once per campaign, never over live edits. */
+  const draftSeededRef = React.useRef(false);
 
-  const rows: BusinessRow[] = React.useMemo(() => {
-    if (!businesses) return [];
-    const usersByBiz = new Map<string, UserProfile>();
-    (users ?? []).forEach(u => { usersByBiz.set(u.businessId, u); });
+  const loadAudience = React.useCallback(async () => {
+    if (!firestore) return;
+    setAudienceLoading(true);
+    setAudienceError(null);
+    try {
+      const [userSnap, businessSnap] = await Promise.all([
+        withFirestoreRetry(() => getDocs(collection(firestore, 'users')), {
+          label: 'Email marketing audience',
+        }),
+        withFirestoreRetry(() => getDocs(collection(firestore, 'businessInstances')), {
+          label: 'Email marketing businesses',
+        }),
+      ]);
+      setUsers(userSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      setBusinesses(businessSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+    } catch (error: any) {
+      console.error('Failed to load audience', error);
+      setAudienceError(error?.message || 'Could not load the audience.');
+    } finally {
+      setAudienceLoading(false);
+    }
+  }, [firestore]);
 
-    const logsByBiz = new Map<string, OutreachLog[]>();
-    (outreachDocs ?? []).forEach(log => {
-      const bizId = log.businessId;
-      if (!bizId) return;
-      if (!logsByBiz.has(bizId)) logsByBiz.set(bizId, []);
-      logsByBiz.get(bizId)!.push(log);
-    });
-
-    return businesses.map(biz => {
-      const logs = (logsByBiz.get(biz.id) ?? []).sort((a, b) => {
-        const da = toDate(a.contactedAt)?.getTime() ?? 0;
-        const db = toDate(b.contactedAt)?.getTime() ?? 0;
-        return db - da;
-      });
-      return { business: biz, owner: usersByBiz.get(biz.id), lastLog: logs[0] ?? null, totalContacts: logs.length };
-    });
-  }, [businesses, users, outreachDocs]);
-
-  const [search, setSearch] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<'all' | 'contacted' | 'not_contacted'>('all');
-  const [planFilter, setPlanFilter] = React.useState<'all' | 'pro' | 'starter' | 'early_pro'>('all');
-  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
-
-  const filtered = React.useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return rows.filter(r => {
-      if (statusFilter === 'contacted' && !r.lastLog) return false;
-      if (statusFilter === 'not_contacted' && r.lastLog) return false;
-      const plan = (r.business.plan ?? 'starter').toLowerCase();
-      if (planFilter === 'pro' && plan !== 'pro') return false;
-      if (planFilter === 'starter' && plan === 'pro') return false;
-      if (planFilter === 'early_pro') {
-        if (plan !== 'pro') return false;
-        if (r.lastLog) return false; // Early pro = Pro and not contacted yet
-      }
-      if (!term) return true;
-      return (
-        (r.business.name ?? '').toLowerCase().includes(term) ||
-        (r.owner?.name ?? '').toLowerCase().includes(term) ||
-        (r.owner?.email ?? '').toLowerCase().includes(term) ||
-        (r.owner?.phone ?? '').toLowerCase().includes(term)
+  const loadLogs = React.useCallback(async () => {
+    if (!firestore) return;
+    setLogsLoading(true);
+    try {
+      // Single-field order, so Firestore's automatic index covers it — no
+      // composite index to deploy.
+      const snap = await withFirestoreRetry(
+        () =>
+          getDocs(
+            query(
+              collection(firestore, 'follow_up_logs'),
+              orderBy('sentAt', 'desc'),
+              fsLimit(LOG_LIMIT),
+            ),
+          ),
+        { label: 'Campaign results' },
       );
-    }).sort((a, b) => {
-      const da = toDate(a.business.createdAt)?.getTime() ?? 0;
-      const db = toDate(b.business.createdAt)?.getTime() ?? 0;
-      return sortDir === 'asc' ? da - db : db - da;
-    });
-  }, [rows, search, statusFilter, planFilter, sortDir]);
-
-  const stats = React.useMemo(() => {
-    const total = rows.length;
-    const contacted = rows.filter(r => r.lastLog).length;
-    const pro = rows.filter(r => (r.business.plan ?? 'starter').toLowerCase() === 'pro').length;
-    return { total, contacted, notContacted: total - contacted, pro };
-  }, [rows]);
-
-  const [selected, setSelected] = React.useState<BusinessRow | null>(null);
-  const [dialogTab, setDialogTab] = React.useState<'push' | 'note' | 'email-template'>('push');
-  const [pushTitle, setPushTitle] = React.useState('');
-  const [pushBody, setPushBody] = React.useState('');
-  const [noteText, setNoteText] = React.useState('');
-  const [logMethod, setLogMethod] = React.useState<OutreachLog['method']>('manual');
-  const [isSending, setIsSending] = React.useState(false);
-
-  function openDialog(row: BusinessRow) {
-    setSelected(row);
-    setDialogTab('push');
-    const firstName = row.owner?.name?.split(' ')[0] ?? 'there';
-    setPushTitle(`Hey ${firstName} \uD83D\uDC4B`);
-    setPushBody(`We noticed you're on Zeneva! We'd love to help you get the most out of your account. Let us know if you have any questions.`);
-    setNoteText('');
-    setLogMethod('manual');
-  }
-
-  async function logOutreach(businessId: string, method: OutreachLog['method'], notes: string) {
-    if (!firestore || !user) return;
-    const logRef = doc(collection(firestore, 'outreachLogs'));
-    await setDoc(logRef, {
-      businessId,
-      notes,
-      method,
-      contactedAt: serverTimestamp(),
-      contactedBy: user.email ?? user.uid,
-    });
-  }
-
-  async function handleSendPush() {
-    if (!selected?.owner?.email || !user) return;
-    setIsSending(true);
-    try {
-      const idToken = await user.getIdToken();
-      const result = await pushAlertToPhones({
-        title: pushTitle,
-        body: pushBody,
-        link: '/support',
-        targetEmail: selected.owner.email,
-        idToken,
-      });
-      if (!result.success) {
-        toast({ variant: 'destructive', title: 'Push failed', description: result.error });
-        return;
-      }
-      await logOutreach(selected.business.id, 'push', `"${pushTitle}" — ${pushBody}`);
-      toast({ title: '\u2705 Push sent!', description: result.message });
-      setSelected(null);
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message });
+      setLogs(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+    } catch (error) {
+      console.error('Failed to load campaign logs', error);
     } finally {
-      setIsSending(false);
+      setLogsLoading(false);
     }
-  }
+  }, [firestore]);
 
-  async function handleLogNote() {
-    if (!selected || !noteText.trim()) return;
-    setIsSending(true);
-    try {
-      await logOutreach(selected.business.id, logMethod, noteText.trim());
-      toast({ title: '\uD83D\uDCDD Logged', description: 'Outreach note saved.' });
-      setSelected(null);
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message });
-    } finally {
-      setIsSending(false);
-    }
-  }
+  React.useEffect(() => {
+    loadAudience();
+  }, [loadAudience]);
+
+  // Deferred until the tab is actually opened — see the Reads note above.
+  React.useEffect(() => {
+    if (tab !== 'results' || logsRequestedRef.current) return;
+    logsRequestedRef.current = true;
+    loadLogs();
+  }, [tab, loadLogs]);
+
+  const profiles = React.useMemo(
+    () => profileAudience(users, businesses),
+    [users, businesses],
+  );
+  const segmentCounts = React.useMemo(() => behaviorSegmentCounts(profiles), [profiles]);
+
+  const profileById = React.useMemo(() => {
+    const map = new Map<string, BehaviorProfile>();
+    for (const p of profiles) map.set(p.userId, p);
+    return map;
+  }, [profiles]);
+
+  const recipients = React.useMemo(
+    () => [...selectedIds].map(id => profileById.get(id)).filter((p): p is BehaviorProfile => !!p),
+    [selectedIds, profileById],
+  );
+
+  /**
+   * Which template to open the composer on.
+   *
+   * The explicit segment filter wins; failing that, the most common segment among
+   * the people actually selected. Guessing beats defaulting, because a mixed
+   * selection still gets the template that fits most of it.
+   */
+  const suggestedSegment = React.useMemo<BehaviorSegment | null>(() => {
+    if (segmentFilter) return segmentFilter;
+    if (!recipients.length) return null;
+    const tally = new Map<BehaviorSegment, number>();
+    for (const r of recipients) tally.set(r.segment, (tally.get(r.segment) ?? 0) + 1);
+    return [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }, [segmentFilter, recipients]);
+
+  const mailableCount = React.useMemo(
+    () => profiles.filter(p => p.contactable).length,
+    [profiles],
+  );
+  const optedOutCount = React.useMemo(() => profiles.filter(p => p.optedOut).length, [profiles]);
+
+  const pickTemplate = React.useCallback((segment: BehaviorSegment) => {
+    setTemplateSegment(segment);
+    setDraft(draftForSegment(segment));
+  }, []);
+
+  /**
+   * Seed the draft from the selection the first time the composer is opened.
+   *
+   * Guarded by the latch rather than re-running on every selection change: once
+   * the operator has started editing, silently replacing their copy because they
+   * ticked one more person would be worse than opening on a slightly wrong
+   * template.
+   */
+  React.useEffect(() => {
+    if (tab !== 'compose' || draftSeededRef.current) return;
+    draftSeededRef.current = true;
+    pickTemplate(suggestedSegment ?? 'feature_focused');
+  }, [tab, suggestedSegment, pickTemplate]);
+
+  const toggleOne = React.useCallback((userId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }, []);
+
+  const selectMany = React.useCallback((userIds: string[]) => {
+    setSelectedIds(new Set(userIds));
+  }, []);
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Target className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Strategic Outreach</h1>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Mail className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Email Marketing</h1>
+          </div>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Every user, grouped by how they actually use Zeneva — hours in the app and
+            the pages they spend them on. Pick a group, send them a branded email that
+            quotes their own numbers back to them, and see who opened it.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Track and manage personal outreach to every business on Zeneva.
-        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadAudience}
+          disabled={audienceLoading}
+          className="gap-1.5"
+        >
+          <RefreshCw className={audienceLoading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+          Refresh
+        </Button>
       </div>
+
+      {audienceError && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {audienceError}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total Businesses" value={isLoading ? '—' : stats.total} icon={Users} accent="bg-slate-500" />
-        <StatCard label="Contacted" value={isLoading ? '—' : stats.contacted} sub={!isLoading && stats.total > 0 ? `${Math.round((stats.contacted / stats.total) * 100)}% coverage` : undefined} icon={CheckCircle2} accent="bg-emerald-500" />
-        <StatCard label="Not Contacted" value={isLoading ? '—' : stats.notContacted} sub="Need outreach" icon={AlertCircle} accent="bg-orange-500" />
-        <StatCard label="Pro Plans" value={isLoading ? '—' : stats.pro} sub="Paying customers" icon={Crown} accent="bg-violet-500" />
+        <HeaderStat
+          label="Users"
+          value={audienceLoading ? '—' : profiles.length}
+          icon={Users}
+        />
+        <HeaderStat
+          label="Mailable"
+          value={audienceLoading ? '—' : mailableCount}
+          icon={Mail}
+        />
+        <HeaderStat
+          label="Unsubscribed"
+          value={audienceLoading ? '—' : optedOutCount}
+          icon={BanIcon}
+        />
+        <HeaderStat label="Selected" value={selectedIds.size} icon={Send} />
       </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search business, owner, email…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-          </div>
-          <Select value={statusFilter} onValueChange={v => setStatusFilter(v as any)}>
-            <SelectTrigger className="w-[160px]">
-              <Filter className="mr-2 h-3.5 w-3.5" /><SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="not_contacted">Not contacted</SelectItem>
-              <SelectItem value="contacted">Contacted</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={planFilter} onValueChange={v => setPlanFilter(v as any)}>
-            <SelectTrigger className="w-[160px]">
-              <Crown className="mr-2 h-3.5 w-3.5" /><SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All plans</SelectItem>
-              <SelectItem value="pro">Pro only</SelectItem>
-              <SelectItem value="early_pro">Early Pro Adopters</SelectItem>
-              <SelectItem value="starter">Starter only</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} className="gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            {sortDir === 'asc' ? 'Oldest first' : 'Newest first'}
-            {sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </Button>
-        </CardContent>
-      </Card>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="audience" className="gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            Audience
+          </TabsTrigger>
+          <TabsTrigger value="compose" className="gap-1.5">
+            <Send className="h-3.5 w-3.5" />
+            Compose
+            {selectedIds.size > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                {selectedIds.size}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="results" className="gap-1.5">
+            <Mail className="h-3.5 w-3.5" />
+            Results
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            {isLoading ? 'Loading…' : `${filtered.length} business${filtered.length !== 1 ? 'es' : ''}`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-4">Business</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Outreach Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Last Contact</TableHead>
-                  <TableHead className="hidden lg:table-cell">Contacts</TableHead>
-                  <TableHead className="hidden lg:table-cell">Joined</TableHead>
-                  <TableHead className="pr-4 text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
-                        <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                      No businesses match your filters.
-                    </TableCell>
-                  </TableRow>
-                ) : filtered.map(row => {
-                  const plan = (row.business.plan ?? 'starter').toLowerCase();
-                  const isPro = plan === 'pro';
-                  const joinedDate = toDate(row.business.createdAt);
-                  const lastContactDate = row.lastLog ? toDate(row.lastLog.contactedAt) : null;
-
-                  return (
-                    <TableRow key={row.business.id}>
-                      <TableCell className="pl-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {initialsOf(row.business.name)}
-                          </div>
-                          <div>
-                            <p className="font-medium leading-tight">{row.business.name ?? '—'}</p>
-                            <p className="text-[11px] text-muted-foreground truncate max-w-[160px]">{row.business.id}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {row.owner ? (
-                          <div>
-                            <p className="text-sm font-medium">{row.owner.name}</p>
-                            <p className="text-[11px] text-muted-foreground">{row.owner.email}</p>
-                            {row.owner.phone && <p className="text-[11px] text-muted-foreground">{row.owner.phone}</p>}
-                          </div>
-                        ) : <span className="text-muted-foreground text-sm">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={cn('gap-1 font-semibold', isPro
-                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          )}
-                          variant="secondary"
-                        >
-                          {isPro && <Crown className="h-3 w-3" />}
-                          {isPro ? 'Pro' : 'Starter'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell><OutreachBadge log={row.lastLog} /></TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {lastContactDate ? (
-                          <div>
-                            <p className="text-sm">{format(lastContactDate, 'MMM d, yyyy')}</p>
-                            <p className="text-[11px] text-muted-foreground capitalize">
-                              {row.lastLog?.method ? METHOD_META[row.lastLog.method]?.label : ''}
-                            </p>
-                          </div>
-                        ) : <span className="text-muted-foreground text-sm">—</span>}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className={cn('text-sm font-medium', row.totalContacts === 0 ? 'text-muted-foreground' : '')}>
-                          {row.totalContacts}×
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className="text-sm text-muted-foreground">
-                          {joinedDate ? format(joinedDate, 'MMM d, yyyy') : '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="pr-4 text-right">
-                        <Button size="sm" variant={row.lastLog ? 'outline' : 'default'} className="gap-1.5" onClick={() => openDialog(row)}>
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          {row.lastLog ? 'Follow up' : 'Reach out'}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!selected} onOpenChange={open => !open && setSelected(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Reach out — {selected?.business.name}
-            </DialogTitle>
-            <DialogDescription>
-              {selected?.owner?.name && <span>Owner: <strong>{selected.owner.name}</strong>{' '}</span>}
-              {selected?.owner?.email && <span>· {selected.owner.email}</span>}
-              {selected?.owner?.phone && <span> · {selected.owner.phone}</span>}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex rounded-lg border p-1 gap-1">
-            {(['push', 'note', 'email-template'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setDialogTab(tab)}
-                className={cn(
-                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  dialogTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {tab === 'push' ? <><Bell className="mr-1.5 inline h-3.5 w-3.5" />Send Push</> : tab === 'note' ? <><StickyNote className="mr-1.5 inline h-3.5 w-3.5" />Log Contact</> : <><Mail className="mr-1.5 inline h-3.5 w-3.5" />Email Template</>}
-              </button>
-            ))}
-          </div>
-
-          {dialogTab === 'email-template' ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted-foreground">A beautiful template to send to early adopters. Copy this to your email client to welcome them.</p>
-              <div 
-                className="bg-white text-black rounded-md overflow-y-auto max-h-[300px] border shadow-inner p-4"
-                dangerouslySetInnerHTML={{ __html: `
-                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #111; margin-top: 0; font-size: 20px;">Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}! 🚀</h2>
-                    <p style="font-size: 15px;">I'm Imam, the founder of Zeneva. I noticed you recently upgraded your business <strong>${selected?.business.name ?? 'account'}</strong> to our Pro plan.</p>
-                    <p style="font-size: 15px;">As one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.</p>
-                    <p style="font-size: 15px;">If you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.</p>
-                    <p style="font-size: 15px;">Thank you for being part of our journey.</p>
-                    <br/>
-                    <p style="font-size: 15px; margin-bottom: 4px;">Best regards,</p>
-                    <p style="font-size: 16px; font-weight: bold; margin-top: 0; margin-bottom: 2px;">Imam Shaffy</p>
-                    <p style="font-size: 13px; color: #666; margin-top: 0;">Founder, Zeneva</p>
-                  </div>
-                ` }}
-              />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
-                <Button 
-                  onClick={() => {
-                    const html = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto;"><h2 style="color: #111; margin-top: 0; font-size: 20px;">Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}! 🚀</h2><p style="font-size: 15px;">I'm Imam, the founder of Zeneva. I noticed you recently upgraded your business <strong>${selected?.business.name ?? 'account'}</strong> to our Pro plan.</p><p style="font-size: 15px;">As one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.</p><p style="font-size: 15px;">If you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.</p><p style="font-size: 15px;">Thank you for being part of our journey.</p><br/><p style="font-size: 15px; margin-bottom: 4px;">Best regards,</p><p style="font-size: 16px; font-weight: bold; margin-top: 0; margin-bottom: 2px;">Imam Shaffy</p><p style="font-size: 13px; color: #666; margin-top: 0;">Founder, Zeneva</p></div>`;
-                    navigator.clipboard.writeText(html);
-                    toast({ title: 'Copied HTML!', description: 'You can now paste this into an email client that supports raw HTML.' });
-                  }}
-                  variant="secondary"
-                >
-                  Copy HTML
-                </Button>
-                <Button 
-                  onClick={() => {
-                    const text = `Welcome to Zeneva Pro, ${selected?.owner?.name?.split(' ')[0] ?? 'there'}!\n\nI'm Imam, the founder of Zeneva. I noticed you recently upgraded your business ${selected?.business.name ?? 'account'} to our Pro plan.\n\nAs one of our early adopters, your trust and support mean the world to us. We built Zeneva to help businesses like yours scale without friction, and I wanted to personally reach out to make sure everything is running smoothly.\n\nIf you have any feedback, feature requests, or just want to chat about how you're using the platform, I'd love to hear from you. You can reply directly to this email.\n\nThank you for being part of our journey.\n\nBest regards,\nImam Shaffy\nFounder, Zeneva`;
-                    navigator.clipboard.writeText(text);
-                    toast({ title: 'Copied Text!', description: 'You can now paste this as plain text.' });
-                  }}
-                >
-                  Copy Text
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : dialogTab === 'push' ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Title</label>
-                <Input value={pushTitle} onChange={e => setPushTitle(e.target.value)} placeholder="e.g. Hey John 👋" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Message</label>
-                <Textarea value={pushBody} onChange={e => setPushBody(e.target.value)} placeholder="Write your outreach message…" rows={4} />
-              </div>
-              {!selected?.owner?.email && (
-                <p className="text-sm text-destructive flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4" />No email found — push cannot be targeted.
-                </p>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
-                <Button onClick={handleSendPush} disabled={isSending || !pushTitle || !pushBody || !selected?.owner?.email} className="gap-1.5">
-                  {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Send push
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Contact method</label>
-                <Select value={logMethod} onValueChange={v => setLogMethod(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="push">Push notification</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="phone">Phone / WhatsApp</SelectItem>
-                    <SelectItem value="manual">Other / Manual note</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Notes</label>
-                <Textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="What was discussed? Any follow-up needed?" rows={4} />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
-                <Button onClick={handleLogNote} disabled={isSending || !noteText.trim()} className="gap-1.5">
-                  {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Log contact
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-
-          {selected && selected.totalContacts > 0 && (
-            <div className="border-t pt-3">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Previous contacts ({selected.totalContacts})
+        <TabsContent value="audience" className="mt-4">
+          <AudienceTable
+            profiles={profiles}
+            isLoading={audienceLoading}
+            selectedIds={selectedIds}
+            onToggle={toggleOne}
+            onSelectMany={selectMany}
+            segmentFilter={segmentFilter}
+            onSegmentFilterChange={setSegmentFilter}
+            segmentCounts={segmentCounts}
+          />
+          {selectedIds.size > 0 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3">
+              <p className="text-sm">
+                <strong>{selectedIds.size}</strong> selected
               </p>
-              <div className="flex flex-col gap-2 max-h-36 overflow-y-auto">
-                {(outreachDocs ?? [])
-                  .filter(d => d.businessId === selected.business.id)
-                  .sort((a, b) => (toDate(b.contactedAt)?.getTime() ?? 0) - (toDate(a.contactedAt)?.getTime() ?? 0))
-                  .map((log, i) => {
-                    const meta = METHOD_META[log.method] ?? METHOD_META.manual;
-                    const Icon = meta.icon;
-                    const d = toDate(log.contactedAt);
-                    return (
-                      <div key={i} className="flex gap-2 text-sm rounded-md bg-muted/50 p-2">
-                        <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', meta.color)} />
-                        <div className="min-w-0">
-                          <p className="text-xs text-muted-foreground">{d ? format(d, 'MMM d, yyyy h:mm a') : '—'} · {meta.label}</p>
-                          <p className="truncate">{log.notes}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                  Clear
+                </Button>
+                <Button size="sm" className="gap-1.5" onClick={() => setTab('compose')}>
+                  <Send className="h-3.5 w-3.5" />
+                  Write to them
+                </Button>
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
+
+        <TabsContent value="compose" className="mt-4">
+          <CampaignComposer
+            recipients={recipients}
+            draft={draft}
+            onDraftChange={setDraft}
+            templateSegment={templateSegment}
+            onPickTemplate={pickTemplate}
+            onSent={() => {
+              setSelectedIds(new Set());
+              // Next campaign starts from a fresh suggestion rather than the copy
+              // that was just sent.
+              draftSeededRef.current = false;
+              // The results tab may never have been opened; mark it fetched so the
+              // deferred load does not immediately overwrite this fresh pull.
+              logsRequestedRef.current = true;
+              loadLogs();
+              setTab('results');
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="results" className="mt-4">
+          <CampaignResults logs={logs} isLoading={logsLoading} onRefresh={loadLogs} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

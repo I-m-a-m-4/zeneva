@@ -3623,6 +3623,1149 @@ Treat this as orientation, not advice. Before making decisions with money attach
 
 What we can say with confidence is the operational half: a business that records every sale digitally, itemised, per user, is ready for whatever the final rules look like. One that does not is exposed no matter which date applies. Our [POS setup guide for Nigeria](/blog/pos-setup-guide-nigeria) covers getting that foundation in place, and [professional invoicing](/blog/professional-invoicing-guide) covers what a proper invoice needs on it.
 `
+  },
+  {
+    slug: 'offline-pos-internet-outage',
+    title: 'Offline POS: How to Keep Selling When the Internet Goes Down',
+    excerpt: 'Exactly what happens to a sale when the connection drops, which parts of a POS keep working, and the reconciliation checks that decide whether an outage costs you an hour or a month of bad figures.',
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1200&auto=format&fit=crop',
+    category: 'Guides',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'An offline POS records sales to local storage on the device and syncs them when the connection returns. In Zeneva, the installed app (Windows, macOS, Android, iOS) writes every pending action to a local SQLite queue that survives closing and reopening the app, then replays it on the next launch. In a browser tab the same queue is held in memory only, so a refresh or a closed tab during an outage loses anything unsynced — which is why outage-prone shops should install the app rather than use the browser. What keeps working offline is selling from the cached catalogue, adding products and customers, and printing receipts, with staff permissions still enforced. What stops is anything requiring a live lookup: bank or terminal payment verification, Zen AI, and the consolidated view across branches that are themselves offline.',
+    tableData: {
+      title: 'What Continues During an Outage and What Waits',
+      headers: ['Function', 'During an outage', 'Why'],
+      rows: [
+        ['Ringing up a sale', 'Works', 'Prices and stock read from the on-device catalogue'],
+        ['Barcode scanning', 'Works', 'Scanner is local hardware; lookup is local'],
+        ['Cash payment', 'Works', 'No third party involved'],
+        ['Card or transfer verification', 'Stops', 'Confirmation can only come from the bank'],
+        ['Printing a receipt', 'Works', 'Printer is local; receipt is generated on device'],
+        ['Adding a product or customer', 'Works', 'Queued; attach product photos once back online'],
+        ['Staff permission limits', 'Enforced', 'Checked against the cached profile, not the server'],
+        ['Branch attribution', 'Preserved', 'Active branch is stamped on the sale when queued'],
+        ['Zen AI questions', 'Stops', 'Runs as a server request, not on the device'],
+        ['Group view across branches', 'Goes stale', 'Other branches cannot report in while offline']
+      ]
+    },
+    faq: [
+      {
+        question: 'If my internet drops mid-sale, do I lose the sale?',
+        answer: 'No. The sale completes against the catalogue already stored on the device and is placed in a pending queue, then committed when the connection returns. The practical caveat is which version you are running: in the installed app that queue is written to a local SQLite database and survives the app being closed, so a laptop that dies mid-outage still has the sales on next launch. In a browser tab the queue lives in memory for the life of the tab, so a refresh loses it. Same product, materially different guarantee.'
+      },
+      {
+        question: 'Should I use the browser or install the app?',
+        answer: 'Install the app if your location loses connectivity with any regularity, and treat that as the deciding factor rather than convenience. The browser is fine for back-office work, a manager checking figures, or a location with reliable service. The counter itself belongs on the installed app, because that is where the durable queue and the local catalogue live. This is the single most consequential setup decision for a shop with unreliable power or service.'
+      },
+      {
+        question: 'Can a cashier bypass their permissions while offline?',
+        answer: 'No, and this is worth verifying in any POS you trial. Permission checks run against the profile cached on the device, so a cashier who cannot record sales or edit inventory online cannot do it during an outage either. Some systems check permissions on the server only, which means an outage silently promotes every user to full access — exactly when supervision is weakest. Ask any vendor this question directly.'
+      },
+      {
+        question: 'Can two devices sell the same last unit while both are offline?',
+        answer: 'Yes, and no offline system can prevent it — this is a property of offline operation, not a defect in any particular product. Each device is working from its own snapshot of stock, so two tills can both sell the final item and both be correct at the time. The result is a negative or impossible figure after sync. Manage it rather than hope: for genuinely scarce items keep a single till authoritative during an outage, and expect to reconcile a handful of lines afterwards rather than none.'
+      },
+      {
+        question: 'How do I take card payments during an outage?',
+        answer: 'You largely do not, and it is important to be direct about why. Card and bank-transfer confirmation comes from the bank, so nothing installed in your shop can verify that money moved while the connection is down. Your realistic options are cash, or releasing goods on trust and recording a debt against a named customer to settle later. What you must not do is accept a screenshot as proof, which is the most common counter fraud there is.'
+      },
+      {
+        question: 'What is the first thing to do when I notice the connection is gone?',
+        answer: 'Confirm it is the internet and not the power, then tell the counter staff explicitly and switch the payment rule to cash-only or recorded-debt. The failure mode in most shops is not technical — it is a cashier who assumes the system is broken, moves to a paper notebook, and creates two hours of sales that never enter any system. Staff behaving correctly matters more than any software behaviour, and it only happens if they were told the rule before the outage.'
+      },
+      {
+        question: 'What should I check after the connection comes back?',
+        answer: 'Four things, in this order: that the pending queue has drained to zero, that the number of receipts recorded during the outage window matches what the counter actually did, that stock levels on anything sold heavily during the outage are not negative or implausible, and that any goods released on trust have a named debt recorded against them. Fifteen minutes of this the same day replaces a month of unexplained variance later.'
+      },
+      {
+        question: 'How do I test that offline actually works before I need it?',
+        answer: 'Deliberately, on a quiet afternoon, with a real product. Turn off the connection at the device, complete a small sale, close the application entirely, reopen it, and confirm the sale is still pending. Then restore the connection and confirm it commits once and only once. Any vendor claiming offline support should survive that ninety-second test, and a surprising number do not. Run it before you need it rather than during your first outage.'
+      }
+    ],
+    content: `
+## The two ways an outage costs money
+
+An internet outage in a shop causes one of two losses, and they are not equally bad.
+
+The first is **lost sales**: the till will not open, the queue walks out, and you can count the damage in an afternoon. It hurts and it is visible.
+
+The second is **lost records**: staff keep selling, but into a notebook, a phone note, or nothing at all. Sales happen, money changes hands, and none of it enters your system. This is the expensive one, because it does not look like a loss on the day. It looks like a normal afternoon and shows up weeks later as stock that does not match, a margin figure you cannot explain, and a suspicion about a member of staff you cannot prove or dismiss.
+
+Most guidance on offline POS treats the first problem and ignores the second. The second is the one that damages a business.
+
+---
+
+## What "works offline" has to mean before it means anything
+
+Almost every POS vendor claims offline support. The claim is close to meaningless without answers to four specific questions, so ask them in this form:
+
+1. **Where do pending sales live?** In memory, or written to storage on the device? Only the second survives the application closing, the battery dying, or the machine being restarted by a member of staff who assumes that will fix it.
+2. **Are permissions still enforced?** If access is checked on the server, an outage quietly gives every user full rights at the exact moment nobody is supervising.
+3. **What happens on reconnect if the commit half-fails?** Anything that does not confirm must be retried, not silently dropped and not committed twice.
+4. **What is explicitly not available?** A vendor that will not tell you the limits has not tested them.
+
+The rest of this guide answers those four for Zeneva, then covers the operational half that no software solves.
+
+---
+
+## Exactly what happens in Zeneva when the connection drops
+
+Being specific here is more useful than being reassuring, so this describes actual behaviour rather than intent.
+
+**The catalogue is already on the device.** Products, prices, customers and recent receipts are mirrored locally, so search and scanning at the counter do not depend on the network. This is also why the app opens fast on a slow connection.
+
+**A completed sale becomes a queued action.** Rather than writing directly to the server, every write goes into a pending queue. That queue is what makes the outage survivable, and it is the same mechanism used when you are online, which matters: the outage path is not a rarely exercised special case, it is the normal path with the network absent.
+
+**In the installed app, the queue is written to a local SQLite database on the device.** It survives closing the app, and on the next launch the pending items are loaded and replayed. This is the durable guarantee, and it applies to the Windows, macOS, Android and iOS builds.
+
+**In a browser tab, the queue is held in memory for the life of that tab.** A brief outage is handled fine. A refresh, a closed tab, or a crash during the outage loses anything not yet committed. This is a real limitation and we would rather state it plainly than let you discover it: if your location loses service with any regularity, run the counter on the installed app from [the downloads page](/download), not in a browser.
+
+**Permissions are enforced against the cached profile.** A cashier restricted from recording sales or editing stock is still restricted during an outage. Access does not widen because the server is unreachable.
+
+**Branch attribution is stamped when the action is queued**, not when it syncs. Sales made at a branch during an outage still land against that branch afterwards, which is what keeps per-branch figures meaningful. Our guide to [multi-branch management](/blog/mastering-multi-branch-management) covers why that attribution matters more than it sounds.
+
+**On reconnect the queue drains, and anything that does not confirm is retained for retry** rather than discarded. The failure you want to avoid in a sync design is a write that silently disappears because a single request timed out.
+
+---
+
+## What does not work offline
+
+This section exists because a vendor unwilling to write one is hiding something.
+
+**Card and bank-transfer verification.** Confirmation that money moved comes from the bank. No local software can produce it while the connection is down, and any product implying otherwise is describing something other than verification. Practical consequence: cash, or a recorded debt against a named customer.
+
+**Zen AI.** Questions run as a server request, so the assistant is unavailable during an outage. Reports built from data already on the device still open.
+
+**A live consolidated view across branches.** Your own device is fine, but a branch that is itself offline cannot report in. Group stock and group sales figures go stale for the duration. This matters most for a decision you might make mid-outage: do not place a group-wide reorder off numbers you cannot confirm are current.
+
+**Photos for products created offline.** The product record itself queues normally. Attach the image once you are back online.
+
+---
+
+## The oversell problem, stated honestly
+
+Two tills, both offline, both holding a snapshot showing one unit left. Both sell it. Both are correct at the time. After sync, stock reads minus one.
+
+No offline system prevents this, because preventing it requires a live authority that an outage removes by definition. Vendors rarely mention it. It is better handled than hidden:
+
+- For genuinely scarce or high-value lines, keep **one till authoritative** during an outage and route those items to it.
+- Expect to reconcile a **small number of lines** after a long outage, and treat a negative figure as an ordinary artefact of the outage rather than evidence of theft.
+- Adjust with a stated reason, never by deleting and re-adding the product, so the trail survives. Our post on [why stock records stop matching the shelf](/blog/stock-records-do-not-match-shelf) covers the difference and why it matters.
+
+---
+
+## The outage drill
+
+Software handles the record. Staff handle the shop. This part is a laminated card near the till, not a policy document.
+
+**Before it happens, once:**
+
+- Install the app on the till rather than using a browser.
+- Decide the payment rule now: cash only, or recorded debt against a named customer. Write it down.
+- Make sure every member of staff has their own login. Shared logins destroy attribution, and an outage is precisely when you will want to know who recorded what.
+- Run the ninety-second test below so staff have seen it work.
+
+**During, in order:**
+
+1. Say out loud that the internet is down and the system still works. Silence is what starts the notebook.
+2. Switch to the agreed payment rule. No screenshots as proof of transfer, ever.
+3. Keep selling normally through the POS. Do not "catch up later" — later never arrives intact.
+4. Do not restart the app or the machine to try to fix it, and if you are on a browser tab, do not refresh it.
+5. Note the time the outage started and ended. Ten seconds now saves an hour of reconciliation.
+
+**After, the same day:**
+
+1. Confirm the pending queue has drained to zero.
+2. Compare receipts recorded in the outage window against what the counter believes it did.
+3. Check stock on anything sold heavily for negative or implausible figures, and adjust with reasons.
+4. Record any goods released on trust as a debt against a named customer while people still remember.
+5. Confirm the day total reconciles with cash in the drawer.
+
+---
+
+## The ninety-second test
+
+Do this on a quiet afternoon, with a real product, before you need it.
+
+| Step | What you are checking |
+| --- | --- |
+| Disconnect the device from the network | That the app keeps working rather than showing a blocking error |
+| Search for a product and complete a small sale | That the catalogue and pricing are genuinely local |
+| Print or view the receipt | That the customer still gets proof of purchase |
+| Fully close the application | The real test: is the pending sale stored or only remembered |
+| Reopen it | That the sale is still listed as pending |
+| Reconnect | That it commits exactly once, not twice and not never |
+| Check stock and the day total | That the figures moved by exactly the amount you sold |
+
+The fourth and fifth rows are the ones that separate a durable queue from a hopeful one. Run this against any POS you are evaluating, including ours.
+
+---
+
+## Why this is a buying criterion, not a footnote
+
+If you trade anywhere with unreliable service or power, offline behaviour is not a feature comparison line — it is the difference between a bad hour and a month of figures you cannot trust. It deserves more weight in a POS decision than the interface, the hardware, or the price, because every other feature depends on the records being complete.
+
+Judge it on specifics: where pending sales are stored, whether permissions hold, what is explicitly unavailable, and whether the vendor will put those answers in writing. Then test it yourself in ninety seconds rather than taking anyone's word for it.
+
+If you want to run that test against Zeneva, [install the app](/download) and try it on the free plan before committing to anything. Our [POS setup guide](/blog/pos-setup-guide-nigeria) covers getting the counter configured properly first, and [audit logs and permissions](/blog/prevent-retail-theft-audit-logs) covers the attribution that makes outage reconciliation possible at all.
+`
+  },
+  {
+    slug: 'stock-records-do-not-match-shelf',
+    title: 'Why Your Stock Records Do Not Match the Shelf',
+    excerpt: 'A diagnostic order for stock discrepancies — from the causes that explain most of them to the one everybody suspects first — plus the twenty-minute investigation that finds yours.',
+    imageUrl: '/Grocery-Stores-And-The-Empty-Store-Shelves.jpg',
+    category: 'Guides',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'Stock discrepancies have seven common causes, and theft is statistically the last one to check rather than the first. In rough order of frequency: goods received were never counted against the invoice, units were recorded inconsistently (carton versus single), transfers between locations were recorded as two separate adjustments, returns and exchanges were not put back into stock, similar items were mis-scanned at the counter, and damage, expiry, samples or staff consumption were never written off. Internal theft is real but sits below all of these. The correct response is to investigate before changing the number, because an adjustment made without a cause destroys the only evidence of what happened and guarantees the same gap reappears next month.',
+    tableData: {
+      title: 'Discrepancy Causes, Their Signatures, and How to Test Each',
+      headers: ['Cause', 'What the pattern looks like', 'How to test it in minutes'],
+      rows: [
+        ['Receiving not checked against invoice', 'Gap appears right after a delivery, one supplier recurs', 'Compare the last three invoices to what was entered'],
+        ['Unit mismatch (carton vs single)', 'Gap is a clean multiple: 12, 24, 144', 'Divide the gap by the pack size; a whole number is your answer'],
+        ['Transfer recorded as two adjustments', 'One location short, another long by the same amount', 'Add the two figures together; if it nets to zero, nothing is lost'],
+        ['Returns not restocked', 'Physical count is higher than the record', 'Check returns against stock movements for the period'],
+        ['Mis-scan of a similar item', 'One variant short, a near-identical one long', 'Look at the two lines side by side, not each alone'],
+        ['Damage, expiry, samples, staff use', 'Slow steady drift on specific categories', 'Ask whether any write-off was ever recorded at all'],
+        ['Internal theft', 'Consistent, targeted, survives every fix above', 'Audit log by user and shift, after eliminating the rest'],
+        ['Counting error', 'Gap vanishes on a careful recount', 'Recount before doing anything else at all']
+      ]
+    },
+    faq: [
+      {
+        question: 'The count is wrong. Should I just correct the number?',
+        answer: 'Not yet, and this is the single most expensive habit in stock control. Correcting the figure without a cause makes the report look right and leaves the mechanism running, so the same gap returns next month and you correct it again. After three rounds of this you have taught yourself that stock records are unreliable, which is how shops end up not counting at all. Spend twenty minutes on the cause first; the number is the last step, not the first.'
+      },
+      {
+        question: 'How do I know if it is theft or a mistake?',
+        answer: 'By pattern, not by suspicion. Mistakes are erratic and spread across items, appear as clean multiples of a pack size, and usually stop once the process is fixed. Theft is consistent, targeted at specific sellable items, and survives every process fix you make. That distinction is why order matters: if you check the audit log first you will find a name attached to every sale, which proves nothing on its own and has ruined the reputation of a lot of honest staff.'
+      },
+      {
+        question: 'My gap is exactly 24 units. What does that mean?',
+        answer: 'Almost certainly a unit problem rather than a loss. Clean multiples of a pack size — 6, 12, 24, 144 — are the signature of goods received in one unit and sold in another, or a carton entered as a single item. Divide the gap by your pack size before doing anything else; if the result is a whole number, you have found your cause in about fifteen seconds and nothing is actually missing.'
+      },
+      {
+        question: 'One branch is short and another is over by the same amount. Is stock missing?',
+        answer: 'No, it is a transfer that was recorded as two independent adjustments rather than one movement. Nothing is lost — the total across both locations is correct — but neither branch report is. Fix it as a transfer so the trail survives, and change the process so future transfers are recorded once with a receiving confirmation at the destination. Two separate adjustments are the most common multi-branch data leak there is.'
+      },
+      {
+        question: 'How often should I count if discrepancies keep appearing?',
+        answer: 'More often, but on less stock. A full count twice a year finds the gap six months after it started, by which point the cause is unknowable. Counting a small rotating slice weekly finds it within days while people still remember the delivery, the return and the customer. Frequency of counting matters far more than completeness for diagnosis, and it does not require closing the shop.'
+      },
+      {
+        question: 'Should I write off damaged goods, or leave them in stock?',
+        answer: 'Write them off, with a reason, on the day it happens. Leaving damage in the record inflates your stock value, hides the real cost of handling, and quietly becomes an unexplained discrepancy months later that you will end up attributing to theft. A dated write-off saying two units were water damaged is honest, auditable, and diagnostic — when the same reason appears every week, you have found a storage problem rather than a staffing one.'
+      },
+      {
+        question: 'What is a stock adjustment reason, and why does it matter so much?',
+        answer: 'It is a short note attached to the correction saying what happened: damaged, expired, recount, transfer error, theft confirmed, supplier shortfall. It matters because the reason is the data. A month of adjustments with reasons tells you where your process leaks; a month of adjustments without them tells you only that your records are wrong, which you already knew. It costs a few seconds per adjustment and is the highest-return habit in this entire article.'
+      },
+      {
+        question: 'Can software prevent discrepancies?',
+        answer: 'It can prevent some and make the rest diagnosable, which is the realistic claim. Software cannot stop a delivery being accepted uncounted or a bottle being taken from the back — those are process and supervision. What it does is make each cause distinguishable: individual logins so activity is attributable, adjustments with reasons so patterns are visible, transfers as movements so nothing vanishes between locations, and an immutable log so the record cannot be quietly tidied. Any vendor claiming to eliminate shrinkage is selling you something else.'
+      }
+    ],
+    content: `
+## The instinct that makes it worse
+
+You count a shelf. The system says forty-one. The shelf holds thirty-four. Seven are missing.
+
+Two instincts arrive immediately, and both are wrong.
+
+The first is to suspect a member of staff. The second is to correct the number to thirty-four and move on. The second feels responsible and is quietly the more damaging of the two, because it destroys the only evidence you had while leaving the cause running. Next month the gap returns, you correct it again, and within a quarter you have trained yourself to believe stock figures are approximate — which is the point at which counting stops entirely.
+
+A discrepancy is information. It is telling you where a process leaks. The number is the last thing you should change.
+
+---
+
+## Recount first
+
+Before any investigation, count it again, and have someone else do it.
+
+An uncomfortable share of discrepancies are counting errors: items stacked behind other items, a second facing on another aisle, a box in the back that nobody looked in, stock already sold but not yet collected, or goods sitting in a delivery bay that belong to today's count. A recount costs five minutes and closes a meaningful percentage of cases outright.
+
+If the second count agrees with the first, you have a real discrepancy and it is worth twenty minutes.
+
+---
+
+## The cause tree, in order of likelihood
+
+Work down this list in order. The order is the method — it puts the common, cheap-to-check causes before the rare, expensive-to-accuse one.
+
+### 1. Goods were received without being counted
+
+The most common cause in most shops, and the least investigated. A delivery arrives during trading hours, the driver is waiting, someone signs the note, and the boxes go to the back. The invoice said forty-one. Thirty-four arrived. The record was created from the invoice, not from the shelf.
+
+**Test:** take your last three deliveries and compare the invoice quantity to what was entered and to what is physically there now. If one supplier keeps appearing, you have found both the cause and the conversation to have.
+
+**Fix:** count at the point of receipt, against the note, before signing. This one change eliminates more variance than any software setting.
+
+### 2. Units were recorded inconsistently
+
+The gap is 12, or 24, or 144. Clean multiples are almost never theft — thieves do not take a gross of anything and leave the rest.
+
+This happens when goods arrive by the carton and sell by the bottle, and the two are not linked by a stated multiplier. A carton entered as one unit, then twelve bottles sold from it, produces a discrepancy of eleven that looks alarming and means nothing.
+
+**Test:** divide the gap by your pack size. A whole number is your answer.
+
+**Fix:** decide what one sellable unit is for that product and apply it everywhere, with the pack-to-single multiplier recorded on the product rather than held in someone's head. Our post on [inventory settings that change decisions](/blog/advanced-inventory-tips) covers how to set this up.
+
+### 3. A transfer was recorded as two adjustments
+
+One location is short by twenty. Another is over by twenty. Nothing is missing at all — but both reports are wrong, and neither location can prove anything about the other.
+
+**Test:** add the two figures. If they net to zero, this is your cause.
+
+**Fix:** record transfers as a single movement with a receiving confirmation at the destination, so a shortfall is discovered at the moment of receipt by a named person against a stated dispatch quantity. This is covered in detail in our [multi-branch guide](/blog/mastering-multi-branch-management), and it is the most common way stock appears to vanish in a business with more than one location.
+
+### 4. Returns and exchanges were never restocked
+
+This is the cause that produces the opposite symptom, which is why it gets missed: the shelf holds *more* than the record. A customer returned an item, it went back on the shelf, and the return was processed as a refund without a corresponding stock movement.
+
+**Test:** compare returns processed in the period against stock movements for those items.
+
+**Fix:** make restocking part of the return, not a separate act of memory, and decide explicitly where a returned item that cannot be resold goes — because it is not stock and it is not gone.
+
+### 5. Two similar items were confused at the counter
+
+One variant is short by nine. A near-identical one is over by nine. Small Blue was scanned as Small Black, or the wrong line was picked from a name search under queue pressure.
+
+**Test:** look at similar lines side by side rather than at the problem line alone. This cause is invisible when you examine one product in isolation, which is why it survives so many investigations.
+
+**Fix:** a unique barcode or SKU per variant, scanned rather than searched. Any product whose variants are chosen from a dropdown at a busy counter will produce this permanently.
+
+### 6. Damage, expiry, samples and staff consumption were never written off
+
+A steady drift on specific categories: cold drinks, snacks, cosmetics, anything perishable or informally consumed. Nothing dramatic, no single event, just a slow bleed on the same lines.
+
+**Test:** ask whether any write-off has ever been recorded. In many shops the honest answer is none, ever — which cannot be true, so the losses are hiding inside your other discrepancies and inflating them.
+
+**Fix:** a write-off with a reason on the day it happens. If breakage genuinely runs at two units a week, you want that visible as breakage. Recorded, it is a storage or handling problem you can solve. Unrecorded, it looks like theft and someone eventually gets blamed for it.
+
+### 7. Internal theft
+
+It is real, it is usually internal rather than external, and it is undramatic. But it belongs here, at the end, after the six causes above have been eliminated — not because it is unlikely, but because everything above is cheaper to check and more likely to be the answer.
+
+**Signature:** consistent, targeted at specific sellable items, survives every process fix you make above.
+
+**Test:** now the audit log is worth opening — activity by user, by shift, against the specific items showing loss. Voids, discounts and adjustments concentrated around one person across many weeks is a pattern. A name attached to a sale is not.
+
+**Fix:** individual logins, an immutable log, and permissions that put voids and adjustments behind approval. Our guide to [audit logs and theft detection](/blog/prevent-retail-theft-audit-logs) covers what the evidence actually looks like and how to act on it fairly.
+
+---
+
+## The twenty-minute investigation
+
+In order, stopping as soon as you have your answer:
+
+1. **Recount**, with a second person. (5 min)
+2. **Divide the gap by the pack size.** Whole number, you are done. (1 min)
+3. **Check the other locations** for an equal and opposite figure. (2 min)
+4. **Check the last three deliveries** of that item against invoice and entry. (5 min)
+5. **Look at similar variants** for an equal and opposite figure. (2 min)
+6. **Check returns** for the period against stock movements. (3 min)
+7. **Ask whether any write-off exists** for a category that certainly has damage. (1 min)
+8. **Only now, open the audit log** for that item, by user and shift. (as long as it takes)
+
+Most cases close by step four. The discipline is stopping when you find the cause instead of continuing until you find a suspect.
+
+---
+
+## An adjustment policy you can adopt as written
+
+Write this down, put it where staff can see it, and follow it yourself — the last part is where most policies fail.
+
+| Rule | Why it exists |
+| --- | --- |
+| Every adjustment carries a reason from a fixed list | The reason is the data; free text becomes blank within a month |
+| Adjustments above a set value need a second approval | Removes the temptation to tidy an inconvenient figure |
+| Never delete and re-add a product to fix a count | Deleting destroys the history that explains the gap |
+| Write off damage on the day, not at the count | A month later nobody remembers what happened |
+| Transfers are movements, never paired adjustments | Paired adjustments make in-transit loss unattributable |
+| Reasons are reviewed monthly, not just recorded | An unreviewed log is filing, not control |
+
+That last row is the one that turns this from paperwork into management. Recording reasons and never reading them is a common and completely wasted habit. Read them monthly and the pattern names your problem for you: mostly damage means a storage or handling fix, mostly recount means your counting method is wrong, mostly supplier shortfall means a supplier conversation, mostly transfer error means a process fix between locations.
+
+---
+
+## Then, finally, change the number
+
+Once you know the cause, correct the figure with the reason attached, and record the correction as of today rather than backdating it. Backdating a correction to the date you think the loss occurred looks tidier and quietly corrupts every report already produced for that period.
+
+The gap you just closed is worth one more minute of thought: ask what would have to change for this specific cause not to recur. That question, asked seven or eight times over a couple of months, is how shrinkage actually falls — not through software, and not through suspicion.
+
+If you want the counting half of this, our [stocktake checklist](/blog/retail-stocktake-checklist) covers how to count without closing the shop, which is what makes weekly diagnosis practical rather than theoretical.
+
+Adjustments with reasons, individual staff logins and a movement history that cannot be quietly edited are the three things that make any of the above diagnosable. They are on every Zeneva plan including the free one — [see what each plan includes](/pricing).
+`
+  },
+  {
+    slug: 'retail-stocktake-checklist',
+    title: 'The Retail Stocktake Checklist: Count Stock Without Closing the Shop',
+    excerpt: 'Annual full counts find problems six months too late. The cycle-count method, the blind-count technique that stops numbers being fudged, and a checklist you can run while still trading.',
+    imageUrl: 'https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=1200&auto=format&fit=crop',
+    category: 'Tactical Guides',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'Stop doing one full annual count and start counting a small rotating slice of stock every week — cycle counting. It finds discrepancies within days of the cause rather than months, so the delivery, the return or the mis-scan that created the gap is still traceable. The three techniques that decide whether a count is worth anything are: count blind, so the person counting cannot see the expected figure; count by physical location rather than down a product list; and set a hard cut-off so sales and deliveries during the count are handled consistently. Weight the schedule so your fastest-moving and highest-value lines are counted monthly and slow-moving low-value lines once or twice a year.',
+    tableData: {
+      title: 'Full Annual Count Versus Weekly Cycle Counting',
+      headers: ['Dimension', 'Annual full count', 'Weekly cycle count'],
+      rows: [
+        ['Shop closure', 'Usually required', 'None'],
+        ['Time to find a cause', 'Up to 12 months', 'Days'],
+        ['Is the cause still traceable?', 'Almost never', 'Usually yes'],
+        ['Staff fatigue and error rate', 'High — long shifts, late hours', 'Low — 30 to 45 minutes'],
+        ['Coverage of fast movers', 'Once a year, same as everything', 'Monthly or better'],
+        ['Coverage of slow movers', 'Once a year', 'Once or twice a year, deliberately'],
+        ['Cost of a mistake in the count', 'Corrupts a full year of figures', 'Affects one small slice'],
+        ['Likelihood it actually happens', 'Often postponed or skipped', 'Habitual once scheduled']
+      ]
+    },
+    faq: [
+      {
+        question: 'What is a blind count and why does it matter?',
+        answer: 'A blind count means the person counting cannot see what the system expects to find. It matters because a visible expected figure is an answer key. Under time pressure, a counter who sees forty-one and counts thirty-nine will very often write forty-one — not dishonestly, but because they assume they miscounted and the system is more likely to be right. This single detail is the difference between a count that discovers problems and one that confirms whatever the system already believed.'
+      },
+      {
+        question: 'Should I close the shop to count?',
+        answer: 'For a cycle count, no — that is the main reason to prefer it. You are counting one aisle or one category for thirty to forty-five minutes, so you count a zone that is quiet, before opening or during a slow hour. What you must do is set a cut-off: either pause sales of the specific items being counted for that short window, or record every sale during it and reconcile against the count. Ignoring in-flight sales is the most common way a good count produces a wrong answer.'
+      },
+      {
+        question: 'How do I decide what to count this week?',
+        answer: 'Weight by value and movement rather than counting everything equally. Your fastest-moving and highest-value lines deserve monthly attention because errors there cost the most and appear the quickest. Slow-moving, low-value stock can be counted once or twice a year. A simple ABC split gives you the schedule directly, and our [ABC analysis guide](/blog/abc-analysis-retail-inventory) sets out how to produce one from sales and cost data you already hold.'
+      },
+      {
+        question: 'Who should do the counting?',
+        answer: 'Two people, and ideally not the person permanently responsible for that section. Two people because one counts and one records, which roughly halves transcription errors. Not the section owner because nobody audits their own work well — this is not an accusation of dishonesty, it is that familiarity makes you skim. Rotating who counts which zone also spreads product knowledge, which pays off in ways unrelated to counting.'
+      },
+      {
+        question: 'What do I do when the count disagrees with the system?',
+        answer: 'Recount that line first, then investigate the cause before changing anything. Roughly half of first-count discrepancies are counting errors — items behind other items, a second facing elsewhere, stock in a delivery bay. If a careful recount confirms the gap, work the cause tree in our guide to [why records stop matching the shelf](/blog/stock-records-do-not-match-shelf) before adjusting. Correcting the figure without a cause guarantees the same gap next quarter.'
+      },
+      {
+        question: 'How long should a cycle count take?',
+        answer: 'Thirty to forty-five minutes, deliberately. If it takes two hours it will be skipped within a month, and a count that does not happen is worth nothing regardless of how thorough it would have been. Size each slice to fit the time available rather than sizing the time to the slice. A shop counting one small zone every week covers more ground in a year, more accurately, than one attempting everything each December.'
+      },
+      {
+        question: 'Do I need barcode scanners to do this properly?',
+        answer: 'They help considerably and are not a precondition. Scanning removes the transcription step, which is where a large share of count errors are introduced, and it makes a blind count natural because the counter is scanning items rather than reading a list. But a two-person count with a printed sheet, done weekly with the expected figures hidden, beats a scanner-equipped count done once a year. Start with the method and add the hardware when it pays for itself.'
+      },
+      {
+        question: 'What should I do the day before a count?',
+        answer: 'Four things: put the zone in physical order so nothing is hidden behind anything, clear the delivery bay so goods are either in stock or not, resolve any pending returns or holds so their status is unambiguous, and confirm nothing is due for delivery during the count window. A count that begins with the zone in disorder is measuring your storage, not your stock.'
+      }
+    ],
+    content: `
+## The problem with counting everything once a year
+
+The annual stocktake is a tradition rather than a method. It closes the shop, runs late, exhausts the staff who are least likely to be careful at nine in the evening, and produces one enormous list of discrepancies that arrive with no explanation attached.
+
+That last part is the fatal flaw. A gap discovered in December might have been created in March. The delivery note is filed, the customer who returned the item is long forgotten, the member of staff who processed it has moved on, and the supplier who short-shipped you cannot be challenged nine months later. So the whole list gets written off as a single adjustment called shrinkage, and nothing changes.
+
+An annual count tells you the size of your problem. It almost never tells you the cause, and only the cause is actionable.
+
+---
+
+## Count less, more often
+
+Cycle counting inverts the trade-off: count a small slice of stock frequently rather than all of it rarely.
+
+A single zone, thirty to forty-five minutes, once a week, while trading normally. Over a year you cover more ground than a full count achieves — and you cover the stock that matters far more often. Critically, when a gap appears you are looking at something that happened in the last few days. The delivery note is on the desk. The staff member is on shift. The customer is in the system. The cause is still findable, which means the process leak is still fixable.
+
+The other benefit is unglamorous and decisive: a forty-minute task actually happens. A two-day task gets postponed until a quieter month that never arrives.
+
+---
+
+## The three techniques that decide whether a count is worth anything
+
+Method matters more than effort here. A careless count is worse than no count, because it replaces honest uncertainty with false confidence.
+
+### 1. Count blind
+
+**Do not let the counter see the expected quantity.**
+
+If the sheet says forty-one and the person counts thirty-nine, they will very often write forty-one. Not through dishonesty — through reasonable deference. They assume they lost their place, that a box is behind another box, that the computer is more likely to be right than they are. So they reconcile in their head and record the expected figure.
+
+A visible expected quantity turns a count into a confirmation exercise. Hide it, capture the physical number, and let the comparison happen afterwards. This is the highest-value detail in this article and it costs nothing.
+
+### 2. Count by location, not by list
+
+Counting down a product list sends one person walking the whole shop repeatedly, and guarantees that anything stored in two places gets counted once or twice depending on luck.
+
+Count a **physical zone**, wall to wall, shelf by shelf, recording whatever is in it. Zones are easier to divide between people, easier to mark as finished, and much harder to accidentally double count. It also surfaces the items sitting in the wrong place, which are frequently the same items that appear as discrepancies.
+
+### 3. Set a hard cut-off
+
+Stock moves while you count. Sales happen, deliveries arrive, a customer returns something to the front while you are counting the back.
+
+Choose one rule and stick to it:
+
+- **Pause movement** on the specific lines being counted for that short window — easiest, and usually invisible to customers for one aisle; or
+- **Record every movement** during the count and reconcile it against the count afterwards — necessary if you cannot pause.
+
+What fails is doing neither and assuming forty minutes is close enough. On a fast-moving line it is not, and the resulting phantom discrepancy sends you investigating a problem that never existed.
+
+---
+
+## The checklist
+
+### The day before
+
+- [ ] Put the zone in physical order; nothing hidden behind anything else
+- [ ] Clear the delivery bay — goods are either received into stock or not
+- [ ] Resolve pending returns, held sales and repairs so their status is unambiguous
+- [ ] Confirm no delivery is due during the count window
+- [ ] Print blind count sheets, or prepare devices, with expected quantities hidden
+- [ ] Tell the staff on shift when it is happening and what the movement rule is
+
+### During the count
+
+- [ ] Two people per zone: one counts, one records
+- [ ] Work the zone systematically, wall to wall — never jump between areas
+- [ ] Record what is physically there, including damaged and unsellable items, marked as such
+- [ ] Note anything found in the wrong location rather than silently moving it
+- [ ] Apply the cut-off rule consistently for the whole window
+- [ ] Finish the zone before starting another, even if it means stopping early
+
+### Immediately after
+
+- [ ] Compare counts to system figures — only now, not during
+- [ ] Recount every discrepancy before recording anything
+- [ ] For confirmed gaps, work the cause tree before adjusting
+- [ ] Record adjustments with a reason from a fixed list
+- [ ] Write off damaged and expired stock explicitly rather than folding it into shrinkage
+- [ ] Log which zone was counted and on what date, so the rotation is real
+
+### Monthly
+
+- [ ] Review adjustment reasons in aggregate and name the top cause
+- [ ] Change one process based on what the reasons say
+- [ ] Check the rotation is actually covering your fast movers monthly
+
+---
+
+## Building the rotation
+
+Do not count everything equally. Weight the schedule by what an error costs you.
+
+| Stock group | Roughly | Count frequency | Reasoning |
+| --- | --- | --- | --- |
+| High value or fast moving | Top 20% by sales value | Monthly | Errors here are expensive and appear quickly |
+| Middle | Next 30% | Quarterly | Worth watching, rarely urgent |
+| Slow moving, low value | Remaining 50% | Twice a year | Cost of counting exceeds the risk |
+| Anything with a history of gaps | As needed | Weekly until stable | A recurring gap is a live process fault |
+| Recently delivered lines | As needed | Within days of receipt | Catches short shipments while challengeable |
+
+The last two rows are where most of the value is. A line with a recurring discrepancy should be counted weekly until you understand it, and newly delivered stock should be counted while you can still raise it with the supplier. Both are targeted responses that a fixed rotation would miss.
+
+Our [ABC analysis guide](/blog/abc-analysis-retail-inventory) covers producing the top-20% list from sales and cost data rather than intuition, which is worth doing because intuition consistently overrates the interesting products and underrates the boring high-turnover ones.
+
+---
+
+## Mistakes that waste the whole exercise
+
+**Showing the expected figure.** Covered above, and worth repeating because it is the most common and the most damaging.
+
+**Adjusting everything immediately.** The count produces a list of questions, not a list of corrections. Investigate first — the cause tree in our post on [records that do not match the shelf](/blog/stock-records-do-not-match-shelf) works through the seven usual causes in order of likelihood.
+
+**Counting when tired.** Errors rise sharply late in the day and after the first hour. This is a strong argument for short slices in the morning.
+
+**Letting the section owner count their own section.** Not about trust; about the fact that familiarity produces skimming.
+
+**Not recording damaged stock separately.** Damage folded into a shrinkage figure looks like theft. Recorded as damage, it is a storage problem with an obvious fix.
+
+**Counting without fixing anything.** The point is not the count. The point is one process change a month, informed by what the counts keep saying.
+
+---
+
+## What good looks like after three months
+
+You are not aiming for zero discrepancies — that target drives people to fudge counts, which is worse than having gaps. You are aiming for gaps that are small, explained, and shrinking on the specific lines you have worked on.
+
+Concretely, after a quarter of weekly cycle counts: your fast movers have been counted three or four times, you know which supplier short-ships, you know which two categories account for most of your damage, your adjustment log has reasons on it, and you have made two or three specific process changes as a result.
+
+That is a different position from having one big December number, and it took less total time to get there. If your counts are currently done on paper and reconciled by hand, our post on [what you stop doing once counts are digital](/blog/5-things-you-will-not-miss-about-manual-stock-taking) covers the mechanical part, and [getting the product data right first](/blog/advanced-inventory-tips) covers the setup that makes any of this measurable.
+
+To run counts on a device in the aisle rather than on paper, [install the app](/download) and try a single zone on the free plan before changing anything about how you count.
+`
+  },
+  {
+    slug: 'retail-reorder-points',
+    title: 'Retail Reorder Points: The Formula and the Setup Checklist',
+    excerpt: 'Stockouts and overstock are the same mistake: one low-stock number applied to every product. The arithmetic for a per-product reorder point, and why supplier reliability matters more than demand.',
+    imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?q=80&w=1200&auto=format&fit=crop',
+    category: 'Tactical Guides',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'A reorder point is the stock level at which you place the next order, and it is calculated per product rather than set once for the whole shop. The base formula is average daily sales multiplied by supplier lead time in days. The refinement that matters most is supplier reliability: because a late delivery causes the stockout, use your worst realistic lead time rather than the promised one, which simplifies to average daily sales multiplied by maximum lead time. A product selling ten a day from a supplier who takes three to six days needs its alert around sixty units, not at five. Applying one threshold to every product is what produces stockouts on fast movers and overstock on slow ones simultaneously.',
+    tableData: {
+      title: 'Worked Reorder Points for Four Different Products',
+      headers: ['Product', 'Sells per day', 'Lead time (usual / worst)', 'Reorder point', 'Note'],
+      rows: [
+        ['Fast-moving drink', '10', '3 / 6 days', '60', 'Worst case doubles it — supplier risk dominates'],
+        ['Staple grocery line', '25', '2 / 3 days', '75', 'Reliable supplier keeps the buffer small'],
+        ['Mid-range clothing item', '1.5', '10 / 21 days', '32', 'Long lead time, not high demand, drives this'],
+        ['Expensive appliance', '0.07 (2/month)', '7 / 10 days', '1', 'Reorder at one; holding two is dead capital'],
+        ['Seasonal item, in season', '20', '5 / 9 days', '180', 'Use the in-season rate, never the annual average'],
+        ['Seasonal item, off season', '3', '5 / 9 days', '27', 'Same product, different number, reviewed quarterly'],
+        ['Item from an unreliable supplier', '8', '4 / 15 days', '120', 'The number is high because the supplier is not trustworthy']
+      ]
+    },
+    faq: [
+      {
+        question: 'What is the simplest formula I can actually use?',
+        answer: 'Average daily sales multiplied by your worst realistic lead time in days. That single expression already contains your safety stock, because the gap between the usual delivery time and the worst one is exactly the risk you are buffering against. A product selling eight a day from a supplier who takes anywhere from four to fifteen days gets a reorder point of one hundred and twenty. It looks high until you notice that the alternative is being out of stock for eleven days.'
+      },
+      {
+        question: 'Why not just use the lead time the supplier promises?',
+        answer: 'Because the promised time is not what causes stockouts — the late delivery does. If a supplier says five days and delivers in five days nine times out of ten, planning around five days means you are out of stock one order in ten. Use the figure you have actually observed at its worst. This also produces a useful side effect: the reorder point becomes a visible price tag on supplier unreliability, which is a much better negotiating position than a general complaint.'
+      },
+      {
+        question: 'How do I work out average daily sales without doing maths?',
+        answer: 'Take units sold over the last sixty days and divide by sixty. Sixty days is long enough to smooth out a quiet week and short enough to still reflect current demand. Avoid using a twelve-month average for anything seasonal — it will be wrong in both directions, too low during your peak and too high afterwards. If a product has fewer than sixty days of history, use what you have and revisit it once it does.'
+      },
+      {
+        question: 'What should I set for a product that sells twice a month?',
+        answer: 'Usually one, sometimes zero. Slow-moving, expensive items are where the cost of holding stock exceeds the cost of a short wait, so the honest answer is often to reorder when the last one sells, or to not hold it at all and order on demand. The mistake is applying fast-mover logic here: a reorder point of five on an appliance selling twice a month means holding two and a half months of dead capital for no service benefit.'
+      },
+      {
+        question: 'My sales are seasonal. Do I need two different numbers?',
+        answer: 'Yes, and reviewing them quarterly is enough. The same product can legitimately need a reorder point of one hundred and eighty in season and twenty-seven out of it. Using one annual average guarantees you run out during the weeks that matter and sit on stock during the weeks that do not. Put a recurring reminder in the calendar for the four points in the year where your demand shifts — that is less work than it sounds and it is the highest-return review on this list.'
+      },
+      {
+        question: 'What if I cannot afford to hold the reorder point the formula gives me?',
+        answer: 'Then the formula has told you something useful rather than something wrong: your cash cannot support that lead time. You have three real options — negotiate a shorter or more reliable lead time, find a closer secondary supplier for emergencies, or accept planned stockouts on that line and stop treating them as surprises. What does not work is setting a lower number and hoping. That converts a known constraint into a recurring emergency, and emergency purchases are almost always more expensive than the stock you could not afford to hold.'
+      },
+      {
+        question: 'How often should reorder points be reviewed?',
+        answer: 'Quarterly for most lines, and immediately after two events: a change of supplier, and any stockout. A stockout is a free data point telling you the number was too low or the lead time assumption was wrong, and reviewing it while the details are fresh takes two minutes. Reviewing everything monthly is not worth the effort and tends to stop happening entirely.'
+      },
+      {
+        question: 'Is a reorder point the same as how much I should order?',
+        answer: 'No, and conflating them is a common and costly error. The reorder point is when to order; the order quantity is how much. They are driven by different things — the reorder point by lead time and demand, the quantity by supplier minimums, price breaks, shelf space, cash available and how fast the item moves. A correct reorder point with a wrong order quantity still produces overstock, so decide the two separately.'
+      }
+    ],
+    content: `
+## Two problems, one cause
+
+Most retailers have both of these complaints at once and treat them as separate:
+
+- **We keep running out of the things that sell.**
+- **We have too much money tied up in stock that does not move.**
+
+They are the same mistake seen from two ends. Both come from a single low-stock number applied to every product in the shop.
+
+Set the shop-wide alert at five and your fast movers are gone days before anyone notices, while your slow movers alert constantly and get reordered for no reason. Set it at fifty and the reverse happens. There is no single value that works, because the correct number depends on how fast an item sells and how long your supplier takes — and those vary enormously across your catalogue.
+
+The fix is arithmetic, not software, and it takes an afternoon.
+
+---
+
+## The base formula
+
+**Reorder point = average daily sales × supplier lead time in days**
+
+This is the amount you will sell while waiting for the delivery. Order at that level and, if everything goes to plan, the new stock lands as the last unit sells.
+
+Worked: a drink selling 10 a day from a supplier who delivers in 3 days.
+
+10 × 3 = **30**
+
+Order when stock hits 30. Compare that to the shop-wide alert of 5 that most systems ship with, and you can see why the fast movers are always the ones that run out.
+
+---
+
+## The refinement that actually prevents stockouts
+
+The base formula assumes everything goes to plan. Stockouts happen specifically when it does not.
+
+Almost all of the risk sits in one variable, and it is not demand — it is **lead time**. Demand varies a bit day to day and averages out. A delivery that was supposed to arrive Tuesday and comes the following Monday empties your shelf regardless of how well you estimated daily sales.
+
+So buffer the thing that actually breaks:
+
+**Safety stock = (worst lead time − usual lead time) × average daily sales**
+
+Which collapses into something you can hold in your head:
+
+**Reorder point = average daily sales × worst realistic lead time**
+
+Back to the drink. The supplier usually takes 3 days but has taken 6 more than once.
+
+10 × 6 = **60**
+
+Sixty, not thirty. The number doubled — not because demand changed, but because the supplier is unreliable. That is the honest cost of that relationship, and seeing it as a number is more useful than a vague sense that they are sometimes late. It also gives you something concrete to raise with them: reliable delivery in three days would free up thirty units of capital on this line alone.
+
+---
+
+## Getting the two inputs right
+
+### Average daily sales
+
+Units sold over the last **60 days**, divided by 60.
+
+Sixty days smooths out a quiet week without going stale. Two cautions:
+
+- **Do not use a twelve-month average for seasonal goods.** It is wrong in both directions — too low exactly when you need stock, too high afterwards.
+- **Do not use a period containing a stockout.** If you were out of stock for a week, your recorded sales understate real demand, and the reorder point you calculate from it will keep you understocked. Adjust upward or use a clean period.
+
+### Lead time
+
+Not what the supplier says. What you have actually observed, at its worst.
+
+Write down the last five orders for each significant supplier: date ordered, date it actually arrived. That short exercise usually produces a surprise, because the promised figure and the observed range are often far apart. Include the parts people forget: the day it sat in the delivery bay before being received into stock, and the weekend it spent in transit.
+
+---
+
+## Where slow movers break the rule
+
+Everything above assumes holding stock is cheaper than running out. For expensive, slow-moving items that is often false.
+
+An appliance selling twice a month, with a 10-day worst lead time:
+
+0.07 × 10 = **0.7**, so a reorder point of **1**.
+
+Reorder when the last one sells. Some of these should not be stocked at all — order on demand, quote the customer a realistic wait, and keep the capital. The failure mode here is applying fast-mover instincts to slow-moving stock and holding two months of an expensive item for a service benefit nobody asked for.
+
+The general principle: as unit cost rises and turnover falls, the correct reorder point trends toward zero. Our post on [dead stock](/blog/dead-stock-trapped-cash) covers how to find the lines where this has already gone wrong.
+
+---
+
+## The setup checklist
+
+**Once, per product group:**
+
+- [ ] Pull units sold over the last 60 days for each product
+- [ ] Divide by 60 for average daily sales
+- [ ] List your suppliers and the observed worst lead time for each
+- [ ] Multiply: daily sales × worst lead time
+- [ ] Round to something practical — a case, a pack, a sensible number
+- [ ] Set the value **on the product**, not globally
+- [ ] Sanity-check the extremes: does the fastest mover look high and the expensive slow mover look near one? If not, recheck your inputs
+
+**Do the top 20% of products by sales value first.** They cause most of your stockouts and most of your tied-up cash, and you can finish them in an afternoon. The long tail can inherit a rough default until you get to it — an imperfect number on a slow mover costs very little, which is precisely why it is not urgent.
+
+**Ongoing:**
+
+- [ ] Review quarterly, and at every seasonal turn
+- [ ] Review immediately after any stockout — it is free evidence the number was wrong
+- [ ] Review immediately after changing supplier
+- [ ] Recheck lead times once a year; they drift, usually upward
+
+---
+
+## Reorder point is not order quantity
+
+These get conflated constantly and they answer different questions.
+
+| | Reorder point | Order quantity |
+| --- | --- | --- |
+| Question | When do I order? | How much do I order? |
+| Driven by | Demand rate and lead time | Supplier minimums, price breaks, cash, shelf space |
+| Wrong answer causes | Stockouts | Overstock and dead capital |
+| Review trigger | Stockout, supplier change, season | Cash position, price change, storage |
+
+A perfect reorder point with a careless order quantity still produces the overstock problem. Decide them separately, and be especially sceptical of the supplier discount that requires tripling your order — a price break that ties up three months of cash on a line selling steadily is rarely the saving it appears to be. Our [cash flow guide](/blog/ten-ways-to-improve-cash-flow) covers that trade-off in more detail.
+
+---
+
+## When the formula gives an unaffordable answer
+
+Sometimes the arithmetic says hold 120 units and you cannot afford 120 units. The formula has not failed; it has told you your cash cannot support that supplier's lead time.
+
+Three real options:
+
+1. **Shorten or stabilise the lead time.** Negotiate, or change supplier. This attacks the actual cause and reduces the requirement rather than the safety margin.
+2. **Find a local emergency supplier.** More expensive per unit, used rarely, and it lets you plan around the cheap slow supplier for the bulk. Effectively you are buying a shorter worst-case lead time only when you need it.
+3. **Accept planned stockouts on that line.** Decide it consciously, tell staff what to say to customers, and stop treating each occurrence as a crisis.
+
+What does not work is quietly setting a lower number and hoping. That turns a known constraint into a recurring emergency, and emergency restocking almost always costs more per unit than the stock you could not afford to hold.
+
+---
+
+## Setting these up in Zeneva
+
+The threshold is a field on each product rather than a single global setting, which is what makes per-product numbers possible. Set it when you add the product and revise it at your quarterly review.
+
+Two things worth knowing if you use Zen AI: it can surface which products are below their threshold and which are trending toward a stockout, and it can suggest a threshold value for a product from its actual sales history. Suggestions arrive as a proposal you approve or reject rather than a change it makes on your behalf — you remain the one deciding, which is the correct arrangement for a number this consequential. Our post on [what Zen AI does and does not do](/blog/zen-ai-copilot-business-insights) is candid about where that boundary sits.
+
+For the forecasting layer on top of this — which lines are accelerating, and what to buy ahead of a season — our guide to [demand forecasting](/blog/product-demand-forecasting) picks up where reorder points leave off.
+
+Per-product thresholds, rather than one number for the whole shop, are available on every plan including the free one — [compare what each includes](/pricing).
+`
+  },
+  {
+    slug: 'dead-stock-trapped-cash',
+    title: 'Dead Stock: How to Find the Cash Trapped in Your Inventory',
+    excerpt: 'Dead stock never shows up as a loss — it sits on a shelf looking like an asset. How to find it, what it genuinely costs you, and a clearance ladder that recovers cash instead of protecting a sunk price.',
+    imageUrl: 'https://images.unsplash.com/photo-1454165833767-0266b1967267?q=80&w=1200&auto=format&fit=crop',
+    category: 'Insights',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'Dead stock is inventory that has had zero sales over a period long enough to be meaningful for your turnover — typically 60 to 90 days for general retail, 30 for perishables, and up to 180 for high-value slow movers. Find it by listing every product with stock on hand and no sales in that window, then rank by capital tied up (units on hand multiplied by cost price) rather than by unit count, because that ranking tells you where the cash actually is. Its true cost is not the purchase price, which is already spent, but the opportunity cost: the same money in fast-moving stock turning six times a year at a normal margin would generate roughly one and a half times its own value in gross profit annually. That is what the shelf is costing you.',
+    tableData: {
+      title: 'The Four Kinds of Dead Stock and What to Do With Each',
+      headers: ['Type', 'How to recognise it', 'Right action', 'Common mistake'],
+      rows: [
+        ['Wrong buy', 'Never sold well from day one', 'Clear fast and hard; recover cash', 'Waiting for the market to change its mind'],
+        ['Ex-bestseller', 'Sold well, then stopped', 'Clear at moderate discount while recognisable', 'Assuming it will come back'],
+        ['Seasonal remainder', 'Sold in season, dead out of it', 'Hold if storage is cheap and season returns', 'Clearing it at a loss two months early'],
+        ['Expiring or perishable', 'Has a date attached', 'Discount early on a schedule, not at the end', 'Discounting at the last week, when nobody wants it'],
+        ['Broken assortment', 'Only odd sizes or colours left', 'Bundle, or clear the remainder as a lot', 'Reordering the full range to complete it'],
+        ['Obsolete or superseded', 'A newer model exists', 'Clear immediately; value only falls', 'Holding for the customer who wants the old one'],
+        ['Damaged or unsellable', 'Cannot be sold at any price', 'Write off today, with a reason', 'Leaving it in stock to protect the valuation']
+      ]
+    },
+    faq: [
+      {
+        question: 'How many days of no sales make stock dead?',
+        answer: 'It depends on how fast your business turns over, so pick the threshold from your own data rather than a rule of thumb. For general retail, 60 to 90 days of zero sales is a sensible starting line. For groceries and perishables, 30 days is already serious. For high-value slow movers like appliances or furniture, 180 days can be normal and healthy. The useful test is comparative: if an item has not sold in the time it takes your average product to sell through three times, it is dead regardless of the calendar.'
+      },
+      {
+        question: 'Why rank by capital tied up rather than by units?',
+        answer: 'Because two hundred cheap items and four expensive ones can represent the same trapped cash, and only one of those is worth an afternoon of your attention. Ranking by units on hand puts your bulk low-value lines at the top and hides the genuinely expensive problem three pages down. Multiply units by cost price and sort by that figure — the list reorders dramatically, and the top ten lines usually account for most of the money.'
+      },
+      {
+        question: 'I paid a lot for this item. Should I really sell it below cost?',
+        answer: 'Almost always yes, and the reasoning is uncomfortable but decisive. The money you paid is already gone — it left when you bought the stock, and no decision you make now recovers it. The only live question is what the item is worth from today onward, and every month it sits there the answer falls while your storage and attention costs continue. Selling at forty percent of cost recovers forty percent. Holding it for eighteen months to protect the original price usually recovers less, later, on an item nobody now wants.'
+      },
+      {
+        question: 'What does dead stock actually cost me, if I already paid for it?',
+        answer: 'The opportunity cost, which is much larger than most owners assume. Take the cash tied up in dead stock and imagine it in your fastest-moving lines instead. If that stock turns six times a year at a twenty-five percent margin, the same money generates about one and a half times its own value in gross profit over a year. That forgone profit is the real cost of the shelf, and it recurs annually for as long as you hold the stock. It is also invisible on every report you look at, which is why dead stock persists.'
+      },
+      {
+        question: 'Should I discount, bundle, or write it off?',
+        answer: 'Work down a ladder rather than jumping to the end. Start with better placement and a modest discount, because a genuine share of dead stock is simply badly positioned rather than unwanted. Then bundle it with something that does sell. Then discount progressively, with a deadline attached to each step. Write off only what genuinely cannot be sold at any price, and do that promptly with a reason recorded — an unsellable item left in stock overstates your inventory value and quietly becomes an unexplained discrepancy later.'
+      },
+      {
+        question: 'How do I avoid buying dead stock in the first place?',
+        answer: 'Three habits cover most of it. Buy a small quantity of anything new and reorder on evidence rather than committing to a full range up front. Be sceptical of supplier volume discounts, which are the single most common source of dead stock — a discount that ties up three months of cash in one line is rarely the saving it appears to be. And review the previous quarter before each buying decision, because the same categories tend to disappoint repeatedly and buyers reliably forget which ones.'
+      },
+      {
+        question: 'Is seasonal leftover stock dead stock?',
+        answer: 'Not necessarily, and treating it as such is a real error. If the season reliably returns and your storage is genuinely cheap, holding is often correct — clearing winter stock at a heavy loss in March, then buying it again in September, is a common and expensive round trip. The judgement is whether the item will still be sellable next season: staples usually will be, anything fashion-led or dated usually will not. Be honest about which category you are in rather than optimistic.'
+      },
+      {
+        question: 'How often should I review this?',
+        answer: 'Monthly, and it takes fifteen minutes once your cost prices are recorded. Monthly is frequent enough to catch a line before it has aged past the point where a modest discount would move it, and infrequent enough to actually happen. The review that matters is not just the list — it is picking the top three by capital tied up and deciding an action with a deadline for each. A list produced and not acted on is how businesses accumulate years of dead stock while reviewing it regularly.'
+      }
+    ],
+    content: `
+## The loss that never appears on a report
+
+Every other loss in retail announces itself. A stockout produces a customer walking out. Theft produces a discrepancy. A bad month produces a bad number.
+
+Dead stock produces nothing. It sits on a shelf, appears on your balance sheet as an asset at full cost, and costs you money every single day without ever generating a line item you could look at and object to. Businesses run out of cash while holding a stockroom full of things they paid for, and the reports all look fine.
+
+This is why dead stock has to be found deliberately. Nothing surfaces it for you.
+
+---
+
+## Defining it for your business
+
+Dead stock is inventory with stock on hand and **zero sales** over a window long enough to matter. The window depends on your turnover, so set it from your own data:
+
+| Business type | Reasonable threshold | Reasoning |
+| --- | --- | --- |
+| Groceries, perishables | 30 days | Anything not moving monthly is a write-off risk |
+| General retail, fashion | 60 to 90 days | A full season has passed without a buyer |
+| Electronics, appliances | 90 to 180 days | Genuinely slow lines can still be profitable |
+| Spare parts, specialist | 180 days or more | Availability is the product; slow is expected |
+
+A useful cross-check that ignores the calendar entirely: if an item has not sold in the time your average product sells through three times, it is dead relative to your own business. That framing travels better than a fixed number of days, because it adapts to how you actually trade.
+
+---
+
+## Finding it, and ranking it correctly
+
+The list you want has two columns that matter: **units on hand**, and **units on hand multiplied by cost price**.
+
+Almost everyone sorts by the first and gets a misleading answer. Two hundred cheap sachets and four expensive appliances can represent the same trapped cash, but sorting by unit count puts the sachets at the top and buries the appliances. Sort by **capital tied up** instead, and the list usually reorders dramatically — with the top ten lines accounting for most of the money.
+
+This is also the reason cost price is worth entering on every product even when you think you know your margins. Without it, you can produce a list of what is not selling but not a list of where your cash is, and the second is the one that changes decisions. Our post on [the inventory settings that change decisions](/blog/advanced-inventory-tips) covers getting that field populated.
+
+In Zeneva, this is what the dead stock view answers directly: products with stock but no sales in a period you choose, with the capital tied up in each and a total across all of them. If you use Zen AI, asking it for products with no sales in the last ninety days returns the same list ranked that way. The number to write down is the total — it is usually larger than owners expect, and it is the number this whole exercise is about recovering.
+
+---
+
+## What it genuinely costs you
+
+Here is the arithmetic that changes how people feel about clearance pricing.
+
+Suppose you have a meaningful sum tied up in dead stock. That money is not lost — it is *immobilised*. The question is what it would have earned somewhere else.
+
+Put the same money in your fastest-moving lines. If those turn six times a year at a twenty-five percent margin, then over twelve months that cash generates roughly **one and a half times its own value in gross profit** — it recycles six times, earning a quarter of itself each time.
+
+That forgone profit is what the dead shelf costs you per year, and it recurs every year you hold it.
+
+Then add the costs that are easier to see once you look: the storage space, the handling every time someone moves it to reach something else, the counting time at every stocktake, and the slow erosion of the item's own sellability as it ages, dates, fades or is superseded.
+
+Against all of that, the discount you have been resisting starts to look cheap.
+
+---
+
+## The sunk cost trap
+
+The single most common reason dead stock persists is a sentence that sounds like sound business sense:
+
+*"I paid a lot for this. I cannot sell it for a fraction of that."*
+
+The money you paid is gone. It left your account when you bought the stock, and no decision available to you now brings any of it back. It is not a factor in the decision, however strongly it feels like one.
+
+The only live question is: **what is this worth from today onward, and what is holding it costing me?**
+
+Selling at forty percent of cost recovers forty percent of the cash, today, and frees the shelf. Holding for eighteen months to protect the original price typically recovers less, much later, on an item that has aged in the meantime. The instinct to avoid "taking a loss" produces a larger loss quietly, which is precisely why it survives — the second loss never appears as a number anyone has to sign off.
+
+---
+
+## The clearance ladder
+
+Work down this, with a deadline on each step. The deadlines are the important part; without them stock sits at step one indefinitely.
+
+**Step 1 — Reposition, two weeks.** Move it to eye level, to the counter, to the front. A genuine share of dead stock is not unwanted, it is unseen — buried behind other things, on a bottom shelf, in a back room. This step costs nothing and resolves more lines than people expect.
+
+**Step 2 — Modest discount, two weeks.** Ten to fifteen percent, clearly signed. Enough to signal action without training customers to wait for markdowns.
+
+**Step 3 — Bundle, three weeks.** Pair it with something that does sell. A slow item attached to a fast one moves at close to full value and does not advertise weakness. This is usually the highest-recovery step on the ladder and it is skipped most often.
+
+**Step 4 — Serious discount, three weeks.** Twenty-five to forty percent, with an end date. Consider a staff incentive here: people sell what they are motivated to sell, and a small commission on clearance lines is cheaper than the stock sitting for another quarter.
+
+**Step 5 — Clear at or below cost, two weeks.** Recovering half your cash beats recovering none. Take the arithmetic above seriously and stop protecting a price you already paid.
+
+**Step 6 — Exit.** Sell as a job lot, return to the supplier if any arrangement exists, donate where that carries goodwill or a tax benefit, or write off. Write-offs are recorded with a reason on the day, not folded into a general shrinkage figure — an unsellable item left in the record inflates your stock value and becomes an unexplained discrepancy at your next count. Our post on [why records stop matching the shelf](/blog/stock-records-do-not-match-shelf) covers why that distinction matters.
+
+The whole ladder is about three months. Anything still present after it should not be in your stockroom.
+
+---
+
+## The exception worth respecting
+
+Seasonal stock is not dead stock, and treating it as such is an expensive mistake in the opposite direction.
+
+Clearing winter goods at a heavy loss in March and repurchasing them in September is a round trip that costs you the discount plus the new margin, for no benefit. If the season reliably returns and your storage is genuinely cheap, holding is correct.
+
+The judgement is whether the item will still be sellable next season. Staples usually will be. Anything fashion-led, dated, branded to a specific event, or subject to a newer model usually will not. Be honest about which one you are holding — the optimistic answer here is what creates the ex-bestseller pile that eventually clears at ten percent.
+
+---
+
+## Not buying it again
+
+Dead stock is a purchasing outcome. Reviewing it monthly without changing how you buy just produces a longer list next month.
+
+**Buy small, then reorder on evidence.** A modest first order of anything new, and a decision informed by actual sales. This feels slower and is dramatically cheaper than committing to a full range on a supplier's recommendation.
+
+**Treat volume discounts with suspicion.** They are the single largest source of dead stock in small retail. A discount requiring you to triple an order ties up months of cash in one line and transfers your risk to your own shelf. The saving is real only if you were going to sell that quantity anyway at that pace — which is a forecast, not a fact.
+
+**Review last quarter before each buying decision.** The same categories disappoint repeatedly, and buyers reliably forget which ones. Five minutes with the previous quarter's worst sellers before you place an order prevents more dead stock than any amount of clearance skill recovers. Our guide to [demand forecasting](/blog/product-demand-forecasting) covers reading those signals earlier, and [reorder points](/blog/retail-reorder-points) covers the separate question of how much to hold on the lines that do sell.
+
+---
+
+## The fifteen-minute monthly review
+
+1. Pull the list of products with stock and no sales in your chosen window.
+2. Sort by capital tied up, not units.
+3. Write down the total. Watch it across months — that trend is the real measure of whether any of this is working.
+4. Take the **top three** lines and assign each an action and a deadline from the ladder.
+5. Check what reached step six last month and confirm it is actually gone rather than moved to a back shelf.
+
+Three lines a month, acted on, beats a full list reviewed and admired. The mistake is producing the report and treating that as the work — most businesses with years of accumulated dead stock have been looking at it regularly the whole time.
+
+If freeing trapped cash is the point of the exercise, our [cash flow guide](/blog/ten-ways-to-improve-cash-flow) covers the other levers worth pulling alongside it, and [ABC analysis](/blog/abc-analysis-retail-inventory) covers how to decide which stock deserves your attention in the first place.
+
+The dead stock and inventory valuation views need one thing from you: a cost price on each product. Once that is in, the ranking above is a report rather than an afternoon of spreadsheet work — [see which plan fits](/pricing).
+`
+  },
+  {
+    slug: 'abc-analysis-retail-inventory',
+    title: 'ABC Analysis: Which Stock Deserves Your Attention',
+    excerpt: 'A small minority of your products carries nearly all your profit. ABC analysis finds them in an afternoon — provided you rank by margin contribution, not revenue, which is the step most people get wrong.',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&auto=format&fit=crop',
+    category: 'Insights',
+    authorName: 'Zeneva Editorial Team',
+    directAnswer: 'ABC analysis ranks every product by its annual contribution, then splits the catalogue into three classes: A lines contributing roughly the first 80% of the total, B the next 15%, and C the remaining 5%. In most retail catalogues the A class is a small minority of products. The critical detail is what you rank by: use gross profit contribution — units sold multiplied by margin per unit — not revenue. Ranking by revenue promotes your high-turnover, low-margin lines and directs your attention to the products that make you least money per unit sold. Each class then gets deliberately different treatment in counting frequency, reorder discipline, buying approval and stockout tolerance.',
+    tableData: {
+      title: 'What Actually Changes for Each Class',
+      headers: ['Practice', 'A class', 'B class', 'C class'],
+      rows: [
+        ['Cycle count frequency', 'Monthly', 'Quarterly', 'Twice a year'],
+        ['Reorder point', 'Calculated per product, reviewed quarterly', 'Calculated, reviewed annually', 'Rough default is fine'],
+        ['Stockout tolerance', 'Near zero — protect availability', 'Low', 'Acceptable; order on demand'],
+        ['Who approves a large buy', 'Owner or manager', 'Manager', 'Whoever is buying'],
+        ['Depth of stock held', 'Deliberate, calculated', 'Moderate', 'Minimum viable; breadth over depth'],
+        ['Supplier relationship', 'Worth negotiating and dual-sourcing', 'Monitor reliability', 'Convenience wins'],
+        ['Price review', 'Quarterly — small changes matter most here', 'Annually', 'Rarely'],
+        ['Time spent thinking about it', 'Most of it', 'Some', 'Almost none, on purpose']
+      ]
+    },
+    faq: [
+      {
+        question: 'Should I rank by revenue or by profit?',
+        answer: 'By gross profit contribution, and this is the difference between a useful analysis and a misleading one. Revenue rewards volume regardless of what you keep from it. A high-turnover, thin-margin line — airtime, staple grains, cigarettes, anything price-transparent — can dominate your revenue while contributing modestly to profit. Rank by revenue and the analysis instructs you to lavish attention on exactly those lines. Multiply units sold by margin per unit instead, and the list often reorders substantially.'
+      },
+      {
+        question: 'What if I do not have cost prices recorded?',
+        answer: 'Then this analysis is not yet available to you, and populating cost price is the prerequisite task. There is no workaround: margin cannot be derived from selling price alone. The practical approach is to enter cost price for your top lines by revenue first — perhaps fifty products — which is an afternoon of work and enough to run a meaningful first pass. The long tail can be filled in as stock is received, since a missing cost price on a slow C-class line barely affects the outcome.'
+      },
+      {
+        question: 'Does the 80/20 split have to be exact?',
+        answer: 'No, and treating the boundaries as precise is a misunderstanding of what the technique is for. The classes are a decision aid, not a measurement. Cut where the cumulative curve flattens, which is usually visible at a glance, and if a line sits ambiguously between A and B put it in the higher class — the cost of watching a B line closely is far lower than the cost of neglecting an A line. Nothing downstream depends on the boundary being defensible to two decimal places.'
+      },
+      {
+        question: 'Should I stop stocking my C-class products?',
+        answer: 'No, and this is the most common and most damaging error made after a first ABC analysis. C lines are frequently assortment — the reason customers choose your shop, or the small item attached to a large purchase. Cutting them can reduce A-class sales in ways the analysis cannot show you. What you should cut is not the range but the depth: stop holding months of C-class stock, order it in small quantities or on demand, and stop spending management attention on it. Breadth in C, depth in A.'
+      },
+      {
+        question: 'How is this different from just looking at my bestsellers?',
+        answer: 'A bestseller list tells you what sold most. ABC tells you where your profit is concentrated and, crucially, what proportion of the total each line represents — which is what lets you allocate attention proportionally. The cumulative percentage is the part that changes behaviour: discovering that eleven products carry three-quarters of your gross profit is a different piece of information from knowing which eleven products sold well, and it justifies treating them differently.'
+      },
+      {
+        question: 'How often should I redo it?',
+        answer: 'Quarterly is right for most retailers, and at any point your range changes materially. Monthly is unnecessary churn — classes do not move that quickly, and reclassifying constantly undermines the stable habits the exercise is meant to create. What is worth watching between full runs is movement across boundaries: a line climbing from B into A deserves a closer look at its reorder point, and an A line slipping is an early signal worth investigating before it becomes a dead stock problem.'
+      },
+      {
+        question: 'Can I run ABC on categories instead of products?',
+        answer: 'Yes, and it is a good way to start if your catalogue is large. Category-level analysis is quicker to produce, easier to interpret, and often reveals the bigger surprise — that a category everyone assumes is central contributes little, or that an unglamorous one carries the business. Use it to decide where to focus, then run product-level analysis inside the two or three categories that matter most, rather than across everything at once.'
+      },
+      {
+        question: 'What is the single most useful thing to do with the result?',
+        answer: 'Set proper reorder points on the A class and nothing else, at first. That is the highest-return action available and it is finishable in an afternoon: a small number of products, each given a calculated threshold instead of a shop-wide default. It directly reduces stockouts on the lines that generate most of your profit. Everything else the analysis suggests — counting cadence, buying approval, price review — is worth doing, and none of it pays back as fast.'
+      }
+    ],
+    content: `
+## Attention is the scarce resource
+
+You cannot manage two thousand products carefully. Nobody can. What actually happens in a shop with a large catalogue is that attention gets spread thinly and arbitrarily — you think hard about whatever caused a problem last week, and give equal consideration to a line generating a large share of your profit and one that sells twice a year.
+
+Meanwhile a small minority of your products carries nearly all of your gross profit. Those are the lines where a stockout is genuinely expensive, where a small pricing change moves real money, and where an inventory error costs the most.
+
+ABC analysis is the method for finding out which ones they are, and it takes an afternoon.
+
+---
+
+## The technique
+
+Rank every product by its annual contribution, run a cumulative total down the list, and cut it into three classes:
+
+- **A** — the lines making up roughly the first 80% of total contribution
+- **B** — the next 15%
+- **C** — the remaining 5%
+
+The proportions of *products* in each class are what surprise people. In most retail catalogues, the A class is a small fraction of the lines. Everything else is B and C.
+
+---
+
+## Rank by margin, not revenue
+
+This is the step that decides whether the analysis helps or misleads, and it is where most attempts go wrong.
+
+**Rank by gross profit contribution: units sold × margin per unit.**
+
+Ranking by revenue rewards volume regardless of what you keep. Consider two lines:
+
+| | Line X | Line Y |
+| --- | --- | --- |
+| Units sold in a year | 4,000 | 400 |
+| Margin per unit | 2 | 30 |
+| Revenue | High | Modest |
+| **Gross profit contribution** | **8,000** | **12,000** |
+
+By revenue, Line X looks like the more important product by a wide margin. By profit contribution, Line Y earns you half again as much. Rank by revenue and your analysis instructs you to protect availability, negotiate hard, and count weekly on your *thinnest-margin* products — the ones where a stockout costs you least per unit.
+
+This matters most in exactly the businesses that have the most products: supermarkets and general stores, where price-transparent staples dominate revenue while the profit sits somewhere less obvious. If your catalogue includes airtime, staple grains, or anything else customers price-check, the two rankings will look very different.
+
+Cost price on every product is therefore a precondition, not an optional refinement. Without it you can rank by revenue and not by profit, which is the wrong ranking.
+
+---
+
+## A worked example
+
+Ten products, ranked by annual gross profit contribution, total 4,000.
+
+| Rank | Contribution | Cumulative | Cumulative % | Class |
+| --- | --- | --- | --- | --- |
+| 1 | 1,400 | 1,400 | 35% | A |
+| 2 | 1,000 | 2,400 | 60% | A |
+| 3 | 800 | 3,200 | 80% | A |
+| 4 | 350 | 3,550 | 89% | B |
+| 5 | 250 | 3,800 | 95% | B |
+| 6 | 120 | 3,920 | 98% | C |
+| 7 | 40 | 3,960 | 99% | C |
+| 8 | 25 | 3,985 | 99.6% | C |
+| 9 | 10 | 3,995 | 99.9% | C |
+| 10 | 5 | 4,000 | 100% | C |
+
+Three products — 30% of the range — carry 80% of the gross profit. Five products, half the catalogue, contribute 5% between them.
+
+Read the bottom of that table carefully, because it contains the counterintuitive point. Product 10 contributes almost nothing measurable. It still probably belongs in your range. More on that below.
+
+With a real catalogue of hundreds or thousands of lines the concentration is usually sharper than this, and the exercise of seeing your own numbers laid out this way tends to be genuinely surprising — including which lines you assumed were central and are not.
+
+---
+
+## What you actually change
+
+An analysis that does not change behaviour is a spreadsheet. Four things change, per class.
+
+### Counting frequency
+
+A lines monthly, B quarterly, C twice a year. Errors on A lines are expensive and worth finding quickly; errors on C lines cost less than the labour of counting them often. This is also the natural way to build a cycle-count rotation, which our [stocktake checklist](/blog/retail-stocktake-checklist) covers as a method.
+
+### Reorder discipline
+
+A lines get a per-product reorder point, calculated from sales rate and supplier lead time, reviewed quarterly. C lines can inherit a rough default or be ordered on demand. Doing this properly for A lines only is the highest-return action available from an ABC analysis, and it is finishable in an afternoon — the arithmetic is in our [reorder points guide](/blog/retail-reorder-points).
+
+### Buying approval
+
+A large order on an A line deserves the owner's or a manager's attention. A large order on a C line is where dead stock comes from, and it usually happens because a supplier offered a discount and nobody senior looked at it. Requiring a second pair of eyes above a value threshold on non-A lines prevents most of it. Our post on [dead stock](/blog/dead-stock-trapped-cash) covers what that accumulation costs.
+
+### Stockout tolerance
+
+Protect A-line availability nearly absolutely. Accept that C lines will occasionally be unavailable and tell staff what to say. Trying to guarantee availability across an entire catalogue is how businesses end up with cash tied up everywhere and still out of stock on the things that matter.
+
+---
+
+## The C-class trap
+
+The most common mistake after a first ABC analysis is deciding to cut the C lines. It looks obviously correct — half the catalogue producing five percent of the profit, why hold it?
+
+Because contribution is measured per line, and some C lines are not there to contribute on their own. They are:
+
+- **Assortment.** The reason a customer chooses your shop over the one down the road is often that you have the odd thing they occasionally need. Remove enough of those and you lose the visit, not just the item.
+- **Attachments.** The small accessory bought alongside a large purchase. Its own margin is trivial; its absence can cost you the sale it was attached to.
+- **Range credibility.** A shop visibly missing obvious items reads as failing, and customers reduce their expectations accordingly.
+
+None of that shows up in a per-line contribution figure, and the analysis cannot warn you about it.
+
+So cut **depth, not breadth**. Stop holding three months of C-class stock. Order in small quantities, accept occasional gaps, stop spending management attention on it. Keep the range and stop funding it.
+
+The C lines genuinely worth removing are the ones failing on their own terms: no sales at all over a meaningful window, no assortment logic, no attachment role. That is a dead stock question rather than an ABC question.
+
+---
+
+## Running it
+
+**The quick version, worth doing first:** run it on categories rather than products. Fewer rows, quicker to interpret, and often the more revealing result — that a category everyone treats as central contributes little, or that an unglamorous one is carrying the business. Then go product-level inside the two or three categories that turn out to matter.
+
+**The inputs:** units sold over the last twelve months (or your best clean period), selling price, and cost price. Margin per unit is selling price minus cost price. Contribution is units sold times margin per unit.
+
+**In Zeneva:** margin analysis and inventory valuation both read from the cost price recorded on each product, so the ranking is available once that field is populated. Category breakdown gives you the quick version above. If you use Zen AI, asking which products contribute most to profit over the last year returns the ranking directly — but the answer is only as good as your cost prices, which is worth remembering before acting on it.
+
+**Cadence:** quarterly. Between runs, watch the boundaries — a line moving from B into A deserves a proper reorder point, and an A line slipping is an early warning worth investigating while it still has value.
+
+---
+
+## What a first pass should produce
+
+Not a filing document. Three concrete outputs:
+
+1. **A written list of your A lines.** Put it somewhere staff can see. A surprising amount of value comes simply from everyone knowing which products must never be out of stock.
+2. **Calculated reorder points on those lines.** One afternoon. This is where the return is.
+3. **One rule about buying non-A lines.** A value threshold above which someone else looks at the order.
+
+That is a realistic afternoon's work with effects that persist. The failure mode is producing a beautiful classification and changing nothing about how the shop is run — in which case the honest verdict is that you spent an afternoon confirming which products sell well.
+
+For the forecasting layer that sits on top of this, our guide to [predicting demand](/blog/product-demand-forecasting) covers reading the direction of travel rather than the current ranking.
+
+Margin analysis and category breakdown read straight from the cost prices you record, so the ranking above becomes a report you open rather than a spreadsheet you build — [see what each plan includes](/pricing).
+`
   }
 ];
 

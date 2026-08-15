@@ -3,6 +3,7 @@
 import { broadcastToAllDevices, sendNotificationToUser } from '@/lib/server/notifications';
 import { adminAuth } from '@/firebase/admin';
 import { requireSuperAdmin, requireUser } from './admin-guard';
+import { sendEmail } from '@/lib/server/resend';
 
 /**
  * Send the caller a test push.
@@ -178,6 +179,26 @@ export async function sendDirectUserPush(
             source: 'support',
             sentBy: admin.uid,
         });
+
+        // 2. Send Email Notification
+        try {
+            if (adminAuth) {
+                const targetUser = await adminAuth.getUser(targetUserId);
+                if (targetUser.email) {
+                    await sendEmail({
+                        to: targetUser.email,
+                        name: targetUser.displayName || 'Zeneva User',
+                        subject: payload.title,
+                        body: `<p style="font-size: 16px; color: #333;">${payload.body}</p><br><hr style="border-top: 1px solid #eaeaea; margin: 20px 0;"><p style="color: #666; font-size: 14px;">Reply to this email or log into your Zeneva account to continue the conversation.</p>`,
+                        from: 'Zeneva Support <support@zeneva.space>',
+                        replyTo: 'support@zeneva.space',
+                        type: 'support'
+                    });
+                }
+            }
+        } catch (emailErr) {
+            console.warn('Failed to send support email:', emailErr);
+        }
 
         return { success: true };
     } catch (error: any) {
